@@ -3,7 +3,7 @@
 @implements IFC-IB-021 ConfigurationSource.load / IFC-IB-022 resolve_project_config
             IFC-IB-023 validate_required（只报键名，不回显值）/ IFC-IB-024 GlobalConfig
 @depends MOD-IB-01
-@author sub_agent_software_developer
+@author software-developer
 
 配置装载与校验（module_design.md §3 MOD-IB-02）。
 

@@ -2,7 +2,7 @@
 @module MOD-IB-23
 @implements IFC-IB-250 鉴权注入点 / AC-IB-11-05（401/403 而非静默）
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-03, MOD-IB-04
-@author sub_agent_software_developer
+@author software-developer
 
 鉴权与请求上下文（MOD-IB-23 的**唯一鉴权入口**）。
 

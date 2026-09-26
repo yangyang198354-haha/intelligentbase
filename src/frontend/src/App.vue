@@ -2,7 +2,7 @@
 /**
  * @module MOD-IB-24
  * @implements IFC-IB-256 / 257 / 258 页面宿主与导航
- * @author sub_agent_software_developer
+ * @author software-developer
  *
  * 应用外壳：令牌输入 + 三个页面的切换。
  *

@@ -3,7 +3,7 @@
 @implements IFC-IB-051 DocumentParser.supports / IFC-IB-052 DocumentParser.parse
             IFC-IB-053 registry.register（**新增格式不改主动线**）
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-04
-@author sub_agent_software_developer
+@author software-developer
 
 解析器注册表与格式分派（module_design.md §3 MOD-IB-05 / ADR-06 / ADR-12）。
 

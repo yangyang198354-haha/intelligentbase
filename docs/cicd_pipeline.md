@@ -5,7 +5,7 @@
 |------|-----|
 | 文档 ID | DOC-IB-CICD-001 |
 | 标题 | intelligentbase 智能知识库基座 —— CI/CD 流水线定义 |
-| 产出代理 | sub_agent_devops_engineer (author_agent) |
+| 产出代理 | devops-engineer (author_agent) |
 | 调用 ID | INV-GROUP_E-INTELBASE-002 |
 | 项目 | intelligentbase |
 | 阶段 | GROUP_E / PHASE_10（部署计划配套；**仅定义，不执行**） |

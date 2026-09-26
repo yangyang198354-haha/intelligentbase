@@ -7,7 +7,7 @@
   <revision>R2</revision>
   <status>DRAFT_FOR_GATE_REVIEW</status>
   <phase>GROUP_B / PHASE_04 模块详细设计（R2 增量：L-03）</phase>
-  <author>sub_agent_system_architect</author>
+  <author>system-architect</author>
   <invocation_id>INV-GROUP_B-INTELBASE-003</invocation_id>
   <created_at>2026-09-26</created_at>
   <owns>MOD-IB-26 ib-embed 常驻 embedding 推理服务</owns>

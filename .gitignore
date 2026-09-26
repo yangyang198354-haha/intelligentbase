@@ -32,5 +32,7 @@ Thumbs.db
 htmlcov/
 .groupd_blobs/
 
-# Claude Code agent-internal state (KB distillation, machine-local)
-.claude/
+# Claude Code: version sub-agent definitions; ignore machine-local KB state
+.claude/*
+!.claude/agents/
+.claude/agents/knowledge_base/

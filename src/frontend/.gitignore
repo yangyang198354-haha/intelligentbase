@@ -1,5 +1,5 @@
 # @module MOD-IB-24
-# @author sub_agent_software_developer
+# @author software-developer
 #
 # 构建产物与依赖不入库：
 #   node_modules/ 体积大且可用 `npm ci` 复现（版本由 package.json 锁定）；

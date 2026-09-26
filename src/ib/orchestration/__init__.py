@@ -5,7 +5,7 @@
             载荷类型化与「空即不发」纪律属 IFC-IB-282 / MOD-IB-21）
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-03, MOD-IB-04, MOD-IB-16, MOD-IB-17,
          MOD-IB-18, MOD-IB-19, MOD-IB-20, MOD-IB-21
-@author sub_agent_software_developer
+@author software-developer
 
 编排图（module_design.md §3 MOD-IB-22 / §7.1 图结构 / §7.2 四级路由；ADR-09 / ADR-11-R1；
 REQ-FUNC-IB-18/19/20/21；AC-IB-09-01~07、AC-IB-11-06）。

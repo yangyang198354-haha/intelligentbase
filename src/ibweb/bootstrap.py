@@ -2,7 +2,7 @@
 @module MOD-IB-23
 @implements IFC-IB-263 启动期 schema 初始化（systemd `ExecStartPre` 调用）
 @depends MOD-IB-11（schema DDL 单一真源）
-@author sub_agent_software_developer
+@author software-developer
 
 启动前 bootstrap：`python -m ibweb.bootstrap --ensure-schema`。
 

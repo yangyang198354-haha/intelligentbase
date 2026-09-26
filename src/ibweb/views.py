@@ -3,7 +3,7 @@
 @implements IFC-IB-242 ~ IFC-IB-249（HTTP 端点）
             IFC-IB-283（R2）`GET /api/files/{doc_id}/images/{image_id}` 页面图字节
 @depends MOD-IB-23（authz/composition/serializers/sse）, MOD-IB-11/12/13/14/15/22（服务）
-@author sub_agent_software_developer
+@author software-developer
 
 HTTP 端点（MOD-IB-23 的对外面）。本模块**只做三件事**：
 

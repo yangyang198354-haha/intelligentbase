@@ -2,7 +2,7 @@
 @module MOD-IB-17
 @implements IFC-IB-181 register_tool / 182 build_capability_digest / 183 bind_scope
 @depends MOD-IB-01, MOD-IB-15, MOD-IB-16
-@author sub_agent_software_developer
+@author software-developer
 
 工具注册与能力摘要（module_design.md §3 MOD-IB-17；ADR-09；REQ-FUNC-IB-03/17/23）。
 

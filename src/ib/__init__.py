@@ -2,7 +2,7 @@
 @module MOD-IB-01..MOD-IB-22
 @implements (package root; see sub-modules)
 @depends (none)
-@author sub_agent_software_developer
+@author software-developer
 
 intelligentbase —— 通用 RAG + 多智能体可复用基座（reusable base library）。
 

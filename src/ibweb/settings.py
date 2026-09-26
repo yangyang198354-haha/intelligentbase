@@ -2,7 +2,7 @@
 @module MOD-IB-23
 @implements 收窄 Django 配置（REQ-NFR-IB-09；module_design §2.1.1 载体映射）
 @depends (stdlib + django)
-@author sub_agent_software_developer
+@author software-developer
 
 **收窄配置**：只启用「承载 HTTP」所必需的部分。
 

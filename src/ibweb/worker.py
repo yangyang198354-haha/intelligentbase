@@ -2,7 +2,7 @@
 @module MOD-IB-23
 @implements IFC-IB-261 `ib-worker` 单元的入口（入库队列 + 重建推进）
 @depends MOD-IB-23（composition）, MOD-IB-13（lifecycle）, MOD-IB-14（rebuild）
-@author sub_agent_software_developer
+@author software-developer
 
 后台 worker 入口：`python -m ibweb.worker [--once]`。
 

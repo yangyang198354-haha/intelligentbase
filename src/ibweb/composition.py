@@ -3,7 +3,7 @@
 @implements IFC-IB-241 build_application / build_deps（组合根，module_design §5）
             R2：`related_images` 提供者（命中 → 页面图）在 `orchestrator_for` 内闭包注入
 @depends MOD-IB-01 ~ MOD-IB-22
-@author sub_agent_software_developer
+@author software-developer
 
 **唯一装配点**（module_design §5 的组合根装配表在本文件的 `build_deps` 里逐行兑现）。
 

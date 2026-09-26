@@ -2,7 +2,7 @@
 /**
  * @module MOD-IB-24
  * @implements IFC-IB-256（消费 IFC-IB-242 列表 / 243 上传 / 244 删除 / 245 重试）
- * @author sub_agent_software_developer
+ * @author software-developer
  *
  * 资料管理页：上传、列表、删除、失败重试。
  *

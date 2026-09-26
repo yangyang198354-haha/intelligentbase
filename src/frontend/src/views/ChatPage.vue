@@ -3,7 +3,7 @@
  * @module MOD-IB-24
  * @implements IFC-IB-257（消费 IFC-IB-247：SSE 问答流；渲染 content / degraded）
  *             IFC-IB-284（R2）`related_images` 缩略图行（该轮回答**下方**；点击经 IFC-IB-283 取原图）
- * @author sub_agent_software_developer
+ * @author software-developer
  *
  * 知识问答页。
  *

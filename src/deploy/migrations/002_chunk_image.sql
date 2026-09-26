@@ -1,7 +1,7 @@
 -- ---------------------------------------------------------------------------
 -- @module MOD-IB-25 / MOD-IB-11
 -- @implements 手写 scoped 迁移（002）：页面图 ↔ 文块关联表（R2 / M-02 / IFC-IB-278~279）
--- @author sub_agent_software_developer
+-- @author software-developer
 --
 -- 由 `ib/ledger/schema.py::ddl_script()` 中 **R2 新增的那三条 DDL 语句** 原样摘录
 -- （单一真源不变；本文件只是「可人工审阅的增量快照」）。生成命令：

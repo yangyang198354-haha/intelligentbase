@@ -1,6 +1,6 @@
 # @module MOD-IB-25
 # @implements IFC-IB-261 systemd 单元之一：ib-embed（bge-m3 常驻 embedding 服务）
-# @author sub_agent_software_developer
+# @author software-developer
 #
 # Embedding 常驻服务单元。**本文件是交付物，不由此代理安装到目标机。**
 #

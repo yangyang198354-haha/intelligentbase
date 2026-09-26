@@ -192,8 +192,8 @@ GR-D-003 门控「148=148+0+0+0」）。CI 成功标准仍挂在 R3 数字上。
 
 ### F-4（INFO）—— 新增 src 交付物的作者归属
 
-`src/deploy/ib-worker.env.example` 头部 `@author sub_agent_devops_engineer (R4 修订…)`，
-与同目录其余模板的 `@author sub_agent_software_developer` 不同。因该文件系 devops 在
+`src/deploy/ib-worker.env.example` 头部 `@author devops-engineer (R4 修订…)`，
+与同目录其余模板的 `@author software-developer` 不同。因该文件系 devops 在
 C-03 授权下**新增**，如实署名**恰当**；仅记录与既有模式的差异，供 module_design §5 键名契约
 （§7.6 声明「新增键须先回设计文档评审」）对账时留意 —— 本次**未新增/改名任何键**，故无契约违背。
 

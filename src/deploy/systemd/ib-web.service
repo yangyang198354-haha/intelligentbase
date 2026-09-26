@@ -1,6 +1,6 @@
 # @module MOD-IB-25
 # @implements IFC-IB-261 systemd 单元之一：ib-web（WSGI 载体）；IFC-IB-263 启动期校验
-# @author sub_agent_software_developer
+# @author software-developer
 #
 # Web 服务单元（Django + Waitress）。**本文件是交付物，不由此代理安装到目标机。**
 #

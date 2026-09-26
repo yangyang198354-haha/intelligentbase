@@ -2,7 +2,7 @@
 @module MOD-IB-18
 @implements IFC-IB-191 score_experts / 192 decide / 193 SemanticRouter.route
 @depends MOD-IB-01, MOD-IB-09, MOD-IB-16
-@author sub_agent_software_developer
+@author software-developer
 
 语义路由（module_design.md §3 MOD-IB-18 / §7.2 的 L1 层；REQ-FUNC-IB-19）。
 

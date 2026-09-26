@@ -7,7 +7,7 @@
             IFC-IB-130 assert_kb_in_project / 131 list_chunks + list_orphan_doc_ids
             （IFC-IB-131 组内扩展）upsert_chunks —— 见 deviation D-07
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-04
-@author sub_agent_software_developer
+@author software-developer
 
 台账（module_design.md §3 MOD-IB-11 / §6 / ADR-10）。
 

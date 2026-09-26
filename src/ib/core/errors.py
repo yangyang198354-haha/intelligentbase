@@ -3,7 +3,7 @@
 @implements IFC-IB-012 (异常类型层次 IbError -> ConfigError / ScopeViolationError /
                        DependencyUnavailableError / ValidationError)
 @depends (none)
-@author sub_agent_software_developer
+@author software-developer
 
 异常层次。**framework-free**：仅使用 stdlib。
 

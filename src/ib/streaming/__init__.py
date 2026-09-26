@@ -4,7 +4,7 @@
             IFC-IB-224 StreamEvent / 225 to_sse
             IFC-IB-282（R2）`related_images` 事件的**载荷类型化**（RelatedImagesPayload）
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-04
-@author sub_agent_software_developer
+@author software-developer
 
 流式契约与会话状态（module_design.md §3 MOD-IB-21；ADR-11-R1；REQ-FUNC-IB-20/21；
 AC-IB-14-01）。

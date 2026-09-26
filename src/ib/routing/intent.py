@@ -2,7 +2,7 @@
 @module MOD-IB-19
 @implements IFC-IB-201 classify_experts / 202 parse_route_output / 203 guard_against_misroute
 @depends MOD-IB-01, MOD-IB-16, MOD-IB-17, MOD-IB-18
-@author sub_agent_software_developer
+@author software-developer
 
 意图路由内核（module_design.md §3 MOD-IB-19 / §7.2 四级降级表；REQ-FUNC-IB-19；
 AC-IB-09-04/05/06/07、AC-IB-15-03）。

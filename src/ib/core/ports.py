@@ -3,7 +3,7 @@
 @implements 13 个端口 Protocol（IFC-IB-021~022 / 032~033 / 051~053 / 061~063 / 071 /
             081~082 / 090~096 / 098 / 100~110 / 120~131 / 131~134 / 211~215 / 221~223）
 @depends (none)
-@author sub_agent_software_developer
+@author software-developer
 
 **全部端口的唯一定义处**（module_design.md §2：「类型化契约与端口（定义于 MOD-IB-01）」）。
 各端口的「契约段落」落在 `module_design.md §3` 对应 MOD 小节，见各方法 docstring 标注。

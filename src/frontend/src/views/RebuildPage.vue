@@ -2,7 +2,7 @@
 /**
  * @module MOD-IB-24
  * @implements IFC-IB-258（消费 IFC-IB-246：启动重建 + 查询进度）
- * @author sub_agent_software_developer
+ * @author software-developer
  *
  * 索引重建页。
  *

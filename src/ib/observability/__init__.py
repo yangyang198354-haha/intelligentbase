@@ -3,7 +3,7 @@
 @implements IFC-IB-041 get_logger / IFC-IB-042 log_event / IFC-IB-043 Timer
             IFC-IB-044 emit_degrade / IFC-IB-045 redact
 @depends MOD-IB-01
-@author sub_agent_software_developer
+@author software-developer
 
 可观测性（module_design.md §3 MOD-IB-04 / architecture §7.2）。
 

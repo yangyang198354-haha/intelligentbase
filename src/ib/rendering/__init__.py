@@ -2,7 +2,7 @@
 @module MOD-IB-08
 @implements IFC-IB-081 available / IFC-IB-082 render_page
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-04
-@author sub_agent_software_developer
+@author software-developer
 
 页面渲染端口与 pypdfium2 适配（module_design.md §3 MOD-IB-08 / ADR-06 / ADR-12）。
 

@@ -3,7 +3,7 @@
 @implements IFC-IB-031 RequestContext / IFC-IB-032 can_manage / IFC-IB-033 can_query
             IFC-IB-034 DenyAllPolicy（默认拒绝；未注入即启动失败）
 @depends MOD-IB-01
-@author sub_agent_software_developer
+@author software-developer
 
 请求上下文与鉴权端口（module_design.md §3 MOD-IB-03）。
 

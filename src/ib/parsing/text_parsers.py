@@ -2,7 +2,7 @@
 @module MOD-IB-05（实现细节）
 @implements IFC-IB-051, IFC-IB-052 —— txt / md / docx 三个解析器
 @depends MOD-IB-01, MOD-IB-04, MOD-IB-05（包内注册表）
-@author sub_agent_software_developer
+@author software-developer
 
 纯文本 / Markdown / DOCX 解析器。
 

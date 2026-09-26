@@ -6,7 +6,7 @@
             IFC-IB-280 process_pending R2 步骤扩展（七步 → 九步）
             IFC-IB-281 delete_document 零改动不变式（关联行按 scope 级联删除）
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-03, MOD-IB-04, MOD-IB-05, MOD-IB-07, MOD-IB-09, MOD-IB-10, MOD-IB-11, MOD-IB-12
-@author sub_agent_software_developer
+@author software-developer
 
 文档生命周期（module_design.md §3 MOD-IB-13 / §6 / ADR-07）。
 

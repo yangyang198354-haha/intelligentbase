@@ -4,7 +4,7 @@
             IFC-IB-175 fallback_prompts / 176 data_experts / 177 delegating_experts
             IFC-IB-178 default_expert / 179 get
 @depends MOD-IB-01
-@author sub_agent_software_developer
+@author software-developer
 
 专家注册表（module_design.md §3 MOD-IB-16；REQ-FUNC-IB-02；REQ-NFR-IB-01）。
 

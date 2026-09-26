@@ -5,7 +5,7 @@
             IFC-IB-107 delete_by_scope / 108 count / 109 health / 110 flush
             （扩展位）supports_hybrid_search -> False，**显式声明不支持**而非静默失败
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-04
-@author sub_agent_software_developer
+@author software-developer
 
 VectorStore 端口与适配（module_design.md §3 MOD-IB-10 / ADR-01）。
 

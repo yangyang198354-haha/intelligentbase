@@ -2,7 +2,7 @@
 @module MOD-IB-07
 @implements IFC-IB-071 Chunker.split
 @depends MOD-IB-01, MOD-IB-02
-@author sub_agent_software_developer
+@author software-developer
 
 切分器（module_design.md §3 MOD-IB-07）。
 

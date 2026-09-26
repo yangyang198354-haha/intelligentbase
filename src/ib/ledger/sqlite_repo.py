@@ -2,7 +2,7 @@
 @module MOD-IB-11（生产实现）
 @implements IFC-IB-120~131 + RebuildJobStore（SQLite 落地）
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-04, MOD-IB-11（schema / 状态机）
-@author sub_agent_software_developer
+@author software-developer
 
 SQLite 台账（ADR-10；tech_stack §3）。
 

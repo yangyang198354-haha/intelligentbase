@@ -3,7 +3,7 @@
 @implements IFC-IB-274（服务端配置键清单，键名与默认值）
             IFC-IB-267（维度三方一致性中的「服务端启动期交叉校验」一侧）
 @depends —
-@author sub_agent_software_developer
+@author software-developer
 
 `ib-embed` 服务端配置（**仅** `IB_EMBED_*` 的 11 个键；见 docs/ib_embed_service_contract.md §9）。
 

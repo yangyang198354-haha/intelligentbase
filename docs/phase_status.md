@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phase_status project="intelligentbase" flow_mode="PARTIAL_FLOW" start_group="GROUP_A" end_group="GROUP_E" updated_at="2026-09-26T10:05:00Z" orchestrator="main_agent_pm">
+<phase_status project="intelligentbase" flow_mode="PARTIAL_FLOW" start_group="GROUP_A" end_group="GROUP_E" updated_at="2026-09-26T10:05:00Z" orchestrator="pm-orchestrator">
 
   <!--
     intelligentbase — 通用 RAG + 多智能体可复用基础架构
@@ -22,16 +22,16 @@
   <group id="GROUP_A" status="APPROVED" gate_decision="PASS">
     <phase id="PHASE_01" name="需求规格" status="APPROVED"
       output_file="docs/requirements_spec.md"
-      assigned_agent="sub_agent_requirement_analyst"
+      assigned_agent="requirement-analyst"
       version="1.1.0"
       invocation_id="INV-GROUP_A-INTELBASE-001"/>
     <phase id="PHASE_02" name="用户故事" status="APPROVED"
       output_file="docs/user_stories.md"
-      assigned_agent="sub_agent_requirement_analyst"
+      assigned_agent="requirement-analyst"
       version="1.1.0"
       invocation_id="INV-GROUP_A-INTELBASE-001"/>
 
-    <gate_review id="GR-A-001" decision="PASS_WITH_CONDITIONS" reviewer="main_agent_pm"
+    <gate_review id="GR-A-001" decision="PASS_WITH_CONDITIONS" reviewer="pm-orchestrator"
       time="2026-09-25T00:00:00Z" retry_count="0"
       finding_1="所有需求有来源引用 — SATISFIED：§7.1 追溯矩阵覆盖 REQ-FUNC-IB-01~24 全部条目；PM 亲自抽验 FreeArk 锚点行号（models_rag.py:101 embedding=BinaryField、orchestrator.py:72 MAX_EXPERT_STEPS=8、settings.py:699 RAG_EMBEDDING_MODEL 默认 BAAI/bge-m3、views_rag.py:47 ALLOWED_EXTENSIONS），逐条命中真实代码"
       finding_2="AC 用 Given/When/Then — SATISFIED：15 条用户故事共 72 组验收标准，逐组核对为 G/W/T 三段式，无例外"
@@ -54,21 +54,21 @@
   <group id="GROUP_B" status="APPROVED" gate_decision="R2_PASS（GR-B-003，基于 v1.2.0 R2；GR-B-002 继续有效）">
     <phase id="PHASE_03" name="系统架构设计" status="APPROVED"
       output_file="docs/architecture_design.md"
-      assigned_agent="sub_agent_system_architect"
+      assigned_agent="system-architect"
       version="1.2.0" revision="R2"
       invocation_id="INV-GROUP_B-INTELBASE-004"/>
     <phase id="PHASE_04" name="模块详细设计" status="APPROVED"
       output_file="docs/module_design.md"
-      assigned_agent="sub_agent_system_architect"
+      assigned_agent="system-architect"
       version="1.2.0" revision="R2"
       invocation_id="INV-GROUP_B-INTELBASE-004"/>
     <phase id="PHASE_04b" name="技术选型" status="APPROVED"
       output_file="docs/tech_stack.md"
-      assigned_agent="sub_agent_system_architect"
+      assigned_agent="system-architect"
       version="1.2.0" revision="R2"
       invocation_id="INV-GROUP_B-INTELBASE-004"/>
 
-    <gate_review id="GR-B-001" decision="PASS_WITH_CONDITIONS" reviewer="main_agent_pm"
+    <gate_review id="GR-B-001" decision="PASS_WITH_CONDITIONS" reviewer="pm-orchestrator"
       time="2026-09-25T00:00:00Z" retry_count="0"
       finding_1="所有 REQ-FUNC-IB-01~24 被模块覆盖 — SATISFIED：module_design.md §9.1 覆盖矩阵 24/24，每条 REQ 均标出『主』模块（如 IB-01→MOD-IB-02、IB-11→MOD-IB-06+08、IB-23→MOD-IB-03、IB-24→MOD-IB-14），无缺口；§9.2 另列 14 条 NFR 的覆盖模块"
       finding_2="无循环依赖 — SATISFIED：§4.1 给出 25 模块的完整依赖边清单；§4.2 为构造性无环证明（按模块编号赋权 w(MOD-IB-n)=n，逐边满足 w(A)>w(B)，环则权值矛盾），并单列三处『看似成环』（13↔05/07、14→13、22↔15）的化解方式；§4.3 分层视图声明『跨层反向依赖一律经端口注入』"
@@ -83,7 +83,7 @@
       open_item_2="[待用户确认 — ARCH-ASSUMPTION-A4] 目标机 CPU 架构 x86_64 vs aarch64：影响 Qdrant .deb / pypdfium2 / onnxruntime 的 wheel 可得性。部署前须实测确认"
       open_item_3="[待用户一行确认] OQ-IB-01 原始文件是否持久化（架构默认 ON，为 DR-07 索引重建前置）"/>
 
-    <gate_review id="GR-B-002" decision="PASS" reviewer="main_agent_pm"
+    <gate_review id="GR-B-002" decision="PASS" reviewer="pm-orchestrator"
       time="2026-09-25T00:00:00Z" retry_count="0" supersedes="GR-B-001" basis="REV-01（框架切换 FastAPI→Django）后重跑"/>
       finding_1="24 条 REQ-FUNC 全覆盖 — SATISFIED：module_design.md §9.1 覆盖矩阵仍为 24/24（框架切换未改任何主/辅覆盖模块）；§9.3 R1 再声明『24/24 REQ-FUNC + 14 REQ-NFR 覆盖不变、无新增缺口』，并逐条说明 REQ-FUNC-IB-05/06/09/21/23 主覆盖模块未变（仅内部载体改 Django）"
       finding_2="无循环依赖 — SATISFIED：module_design.md §4.1 依赖边清单零改动（仅 MOD-IB-23 外部依赖载体 fastapi/uvicorn → django/djangorestframework/waitress/gunicorn 替换，非模块间边）；§4.2 构造性无环证明（w(MOD-IB-n)=n 严格递减）继续成立；§4.2.1 R1 再声明『DAG 拓扑不变、载体映射不引入新模块/新依赖边』"
@@ -99,7 +99,7 @@
 
     <followup_note>R1 修订后重跑门控 GR-B-002：门控六项（24 REQ 全覆盖 / 无环 / ADR≥2 方案 / 接口类型化 / 许可合规 / 凭据安全）+ REV-01 五项闭合 + 上轮 MINOR 闭环，全部 SATISFIED，无残留 finding，故判 PASS（较 GR-B-001 的 PASS_WITH_CONDITIONS 收敛）。依据用户指令，门控通过后暂停回报（改动点摘要 + 新门控结论 + 流式方案最终结论），等最终授权再进 GROUP_C。</followup_note>
 
-    <gate_review id="GR-B-003" decision="PASS" reviewer="main_agent_pm"
+    <gate_review id="GR-B-003" decision="PASS" reviewer="pm-orchestrator"
       time="2026-09-26T00:00:00Z" retry_count="0" basis="REV-02（L-03 ib-embed 纳入基座）增量评审；GR-B-002 继续有效，本条不整体取代"/>
       finding_1="需求覆盖无缺口（增量）— SATISFIED：module_design.md §9.4 R2 覆盖率再声明『24/24 REQ-FUNC + 14 REQ-NFR 不变、无新增缺口』；§9.1 IB-15 行更新为『MOD-IB-09, MOD-IB-26 / 10』；M-02 明确落在 REQ-FUNC-IB-10/11/14/17 既有语义内、只增辅覆盖，不新增 REQ 条目。PM 抽验 §9.1/§9.2 行改动已生效"
       finding_2="无循环依赖（增量）— SATISFIED：§1 计数改 26；§1 总览新增 MOD-IB-26 行（依赖 01,02,04）；§4.1 新增单边『MOD-IB-26 → 01,02,04』；§4.2 R2 补句给出权值校验 w(26)=26 > max{w(01),w(02),w(04)}=4 且 26 无入边。**PM 独立 grep 核验**：MOD-IB-26 仅出现在 §1 总览、§3 小节标题、§4.1 新边、§4.3 层视图、§5/§7.4/§9 覆盖列与禁止性表述（『不 import MOD-IB-26』），**无任何模块把 26 列入其依赖列** → 26 结构性无入边，DAG 仍无环"
@@ -171,21 +171,21 @@
     <comment>R4 为缺陷修复轮：改动面 = ib/blob/__init__.py（新增 kb_segment 单一真源）、ib/lifecycle/__init__.py（_blob_scope_of + 删除第 2 步改用台账派生 scope）、src/requirements-embed.txt（新增）、.gitignore（权重忽略规则）。未增删模块，src/ 仍 76 文件。</comment>
     <phase id="PHASE_05" name="实现计划" status="APPROVED"
       output_file="docs/implementation_plan.md"
-      assigned_agent="sub_agent_software_developer"
+      assigned_agent="software-developer"
       version="2.2.0" revision="R4"
       invocation_id="INV-GROUP_C-INTELBASE-002" r3_invocation_id="INV-GROUP_C-INTELBASE-003" r4_invocation_id="INV-GROUP_C-INTELBASE-004"/>
     <phase id="PHASE_06" name="代码实现" status="APPROVED"
       output_file="src/（R4 改动：ib/blob/__init__.py、ib/lifecycle/__init__.py、requirements-embed.txt（新增）、.gitignore）"
-      assigned_agent="sub_agent_software_developer"
+      assigned_agent="software-developer"
       version="2.2.0" revision="R4"
       invocation_id="INV-GROUP_C-INTELBASE-002" r3_invocation_id="INV-GROUP_C-INTELBASE-003" r4_invocation_id="INV-GROUP_C-INTELBASE-004"/>
     <phase id="PHASE_06b" name="自我代码评审" status="APPROVED"
       output_file="docs/code_review_report.md"
-      assigned_agent="sub_agent_software_developer"
+      assigned_agent="software-developer"
       version="2.2.0" revision="R4（§11 R4 增量评审）"
       invocation_id="INV-GROUP_C-INTELBASE-002" r3_invocation_id="INV-GROUP_C-INTELBASE-003" r4_invocation_id="INV-GROUP_C-INTELBASE-004"/>
 
-    <gate_review id="GR-C-001" decision="PASS_WITH_CONDITIONS" reviewer="main_agent_pm"
+    <gate_review id="GR-C-001" decision="PASS_WITH_CONDITIONS" reviewer="pm-orchestrator"
       time="2026-09-26T00:00:00Z" retry_count="0"/>
       finding_1="所有模块已实现（25/25）— SATISFIED：PM 独立 Glob 核验 src/ 文件树，ib/{core,config,context,observability,parsing,ocr,chunking,rendering,embedding,vectorstore,ledger,blob,lifecycle,rebuild,retrieval,experts,tools,routing,llm,streaming,orchestration} 对应 MOD-IB-01~22，ibweb/=MOD-IB-23、frontend/=MOD-IB-24、deploy/=MOD-IB-25，无缺模块；implementation_plan.md §2 给出 69 文件/16,396 行与 MOD 映射"
       finding_2="code_review 无 CRITICAL — SATISFIED：code_review_report.md §1.3 统计 CRITICAL 4 发现/4 修复/0 遗留；§4 明列『未解决 CRITICAL = 0』。PM 抽验其自述的 4 个 CRITICAL 之一的去重修复 FND-IB-21-001：grep 确认 StreamEvent 仅在 ib/core/types.py:629 定义一次、ib/streaming/__init__.py:87 以别名 `StreamEvent = _CoreStreamEvent` 引用，无重复类定义（与报告一致）"
@@ -204,7 +204,7 @@
 
     <followup_note>GROUP_C 门控 GR-C-001：两项 PASS 标准（25 模块全部实现 / code_review 无 CRITICAL）均 SATISFIED；PM 独立复核了模块完整性、CRITICAL 归零、冻结架构约束（禁 PyMuPDF / 禁 FastAPI-channels-redis / langchain-openai pin）、IC-IB-01、?token= 拒绝与凭据安全，全部一致。遗留为 3 MAJOR（L-01/L-02 本机不可验证、L-03 ib-embed 归属未定）+ 2 MINOR（M-01 内存会话、M-02 related_images 无生产端），均**非设计缺陷**且不阻塞 GROUP_D，故判 PASS_WITH_CONDITIONS。依据用户指令，门控通过后暂停回报（实现计划路径 + 代码结构摘要 + 自评结论 + 已消化 P1 决定清单），等 GROUP_D 授权再继续。</followup_note>
 
-    <gate_review id="GR-C-002" decision="PASS" reviewer="main_agent_pm"
+    <gate_review id="GR-C-002" decision="PASS" reviewer="pm-orchestrator"
       time="2026-09-26T00:00:00Z" retry_count="0" scope="GROUP_C R2 增量（REV-02 实现侧：L-03 + M-02）"/>
       finding_1="所有模块已实现（26/26，含 R2 新增 MOD-IB-26）— SATISFIED：PM 独立 Glob/Grep 核验 src/ 共 76 文件；R2 新增 ib_embed/{__init__,config,runtime,server}.py（MOD-IB-26）+ ib/embedding/inproc.py（IFC-IB-275）+ deploy/ib-embed.env.example（IFC-IB-286）+ deploy/migrations/002_chunk_image.sql（手写 scoped DDL）；IB_EMBED_BACKEND 值域 {http,inproc,fake} 且 ib/embedding/build_embedder 三形态分派在位"
       finding_2="code_review 无 CRITICAL — SATISFIED：code_review_report.md §9.3 统计 R2 CRITICAL 3 发现/3 修复/0 遗留（FND-R2-01 inproc 导入期硬依赖 / FND-R2-02 图片 Content-Type 用 mimetypes 读 Windows 注册表 / FND-R2-03 upsert_chunk_images 只 INSERT OR REPLACE 留孤儿行），§9.11 结论『R2 自评 SUCCESS』；PM 抽验 FND-R2-01 修复：inproc.py 全部第三方 import 在函数体内（_build 惰性），模块顶层仅 stdlib，缺库经 DependencyUnavailableError 承载 —— 与报告一致"
@@ -225,7 +225,7 @@
 
     <followup_note id="GR-C-002">GROUP_C R2 增量门控 GR-C-002：两项 PASS 标准（26/26 模块已实现 / code_review 无 CRITICAL）均 SATISFIED；REV-02 实现侧（L-03 + M-02）闭合，R1 遗留 L-03/M-02 关闭且**零回归**；冻结架构约束（禁 Docker/PyMuPDF/Channels/Redis、langchain-openai pin、framework-free 核心）、IC-IB-01、?token= 拒绝、凭据安全、契约纪律（IFC-IB-001~265 未改/端口仍 13/MOD-IB-26 零入边）全部经 PM 亲自复核 + 独立 verifier 复跑一致。遗留 2 MAJOR（D-R2-01/D-R2-02，均『本机不可验证/上游裁决』类，已给决策与理由）+ 5 项本地不可验证登记，**均非设计缺陷**且不阻塞 GROUP_D，故判 PASS。依据用户授权（REV-02 指令：完成 L-03/M-02 增补后进入 GROUP_D），本门控通过后**不再暂停**，直接编排 GROUP_D（PHASE_07 测试计划 → PHASE_08 测试执行+报告 → PHASE_09 测试用例实现）；GROUP_E 部署继续冻结。</followup_note>
 
-    <gate_review id="GR-C-003" decision="PASS_WITH_CONDITIONS" reviewer="main_agent_pm"
+    <gate_review id="GR-C-003" decision="PASS_WITH_CONDITIONS" reviewer="pm-orchestrator"
       time="2026-09-26T00:00:00Z" retry_count="0" scope="GROUP_C R3 增量（PHASE_05/06/06b，INV-GROUP_C-INTELBASE-003）"
       finding_1="所有模块已实现（26/26）— SATISFIED：R3 为修订轮，未增删模块；PM 复核 implementation_plan.md v2.1.0 §13 与 src/ 与 MOD-IB-01~26 映射不变"
       finding_2="code_review 无 CRITICAL — SATISFIED：code_review_report.md §10 R3 自评 5 维（Correctness 9.0 / Security 9.3 / Performance 8.9 / Maintainability 9.1 / TestCoverage 8.8）无 CRITICAL；新登记 MINOR FND-R3-03 与偏差 D-R3-01 均非 CRITICAL"
@@ -242,7 +242,7 @@
     />
     <followup_note id="GR-C-003">GROUP_C R3 增量门控 GR-C-003：两项 PASS 标准（26/26 模块已实现 / code_review 无 CRITICAL）均 SATISFIED，故**不判 FAIL**；R3 两缺陷的修复经**独立 verifier 亲自复跑 + 突变测试 + 反例验证**证实（未采信 developer 自述），且三翻转用例被证明为载荷性守卫。因 GROUP_D 轮次新发现 FND-GROUP-D-03（MAJOR，生产 HTTP 删除路径 blob 孤儿；非 R3 引入）且其涉隐私/保留，故判 **PASS_WITH_CONDITIONS**（该 MAJOR 按判据字面不构成 GROUP_C 的 FAIL 条件，但应阻塞 PHASE_11）。GR-C-001/GR-C-002 继续有效。依据用户指令（REV-03：R3 修复后进入 GROUP_E 计划，PHASE_11 须另获 PRODUCTION_DEPLOY_CONFIRM），本门控通过后**不暂停**，继续编排出 GROUP_D R3 增量门控。</followup_note>
 
-    <gate_review id="GR-C-004" decision="PASS" reviewer="main_agent_pm"
+    <gate_review id="GR-C-004" decision="PASS" reviewer="pm-orchestrator"
       time="2026-09-26T09:30:00Z" retry_count="0" scope="GROUP_C R4 增量（PHASE_05/06/06b，INV-GROUP_C-INTELBASE-004；FND-GROUP-D-03 修复 + B-05 依赖清单补齐）"
       finding_1="所有模块已实现（26/26）— SATISFIED：R4 为缺陷修复轮，未增删模块；PM 复核 implementation_plan.md v2.2.0 §14 与 src/ 的 MOD-IB-01~26 映射不变（src/ 仍 76 文件，仅 2 文件内改动 + 1 个新增依赖清单 + .gitignore）"
       finding_2="code_review 无 CRITICAL — SATISFIED：code_review_report.md §11 R4 增量自评无 CRITICAL；新增登记均为文档口径/覆盖边界类 MINOR，无 CRITICAL"
@@ -263,21 +263,21 @@
   <group id="GROUP_D" status="APPROVED" gate_decision="PASS_WITH_CONDITIONS（GR-D-001 + GR-D-002 + GR-D-003 R4 回归增量；GR-D-002 的 blob 覆盖缺口条件已闭合）">
     <phase id="PHASE_07" name="测试计划" status="APPROVED"
       output_file="docs/test_plan.md"
-      assigned_agent="sub_agent_test_engineer"
+      assigned_agent="test-engineer"
       version="1.2.0（R4 增量：§3/§4 覆盖矩阵更新 + §10 R4 回归节 + 计数 142→148）"
       invocation_id="INV-GROUP_D-INTELBASE-001" r3_invocation_id="INV-GROUP_D-INTELBASE-002" r4_invocation_id="INV-GROUP_D-INTELBASE-003"/>
     <phase id="PHASE_08" name="测试执行+报告" status="APPROVED"
       output_file="docs/test_report.md"
-      assigned_agent="sub_agent_test_engineer"
+      assigned_agent="test-engineer"
       version="1.2.0（R4 增量：§11 R4 回归报告 + FND-GROUP-D-03 标 CLOSED_VERIFIED）"
       invocation_id="INV-GROUP_D-INTELBASE-001" r3_invocation_id="INV-GROUP_D-INTELBASE-002" r4_invocation_id="INV-GROUP_D-INTELBASE-003"/>
     <phase id="PHASE_09" name="测试用例实现" status="APPROVED"
       output_file="tests/（unit 4 文件/56 例 + integration 9 文件/78 例 + e2e 1 文件/14 例 + conftest.py；R4 新增 TC-UNIT-055 + TC-INT-074~078 并强化 TC-INT-041 / TC-E2E-003）"
-      assigned_agent="sub_agent_test_engineer"
+      assigned_agent="test-engineer"
       version="1.2.0（R4：142 → 148 例）"
       invocation_id="INV-GROUP_D-INTELBASE-001" r3_invocation_id="INV-GROUP_D-INTELBASE-002" r4_invocation_id="INV-GROUP_D-INTELBASE-003"/>
 
-    <gate_review id="GR-D-001" decision="PASS_WITH_CONDITIONS" reviewer="main_agent_pm"
+    <gate_review id="GR-D-001" decision="PASS_WITH_CONDITIONS" reviewer="pm-orchestrator"
       time="2026-09-26T00:00:00Z" retry_count="0" scope="GROUP_D（PHASE_07 测试计划 + PHASE_08 执行报告 + PHASE_09 用例实现）"/>
       finding_1="单元测试通过率 ≥80% — SATISFIED：55/55 = **100.0%**（0 fail / 0 skip / 0 blocked）。PM 委派独立 verifier 亲自复跑 `PYTHONUTF8=1 IB_OFFLINE_MODE=1 python -m pytest tests/unit -q` → `55 passed in 0.08s` EXIT=0；`--collect-only` 收集 55；函数计数 23+20+12=55 与收集数相等（无静默丢弃）"
       finding_2="集成测试通过率 ≥90% — SATISFIED：69/69 = **100.0%**（0 fail / 0 skip / 0 blocked）。verifier 复跑 `pytest tests/integration -q` → `69 passed in 13.49s` EXIT=0；`--collect-only` 收集 69；8 文件函数计数 10+7+12+13+7+5+7+8=69 相等"
@@ -301,7 +301,7 @@
 
     <followup_note id="GR-D-001">GROUP_D 门控 GR-D-001：四项 PASS 标准（单元≥80% / 集成≥90% / 所有 US 有测试 / metrics 算术一致）**全部 SATISFIED**，实际通过率三层均 100%、16/16 US 有用户故事级覆盖、12/12 Must Have 关键路径 100%、算术精确闭合、CRITICAL 0；且通过率证据由 PM 委派的**独立 verifier 亲自复跑**复现（55/69/14/138 全部 EXIT=0，collect-only 与函数计数一致，无 skip/xfail/deselect/addopts 作弊面），两项缺陷亦由**脱离测试套件的探针**独立复现（非测试自证）。因存 1 MAJOR（FND-GROUP-D-02 删除静默失效 + 幽灵文档可检索）+ 1 MEDIUM（FND-GROUP-D-01 能力摘要恒空）+ 8 项 not-verified + 3 项环境偏差，故判 **PASS_WITH_CONDITIONS**（不判 FAIL：门控阈值无一被违反；不判纯 PASS：存在须在部署前闭合的用户可见正确性缺陷）。FND-GROUP-D-02 建议由 software-developer 以 GROUP_C R3 增量修复（删除路径不得依赖 collection 已绑定）。依据用户指令（『完成后按门控停下回报』），本门控**通过后停下回报**，不自动进入 GROUP_E；GROUP_E 继续冻结，解冻须用户复核测试报告后明确授权。</followup_note>
 
-    <gate_review id="GR-D-002" decision="PASS_WITH_CONDITIONS" reviewer="main_agent_pm"
+    <gate_review id="GR-D-002" decision="PASS_WITH_CONDITIONS" reviewer="pm-orchestrator"
       time="2026-09-26T00:00:00Z" retry_count="0" scope="GROUP_D R3 增量（PHASE_07/08/09，INV-GROUP_D-INTELBASE-002）"
       finding_1="单元测试通过率 ≥80% — SATISFIED：55/55 = **100.0%**。verifier 亲自复跑 tests/unit（EXIT=0）并逐文件对账"
       finding_2="集成测试通过率 ≥90% — SATISFIED：73/73 = **100.0%**（R3 由 69 增至 73）。verifier 亲自复跑 tests/integration（EXIT=0）"
@@ -322,7 +322,7 @@
     />
     <followup_note id="GR-D-002">GROUP_D R3 增量门控 GR-D-002：四项 PASS 标准（单元≥80% / 集成≥90% / 所有 US 有测试 / metrics 算术一致）**全部 SATISFIED**，三层实测 100%/100%/100%、16/16 US 覆盖、12/12 Must Have 关键路径、算术精确闭合、CRITICAL 0；且全部由**独立 verifier 亲自复跑 + 反注水五查 + 突变测试**证实（未采信 test-engineer 自述）。R3 两项缺陷 FND-GROUP-D-01 / FND-GROUP-D-02 判 **CLOSED_VERIFIED**。判 **PASS_WITH_CONDITIONS**（不判 FAIL：门控阈值无一被违反；不判纯 PASS：存在 1 项须补登记的稳定性抖动 FLAKE-IB-01（实测 5/6、暴露出 TC-INT-026 漏登记）、1 项覆盖缺口（blob 维度无正向覆盖，与 FND-GROUP-D-03 绑定）、2 项文档口径 MINOR，以及**非 git 仓库导致『实现未改』只能以弱证据佐证**的诚实性限制）。GR-D-001 继续有效。依据用户指令（REV-03：R3 修复与回归完成后进入 GROUP_E 计划、PHASE_11 须另获 PRODUCTION_DEPLOY_CONFIRM），本门控通过后**不暂停**，继续编排出 GROUP_E PHASE_10（仅部署计划，禁止任何目标机写操作）。</followup_note>
 
-    <gate_review id="GR-D-003" decision="PASS_WITH_CONDITIONS" reviewer="main_agent_pm"
+    <gate_review id="GR-D-003" decision="PASS_WITH_CONDITIONS" reviewer="pm-orchestrator"
       time="2026-09-26T09:30:00Z" retry_count="0" scope="GROUP_D R4 增量（PHASE_07/08/09，INV-GROUP_D-INTELBASE-003；FND-GROUP-D-03 修复的回归，含 6 新例 + 2 强化）"
       finding_1="单元测试通过率 ≥80% — SATISFIED：56/56 = **100.0%**（R3 55 → +TC-UNIT-055）。verifier 亲自复跑 tests/unit 并逐文件对账（1+23+12+20=56）"
       finding_2="集成测试通过率 ≥90% — SATISFIED：78/78 = **100.0%**（R3 73 → +TC-INT-074~078）。verifier 亲自复跑并逐文件对账（5+11+5+7+13+12+7+11+7=78）"
@@ -345,14 +345,14 @@
   <group id="GROUP_E" status="IN_PROGRESS" gate_decision="PHASE_10_APPROVED（GR-E-001 对 v1.0.0 + GR-E-002 对 v1.1.0/R4，均 PASS_WITH_CONDITIONS，仅计划层）；PHASE_11 仍 PENDING，待用户 PRODUCTION_DEPLOY_CONFIRM">
     <phase id="PHASE_10" name="CI/CD 与部署计划" status="APPROVED"
       output_file="docs/deployment_plan.md（+ docs/cicd_pipeline.md）"
-      assigned_agent="sub_agent_devops_engineer"
+      assigned_agent="devops-engineer"
       revision="R4（REV-04-3：C-02 nginx 纳入组件清单 / C-03 补 ib-worker.env.example / C-04 Qdrant 二进制路径统一 / C-05 ib_embed 包落点明确 / C-06 无 AVX2 wheel fallback；并反映 B-05 已补 requirements-embed.txt）"
       invocation_id="INV-GROUP_E-INTELBASE-001" r4_invocation_id="INV-GROUP_E-INTELBASE-002"
       constraint="仅产出计划；**禁止任何对目标机 192.168.31.133 的写操作/安装/服务启动/SSH 写**；凭据仅环境变量注入、禁止写入任何 git 跟踪文件"/>
     <phase id="PHASE_11" name="生产部署" status="PENDING"
       blocker="须用户明确下达 PRODUCTION_DEPLOY_CONFIRM；且 FND-GROUP-D-03（MAJOR）建议先闭合"/>
 
-    <gate_review id="GR-E-001" decision="PASS_WITH_CONDITIONS" reviewer="main_agent_pm"
+    <gate_review id="GR-E-001" decision="PASS_WITH_CONDITIONS" reviewer="pm-orchestrator"
       time="2026-09-26T00:00:00Z" retry_count="0" scope="GROUP_E 仅 PHASE_10（部署计划 + CI/CD 定义）；PHASE_11 不在本轮门控范围"
       finding_1="产出完整 — SATISFIED：PM 亲读 docs/deployment_plan.md（549 行，DOC-IB-DP-001）覆盖任务要求全部 12 节（P0/P1 前置、目标机环境、Qdrant .deb 裸装、ib-embed 常驻、Django 栈、rapidocr/onnxruntime 含无 AVX2、4 个 systemd 单元、git pull 交付、DeepSeek 真跑 smoke、回滚、验证清单、风险）+ DEPLOY-001~010 与 ROLLBACK-001~010 逆操作表 + NV-01~08 证据归档映射；配套 docs/cicd_pipeline.md（96 行，DOC-IB-CICD-001）10 阶段 + 3 条硬版本门"
       finding_2="仅计划、未执行 — SATISFIED：两文件均明示『未执行 / 未连接 / 未触碰目标机』，全部命令标注『须 PM CONFIRM 后执行』；无任何已执行痕迹；PHASE_11 未被触发（confirm_status=PENDING）"
@@ -367,7 +367,7 @@
       open_item_1="[已登记] 本门控结论基于 PM 亲读两文件 + 独立凭据扫描，未采信代理自述；代理自报 status=PARTIAL_SUCCESS（因 6 项 P0 前置属外部依赖，非其可闭合项）" />
     <followup_note>GROUP_E PHASE_10 门控 GR-E-001（限计划层）：产出完整（12 节 + CI/CD 定义）、仅计划未执行、冻结决策遵循、凭据洁净、回滚与验证覆盖 — 全部 SATISFIED，故**不判 FAIL**；因存在 6 项 P0 外部前置未闭合（含 B-01 无 git 仓库、B-04 FND-GROUP-D-03）+ 6 项 P1 待澄清 + 一批须目标机实测项，判 **PASS_WITH_CONDITIONS**（计划本身合格，执行被外部前置阻塞）。PHASE_10 置 APPROVED；GROUP_E 整体仍 IN_PROGRESS，PHASE_11 保持 PENDING 未门控。依据用户指令（REV-03-4：『计划产出后停止回报，等我复核 + 补齐前置后再下达 PRODUCTION_DEPLOY_CONFIRM』），本门控通过后**停下回报**。</followup_note>
 
-    <gate_review id="GR-E-002" decision="PASS_WITH_CONDITIONS" reviewer="main_agent_pm"
+    <gate_review id="GR-E-002" decision="PASS_WITH_CONDITIONS" reviewer="pm-orchestrator"
       time="2026-09-26T10:00:00Z" retry_count="0" scope="GROUP_E PHASE_10 R4 修订增量（INV-GROUP_E-INTELBASE-002；C-02~C-06 闭合 + B-05 反映）；PHASE_11 仍不在门控范围"
       finding_1="P1 项 C-02~C-06 处置经 PM 亲自复核 — SATISFIED：C-02 nginx 列为第 5 交付组件（§7.5；事实锚点 PM 独立核对：ib-web.service:49-54 Waitress --port=18080、vite.config.ts:10 反代同址、settings.py 确无 STATIC_ROOT），含 SSE proxy_buffering off 硬条件与 proxy_read_timeout 须大于 SSE 静默期；C-03 新增 src/deploy/ib-worker.env.example（PM 亲自对账 27 键与 env.example **逐键一致**、全占位符）；C-04 qdrant.service:35 统一为 /usr/bin/qdrant（仅此一行，与 architecture_design/tech_stack 一致，全仓无残留 /usr/local/bin/qdrant）；C-05 §8.1 软链单一真源（禁复制第二份源码，含 import 验证与回滚）；C-06 §6.1 有序决策树 + 目标机最小探针优先 + OCR/embedding **双链路合并评估** + 各链路挂掉症状表"
       finding_2="B-05 反映正确 — SATISFIED：§1.1 改判『部分闭合』、§2.2/§4.2 指向 src/requirements-embed.txt、torch 经 PyTorch CPU 索引显式安装、区间**未**被当锁定值；devops 未把区间说成已锁定"
@@ -376,7 +376,7 @@
       condition_1="[MEDIUM 开放项 — 须 PM 裁决，PHASE_11 前置] verifier F-1：C-02 未同步 src/deploy/checklists.txt —— 该文件 [B12]（mtime 07:57，非本轮窗口，且不在 devops 授权改动面）仍写 dist 产物『由 ib-web 托管』，与 C-02 立论（settings.py 无 STATIC_ROOT → 不由 Django 托管）**直接冲突**；且 B12 全文无 nginx -t / proxy_buffering off。后果：PHASE_11 若照 checklists 执行，nginx 与 SSE 不缓冲两项不会被验。缓解：cicd §3.1 D-2/D-3 已把两门独立定为部署前硬门，门未完全落空。处置二选一：(a) 单独立项修 checklists.txt B12（增 nginx/nginx -t/proxy_buffering off 三条 + 更正『由 ib-web 托管』），属 MOD-IB-25 交付物、归 software-developer；(b) 登记为 PHASE_11 前置开放项"
       condition_2="[MINOR 文档修订，随下轮触碰] verifier F-2：§1.2 C-01 括注『目标机 18080（nginx）』与 §7.5 硬约束（nginx 不得用 18080）冲突，应更正括注；另 C-01 引『checklists.txt A3 强制』涵盖 6333/8100，而 A3 实际只检 6333。**C-01 自身仍保持未闭合**（devops 未私标闭合）"
       condition_3="[MINOR 文档一致性，随下轮触碰] verifier F-3：docs/cicd_pipeline.md §2 测试基线落后一轮（仍写 55/55、69→73、142/142），而 GROUP_D R4 已达 148（56+78+14，见 test_report.md §11 / GR-D-003）"
-      open_item_1="[INFO] verifier F-4：新增 ib-worker.env.example 头部署名 sub_agent_devops_engineer，与同目录其余模板不同 —— 系 C-03 授权新增，署名恰当；未新增/改名任何键，module_design §5 键名契约无违背"
+      open_item_1="[INFO] verifier F-4：新增 ib-worker.env.example 头部署名 devops-engineer，与同目录其余模板不同 —— 系 C-03 授权新增，署名恰当；未新增/改名任何键，module_design §5 键名契约无违背"
       open_item_2="[诚实性限制] verifier F-5：intelligentbase 无 git 仓库且无 v1.0.0 基线副本，无法 diff 复核『18 处定点修订』，仅与修订记录枚举量级对量 → 不可完全判定；同轮『未触目标机』亦无审计钩子，仅间接证据"
     />
     <followup_note id="GR-E-002">GROUP_E PHASE_10 R4 修订增量门控 GR-E-002：本轮为**计划层修订**，适用标准与 GR-E-001 同类（产出完整 / 仅计划未执行 / 冻结决策遵循 / 凭据洁净 / 回滚与验证覆盖）。C-02~C-06 **五项 P1 全部处置**、B-05 反映正确，且额外揪出并修正一处真实端口冲突；越界与纪律经**独立只读 verifier 证实**（src/ 改动收敛、未抢发门控、FreeArk 只读、无凭据）。故判 **PASS_WITH_CONDITIONS**（不判 FAIL：无 PASS 标准被违反；不判纯 PASS：存在 1 项 MEDIUM 开放项 F-1（checklists.txt B12 与 C-02 冲突且未登记，须 PM 裁决）+ 2 项文档 MINOR + 未触目标机的不可完全判定）。PHASE_10 置 **APPROVED（计划层，v1.1.0/R4）**；GR-E-001 对 v1.0.0 仍有效。GROUP_E 整体仍 IN_PROGRESS，**PHASE_11 保持 PENDING 未门控**（须用户 PRODUCTION_DEPLOY_CONFIRM，且 P0 前置 B-01/B-02/B-03/B-05/B-06 与 F-1 待闭合）。依据用户指令（REV-04），本门控通过后**停下回报**。</followup_note>
@@ -450,17 +450,17 @@
     <input id="F-1-CHECKLISTS-C02-GAP" status="OPEN_MEDIUM_PENDING_PM_DECISION" blocking="true_phase_11"
       note="[MEDIUM — devops R4 复核新发现，须 PM 裁决] C-02 未同步 src/deploy/checklists.txt：其 [B12] 原文仍写『前端构建产物已就位**由 ib-web 托管**』，与 C-02 立论（`settings.py` 无 STATIC_ROOT → dist 不由 Django 托管、须 nginx）**直接冲突**；且 B12 全文无 `nginx -t`、无 `proxy_buffering off`。后果：PHASE_11 若照 checklists 执行，nginx 站点与 SSE 不缓冲两项**不会被验**，而 `proxy_buffering off` 缺失恰是『流式功能静默失效』。**非纪律越界**（checklists.txt 不在 devops 本轮授权改动面内，mtime 07:57 属 R3 窗口）。缓解：cicd_pipeline.md §3.1 的 D-2（nginx -t）/ D-3（proxy_buffering off 复验）已把两门独立定为部署前硬门，故缺口未完全无防护。处置二选一：(a) 单独立项（GROUP_C 增量，software-developer）修 checklists.txt B12 —— 增 nginx 服务 active / `nginx -t` 通过 / 站点含 `proxy_buffering off` 三条，并更正『由 ib-web 托管』表述；(b) 登记为 PHASE_11 前置开放项，由部署执行人手工加验。**PM 倾向 (a)**（checklists 是 PHASE_11 的执行脚本，让它与计划一致比旁路补验更可靠）。"/>
     <input id="VERIFIER-MINORS-DEVOPS-R4" status="REGISTERED_MINOR" blocking="false"
-      note="[独立 verifier 于 devops R4 复核中发现的 MINOR/INFO，如实登记，均不阻塞] F-2：§1.2 C-01 括注『目标机 18080（nginx）』与 §7.5 硬约束（nginx 不得用 18080）冲突，应更正括注；另 C-01 引『checklists.txt A3 强制』涵盖 6333/8100，而 A3 实际只检 6333（须随下轮文档修订更正，**C-01 自身仍保持未闭合**）。F-3：docs/cicd_pipeline.md §2 测试基线落后一轮（仍写 55/55、69→73、142/142），实际已 148（56+78+14）。F-4（INFO）：新增 ib-worker.env.example 署名为 sub_agent_devops_engineer，系 C-03 授权新增，署名恰当，未违背 module_design §5 键名契约。F-5（INFO，不可判定）：intelligentbase 无 git 仓库且无 v1.0.0 基线副本，无法 diff 复核『18 处定点修订』；同轮『未触目标机』亦无审计钩子，仅间接证据。"/>
+      note="[独立 verifier 于 devops R4 复核中发现的 MINOR/INFO，如实登记，均不阻塞] F-2：§1.2 C-01 括注『目标机 18080（nginx）』与 §7.5 硬约束（nginx 不得用 18080）冲突，应更正括注；另 C-01 引『checklists.txt A3 强制』涵盖 6333/8100，而 A3 实际只检 6333（须随下轮文档修订更正，**C-01 自身仍保持未闭合**）。F-3：docs/cicd_pipeline.md §2 测试基线落后一轮（仍写 55/55、69→73、142/142），实际已 148（56+78+14）。F-4（INFO）：新增 ib-worker.env.example 署名为 devops-engineer，系 C-03 授权新增，署名恰当，未违背 module_design §5 键名契约。F-5（INFO，不可判定）：intelligentbase 无 git 仓库且无 v1.0.0 基线副本，无法 diff 复核『18 处定点修订』；同轮『未触目标机』亦无审计钩子，仅间接证据。"/>
   </open_inputs>
 
   <audit_log>
     <log time="2026-09-25T00:00:00Z" state="PM_INIT_WORKSPACE" action="创建工作区 docs/phase_status.md" result="OK" trace_id="intelligentbase"/>
-    <log time="2026-09-25T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke sub_agent_requirement_analyst (GROUP_A)" result="SUCCESS" invocation_id="INV-GROUP_A-INTELBASE-001" trace_id="intelligentbase"/>
+    <log time="2026-09-25T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke requirement-analyst (GROUP_A)" result="SUCCESS" invocation_id="INV-GROUP_A-INTELBASE-001" trace_id="intelligentbase"/>
     <log time="2026-09-25T00:00:00Z" state="PM_GATE_REVIEW" action="门控评审 GR-A-001，独立复核输出文件与 FreeArk 锚点" result="PASS_WITH_CONDITIONS" invocation_id="INV-GROUP_A-INTELBASE-001" trace_id="intelligentbase"/>
     <log time="2026-09-25T00:00:00Z" state="PM_AWAIT_USER_CONFIRM" action="暂停，等待用户拍板 OD-1~OD-5" result="WAITING" trace_id="intelligentbase"/>
     <log time="2026-09-25T00:00:00Z" state="PM_GATE_PASS" action="用户 8 项决策确认（DR-01~DR-08），需求升版 1.1.0 定稿" result="GROUP_A APPROVED (gate_decision=PASS)" invocation_id="INV-GROUP_A-INTELBASE-001" trace_id="intelligentbase"/>
     <log time="2026-09-25T00:00:00Z" state="PM_READ_OUTPUTS" action="事故复核：requirement-analyst 误覆盖 requirements_spec.md 后重建；PM 对照原始全文抽验，确认无内容丢失" result="VERIFIED_OK" trace_id="intelligentbase"/>
-    <log time="2026-09-25T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke sub_agent_system_architect (GROUP_B)" result="SUCCESS" invocation_id="INV-GROUP_B-INTELBASE-001" trace_id="intelligentbase"/>
+    <log time="2026-09-25T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke system-architect (GROUP_B)" result="SUCCESS" invocation_id="INV-GROUP_B-INTELBASE-001" trace_id="intelligentbase"/>
     <log time="2026-09-25T00:00:00Z" state="PM_GATE_REVIEW" action="门控评审 GR-B-001：独立核验 24/24 REQ-FUNC 覆盖矩阵、§4.1/§4.2 DAG 无环证明、13 ADR 逐条 ≥2 方案、13 端口类型化契约、许可台账(PyMuPDF AGPL 否决)" result="PASS_WITH_CONDITIONS (1 MINOR: ADR-01 方法数 10 vs 11)" invocation_id="INV-GROUP_B-INTELBASE-001" trace_id="intelligentbase"/>
     <log time="2026-09-25T00:00:00Z" state="PM_AWAIT_USER_CONFIRM" action="GROUP_B 门控通过，暂停回报；等待用户复核架构并授权进入 GROUP_C" result="WAITING" trace_id="intelligentbase"/>
     <log time="2026-09-25T00:00:00Z" state="PM_PHASE_REVISION" action="收到架构复核反馈，登记修订指令 REV-01（框架 FastAPI→Django 等 5 项 + 实现约束 IC-IB-01）；GR-B-001 标记 SUPERSEDED；GROUP_B 重置为 IN_PROGRESS" result="REVISION_STARTED" trace_id="intelligentbase"/>
@@ -472,7 +472,7 @@
     <log time="2026-09-25T00:00:00Z" state="PM_GATE_PASS" action="GROUP_B 三门控阶段（PHASE_03/04/04b）status=APPROVED，gate_decision=PASS，版本 1.1.0(R1)" result="GROUP_B APPROVED" invocation_id="INV-GROUP_B-INTELBASE-002" trace_id="intelligentbase"/>
     <log time="2026-09-25T00:00:00Z" state="PM_AWAIT_USER_CONFIRM" action="依据用户指令，R1 门控通过后暂停回报（改动点摘要 + 新门控结论 GR-B-002=PASS + 流式方案最终结论=ADR-11-R1 Option A Django 原生 SSE）；等待最终授权进入 GROUP_C" result="WAITING" trace_id="intelligentbase"/>
     <log time="2026-09-25T00:00:00Z" state="PM_PARSE_PROJECT" action="收到用户授权：进入实现阶段（GROUP_C）。授权范围 PHASE_05 实现计划 → PHASE_06 代码实现 → 自我代码评审；产出写入 intelligentbase/src/ + docs/implementation_plan.md + docs/code_review_report.md；GROUP_E 部署本轮明确不触碰" result="AUTHORIZED" trace_id="intelligentbase"/>
-    <log time="2026-09-25T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke sub_agent_software_developer (GROUP_C)：解冻 GROUP_C，PHASE_05/06/06b 置 IN_PROGRESS；输入=已批准需求/用户故事 + architecture_design(1.1.0 R1) + module_design(1.1.0 R1) + tech_stack(1.1.0 R1) + IC-IB-01" result="IN_PROGRESS" invocation_id="INV-GROUP_C-INTELBASE-001" trace_id="intelligentbase"/>
+    <log time="2026-09-25T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke software-developer (GROUP_C)：解冻 GROUP_C，PHASE_05/06/06b 置 IN_PROGRESS；输入=已批准需求/用户故事 + architecture_design(1.1.0 R1) + module_design(1.1.0 R1) + tech_stack(1.1.0 R1) + IC-IB-01" result="IN_PROGRESS" invocation_id="INV-GROUP_C-INTELBASE-001" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_AWAIT_AGENT" action="software-developer (INV-GROUP_C-INTELBASE-001) 返回 SUCCESS：implementation_plan.md(341行) + src/(69文件/16,396行) + code_review_report.md(758行) 三交付落盘；自报 CRITICAL 0（4 修复）、MAJOR 3 遗留、MINOR 2 遗留；无 blocker" result="SUCCESS" invocation_id="INV-GROUP_C-INTELBASE-001" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_READ_OUTPUTS" action="PM 独立核验（不信自述）：Glob 确认 25 模块文件树齐备；grep 确认无 fitz/fastapi/uvicorn/channels/redis 实际 import；requirements 版本在位；frontend 无 axios 且走 fetch+Authorization；authz.py 拒绝 query 串 token；StreamEvent 无重复定义；凭据零命中；两份 docs 交付在位" result="VERIFIED_OK" invocation_id="INV-GROUP_C-INTELBASE-001" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_GATE_REVIEW" action="门控评审 GR-C-001：25/25 模块已实现 + code_review 无 CRITICAL 两项标准 SATISFIED；冻结架构约束、IC-IB-01、?token= 拒绝、凭据安全均独立复核一致；遗留 3 MAJOR + 2 MINOR（非设计缺陷）" result="PASS_WITH_CONDITIONS" invocation_id="INV-GROUP_C-INTELBASE-001" trace_id="intelligentbase"/>
@@ -484,7 +484,7 @@
     <log time="2026-09-26T00:00:00Z" state="PM_AWAIT_AGENT" action="system-architect (INV-GROUP_B-INTELBASE-003) 返回 PARTIAL_SUCCESS：新建 docs/ib_embed_service_contract.md（R2，L-03 契约，归属 MOD-IB-26，覆盖 IFC-IB-266~274，含 MOD-IB-09 事实基线与 §11 否决留痕）；但 (a) APPLY-READY 修订包仅存在于会话文本未落盘，(b) KB 误写至 FreeArk 仓库" result="PARTIAL_SUCCESS" invocation_id="INV-GROUP_B-INTELBASE-003" trace_id="intelligentbase"/>
     <security_event time="2026-09-26T00:00:00Z" type="readonly_violation" action="检出 architect R2 将 system_architect KB（kb_index.md/kb_full.xml/kb_distillation_log.md，条目 KE-ARCH-001~004）写入 C:\Users\胖子熊\MyProject\FreeArk\.claude\agents\knowledge_base\system_architect\，违反『FreeArk 仓库全程只读』硬约束；PM 无 Bash 无法删除文件，已即时上报用户并由本次重跑调用纠偏（KB 改写至 intelligentbase 路径）" result="REPORTED_PENDING_MANUAL_CLEANUP"/>
     <log time="2026-09-26T00:00:00Z" state="PM_DECIDE" action="B-2 处置（工具约束 KE-PM-019）：不改为超限写入。重跑 system-architect（INV-GROUP_B-INTELBASE-004），要求将 R2 APPLY-READY 修订包**落盘为文件** docs/r2_apply_package.md（必要时分片 &lt;50KB），PM 再据锚点用 Edit 机械落盘（领域内容仍由架构师撰写，PM 不自行生成）" result="RESOLUTION_IN_PROGRESS" trace_id="intelligentbase"/>
-    <log time="2026-09-26T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke sub_agent_system_architect (GROUP_B R2 补交, INV-GROUP_B-INTELBASE-004)：任务1 将 R2 修订包落盘 docs/r2_apply_package.md；任务2 KB 改写至 intelligentbase/.claude/agents/knowledge_base/system_architect/（合并，不覆盖，新条目自 KE-ARCH-013 起）；任务3 回报条目计数与残余决策项" result="IN_PROGRESS" invocation_id="INV-GROUP_B-INTELBASE-004" trace_id="intelligentbase"/>
+    <log time="2026-09-26T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke system-architect (GROUP_B R2 补交, INV-GROUP_B-INTELBASE-004)：任务1 将 R2 修订包落盘 docs/r2_apply_package.md；任务2 KB 改写至 intelligentbase/.claude/agents/knowledge_base/system_architect/（合并，不覆盖，新条目自 KE-ARCH-013 起）；任务3 回报条目计数与残余决策项" result="IN_PROGRESS" invocation_id="INV-GROUP_B-INTELBASE-004" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_AWAIT_AGENT" action="system-architect (INV-GROUP_B-INTELBASE-004) 返回 SUCCESS：R2 APPLY-READY 修订包落盘为 7 册 docs/r2_apply_package_part1..7.md（43 条目 MD-01~22 / AD-01~11 / TS-01~10，51 定位点）；KB 已写入正确路径 intelligentbase/.claude/agents/knowledge_base/system_architect/（16 条，新增 KE-ARCH-013~016）；对 FreeArk 仅只读列举、未写入" result="SUCCESS" invocation_id="INV-GROUP_B-INTELBASE-004" trace_id="intelligentbase"/>
     <security_event time="2026-09-26T00:00:00Z" type="kb_path_violation_corrected" action="KB 落盘位置由 FreeArk 仓库纠正至 intelligentbase/.claude/agents/knowledge_base/system_architect/（合并写入，未覆盖既有 KE-ARCH-001~012）" result="CORRECTED"/>
     <log time="2026-09-26T00:00:00Z" state="PM_READ_OUTPUTS" action="PM 读取 7 册修订包，逐锚点用 Edit 机械落盘 43 条目至 module_design.md(22)/architecture_design.md(11)/tech_stack.md(10)，三份文档升至 1.2.0/R2；领域内容全部源自架构师（PM 未生成）" result="APPLIED" invocation_id="INV-GROUP_B-INTELBASE-004" trace_id="intelligentbase"/>
@@ -492,13 +492,13 @@
     <log time="2026-09-26T00:00:00Z" state="PM_GATE_REVIEW" action="增量门控 GR-B-003：REQ 覆盖 24/24 无缺口 + 无环（26 无入边）+ ADR≥2 方案（R2 仅补附注、§2.0.1 逐条复核 13 ADR）+ 接口类型化（新增 IFC-IB-266~286 均类型化）+ 许可合规（torch/transformers 条件性采纳、无 AGPL 新增、PyMuPDF 仍否决）+ 凭据安全 + REV-02 三项闭环 + 契约单一落点，全部 SATISFIED" result="PASS (4 非阻塞 open_item)" invocation_id="INV-GROUP_B-INTELBASE-004" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_GATE_PASS" action="GROUP_B 三门控阶段（PHASE_03/04/04b）status=APPROVED，版本 1.2.0(R2)，gate_decision=R2_PASS（GR-B-003）" result="GROUP_B APPROVED" invocation_id="INV-GROUP_B-INTELBASE-004" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_FIX" action="schema 修补：GROUP_C 组此前缺闭合标签 &lt;/group&gt;（既有缺陷），已补齐，phase_status.md 结构恢复合法" result="FIXED" trace_id="intelligentbase"/>
-    <log time="2026-09-26T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke sub_agent_software_developer (GROUP_C R2, INV-GROUP_C-INTELBASE-002)：实现 L-03（MOD-IB-26 ib-embed 服务端包 ib_embed.server + MOD-IB-09 InProcessBgeM3Embedder + deploy 第二份 EnvironmentFile 与单元补齐）与 M-02（MOD-IB-01 三结构 + MOD-IB-13 五条 bind/persist/ChunkImageRecord/process_pending 九步/delete 零改动 + MOD-IB-11 手写迁移 + MOD-IB-21/23/24 增量）；输入=ib_embed_service_contract.md + module_design/architecture_design/tech_stack 1.2.0(R2)；约束 FreeArk 只读/禁 Docker-禁 PyMuPDF-禁 Channels-Redis/langchain-openai&lt;0.3/凭据仅环境变量/测试 SQLite-InMemory 不联外网" result="IN_PROGRESS" invocation_id="INV-GROUP_C-INTELBASE-002" trace_id="intelligentbase"/>
+    <log time="2026-09-26T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke software-developer (GROUP_C R2, INV-GROUP_C-INTELBASE-002)：实现 L-03（MOD-IB-26 ib-embed 服务端包 ib_embed.server + MOD-IB-09 InProcessBgeM3Embedder + deploy 第二份 EnvironmentFile 与单元补齐）与 M-02（MOD-IB-01 三结构 + MOD-IB-13 五条 bind/persist/ChunkImageRecord/process_pending 九步/delete 零改动 + MOD-IB-11 手写迁移 + MOD-IB-21/23/24 增量）；输入=ib_embed_service_contract.md + module_design/architecture_design/tech_stack 1.2.0(R2)；约束 FreeArk 只读/禁 Docker-禁 PyMuPDF-禁 Channels-Redis/langchain-openai&lt;0.3/凭据仅环境变量/测试 SQLite-InMemory 不联外网" result="IN_PROGRESS" invocation_id="INV-GROUP_C-INTELBASE-002" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_AWAIT_AGENT" action="software-developer (INV-GROUP_C-INTELBASE-002) 返回 SUCCESS：R2 新增 7 文件（src/ 69→76：ib_embed/{__init__,config,runtime,server}.py + ib/embedding/inproc.py + deploy/ib-embed.env.example + deploy/migrations/002_chunk_image.sql），18 个 R1 文件纯追加；docs/implementation_plan.md §12（v2.0.0）+ docs/code_review_report.md §9（R2）；自报 CRITICAL 3 发现/3 修复、MAJOR 2 遗留（D-R2-01/02）、L-03/M-02 关闭、零回归；无 blocker" result="SUCCESS" invocation_id="INV-GROUP_C-INTELBASE-002" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_READ_OUTPUTS" action="PM 独立核验（不信自述）：Glob 确认 src/ 76 文件、ib_embed 4 文件齐备；Read 逐份复核 inproc.py（惰性导入、不 import ib_embed）、ib_embed/config.py（11 键闭集、只报键名）、server.py（四端点/错码表/有界并发）、lifecycle/bind_page_images（按 page_or_section 聚合=结构性教训修复）、002_chunk_image.sql（FK CASCADE）、ib-embed.service（MemoryMax 与键值一致）、frontend（无 v-html/无裸 axios）" result="VERIFIED_OK" invocation_id="INV-GROUP_C-INTELBASE-002" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_VERIFY" action="PM 委派独立 verifier **亲自复跑**可执行证据（高影响决策须实测，不信静态推理）：compileall EXIT=0；selfcheck.py **24/24 通过** EXIT=0；stderr 三行经 2>/dev/null 复跑证为设计内负路径日志（非失败）；禁忌 import/django-in-core/ib_embed↔ib 交叉 import/真实凭据/裸 axios 全部为空（逐条追溯至注释或自检正则）" result="VERIFIED_OK" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_GATE_REVIEW" action="增量门控 GR-C-002（GROUP_C R2）：26/26 模块已实现 + code_review 无 CRITICAL 两项标准 SATISFIED；L-03/M-02 闭合、零回归、契约纪律（IFC-IB-001~265 未改/端口 13/MOD-IB-26 零入边/IB_EMBED_BACKEND 仅扩值域）、IC-IB-01、?token=、凭据安全全部 SATISFIED" result="PASS (2 非阻塞 MAJOR open_item)" invocation_id="INV-GROUP_C-INTELBASE-002" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_GATE_PASS" action="GROUP_C 三门控阶段（PHASE_05/06/06b）status=APPROVED，版本 2.0.0(R2)，gate_decision=R2_PASS（GR-C-002）；REV-02 实现侧闭合" result="GROUP_C APPROVED" invocation_id="INV-GROUP_C-INTELBASE-002" trace_id="intelligentbase"/>
-    <log time="2026-09-26T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke sub_agent_test_engineer (GROUP_D)：解冻 GROUP_D，PHASE_07/08/09 置 IN_PROGRESS；输入=已批准 requirements_spec(1.1.0) + user_stories(1.1.0, 16 US) + module_design/architecture_design/tech_stack(1.2.0 R2) + ib_embed_service_contract + implementation_plan(2.0.0 R2) + code_review_report(R2 含 §9.10 不可验证项与 D-R2-01/02 验收动作) + src/(76 文件)；约束=测试用 SQLite/InMemory、严禁连接任何生产数据库/外部服务、凭据仅环境变量、串行通过率门控（单元≥80%/集成≥90%/全 US 覆盖/metrics 算术一致）" result="IN_PROGRESS" invocation_id="INV-GROUP_D-INTELBASE-001" trace_id="intelligentbase"/>
+    <log time="2026-09-26T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke test-engineer (GROUP_D)：解冻 GROUP_D，PHASE_07/08/09 置 IN_PROGRESS；输入=已批准 requirements_spec(1.1.0) + user_stories(1.1.0, 16 US) + module_design/architecture_design/tech_stack(1.2.0 R2) + ib_embed_service_contract + implementation_plan(2.0.0 R2) + code_review_report(R2 含 §9.10 不可验证项与 D-R2-01/02 验收动作) + src/(76 文件)；约束=测试用 SQLite/InMemory、严禁连接任何生产数据库/外部服务、凭据仅环境变量、串行通过率门控（单元≥80%/集成≥90%/全 US 覆盖/metrics 算术一致）" result="IN_PROGRESS" invocation_id="INV-GROUP_D-INTELBASE-001" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_AWAIT_AGENT" action="test-engineer (INV-GROUP_D-INTELBASE-001) 返回 SUCCESS：docs/test_plan.md(1.0.0) + docs/test_report.md(1.0.0) + tests/（unit 3 文件 55 例 + integration 8 文件 69 例 + e2e 1 文件 14 例 + conftest.py）+ docs/evidence/ 9 份原始日志；自报三层 55/69/14 全 100%、CRITICAL 0、MAJOR 1（FND-GROUP-D-02）、MEDIUM 1（FND-GROUP-D-01）、8 项 not-verified 如实登记、11 项 NOT_TESTABLE AC；无 blocker；未触碰 GROUP_E" result="SUCCESS" invocation_id="INV-GROUP_D-INTELBASE-001" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_READ_OUTPUTS" action="PM 独立核验（不信自述）：Read test_plan.md/test_report.md 全文；Glob 确认 12 个测试文件 + 9 份证据日志齐备；Grep 独立计数 user_stories.md 得 16 US / 78 AC / 12 Must Have（与计划声明一致）；Grep 确认 tests/e2e 的 US 覆盖 16/16 无一遗漏；Read conftest.py 与 3 份单元用例，确认离线纪律（IB_OFFLINE_MODE=1、SQLite/内存/替身、真实管线 ingest_text、无真实凭据）" result="VERIFIED_OK" invocation_id="INV-GROUP_D-INTELBASE-001" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_VERIFY" action="PM 委派**独立 verifier 亲自复跑**通过率证据（高影响决策须实测，不信静态推理）：pytest unit/integration/e2e/all → 55/69/14/138 全部 passed，四者 EXIT=0；--collect-only 收集数 138 与函数计数逐目录相等；无 pytest.ini/setup.cfg/pyproject/tox.ini（无 addopts/-k/--deselect/--ignore 作弊面）、0 skip/xfail、0 monkeypatch 打在 ib.* 上；另以**脱离测试套件的探针**独立复现两项缺陷（digest='' / '（无可用工具）'；StartupError + pending 幽灵行 + 真实 HTTP 500）；凭据扫描 0 真实命中（2 处 key 形字面量为占位符）；tests/ 无生产 IP/端口，真实 socket 仅回环 127.0.0.1:0；src/*.py mtime 全部早于测试窗口；FreeArk git status 仅 14 条 ?? 未跟踪、无 M/A/D" result="VERIFIED_OK" trace_id="intelligentbase"/>
@@ -509,11 +509,11 @@
     <log time="2026-09-26T00:00:00Z" state="PM_AWAIT_USER_CONFIRM" action="依据用户指令『完成后按门控停下回报：R2 修订摘要 + M-02 实现摘要 + 测试计划/报告结论 + 通过率门控结果』，GROUP_D 门控通过后暂停回报；GROUP_E **保持冻结**，等待用户复核测试报告并明确授权进入部署阶段（生产部署另须 PRODUCTION_DEPLOY_CONFIRM）" result="WAITING" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_PARSE_PROJECT" action="收到协调者两项授权：① 授权 GROUP_C R3 修复 FND-GROUP-D-02（MAJOR）+ FND-GROUP-D-01（MEDIUM）并补回归用例、重跑串行通过率门控；② 授权 GROUP_E 至 PHASE_10（先产出部署计划，**暂不执行生产部署**，待 PRODUCTION_DEPLOY_CONFIRM）。登记修订指令 REV-03；GROUP_C 置 IN_PROGRESS（R3_PENDING）" result="AUTHORIZED" trace_id="intelligentbase"/>
     <security_event time="2026-09-26T00:00:00Z" type="credential_received_redacted" action="协调者消息中携带目标机 SSH 口令（明文）。按 SC-3 敏感数据保护：**未写入任何文件/日志/知识库/子代理提示**，仅在内存中识别并即刻弃置；后续一律以『凭据走环境变量注入』表述。已登记约定：目标机 host=192.168.31.133、user=yangyang198354（非 secret）、认证方式=口令认证、主机指纹 ssh-ed25519 SHA256:BwIe6k9QhluWCPPyrOykjSDtrWn+EgtesTllQjUd2eY（公钥指纹，非 secret；供主机键校验）。口价值 [REDACTED]，禁止出现在 .env.example / deployment_plan.md / phase_status.md / 任何 git 跟踪文件" result="REDACTED_NOT_STORED"/>
-    <log time="2026-09-26T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke sub_agent_software_developer (GROUP_C R3, INV-GROUP_C-INTELBASE-003)：修 FND-GROUP-D-02（delete_document 不得依赖 collection 已绑定；未绑定应视为无向量可删并后置台账删除）+ FND-GROUP-D-01（组合根 capability_digest 装配接线）；输入=REV-03 + code_review_report(R2) + implementation_plan(2.0.0 R2) + docs/test_report.md §5（两缺陷复现命令与根因）+ src/(76 文件)+ tests/(只读，不得修改)；约束=FreeArk 只读/冻结架构约束不破/凭据仅环境变量/测试 SQLite-InMemory 不联外网/不得修改 tests/（回归用例由 test-engineer 补）" result="IN_PROGRESS" invocation_id="INV-GROUP_C-INTELBASE-003" trace_id="intelligentbase"/>
+    <log time="2026-09-26T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke software-developer (GROUP_C R3, INV-GROUP_C-INTELBASE-003)：修 FND-GROUP-D-02（delete_document 不得依赖 collection 已绑定；未绑定应视为无向量可删并后置台账删除）+ FND-GROUP-D-01（组合根 capability_digest 装配接线）；输入=REV-03 + code_review_report(R2) + implementation_plan(2.0.0 R2) + docs/test_report.md §5（两缺陷复现命令与根因）+ src/(76 文件)+ tests/(只读，不得修改)；约束=FreeArk 只读/冻结架构约束不破/凭据仅环境变量/测试 SQLite-InMemory 不联外网/不得修改 tests/（回归用例由 test-engineer 补）" result="IN_PROGRESS" invocation_id="INV-GROUP_C-INTELBASE-003" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_AWAIT_AGENT" action="software-developer 返回" result="SUCCESS" invocation_id="INV-GROUP_C-INTELBASE-003" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_READ_OUTPUTS" action="读 R3 产出：src/ib/lifecycle/__init__.py(FND-02)、src/ibweb/composition.py(FND-01)、src/deploy/checklists.txt(B6 订正)、docs/implementation_plan.md v2.1.0 §13、docs/code_review_report.md §10、docs/evidence/groupc_r3_*(8 件)" result="READ" invocation_id="INV-GROUP_C-INTELBASE-003" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_GATE_REVIEW" action="登记 R3 两缺陷为 FIXED_PENDING_VERIFICATION（未采信『测试通过』单独陈述，按 KE-PM-021 待独立复跑）；登记遗留 MINOR FND-R3-03 与 R3-RISK-01~04；不改 tests/（3 个固化用例按设计失败待 test-engineer 翻转）" result="PENDING_INDEPENDENT_VERIFICATION" invocation_id="INV-GROUP_C-INTELBASE-003" trace_id="intelligentbase"/>
-    <log time="2026-09-26T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke sub_agent_test_engineer (GROUP_D R3 增量, INV-GROUP_D-INTELBASE-002)：翻转三个固化缺陷用例为正向断言 + 补 AC-IB-03-02/03-03/02-04 定向回归 + 补真并发竞态用例(R3-RISK-01) + 全量重跑并执行串行通过率门控 + 更新 test_plan/test_report；约束=只改 tests/ 与测试文书、不得改 src/、离线 SQLite-InMemory、禁收缩测试面(无 addopts/-k/--deselect/--ignore、0 skip/xfail)、FreeArk 只读、凭据仅环境变量、不触碰目标机" result="IN_PROGRESS" invocation_id="INV-GROUP_D-INTELBASE-002" trace_id="intelligentbase"/>
+    <log time="2026-09-26T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke test-engineer (GROUP_D R3 增量, INV-GROUP_D-INTELBASE-002)：翻转三个固化缺陷用例为正向断言 + 补 AC-IB-03-02/03-03/02-04 定向回归 + 补真并发竞态用例(R3-RISK-01) + 全量重跑并执行串行通过率门控 + 更新 test_plan/test_report；约束=只改 tests/ 与测试文书、不得改 src/、离线 SQLite-InMemory、禁收缩测试面(无 addopts/-k/--deselect/--ignore、0 skip/xfail)、FreeArk 只读、凭据仅环境变量、不触碰目标机" result="IN_PROGRESS" invocation_id="INV-GROUP_D-INTELBASE-002" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_AWAIT_AGENT" action="test-engineer 返回（三固化用例翻转为正向守卫全 PASS；新增 TC-INT-069/070/071/073；全量 142 passed EXIT=0；三层 100%/100%/100%；0 skip/xfail；未改 src/）" result="SUCCESS" invocation_id="INV-GROUP_D-INTELBASE-002" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_READ_OUTPUTS" action="读 R3 回归产出：docs/test_plan.md 1.1.0、docs/test_report.md 1.1.0（§5.1/§5.2 CLOSED_VERIFIED + §10 R3 报告）、tests/integration/{test_composition_retrieval,test_http_contract,test_ops_contract}.py、docs/evidence/groupd_r3_*(9 件)" result="READ" invocation_id="INV-GROUP_D-INTELBASE-002" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_GATE_REVIEW" action="按 KE-PM-021/023 **不采信** test-engineer 的 142/142 与 CLOSED_VERIFIED 自述；登记 R3 新发现 FND-GROUP-D-03（MAJOR，blob 孤儿，倾向阻塞 GROUP_E，待独立复核后裁定）+ FLAKE-IB-01（MINOR 环境偶发）；R3-RISK-01 由 TC-INT-071 真并发用例部分消解但仍未闭合（无多进程压测）" result="PENDING_INDEPENDENT_VERIFICATION" invocation_id="INV-GROUP_D-INTELBASE-002" trace_id="intelligentbase"/>
@@ -526,7 +526,7 @@
     <log time="2026-09-26T00:00:00Z" state="PM_GATE_REVIEW" action="签发 GR-D-002（GROUP_D R3 增量）：四项 PASS 标准（单元≥80%/集成≥90%/全 US 覆盖/metrics 算术一致）**全部 SATISFIED**（实测 100%/100%/100%、16/16 US、142=142+0+0+0）且由独立 verifier 复跑 + 反注水五查 + 突变测试证实 → 不判 FAIL；因 FLAKE-IB-01 稳定性需重估（5/6、漏登 TC-INT-026）+ blob 覆盖缺口 + 2 项文档 MINOR + 非 git 仓弱证据限制 → 判 **PASS_WITH_CONDITIONS**" result="PASS_WITH_CONDITIONS" invocation_id="INV-GROUP_D-INTELBASE-002" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_GATE_PASS" action="两缺陷 **CLOSED_VERIFIED**（FND-GROUP-D-01 / FND-GROUP-D-02）；GROUP_C 置 APPROVED（R3_PASS）、GROUP_D 置 APPROVED（PASS_WITH_CONDITIONS）" result="GROUP_C + GROUP_D APPROVED" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_FIX" action="PM 自查并修复自引入的 XML 破损：FND-GROUP-D-01 元素**缺闭合标记**（致 phase_status.md 非法 XML，属 KE-PM-025 形态 a 的复发）→ 补上并顺带写入 note_4 闭合结论；另修属性值内裸引号（回退『双引号包夹的 default 字面量』→ 回退『default』）与属性值内裸尖括号。收官结构自检：group 5/5、followup_note 5/5、gate_review 7 处自闭合、input 22 个均内联闭合、无裸 &amp;、无属性内未转义尖括号；另委派 XML 良构性解析复核" result="FIXED" trace_id="intelligentbase"/>
-    <log time="2026-09-26T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke sub_agent_devops_engineer (GROUP_E **仅 PHASE_10**, INV-GROUP_E-INTELBASE-001)：产出 docs/deployment_plan.md（如需加 docs/cicd_pipeline.md），覆盖目标机 192.168.31.133（Ubuntu 26.04 LTS / x86_64 / i7-3770S 4C8T / 11Gi / GTX960 太老按 CPU-only / 78G 磁盘）上 Qdrant .deb 裸装 + Python venv + bge-m3（FlagEmbedding, CPU）+ Django 栈 + rapidocr/onnxruntime + langchain-openai&lt;0.3 + 4 个 systemd 单元；交付方式 git pull/裸仓库；DeepSeek 真跑 smoke 验证步骤；回滚方案。**仅计划：严禁任何对目标机的写/安装/服务启动/SSH 写**；凭据仅环境变量注入、.env.example 只放占位符、禁止任何明文口令入库" result="IN_PROGRESS" invocation_id="INV-GROUP_E-INTELBASE-001" trace_id="intelligentbase"/>
+    <log time="2026-09-26T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke devops-engineer (GROUP_E **仅 PHASE_10**, INV-GROUP_E-INTELBASE-001)：产出 docs/deployment_plan.md（如需加 docs/cicd_pipeline.md），覆盖目标机 192.168.31.133（Ubuntu 26.04 LTS / x86_64 / i7-3770S 4C8T / 11Gi / GTX960 太老按 CPU-only / 78G 磁盘）上 Qdrant .deb 裸装 + Python venv + bge-m3（FlagEmbedding, CPU）+ Django 栈 + rapidocr/onnxruntime + langchain-openai&lt;0.3 + 4 个 systemd 单元；交付方式 git pull/裸仓库；DeepSeek 真跑 smoke 验证步骤；回滚方案。**仅计划：严禁任何对目标机的写/安装/服务启动/SSH 写**；凭据仅环境变量注入、.env.example 只放占位符、禁止任何明文口令入库" result="IN_PROGRESS" invocation_id="INV-GROUP_E-INTELBASE-001" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_FIX" action="修复**先存**（非本轮引入）的 XML 破损：5 个 gate_review 起始标签（GR-B-002/GR-B-003/GR-C-001/GR-C-002/GR-D-001）以 `&gt;` 而非 `/>` 结尾且全文件无 `&lt;/gate_review&gt;` → 致本权威状态文件自 GR-B-002 起长期**非法 XML**（此前的开闭计数自检无法察觉，仅独立解析器可暴露；属 KE-PM-025 形态 a 的长期潜伏）。已逐一改为自闭合；另修 kb_full.xml 中 KE-PM-018 正文两处裸尖括号。核实：group 5/5、followup_note 7/7、gate_review 9/9 全自闭合、revision_request 3/3、input 22/22" result="FIXED" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_AWAIT_AGENT" action="devops-engineer 返回 GROUP_E PHASE_10：status=PARTIAL_SUCCESS（因 6 项 P0 外部前置非其可闭合项）；产出 docs/deployment_plan.md 549 行 + docs/cicd_pipeline.md 96 行 + 自身 KB（.claude/agents/knowledge_base/devops_engineer/* 首次初始化）" result="SUCCESS" invocation_id="INV-GROUP_E-INTELBASE-001" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_READ_OUTPUTS" action="读 PHASE_10 产出：docs/deployment_plan.md（12 节 + DEPLOY/ROLLBACK 逆操作表 + NV-01~08 映射，status=DRAFT）、docs/cicd_pipeline.md（10 阶段 + 3 条硬版本门）" result="READ" invocation_id="INV-GROUP_E-INTELBASE-001" trace_id="intelligentbase"/>
@@ -535,16 +535,16 @@
     <log time="2026-09-26T00:00:00Z" state="PM_GATE_PASS" action="PHASE_10 置 APPROVED；docs/deployment_plan.md 与 docs/cicd_pipeline.md 的 file_header status 由 DRAFT 升为 APPROVED；GROUP_E 整体仍 IN_PROGRESS（PHASE_11 PENDING，未门控）" result="PHASE_10 APPROVED" trace_id="intelligentbase"/>
     <log time="2026-09-26T00:00:00Z" state="PM_AWAIT_USER_CONFIRM" action="依据用户指令（REV-03-4）计划产出后停下回报。**等待用户**：(1) 复核部署计划；(2) 补齐 P0 前置（B-01 git 仓库/remote、B-02 凭据注入、B-03 源可达、B-04 FND-GROUP-D-03 裁决、B-05 ib-embed 运行时选型、B-06 权重获取）；(3) 明确下达 PRODUCTION_DEPLOY_CONFIRM=true 方可进 PHASE_11。**在此之前不执行任何目标机写操作**" result="WAITING" trace_id="intelligentbase"/>
     <log time="2026-09-26T09:00:00Z" state="PM_PHASE_REVISION" action="登记修订指令 REV-04（FND-GROUP-D-03 修复 + B-05 依赖补齐 + 部署计划 P1 修订 + 回归门控 + git remote）；GROUP_C 置 IN_PROGRESS（R4），重试计数 0" result="REVISION_STARTED" trace_id="intelligentbase"/>
-    <log time="2026-09-26T09:05:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke sub_agent_software_developer (GROUP_C R4：FND-GROUP-D-03 修复 + B-05)" result="SUCCESS" invocation_id="INV-GROUP_C-INTELBASE-004" trace_id="intelligentbase"/>
+    <log time="2026-09-26T09:05:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke software-developer (GROUP_C R4：FND-GROUP-D-03 修复 + B-05)" result="SUCCESS" invocation_id="INV-GROUP_C-INTELBASE-004" trace_id="intelligentbase"/>
     <log time="2026-09-26T09:10:00Z" state="PM_READ_OUTPUTS" action="PM 亲读 developer R4 改动：ib/blob/__init__.py 新增 kb_segment 单一真源（4 调用点）、ib/lifecycle/__init__.py blob_ref_for 改 kb_segment + 新增 _blob_scope_of + delete_document 第 2 步改台账派生 scope、新增 src/requirements-embed.txt + .gitignore 权重规则；确认未加 BlobStore 端口方法（MOD-IB-12 冻结 4 方法）" result="VERIFIED_DESIGN_OK" invocation_id="INV-GROUP_C-INTELBASE-004" trace_id="intelligentbase"/>
-    <log time="2026-09-26T09:15:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke sub_agent_test_engineer (GROUP_D R4：回归 + 新增/强化用例)" result="SUCCESS (148/148 EXIT=0)" invocation_id="INV-GROUP_D-INTELBASE-003" trace_id="intelligentbase"/>
+    <log time="2026-09-26T09:15:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke test-engineer (GROUP_D R4：回归 + 新增/强化用例)" result="SUCCESS (148/148 EXIT=0)" invocation_id="INV-GROUP_D-INTELBASE-003" trace_id="intelligentbase"/>
     <log time="2026-09-26T09:20:00Z" state="PM_DECIDE" action="按 KE-PM-021 不采信 test-engineer 的 148/148 与 CLOSED_VERIFIED 自述；委派独立只读 verifier 做对抗性证伪（含 PM 指定的上传侧 put(scope) vs 删除侧 _blob_scope_of 三方一致性专项）" result="VERIFICATION_DISPATCHED" trace_id="intelligentbase"/>
     <log time="2026-09-26T09:25:00Z" state="PM_READ_OUTPUTS" action="独立 verifier 判定 CONFIRMED_WITH_CAVEATS：真实 HTTP 探针 19/19（blob_deleted=True、根目录 0 残留）+ 回退副本 8 项失败（灵敏度反证）+ 三组合无孤儿 + 自建突变 6F/2P 与 1F/5P（与 test-engineer 口径吻合）+ netguard 0 非回环 + FreeArk 只读未破；新发现 6 项 MINOR/INFO（N-1..N-6）" result="CONFIRMED_WITH_CAVEATS" trace_id="intelligentbase"/>
     <log time="2026-09-26T09:30:00Z" state="PM_GATE_REVIEW" action="签发 GR-C-004（GROUP_C R4 增量）：两 PASS 标准（26/26 模块 / 无 CRITICAL）SATISFIED；FND-GROUP-D-03 修复经独立复核证实、三 scope 组合无孤儿、端口/签名未越界、B-05 清单已补 → 判 PASS（升格自 R3 的 PASS_WITH_CONDITIONS）" result="PASS" invocation_id="INV-GROUP_C-INTELBASE-004" trace_id="intelligentbase"/>
     <log time="2026-09-26T09:30:00Z" state="PM_GATE_REVIEW" action="签发 GR-D-003（GROUP_D R4 增量）：四项 PASS 标准全部 SATISFIED（56/56、78/78、16/16 US、148=148+0+0+0），经 verifier 复跑 + 反注水五查 + 自建突变 + netguard 证实；GR-D-002 覆盖缺口条件已闭合 → 判 PASS_WITH_CONDITIONS（2 文档 MINOR + FLAKE-IB-01 未闭合 + 非 git 弱证据）" result="PASS_WITH_CONDITIONS" invocation_id="INV-GROUP_D-INTELBASE-003" trace_id="intelligentbase"/>
     <log time="2026-09-26T09:30:00Z" state="PM_GATE_PASS" action="GROUP_C 三门控阶段（PHASE_05/06/06b）status=APPROVED，版本 2.2.0(R4)，gate_decision=R4_PASS（GR-C-004）；GROUP_D 三门控阶段（PHASE_07/08/09）保持 APPROVED，版本 1.2.0(R4)，gate_decision 追加 GR-D-003；FND-GROUP-D-03 登记为 CLOSED_VERIFIED" result="GROUP_C/GROUP_D APPROVED" trace_id="intelligentbase"/>
     <log time="2026-09-26T09:31:00Z" state="PM_FIX" action="R4 编辑后跑 XML 解析器收官门（委派独立代理以 **ElementTree + expat-minidom + lxml 三解析器**全量解析）：三者 EXIT=0，根 tag=phase_status，gate_review=12（全部自闭合、零子元素零文本）、group=5、input=23、log=86、security_event=5，无重复 id，且字面串计数与解析器元素数逐一一致" result="PARSER_GATE_PASS" trace_id="intelligentbase"/>
-    <log time="2026-09-26T09:35:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke sub_agent_devops_engineer (GROUP_E PHASE_10 R4 修订：C-02~C-06 + 反映 B-05)。PHASE_10 置 IN_PROGRESS（R4）。仅文档/部署产物，**不触目标机**；赋予的 src/ 改动权限仅限两处（新增 ib-worker.env.example、qdrant.service 的 ExecStart 一行）" result="DISPATCHED" invocation_id="INV-GROUP_E-INTELBASE-002" trace_id="intelligentbase"/>
+    <log time="2026-09-26T09:35:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke devops-engineer (GROUP_E PHASE_10 R4 修订：C-02~C-06 + 反映 B-05)。PHASE_10 置 IN_PROGRESS（R4）。仅文档/部署产物，**不触目标机**；赋予的 src/ 改动权限仅限两处（新增 ib-worker.env.example、qdrant.service 的 ExecStart 一行）" result="DISPATCHED" invocation_id="INV-GROUP_E-INTELBASE-002" trace_id="intelligentbase"/>
     <log time="2026-09-26T09:32:00Z" state="PM_AWAIT_USER_CONFIRM" action="依据用户指令（REV-04）完成 R4 修复与回归后停下回报：R4 修复摘要 + 回归结果 + 部署计划修订点。**仍不执行对目标机的任何写入/安装/启动**；REV-04-3（devops 部署计划 P1 修订）与 REV-04-5（git remote）待续；PHASE_11 须待用户完成 git 仓库 + GitHub push + SSH 免密后再下达 PRODUCTION_DEPLOY_CONFIRM" result="WAITING" trace_id="intelligentbase"/>
     <log time="2026-09-26T09:40:00Z" state="PM_AWAIT_AGENT" action="devops-engineer (INV-GROUP_E-INTELBASE-002) 返回 SUCCESS：deployment_plan.md / cicd_pipeline.md → v1.1.0，新增 src/deploy/ib-worker.env.example，qdrant.service ExecStart 统一；C-02~C-06 全部处置、B-05 反映为部分闭合；**额外发现真实端口冲突**（18080 被 Waitress 占用 → nginx 对外须另用端口）" result="SUCCESS" invocation_id="INV-GROUP_E-INTELBASE-002" trace_id="intelligentbase"/>
     <log time="2026-09-26T09:45:00Z" state="PM_READ_OUTPUTS" action="PM 亲自复核 devops 修订的关键事实：qdrant.service:35=/usr/bin/qdrant（仅此一行）；ib-worker.env.example 27 键与 env.example 逐键一致全占位符；§7.5 nginx 反代 127.0.0.1:18080 与 ib-web.service:49-54 / vite.config.ts:10 一致且真实；§6.1 C-06 决策树含最小探针与双链路合并；§8.1 软链单一真源；修订记录与 file_header REVISED_PENDING_REVIEW 均合规" result="VERIFIED_OK" invocation_id="INV-GROUP_E-INTELBASE-002" trace_id="intelligentbase"/>

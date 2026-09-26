@@ -3,7 +3,7 @@
 @implements IFC-IB-242 ~ IFC-IB-249 路由表
             IFC-IB-283（R2）`/api/files/{doc_id}/images/{image_id}` 路由
 @depends MOD-IB-23（views）
-@author sub_agent_software_developer
+@author software-developer
 
 URLconf（路径 → 视图的**全量**映射）。
 

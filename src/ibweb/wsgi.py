@@ -2,7 +2,7 @@
 @module MOD-IB-23
 @implements IFC-IB-241 `WSGIApplication`（WSGI 入口点）
 @depends MOD-IB-23（composition）
-@author sub_agent_software_developer
+@author software-developer
 
 WSGI 入口（Waitress 主 / Gunicorn 备）。
 

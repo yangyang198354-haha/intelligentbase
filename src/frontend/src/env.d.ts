@@ -1,7 +1,7 @@
 /**
  * @module MOD-IB-24
  * @implements IFC-IB-256/257/258 类型声明（.vue 单文件组件与 Vite 环境）
- * @author sub_agent_software_developer
+ * @author software-developer
  *
  * 没有这个文件时 `import App from './App.vue'` 在 `vue-tsc` 下会报
  * TS2307（找不到模块），于是 `npm run build` 的 typecheck 关卡形同虚设 ——

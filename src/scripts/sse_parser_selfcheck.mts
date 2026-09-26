@@ -1,7 +1,7 @@
 /**
  * @module MOD-IB-24（自检，非交付运行时）
  * @implements 验证 IFC-IB-259 的 SSE 分帧逻辑与后端 IFC-IB-225 编码的往返一致性
- * @author sub_agent_software_developer
+ * @author software-developer
  *
  * 离线自检：**真跑**前端 `parseSseStream`，而不是靠阅读代码断言「应该没问题」。
  *

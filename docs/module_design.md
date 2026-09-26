@@ -7,14 +7,14 @@
   <revision>R2</revision>
   <status>DRAFT_FOR_GATE_REVIEW</status>
   <phase>GROUP_B / PHASE_04 模块详细设计</phase>
-  <author>sub_agent_system_architect</author>
+  <author>system-architect</author>
   <invocation_id>INV-GROUP_B-INTELBASE-002</invocation_id>
   <created_at>2026-09-25</created_at>
   <revision_history>
-    <rev no="R1" date="2026-09-25" by="sub_agent_system_architect" basis="REV-01（框架切换 FastAPI→Django）">
+    <rev no="R1" date="2026-09-25" by="system-architect" basis="REV-01（框架切换 FastAPI→Django）">
       Web 层载体由 FastAPI/Uvicorn/ASGI 切换为 Django + DRF + WSGI（Waitress 主 / Gunicorn 备）。仅替换「载体」，不改变任何领域契约：25 模块、13 端口、58 条 IFC-IB 编号、DAG 拓扑序与 REQ 覆盖率均保持不变。新增 §2.1.1 载体等价映射表、§4.2.1 无环性再声明、§9.3 覆盖率再声明；MOD-IB-21 增补 SSE 承载与鉴权纪律；MOD-IB-23 组合根返回类型与外部依赖替换。
     </rev>
-  <rev no="R2" date="2026-09-26" by="sub_agent_system_architect" invocation_id="INV-GROUP_B-INTELBASE-004" basis="PM 补交要求（L-03：ib-embed 服务端无模块归属与完整契约）">
+  <rev no="R2" date="2026-09-26" by="system-architect" invocation_id="INV-GROUP_B-INTELBASE-004" basis="PM 补交要求（L-03：ib-embed 服务端无模块归属与完整契约）">
     新增 MOD-IB-26「ib-embed 服务端」（26 大于其全部依赖 {01,02,04}，编号即拓扑序仍成立，且本模块不被任何模块 import）。新增 IFC 编号：266~274（MOD-IB-26 线协议，正文以 docs/ib_embed_service_contract.md 为准）、275（MOD-IB-09 的 InProcessBgeM3Embedder 第三适配器）、276~284（M-02 页面图绑定：MOD-IB-01 数据结构 / MOD-IB-13 五条 / MOD-IB-21 related_images 载荷 / MOD-IB-23 图片端点 / MOD-IB-24 渲染约束）、286（MOD-IB-25 第二份 EnvironmentFile 模板）；IFC-IB-285 预留未分配。既有 MOD-IB-01~25、IFC-IB-001~265、端口名、DAG 拓扑与 REQ 覆盖率矩阵一字不动（纯追加）。增补位置：§1 总览行与计数、§2.1 三行数据结构、§2.2.1 R2 IFC 段号索引、§3 的 MOD-IB-09/13/21/23/24/25 增补与 MOD-IB-26 新小节（摘要视图）、§4.1 一条新依赖边、§4.2 R2 无环补句、§4.3 分层一行、§5 装配表 IB_EMBED_BACKEND 值域扩展、§7.4 两行降级、§9.1/§9.2 覆盖更新与 §9.4 再声明、§11 R2 自检。
   </rev>
   </revision_history>

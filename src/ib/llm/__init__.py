@@ -3,7 +3,7 @@
 @implements IFC-IB-211 build_router / 212 build_expert / 213 build_aggregator
             IFC-IB-214 health / 215 describe_egress
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-04
-@author sub_agent_software_developer
+@author software-developer
 
 LLM 端点抽象（module_design.md §3 MOD-IB-20；ADR-08；REQ-FUNC-IB-18/19/21；DR-04；
 AC-IB-12-05、AC-IB-09-07）。

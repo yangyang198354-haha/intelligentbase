@@ -4,7 +4,7 @@
  *             同一契约的路径写法差异，见 implementation_plan §8 偏差 D-09）
  *             IFC-IB-283（R2）`fetchFileImage` / `fileImageUrl`：页面图字节取用
  * @depends MOD-IB-23（HTTP / SSE 契约，**仅**契约，不 import 任何后端模块）
- * @author sub_agent_software_developer
+ * @author software-developer
  *
  * 类型化 HTTP 客户端 —— 前端与后端之间**唯一**的通信入口（IC-IB-01 的落点）。
  *

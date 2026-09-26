@@ -2,7 +2,7 @@
 @module MOD-IB-12
 @implements IFC-IB-131 put / 132 get / 133 delete / 134 exists
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-04
-@author sub_agent_software_developer
+@author software-developer
 
 原文件 BlobStore（module_design.md §3 MOD-IB-12 / ADR-05；OQ-IB-01 = CONFIRMED_ON）。
 

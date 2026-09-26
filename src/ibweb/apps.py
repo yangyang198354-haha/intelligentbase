@@ -2,7 +2,7 @@
 @module MOD-IB-23
 @implements IFC-IB-263 启动期必填校验（AC-IB-12-03） / §2.1.1 lifespan 等价物
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-04
-@author sub_agent_software_developer
+@author software-developer
 
 启动钩子（`AppConfig.ready()`）—— FastAPI `lifespan` 的 Django 等价物（module_design §2.1.1）。
 

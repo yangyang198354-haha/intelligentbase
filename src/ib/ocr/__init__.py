@@ -3,7 +3,7 @@
 @implements IFC-IB-061 available / IFC-IB-062 recognize / IFC-IB-063 descriptor
             IFC-IB-064 NullOcrEngine
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-04
-@author sub_agent_software_developer
+@author software-developer
 
 OCR 端口与适配（module_design.md §3 MOD-IB-06 / ADR-12）。
 

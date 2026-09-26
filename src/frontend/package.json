@@ -2,7 +2,7 @@
   "name": "intelligentbase-frontend",
   "@module": "MOD-IB-24",
   "@implements": "IFC-IB-256 / 257 / 258 / 259（上传·列表·重建页 + 问答页 + 类型化 API 客户端）",
-  "@author": "sub_agent_software_developer",
+  "@author": "software-developer",
   "private": true,
   "version": "1.0.0",
   "type": "module",

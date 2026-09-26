@@ -2,7 +2,7 @@
 @module MOD-IB-23
 @implements IFC-IB-241 build_application / 242~249 HTTP 端点 / 250 鉴权注入
 @depends MOD-IB-01 ~ MOD-IB-22（全部装配，见 module_design §5）
-@author sub_agent_software_developer
+@author software-developer
 
 Django 承载层（MOD-IB-23）—— **唯一装配点**。
 

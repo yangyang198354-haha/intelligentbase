@@ -2,7 +2,7 @@
 @module MOD-IB-23
 @implements IFC-IB-242~249 响应体字段契约（module_design §3 MOD-IB-23）
 @depends MOD-IB-01（领域类型）, MOD-IB-11/12/14（台账/Blob/重建类型）
-@author sub_agent_software_developer
+@author software-developer
 
 HTTP 出入参的类型边界（**唯一**允许把领域 dataclass 翻成 JSON 的地方）。
 

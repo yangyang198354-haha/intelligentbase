@@ -6,7 +6,7 @@
 |------|-----|
 | 文档 ID | DOC-IB-TP-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 测试计划 |
-| 产出代理 | sub_agent_test_engineer |
+| 产出代理 | test-engineer |
 | 调用 ID | INV-GROUP_D-INTELBASE-002（R3 增量；原 INV-GROUP_D-INTELBASE-001） |
 | 项目 | intelligentbase |
 | 阶段 | GROUP_D / PHASE_07（测试计划）+ R3 增量（缺陷回归与门控） |

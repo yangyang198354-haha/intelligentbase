@@ -2,7 +2,7 @@
 @module MOD-IB-23
 @implements IFC-IB-247 SSE 承载（`StreamingHttpResponse` 原生 SSE）
 @depends MOD-IB-21（`StreamEvent` / `to_sse` / `SSE_HEADERS`）
-@author sub_agent_software_developer
+@author software-developer
 
 SSE 响应构造（MOD-IB-21 的事件编码 + Django 的 `StreamingHttpResponse`）。
 

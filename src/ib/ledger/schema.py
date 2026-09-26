@@ -2,7 +2,7 @@
 @module MOD-IB-11（schema）
 @implements IFC-IB-120~131 的持久化基座（表结构 / 索引 / PRAGMA）
 @depends (none)
-@author sub_agent_software_developer
+@author software-developer
 
 台账 DDL 的**单一真源**（module_design.md §6；ADR-10；tech_stack §3）。
 

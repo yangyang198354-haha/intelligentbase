@@ -1,7 +1,7 @@
 -- ---------------------------------------------------------------------------
 -- @module MOD-IB-25 / MOD-IB-11
 -- @implements 手写 scoped 迁移（001）：台账 SQLite schema 初始化
--- @author sub_agent_software_developer
+-- @author software-developer
 --
 -- 由 `ib/ledger/schema.py::ddl_script()` **原样生成**（单一真源）。
 -- 生成命令：

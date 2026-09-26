@@ -7,7 +7,7 @@
   <revision>R2</revision>
   <status>APPLY_READY</status>
   <phase>GROUP_B / R2 补交（L-03）</phase>
-  <author>sub_agent_system_architect</author>
+  <author>system-architect</author>
   <invocation_id>INV-GROUP_B-INTELBASE-004</invocation_id>
   <created_at>2026-09-26</created_at>
   <targets>docs/architecture_design.md（AD-04 ~ AD-05：ADR-02-R2 附注 + §2.0.1 R2 影响复核表）</targets>

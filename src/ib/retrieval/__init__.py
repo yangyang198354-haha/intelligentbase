@@ -2,7 +2,7 @@
 @module MOD-IB-15
 @implements IFC-IB-161 RetrievalService.search / IFC-IB-162 RetrievalService.search_as_tool
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-03, MOD-IB-04, MOD-IB-09, MOD-IB-10
-@author sub_agent_software_developer
+@author software-developer
 
 检索服务（module_design.md §3 MOD-IB-15 / architecture_design.md ADR-13、§「fail-open 读路径」；
 REQ-FUNC-IB-14/16/17/23；AC-IB-06-02、AC-IB-08-03/04、AC-IB-13-01/02、AC-IB-14-01/02）。

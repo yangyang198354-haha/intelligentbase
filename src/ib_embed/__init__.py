@@ -3,7 +3,7 @@
 @implements IFC-IB-266 ~ IFC-IB-274（ib-embed 服务端线协议；契约唯一落点：
             docs/ib_embed_service_contract.md）
 @depends —（**不 import 任何 `ib.*`**：服务端与业务基座之间**只有线协议**）
-@author sub_agent_software_developer
+@author software-developer
 
 `ib-embed` —— bge-m3 常驻 embedding 推理服务（MOD-IB-26）。
 

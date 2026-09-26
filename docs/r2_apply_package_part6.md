@@ -7,7 +7,7 @@
   <revision>R2</revision>
   <status>APPLY_READY</status>
   <phase>GROUP_B / R2 补交（L-03）</phase>
-  <author>sub_agent_system_architect</author>
+  <author>system-architect</author>
   <invocation_id>INV-GROUP_B-INTELBASE-004</invocation_id>
   <created_at>2026-09-26</created_at>
   <targets>docs/tech_stack.md（TS-04 ~ TS-07：bge-m3 加载库选型行改写 / 许可台账新增行 / §1.2 服务端配置键登记 / §5.2 指令集风险行）</targets>

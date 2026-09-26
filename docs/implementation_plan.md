@@ -6,7 +6,7 @@
   <version>2.2.0</version>
   <status>DRAFT</status>
   <phase>GROUP_C / PHASE_05 实现计划（R4 增量：缺陷修复 FND-GROUP-D-03 + B-05 补齐）</phase>
-  <author>sub_agent_software_developer</author>
+  <author>software-developer</author>
   <invocation_id>INV-GROUP_C-INTELBASE-002</invocation_id>
   <latest_invocation_id>INV-GROUP_C-INTELBASE-004</latest_invocation_id>
   <created_at>2026-09-25</created_at>
@@ -295,7 +295,7 @@ src/
 
 | 偏差ID | 偏差描述 | 原 ADR / 约束 | 偏差原因 | 处置 |
 |--------|---------|--------------|---------|------|
-| D-01 | 三份 GROUP_B 文档的 `<file_header><status>` 仍为 `DRAFT_FOR_GATE_REVIEW`，而 `phase_status.md` 已记 `GROUP_B status=APPROVED / GR-B-002=PASS` 且三个 phase 均 `status=APPROVED` | 硬约束「status ≠ APPROVED 即 BLOCKED」 | 冲突源为**文件头状态字段未随门控回写**（纯文档一致性问题，非设计未批）。PM 的权威项目状态文件与门控记录（GR-B-002，reviewer=main_agent_pm，decision=PASS）均为 APPROVED，且调用块显式声明「R1，已通过 GR-B-002」 | **不阻塞**，按 APPROVED 执行；本项作为 MINOR finding 记入 code_review_report，建议 GROUP_B 回写文件头 status |
+| D-01 | 三份 GROUP_B 文档的 `<file_header><status>` 仍为 `DRAFT_FOR_GATE_REVIEW`，而 `phase_status.md` 已记 `GROUP_B status=APPROVED / GR-B-002=PASS` 且三个 phase 均 `status=APPROVED` | 硬约束「status ≠ APPROVED 即 BLOCKED」 | 冲突源为**文件头状态字段未随门控回写**（纯文档一致性问题，非设计未批）。PM 的权威项目状态文件与门控记录（GR-B-002，reviewer=pm-orchestrator，decision=PASS）均为 APPROVED，且调用块显式声明「R1，已通过 GR-B-002」 | **不阻塞**，按 APPROVED 执行；本项作为 MINOR finding 记入 code_review_report，建议 GROUP_B 回写文件头 status |
 | D-02 | `IFC-IB-131` 编号在 LedgerRepository（`list_chunks`）与 BlobStore（`put`）**重复** | module_design §2.2 / §3（自称 12+4 条共占 120~134） | 上游文档编号算术缺陷（12+4=16 条需 120~135） | 按字面编号实现，代码注释以 `MOD-IB-11:` / `MOD-IB-12:` 前缀消歧；记 MINOR finding |
 | D-03 | 自测机 Python 为 **3.14.6**，超出 tech_stack 的 `>=3.11,<3.14` | tech_stack §1 编程语言行 | 开发机既有环境，不擅自改动（且不属本代理职责） | 自测证据标注「开发机 3.14.6」；部署目标机须以 `venv` 满足版本约束后才作为验收证据 |
 | D-04 | 自测机 `langchain-openai` 为 **1.3.3**，违反 `pin <0.3` | tech_stack §3 / 冻结约束 9 | 开发机既有全局环境，本代理不改动全局依赖 | **实际实现与本节初稿不同**：不是「WARN 不抛错」，而是 `ib/llm/__init__.py::assert_langchain_openai_version()` 在**构造 provider 时直接抛 `StartupError`**。理由：0.3.x 移除 `_convert_chunk_to_generation_chunk` 会让**流式**输出静默退化为一次性返回 —— 只 WARN 等于把 FreeArk 已发生过的生产漂移原样复刻。已实证该断言会拒绝本机的 1.3.3（见 code_review_report §2.5）；离线装配走 `fake` 后端，不受影响。记 MAJOR finding（部署前必须满足） |

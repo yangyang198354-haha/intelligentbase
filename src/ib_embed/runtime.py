@@ -5,7 +5,7 @@
             IFC-IB-272（单条截断保前缀 —— 由运行时上报 `truncated_indices`）
             IFC-IB-274（形态可逆的**运行时**一侧：库可替换，装配可切换）
 @depends —
-@author sub_agent_software_developer
+@author software-developer
 
 bge-m3 推理运行时（**可替换端口** + **惰性加载**）。
 

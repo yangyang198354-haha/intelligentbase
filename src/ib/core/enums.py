@@ -2,7 +2,7 @@
 @module MOD-IB-01
 @implements IFC-IB-011 (枚举: DocStatus / SourceKind / DegradeReason / RouteTier / StreamEventKind)
 @depends (none)
-@author sub_agent_software_developer
+@author software-developer
 
 契约层枚举。**framework-free**：仅使用 stdlib `enum`。
 

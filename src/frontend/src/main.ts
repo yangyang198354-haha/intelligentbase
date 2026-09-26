@@ -1,7 +1,7 @@
 /**
  * @module MOD-IB-24
  * @implements IFC-IB-256/257/258 应用引导
- * @author sub_agent_software_developer
+ * @author software-developer
  *
  * 应用入口。
  *

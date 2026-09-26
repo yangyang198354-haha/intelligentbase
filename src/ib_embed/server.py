@@ -9,7 +9,7 @@
             IFC-IB-272 批上限（回显 max_batch）与截断保前缀
             IFC-IB-273 冷/热单一落点：**服务端不区分冷热**（无状态 HTTP）
 @depends —
-@author sub_agent_software_developer
+@author software-developer
 
 `ib-embed` 常驻 HTTP 服务（MOD-IB-26）——契约唯一落点见 docs/ib_embed_service_contract.md。
 

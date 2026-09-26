@@ -3,7 +3,7 @@
 @implements IFC-IB-151 plan_rebuild / 152 start_rebuild / 153 step_rebuild
             IFC-IB-154 activate_version / 155 rollback / 156 fingerprint
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-03, MOD-IB-04, MOD-IB-11, MOD-IB-12, MOD-IB-13
-@author sub_agent_software_developer
+@author software-developer
 
 索引重建（module_design.md §3 MOD-IB-14 / §6.5 序列；architecture_design.md ADR-05:235-236；
 REQ-FUNC-IB-24 / DR-07）。

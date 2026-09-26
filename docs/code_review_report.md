@@ -6,7 +6,7 @@
 |------|-----|
 | 文档 ID | DOC-IB-CR-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 开发者自我代码评审报告 |
-| 产出代理 | sub_agent_software_developer |
+| 产出代理 | software-developer |
 | 调用 ID | INV-GROUP_C-INTELBASE-001（R1）／ INV-GROUP_C-INTELBASE-002（R2 增量）／ INV-GROUP_C-INTELBASE-003（R3 缺陷修复增量）／ INV-GROUP_C-INTELBASE-004（R4 缺陷修复 + 依赖补齐增量） |
 | 项目 | intelligentbase |
 | 阶段 | PHASE_06b（自我代码评审） |

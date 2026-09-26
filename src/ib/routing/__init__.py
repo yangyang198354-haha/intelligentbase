@@ -2,7 +2,7 @@
 @module MOD-IB-18 / MOD-IB-19（包入口）
 @implements 见 ib.routing.semantic（IFC-IB-191~193）与 ib.routing.intent（IFC-IB-201~203）
 @depends MOD-IB-01, MOD-IB-09, MOD-IB-16, MOD-IB-17
-@author sub_agent_software_developer
+@author software-developer
 
 路由包的**统一出口**。分成两个子模块而非一个，是因为两者变更频率与可测性完全不同：
 

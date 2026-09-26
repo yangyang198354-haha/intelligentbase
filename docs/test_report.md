@@ -6,7 +6,7 @@
 |------|-----|
 | 文档 ID | DOC-IB-TR-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 测试执行报告 |
-| 产出代理 | sub_agent_test_engineer |
+| 产出代理 | test-engineer |
 | 调用 ID | INV-GROUP_D-INTELBASE-001；**R3 增量 = INV-GROUP_D-INTELBASE-002**（见 §10） |
 | 项目 | intelligentbase |
 | 阶段 | GROUP_D / PHASE_08（测试执行）+ PHASE_09（测试用例实现）+ **R3 增量（缺陷回归与门控）** |

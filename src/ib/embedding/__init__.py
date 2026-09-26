@@ -5,7 +5,7 @@
             IFC-IB-098 CollectionResolver.resolve（**唯一** collection 名解析入口）
             IFC-IB-275 InProcessBgeM3Embedder（R2 第三种适配器形态；见 `inproc.py`）
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-04
-@author sub_agent_software_developer
+@author software-developer
 
 Embedding 端口与适配（module_design.md §3 MOD-IB-09 / ADR-02）。
 

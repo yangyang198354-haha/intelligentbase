@@ -2,7 +2,7 @@
 @module MOD-IB-01
 @implements IFC-IB-001 .. IFC-IB-010 （全部不可变数据结构；逐字段名 + 类型 + 可空性）
 @depends (none)
-@author sub_agent_software_developer
+@author software-developer
 
 契约层数据结构。**framework-free**：仅使用 stdlib `dataclasses` / `typing`。
 

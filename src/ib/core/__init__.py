@@ -2,7 +2,7 @@
 @module MOD-IB-01
 @implements IFC-IB-001..012（汇总导出）
 @depends (none)
-@author sub_agent_software_developer
+@author software-developer
 
 核心契约层唯一导出面。上层模块一律 `from ib.core import Scope, VectorStore, ...`，
 **不**直接 import 子模块，使未来的契约内部重构不影响调用方。

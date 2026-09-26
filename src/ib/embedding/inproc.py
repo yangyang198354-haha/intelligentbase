@@ -2,7 +2,7 @@
 @module MOD-IB-09
 @implements IFC-IB-275 `InProcessBgeM3Embedder`（第三种适配器形态；IFC-IB-090~096 的端口实现）
 @depends MOD-IB-01
-@author sub_agent_software_developer
+@author software-developer
 
 进程内 bge-m3 Embedder（`IB_EMBED_BACKEND=inproc`；契约 §8「形态可逆」）。
 

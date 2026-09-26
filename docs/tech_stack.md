@@ -7,7 +7,7 @@
   <revision>R2</revision>
   <status>DRAFT_FOR_GATE_REVIEW</status>
   <phase>GROUP_B / PHASE_04b 技术选型</phase>
-  <author>sub_agent_system_architect</author>
+  <author>system-architect</author>
   <invocation_id>INV-GROUP_B-INTELBASE-002</invocation_id>
   <created_at>2026-09-25</created_at>
   <updated_at>2026-09-26</updated_at>

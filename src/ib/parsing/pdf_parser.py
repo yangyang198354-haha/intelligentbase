@@ -2,7 +2,7 @@
 @module MOD-IB-05（实现细节）
 @implements IFC-IB-051, IFC-IB-052 —— PDF 三路径解析器
 @depends MOD-IB-01, MOD-IB-04, MOD-IB-05（包内注册表）
-@author sub_agent_software_developer
+@author software-developer
 
 PDF 三路径解析（module_design.md §3 MOD-IB-05 / ADR-06；AC-IB-04-05/06/07）：
 

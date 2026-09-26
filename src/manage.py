@@ -3,7 +3,7 @@
 @module MOD-IB-23
 @implements 运维入口（`check` / `selfcheck` / 离线装配探针）
 @depends MOD-IB-23（composition）
-@author sub_agent_software_developer
+@author software-developer
 
 Django 管理入口。**刻意保持极薄**：不注册自定义命令包（`ibweb/management/`），
 因为本服务只有三个真实需求 ——

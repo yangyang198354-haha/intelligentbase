@@ -3,7 +3,7 @@
 @module MOD-IB-23（自我验证；**非** GROUP_D 的正式测试套件）
 @implements 离线自检：装配 / 端口一致性 / 隔离 / 降级 / SSE / 鉴权纪律
 @depends 全部模块（作为装配入口）
-@author sub_agent_software_developer
+@author software-developer
 
 离线自检脚本（`python scripts/selfcheck.py`）。
 
