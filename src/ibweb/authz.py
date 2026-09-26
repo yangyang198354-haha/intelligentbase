@@ -122,6 +122,23 @@ class EnvTokenResolver:
         return AuthzContext(actor_id=self._actor_id, project_id=self._project_id, roles=self._roles)
 
 
+class _FunctionPrincipalResolver:
+    """把注入模块的裸函数 `resolve_principal(token)` 适配成 `PrincipalResolver` 协议。
+
+    `PrincipalResolver` 要求 `.resolve(token)` **方法**（与离线态 `EnvTokenResolver`
+    一致），而策略模块按 `build_authz` 的契约提供的是**裸函数** `resolve_principal`。
+    二者之间必须有一个薄适配层 —— 否则中间件 `resolver.resolve(token)` 会命中
+    `AttributeError: 'function' object has no attribute 'resolve'`（生产注入时才暴露，
+    离线 `EnvTokenResolver` 掩盖了它）。
+    """
+
+    def __init__(self, resolve_principal: Any) -> None:
+        self._resolve_principal = resolve_principal
+
+    def resolve(self, token: str) -> AuthzContext | None:
+        return self._resolve_principal(token)
+
+
 def parse_bearer(header_value: str) -> str:
     """从 `Authorization` 头取出 bearer 令牌；格式不符返回 `""`。
 
@@ -179,12 +196,12 @@ def _load_policy_module(module_path: str) -> tuple[Any, PrincipalResolver]:
     policy = getattr(module, "POLICY", None)
     if policy is None:
         raise StartupError(f"策略模块 {module_path!r} 缺少 POLICY（AuthzPolicy 实现）")
-    resolver = getattr(module, "resolve_principal", None)
-    if resolver is None:
+    resolve_principal = getattr(module, "resolve_principal", None)
+    if resolve_principal is None:
         raise StartupError(
             f"策略模块 {module_path!r} 缺少 resolve_principal(token) -> AuthzContext | None"
         )
-    return policy, resolver
+    return policy, _FunctionPrincipalResolver(resolve_principal)
 
 
 # --------------------------------------------------------------------------- #
