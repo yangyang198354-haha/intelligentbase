@@ -8,8 +8,8 @@
 | 产出代理 | 部署执行人（PHASE_11） |
 | 项目 | intelligentbase |
 | 阶段 | GROUP_E / **PHASE_11（生产部署）** |
-| 版本 | 1.0.0（初稿） |
-| status | **DRAFT**（未门控；B11 重建回滚部分 FAIL，待 PM 裁决） |
+| 版本 | 1.1.0（D-4/D-5 修复已提交 `d99f36d`，待目标机部署复验） |
+| status | **DRAFT**（D-4/D-5 代码修复+本地回归通过；目标机部署与端到端复验待执行） |
 | 创建日期 | 2026-09-26 |
 | 目标机 | `192.168.31.133`（Ubuntu 26.04 LTS / x86_64 / i7-3770S 4C8T / 11 GiB） |
 | 上游输入 | `docs/deployment_plan.md`(1.1.0/R4)、`src/deploy/checklists.txt`(A1–A8 / B1–B14 / C)、`docs/phase_status.md` |
@@ -21,23 +21,24 @@
 ## 1. 执行摘要
 
 PHASE_11（生产部署）已进入 **B11（原文件留存与重建回滚）真跑**。真跑暴露并修复 **3 个生产阻断缺陷**（均提交并部署），
-另发现 **4 个未修复缺陷**，其中**重建机制整体断裂**（B11 重建回滚部分 FAIL），
-以及一个**删除路径向量孤儿**缺陷。
+另发现 **4 个未修复缺陷**（D-4a/D-4b/D-4c 重建机制整体断裂 + D-5 删除路径向量孤儿）。
+
+**D-4/D-5 已于本轮代码修复**（commit `d99f36d`，本地回归 149 passed），**待目标机 `git pull` + systemd 重启后端到端复验**。
 
 | 结论 | 状态 |
 |------|------|
-| 文档上传 → 解析 → 切分 → 嵌入 → 写入 Qdrant 全链路 | ✅ **PASS**（修复 D-1/D-2/D-3 后） |
+| 文档上传 → 解析 → 切分 → 嵌入 → 写入 Qdrant 全链路 | ✅ **PASS**（修复 D-1/D-2/D-3 后，已部署复验） |
 | 文档删除：blob + 台账行移除 | ✅ **PASS** |
-| 文档删除：向量同步删除 | ❌ **FAIL**（D-5：`vectors_deleted=0`，向量孤儿） |
-| 重建：触发 → worker 推进 → 目标集合建库 | ❌ **FAIL**（D-4：任务卡死 `pending`，目标集合空） |
-| 重建：active 版本原子切换 / 回滚 | ❌ **FAIL**（D-4：无 HTTP 端点，且前提不成立） |
+| 文档删除：向量同步删除 | 🟡 **已修未验**（D-5 代码修复 `d99f36d`，删点改为跨全版本集合；待目标机复验） |
+| 重建：触发 → worker 推进 → 目标集合建库 | 🟡 **已修未验**（D-4a/b 代码修复，状态机 `planned` + 文档重置；待目标机复验） |
+| 重建：active 版本原子切换 / 回滚 | 🟡 **已修未验**（D-4c 新增 `activate`/`rollback` 端点；待目标机复验） |
 
 ---
 
-## 2. 已修复缺陷（3 个，已提交、已部署、经真跑复验）
+## 2. 已修复缺陷（5 个：3 个已部署复验 + 2 个已提交待复验）
 
-三个缺陷均为「**路由/依赖/写入层面**」的生产阻断，修复后一条 `.txt` 测试文档端到端索引成功
-（`status=indexed`、`chunk_count=1`、Qdrant `ib_demo_v1` `points_count=1`）。
+**A 组（D-1/D-2/D-3）**：均为「**路由/依赖/写入层面**」的生产阻断，已提交、已部署、经真跑复验。
+修复后一条 `.txt` 测试文档端到端索引成功（`status=indexed`、`chunk_count=1`、Qdrant `ib_demo_v1` `points_count=1`）。
 
 | # | 缺陷 | 根因 | 修复 | commit |
 |---|------|------|------|--------|
@@ -47,9 +48,18 @@ PHASE_11（生产部署）已进入 **B11（原文件留存与重建回滚）真
 
 > 证据：修复后 `/api/files` 上传 → 轮询 `status: pending → parsing → indexed`；Qdrant `GET /collections/ib_demo_v1` → `points_count=1`。
 
+**B 组（D-4/D-5）**：重建机制断裂 + 删除向量孤儿，**本轮提交 `d99f36d`，本地回归 149 passed，待目标机部署后端到端复验**（见 §3 根因明细）。
+
+| # | 缺陷 | 修复 | commit |
+|---|------|------|--------|
+| **D-4** | 重建机制整体断裂（4a 状态机失配 / 4b 无文档重置 / 4c 无激活回滚端点） | 状态机 `pending`→`planned`（两处 ledger 实现 + `IN_FLIGHT_REBUILD_STATES`）；`start_rebuild` 触发 `reset_documents_for_rebuild`（`indexed/failed → pending` 并写 `target_collection_version`）；`ibweb/urls.py` 新增 `POST /api/rebuild/activate` 与 `/rollback` 端点 | `d99f36d` |
+| **D-5** | 删除路径向量孤儿（在飞重建期间删除只清目标集合，旧集合点成幽灵） | 新增 `delete_doc_everywhere(project_id, scope, doc_id)`（InMemory + Qdrant 双实现），删除跨**全部**版本集合清点；`lifecycle.delete_document` 改走它并移除 `_bind_write_collection` | `d99f36d` |
+
+> 回归：`python -m pytest tests/` → **149 passed**（含新增 `test_TC_INT_072_delete_during_inflight_rebuild_clears_all_versions` 与扩展 `test_TC_E2E_011_rebuild_journey` 至 activate/rollback）。目标机端到端复验见 §7。
+
 ---
 
-## 3. 未修复缺陷（4 个，B11 重建回滚部分 FAIL 的直接原因）
+## 3. D-4/D-5 根因明细（已修复，保留作修复对照）
 
 ### D-4 重建机制整体断裂（三处独立缺陷叠加）
 
@@ -107,11 +117,11 @@ ib_demo_v1 points_count      → 1  ← 孤儿向量，未随删除清除
 
 | 痕迹 | 位置 | 影响 |
 |------|------|------|
-| 幽灵向量 1 个 | Qdrant `ib_demo_v1`（点 id = UUID5(`6685ca7069dd42d881e895c362051f96#0`)） | 检索可见但台账无行 |
-| 卡死重建任务 | ledger `rebuild_jobs` 行 `6807ed0f6d594e4ebd00634d93c7c2fa`（state=`pending`） | 使 `demo` 项目**持续处于写路径重定向状态**，后续所有删除都会孤儿化向量（D-5 持续触发） |
+| 幽灵向量 1 个 | Qdrant `ib_demo_v1`（点 id = UUID5(`6685ca7069dd42d881e895c362051f96#0`)） | 检索可见但台账无行（数据完整性） |
+| 卡死重建任务 | ledger `rebuild_jobs` 行 `6807ed0f6d594e4ebd00634d93c7c2fa`（state=`pending`） | 修复后 `IN_FLIGHT_REBUILD_STATES=("planned","running")` 不再匹配 `pending`，此任务已**对写路径重定向失效**，不再触发 D-5；仅残留一行 |
 | 空集合 | Qdrant `ib_demo_v2` | 占位，无害 |
 
-> **卡死任务必须清理**：它不删除，D-5 会在 `demo` 项目持续发生。清理命令（需授权）：
+> **清理要点**：D-4 修复后，上述 `pending` 卡死任务已不再把写路径重定向到 v2，故 D-5 不会因其复发。剩余真正需要清理的是**幽灵向量**（数据完整性）与两行占位痕迹。清理命令（需授权）：
 > `DELETE FROM rebuild_jobs WHERE job_id='6807ed0f6d594e4ebd00634d93c7c2fa'`、
 > Qdrant `DELETE /collections/ib_demo_v2`、`POST /collections/ib_demo_v1/points/delete`（按上述 UUID5 点 id）。
 
@@ -129,9 +139,27 @@ ib_demo_v1 points_count      → 1  ← 孤儿向量，未随删除清除
 
 ## 6. 结论与建议
 
-1. **上传入库链路已可用**（D-1/D-2/D-3 修复后实测 PASS）。
-2. **B11 重建回滚部分 FAIL**：D-4（4a/4b/4c）为设计层缺口而非单点笔误——重建的「文档重置」与「激活/回滚端点」在实现期未交付，`target_collection_version` 字段成死列。建议路由 `software_developer` 以 GROUP_C 增量修复，并经 `test_engineer` 回归 + 独立 verifier 复核（与既有 R3/R4 流程一致）。
-3. **D-5 删除向量孤儿** 是数据完整性缺陷，与 D-4 耦合（修复 D-4 后需单独覆盖「重建期间删除文档」场景）。
+1. **上传入库链路已可用**（D-1/D-2/D-3 修复后实测 PASS，已部署）。
+2. **D-4（4a/4b/4c）与 D-5 已代码修复**（commit `d99f36d`）：状态机 `planned` 对齐、`start_rebuild` 触发文档重置并写 `target_collection_version`、新增 activate/rollback 端点、删除跨全版本集合清点。本地回归 **149 passed**。
+3. **剩余工作 = 部署 + 复验 + 清理**：目标机 `192.168.31.133` 需 `git pull` + systemd 重启 `ib-web`/`ib-worker` 后端到端复验（上传 → 重建 → activate → rollback → 删除）；复验后清理 §4 遗留痕迹（幽灵向量 / 卡死任务 / 空集合）。
 4. **遗留痕迹清理** 需用户明确授权（见 §4）。
 
 > 本报告未修改任何生产数据（清理动作已被权限系统拦截，留待授权）。
+
+---
+
+## 7. 待执行：目标机部署与端到端复验（D-4/D-5）
+
+修复已提交 `d99f36d` 并推送 `main`，但**尚未部署到目标机**。部署与复验步骤：
+
+1. **部署**：目标机 `git pull origin main` → systemd 重启 `ib-web` + `ib-worker`（无需 `makemigrations`，本轮未改 schema；`reset_documents_for_rebuild` 复用现有 `target_collection_version` 列）。
+2. **复验脚本**（对 `demo` 项目，或新建临时项目更干净）：
+   - 上传一条文档 → 轮询至 `indexed`；
+   - `POST /api/rebuild` → 断言 `state ∈ {planned, running}` 且 `pending ≥ 1`（文档被重置）；
+   - 推进 worker → `indexed ≥ 1` 且 `pending == 0`；
+   - `POST /api/rebuild/activate {"version":"2"}` → active 版本切至 `2`；
+   - `POST /api/rebuild/rollback {"version":"1"}` → active 版本回到 `1`；
+   - 在飞重建期间 `DELETE /api/files/<doc_id>` → 断言 `vectors_deleted ≥ 1` 且旧/新集合点均清。
+3. **清理**：见 §4（需授权）。
+
+> 本轮代码修复与测试为本地执行；目标机复验为部署报告中唯一未闭合的「已修未验」项。
