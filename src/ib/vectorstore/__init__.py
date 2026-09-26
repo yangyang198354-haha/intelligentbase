@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from typing import Any, Sequence
 
@@ -47,11 +48,16 @@ __all__ = ["InMemoryVectorStore", "QdrantVectorStore", "build_vector_store", "po
 
 
 def point_id_for(doc_id: str, chunk_index: int) -> str:
-    """向量点幂等键（§6.2）：`doc_id` + `chunk_index`。
+    """向量点幂等键（§6.2）：`doc_id` + `chunk_index` 的**确定性 UUID**。
 
     重跑覆盖同一批点，**不产生重复** —— 这是「delete-then-write」之外的第二重幂等保障。
+
+    **为什么是 UUID 而不是 `f"{doc_id}#{chunk_index}"`**：Qdrant 的点 id 只接受 UUID 或
+    uint64，不接受任意字符串。旧式 `doc_id#chunk_index` 在 `InMemoryVectorStore`（dict key）
+    下能跑通，但打真实 Qdrant 会 `INVALID_ARGUMENT: Unable to parse UUID` —— 离线替身掩盖了
+    这个契约差异。UUID5 用固定命名空间做确定性哈希，保住幂等语义的同时与 Qdrant 兼容。
     """
-    return f"{doc_id}#{chunk_index}"
+    return str(uuid.uuid5(uuid.NAMESPACE_OID, f"{doc_id}#{chunk_index}"))
 
 
 def _version_key(collection: str) -> tuple[int, str]:

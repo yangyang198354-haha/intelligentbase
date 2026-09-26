@@ -64,6 +64,7 @@ from ib.core import (
     VectorPoint,
 )
 from ib.observability import Timer, get_logger, log_event
+from ib.vectorstore import point_id_for
 
 __all__ = [
     "DocumentLifecycle",
@@ -572,7 +573,7 @@ class DocumentLifecycle:
             self._vectors.delete_by_doc(scope, record.doc_id)
             points = [
                 VectorPoint(
-                    id=f"{record.doc_id}#{index}",
+                    id=point_id_for(record.doc_id, index),
                     vector=vector,
                     payload=_payload_for(
                         record, chunk, index, vector, project, blob_ref.rel_path if blob_ref else None
