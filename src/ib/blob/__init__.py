@@ -223,6 +223,11 @@ class FsBlobStore:
                 ]
             )
             final_path = os.path.join(doc_dir, f"{sha256}.{ext}")
+            # 落盘文件必须对共享组可读：web 进程写、worker 进程读，二者分属不同 systemd
+            # 用户（ib-web / ib-worker），靠共同组 `ib` 共享访问。`tempfile.mkstemp` 固定生成
+            # 0600，若原样 replace 进最终文件，worker 读不到 → 每篇文档都 E_BLOB_UNAVAILABLE。
+            # 台账侧（0664，经 UMask=0002）已正确共享，这里显式对齐同一模式，避免依赖部署机的 umask。
+            os.chmod(temp_path, 0o664)
             if os.path.exists(final_path):
                 # 内容寻址 + 幂等：同内容已在盘上，丢弃临时文件即可
                 os.unlink(temp_path)
