@@ -29,6 +29,7 @@ langchain-openai>=0.2,<0.3
 pypdf>=4.0,<7.0                  # 主路径：纯 Python，许可 BSD
 pdfminer.six>=20231228,<20260101 # 备路径：主路径解析失败时的回退
 pdfplumber>=0.11,<1.0            # 可选路径：表格抽取
+python-docx>=1.1,<2.0            # DOCX 解析（DocxParser；SUPPORTED_EXTS 含 docx，缺此依赖则 docx 上传全 failed）
 
 # --- 栅格化（扫描件 → 图像 → OCR）--------------------------------------------
 pypdfium2>=4.20,<5.0             # PDFium 绑定；许可 Apache-2.0/BSD
