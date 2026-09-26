@@ -152,9 +152,9 @@
       <item id="REV-04-5">[git remote] 用户负责在修复后 `git init` + commit + push 到 GitHub 私有仓库（B-01 由用户闭合）。**在用户完成前 PHASE_11 不可执行。**</item>
       <closure item="REV-04-1" status="DONE_CLOSED_VERIFIED" note="2026-09-26：FND-GROUP-D-03 已修复并经独立 verifier 复核判 CLOSED_VERIFIED（GR-C-004 = PASS / GR-D-003 = PASS_WITH_CONDITIONS）。"/>
       <closure item="REV-04-2" status="PARTIAL" note="2026-09-26：src/requirements-embed.txt 已新增（FlagEmbedding + torch(CPU) + transformers + pin；bge-m3 双源；权重不入 git）。**运行时三选一仍须目标机实测后锁定**（B-05 仅部分闭合，属 PHASE_11 前置）。"/>
-      <closure item="REV-04-3" status="DONE_WITH_OPEN_ITEM" note="2026-09-26：devops-engineer 完成 R4 修订（deployment_plan.md 与 cicd_pipeline.md → v1.1.0；新增 src/deploy/ib-worker.env.example；qdrant.service ExecStart 统一），已由 GR-E-002 判 PASS_WITH_CONDITIONS。**遗留 1 项 MEDIUM 开放项 F-1**：checklists.txt [B12] 仍写 dist『由 ib-web 托管』且无 nginx -t / proxy_buffering off，与 C-02 冲突，须 PM 裁决（单独立项修 or 登记为 PHASE_11 前置）。"/>
+      <closure item="REV-04-3" status="DONE_CLOSED_VERIFIED" note="2026-09-26：devops-engineer 完成 R4 修订（deployment_plan.md 与 cicd_pipeline.md → v1.1.0；新增 src/deploy/ib-worker.env.example；qdrant.service ExecStart 统一），已由 GR-E-002 判 PASS_WITH_CONDITIONS。**开放项 F-1 已由 PM 裁决为「部署计划 §7.5 直接修」并闭合**：checklists.txt [B12] 已更正为『四个 unit + nginx』（前端 dist/ 由 nginx 托管 /var/www/intelligentbase），并新增 `nginx -t` 与 `proxy_buffering off` 两条验证；全仓 grep 确认无其它执行脚本残留『ib-web 托管 dist』（仅 deployment_plan.md C-02 正确表述、phase_status 历史记录、docs/evidence 历史证据与 .claude KB，均不需改）。"/>
       <closure item="REV-04-4" status="DONE" note="2026-09-26：全量回归 148/148 EXIT=0（经 verifier 复跑 3+1 次），GR-C-004 / GR-D-003 已签发；phase_status.md 已同步（deployment_plan.md / cicd_pipeline.md 的 R4 修订见 REV-04-3，待完成）。"/>
-      <closure item="REV-04-5" status="PENDING_USER" note="待用户完成 git init + commit + push 至 GitHub 私有仓库；在此之前 PHASE_11 不可执行。"/>
+      <closure item="REV-04-5" status="DONE" note="2026-09-26：git init + 初始提交（621d01f）+ push 至 GitHub 私有仓库 `yangyang198354-haha/intelligentbase` 已完成；默认分支设为主 `main`（master 遗留一个同 commit 空分支，待用户决定是否删除）。181 文件、凭据扫描 0 命中、新增 .gitattributes 强制 LF（Windows 开发 → Linux 部署防 CRLF 破坏 systemd/shebang）。B-01 闭合，PHASE_11 解除此阻塞。/>
     </revision_request>
 
     <implementation_constraints frozen_for="GROUP_C">
