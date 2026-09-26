@@ -276,7 +276,7 @@ def _list_files(request: Any) -> Any:
     deps = composition.get_deps()
     try:
         ctx = _ctx_of(request)
-        query = FileListQuerySerializer(data=dict(request.GET))
+        query = FileListQuerySerializer(data=request.GET.dict())
         query.is_valid(raise_exception=True)
         data = query.validated_data
         raw_status = (data.get("status") or "").strip()
