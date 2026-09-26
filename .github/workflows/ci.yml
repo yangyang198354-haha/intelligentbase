@@ -19,7 +19,7 @@ permissions:
 jobs:
   ci:
     name: build & test (Python 3.12)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     # 离线装配的环境前提（与 tests/conftest.py、scripts/selfcheck.py 保持一致；
@@ -110,16 +110,18 @@ jobs:
           python -c "import sys; assert (3,11) <= sys.version_info[:2] < (3,14), 'python out of range'; print('PASS')"
 
       # ---- 阶段 9：Frontend build（vue-tsc 零错 + vite build）----
-      # 注：仓库未提交 package-lock.json，故用 npm install（npm ci 需 lockfile 会失败）。
+      # 已提交 package-lock.json，用 npm ci 精确复现（版本锁定，杜绝 ^ 区间漂移）。
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
 
       - name: Frontend build (阶段9)
         working-directory: src/frontend
         run: |
-          npm install
+          npm ci
           npm run build
 
       # ---- 阶段 10：Package artifact（dist + HEAD 可追溯）----
