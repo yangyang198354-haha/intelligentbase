@@ -51,7 +51,7 @@ ExecStart=/opt/intelligentbase/venv/bin/waitress-serve \
     --port=18080 \
     --threads=8 \
     --channel-timeout=120 \
-    --call=ibweb.wsgi:application
+    ibweb.wsgi:application
 
 # 反向代理（nginx）在 127.0.0.1:18080 前终止 TLS 并提供静态资源。
 # 之所以不直接对 0.0.0.0 监听：本服务无 TLS、无 CSRF 中间件，直接暴露等于把凭据

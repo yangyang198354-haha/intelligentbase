@@ -345,7 +345,7 @@ sudo PYTHONUTF8=1 /opt/intelligentbase/venv/bin/pip install -r /opt/intelligentb
 | `User/Group` | `ib-web` |
 | `WorkingDirectory` | `/opt/intelligentbase` |
 | `ExecStartPre` | `/opt/intelligentbase/venv/bin/python -m ibweb.bootstrap --ensure-schema`（**失败即中止启动，不得加 `-`**） |
-| `ExecStart` | `/opt/intelligentbase/venv/bin/waitress-serve --host=127.0.0.1 --port=18080 --threads=8 --channel-timeout=120 --call=ibweb.wsgi:application` |
+| `ExecStart` | `/opt/intelligentbase/venv/bin/waitress-serve --host=127.0.0.1 --port=18080 --threads=8 --channel-timeout=120 ibweb.wsgi:application` |
 | `EnvironmentFile` | **`/etc/intelligentbase/ib-web.env`**（**凭据唯一来源**，权限 **0600**、属主 `ib-web`） |
 | `Restart=` | `on-failure` / `RestartSec=3s`；`KillSignal=SIGTERM` / `TimeoutStopSec=30`（留给 SSE 写回会话） |
 | 限制 | `MemoryMax=1024M`；`ReadWritePaths=/var/lib/intelligentbase` |
