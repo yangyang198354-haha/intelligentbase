@@ -132,8 +132,11 @@ SSE_HEADERS = {
     "Content-Type": SSE_CONTENT_TYPE,
     "Cache-Control": "no-cache",
     "X-Accel-Buffering": "no",
-    "Connection": "keep-alive",
 }
+# 注意：**不得**在此加 `Connection` / `Keep-Alive` / `Transfer-Encoding` 等 hop-by-hop 头。
+# 它们是逐跳头，按 PEP 3333 由 WSGI 服务器（Waitress/nginx）管理，应用设置会被
+# Waitress 以 `AssertionError: Connection is a "hop-by-hop" header` 拒绝（生产真机复现）。
+# 长连接的语义由 `--channel-timeout`（Waitress）与 `proxy_read_timeout`（nginx）负责。
 
 
 #: [IFC-IB-224] **契约类型的直接别名**（不另立同名类）。
