@@ -94,12 +94,10 @@ jobs:
             && echo "PASS: 无 PyMuPDF/fitz" \
             || { echo "FAIL: PyMuPDF/fitz 在场（AGPL-3.0 合规硬约束）"; exit 1; }
 
-          echo "== 禁 Docker =="
-          if command -v docker >/dev/null 2>&1; then
-            echo "FAIL: docker 可执行文件在场"; exit 1
-          else
-            echo "PASS: 无 docker"
-          fi
+          echo "== 禁 Docker（DR-03）=="
+          # `command -v docker` 属部署目标机硬门（D-gate），GitHub 托管 runner 自带 docker CLI，
+          # 不能作 CI 判据（否则永远假阳性）。CI 只校验「仓库不含 Dockerfile/compose」——
+          # 即交付物不是容器镜像（DR-03 的可 CI 化部分）。
           if find . -type f \( -name 'Dockerfile' -o -name 'docker-compose.yml' -o -name 'docker-compose.yaml' \) \
                 -not -path './.git/*' | grep -q .; then
             echo "FAIL: 仓库存在 Dockerfile / docker-compose"; exit 1
