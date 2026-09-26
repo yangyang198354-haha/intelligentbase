@@ -1,0 +1,140 @@
+# intelligentbase CI —— 忠实落地 docs/cicd_pipeline.md 的 10 阶段定义
+#
+# 平台实现选择：GitHub Actions（原定义文档 §附注「待 PM 确认平台」，此处选定）。
+# 触发：push main 全量 / PR 全量 / workflow_dispatch 手动（供 PHASE_11 部署前复跑）。
+# 纪律：任一阶段失败即 abort（原生 fail-fast，后续 step 自动跳过），不 continue-on-error。
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: build & test (Python 3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # 离线装配的环境前提（与 tests/conftest.py、scripts/selfcheck.py 保持一致；
+    # 两者内部也会 setdefault 这些键，此处再显式声明一次作为 job 级兜底）。
+    env:
+      PYTHONUTF8: "1"
+      IB_OFFLINE_MODE: "1"
+      IB_CONFIG_SOURCE: dict
+      IB_OFFLINE_TOKEN: ci-offline-token
+      IB_LOG_LEVEL: ERROR
+      DJANGO_SETTINGS_MODULE: ibweb.settings
+
+    steps:
+      # ---- 阶段 1：Source（git checkout / fetch）----
+      - name: Checkout (阶段1 Source)
+        uses: actions/checkout@v4
+
+      # ---- 依赖安装（测试与自检前置；不属于 10 阶段，是 runner 准备）----
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: src/requirements-offline.txt
+
+      # 离线纪律：只装 requirements-offline.txt（不含 qdrant-client / rapidocr /
+      # onnxruntime / pypdfium2 / langchain-openai），另补测试工具 pytest + pytest-cov。
+      - name: Install offline deps + test tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r src/requirements-offline.txt pytest pytest-cov
+
+      # ---- 阶段 2：Config（compileall）----
+      - name: Compile check (阶段2 Config)
+        run: python -m compileall -q src
+
+      # ---- 阶段 3：Unit（基线 55/55）----
+      - name: Unit tests (阶段3)
+        run: python -m pytest tests/unit -q
+
+      # ---- 阶段 4：Integration（基线 69→73）----
+      - name: Integration tests (阶段4)
+        run: python -m pytest tests/integration -q
+
+      # ---- 阶段 5：E2E（基线 14/14）----
+      - name: E2E tests (阶段5)
+        run: python -m pytest tests/e2e -q
+
+      # ---- 阶段 6：Full suite + coverage（覆盖率仅记录不设门）----
+      - name: Full suite + coverage (阶段6)
+        run: python -m pytest tests --cov=ib --cov=ibweb --cov=ib_embed -q
+
+      # ---- 阶段 7：Offline selfcheck（任一 FAIL 非零退出）----
+      - name: Offline selfcheck (阶段7)
+        run: python src/scripts/selfcheck.py
+
+      # ---- 阶段 8：Version gate（硬断言）----
+      - name: Version gate (阶段8)
+        run: |
+          set -euo pipefail
+          echo "== langchain-openai < 0.3 =="
+          # 离线依赖集刻意不含 langchain-openai，故改为校验 requirements.txt 的声明 pin
+          # （0.3.x 删除 _convert_chunk_to_generation_chunk 致流式断流，必须 <0.3）。
+          grep -qE '^langchain-openai[[:space:]]*>=[^#]*<0\.3' src/requirements.txt \
+            && echo "PASS: langchain-openai pin <0.3" \
+            || { echo "FAIL: langchain-openai 未 pin <0.3"; exit 1; }
+
+          echo "== 禁 PyMuPDF / fitz =="
+          out=$(python -c "import importlib.util as u; print(u.find_spec('fitz'), u.find_spec('pymupdf'))")
+          echo "fitz/pymupdf spec: ${out}"
+          [ "${out}" = "None None" ] \
+            && echo "PASS: 无 PyMuPDF/fitz" \
+            || { echo "FAIL: PyMuPDF/fitz 在场（AGPL-3.0 合规硬约束）"; exit 1; }
+
+          echo "== 禁 Docker =="
+          if command -v docker >/dev/null 2>&1; then
+            echo "FAIL: docker 可执行文件在场"; exit 1
+          else
+            echo "PASS: 无 docker"
+          fi
+          if find . -type f \( -name 'Dockerfile' -o -name 'docker-compose.yml' -o -name 'docker-compose.yaml' \) \
+                -not -path './.git/*' | grep -q .; then
+            echo "FAIL: 仓库存在 Dockerfile / docker-compose"; exit 1
+          else
+            echo "PASS: 无 Dockerfile / compose"
+          fi
+
+          echo "== Python 版本（>=3.11,<3.14）=="
+          python -V
+          python -c "import sys; assert (3,11) <= sys.version_info[:2] < (3,14), 'python out of range'; print('PASS')"
+
+      # ---- 阶段 9：Frontend build（vue-tsc 零错 + vite build）----
+      # 注：仓库未提交 package-lock.json，故用 npm install（npm ci 需 lockfile 会失败）。
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Frontend build (阶段9)
+        working-directory: src/frontend
+        run: |
+          npm install
+          npm run build
+
+      # ---- 阶段 10：Package artifact（dist + HEAD 可追溯）----
+      - name: Record HEAD (阶段10)
+        run: |
+          git rev-parse HEAD > HEAD
+          echo "HEAD=$(cat HEAD)"
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: ib-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            src/frontend/dist/
+            HEAD
+          retention-days: 30
