@@ -1,0 +1,193 @@
+
+==============================================================================
+[1] src/ 改动面收敛（R4-devops 窗口 = 2026-09-26 09:00 起）
+==============================================================================
+  src/** 全量（排除 __pycache__），按 mtime 降序，前 12 条：
+    1790384959  src/deploy/systemd/qdrant.service
+    1790384955  src/deploy/ib-worker.env.example
+    1790383562  src/requirements-embed.txt
+    1790383452  src/ib/lifecycle/__init__.py
+    1790383434  src/ib/blob/__init__.py
+    1790380662  src/deploy/checklists.txt
+    1790380487  src/ibweb/composition.py
+    1790356708  src/scripts/selfcheck.py
+    1790356426  src/frontend/src/views/ChatPage.vue
+    1790356393  src/frontend/src/api/client.ts
+    1790356365  src/ib/core/__init__.py
+    1790356337  src/ib/orchestration/__init__.py
+
+  mtime >= 09:00:00 的 src/ 文件数 = 2: ['src/deploy/systemd/qdrant.service', 'src/deploy/ib-worker.env.example']
+  mtime >= 08:47:00 的 src/ 文件数 = 2: ['src/deploy/systemd/qdrant.service', 'src/deploy/ib-worker.env.example']
+  OK: 宽松窗口(>=08:47)内 src/ 改动恰为 ['src/deploy/ib-worker.env.example', 'src/deploy/systemd/qdrant.service']，无第三处
+
+==============================================================================
+[2] env.example vs ib-worker.env.example 键集与值逐键比对
+==============================================================================
+  env.example       键数 = 27
+  ib-worker.example 键数 = 27
+  A-B 差集 = []
+  B-A 差集 = []
+  OK: 键集逐键一致（差集双空）
+  键+值 全等 = True
+
+  ib-worker.env.example 逐值占位符判定：
+    PLACEHOLDER  IB_ALLOWED_HOSTS=<REPLACE_ME_host>
+    PLACEHOLDER  IB_AUTHZ_POLICY_MODULE=<REPLACE_ME_module_path>
+    safe-default  IB_BLOB_ROOT=/var/lib/intelligentbase/blobs
+    safe-default  IB_BLOB_STORE_ENABLED=1
+    safe-default  IB_CONFIG_FILE=/etc/intelligentbase/config.json
+    safe-default  IB_CONFIG_SOURCE=file
+    PLACEHOLDER  IB_DJANGO_SECRET_KEY=<REPLACE_ME_generated_random_secret>
+    safe-default  IB_EMBED_BACKEND=http
+    safe-default  IB_EMBED_DIM=1024
+    safe-default  IB_EMBED_MODEL_ID=bge-m3
+    safe-default  IB_EMBED_URL=http://127.0.0.1:8100
+    safe-default  IB_EXEMPLARS_DIR=/etc/intelligentbase/exemplars
+    safe-default  IB_LEDGER_BACKEND=sqlite
+    safe-default  IB_LEDGER_PATH=/var/lib/intelligentbase/ledger/ledger.sqlite3
+    PLACEHOLDER  IB_LLM_API_KEY=<REPLACE_ME_llm_api_key>
+    safe-default  IB_LLM_BACKEND=openai_compatible
+    safe-default  IB_LLM_BASE_URL=https://api.deepseek.com/v1
+    safe-default  IB_LLM_MODEL=deepseek-chat
+    safe-default  IB_LOG_LEVEL=INFO
+    safe-default  IB_OCR_ENABLED=1
+    safe-default  IB_OFFLINE_MODE=0
+    PLACEHOLDER  IB_OFFLINE_TOKEN=<REPLACE_ME_only_for_offline_selfcheck>
+    safe-default  IB_QDRANT_URL=http://127.0.0.1:6333
+    safe-default  IB_RENDER_ENABLED=1
+    PLACEHOLDER  IB_SERVICE_TOKEN=<REPLACE_ME_service_token>
+    safe-default  IB_SESSION_BACKEND=memory
+    safe-default  IB_VECTORSTORE_BACKEND=qdrant
+  OK: 无真实值残留；6 个占位符 + 其余安全默认
+
+==============================================================================
+[3] 凭据模式扫描（只报命中数，不复述任何疑似值）
+==============================================================================
+  docs/deployment_plan.md: {'token_assign_realval': 4}
+  docs/cicd_pipeline.md: ALL ZERO
+  src/deploy/ib-worker.env.example: ALL ZERO
+  src/deploy/systemd/qdrant.service: ALL ZERO
+
+  ib-worker.env.example 是否仅含占位符/安全默认: True
+  192.168.31.133 字面出现次数（应为「目标机」标注，非赋值）: {'docs/deployment_plan.md': 4, 'docs/cicd_pipeline.md': 1, 'src/deploy/ib-worker.env.example': 0, 'src/deploy/systemd/qdrant.service': 0}
+
+==============================================================================
+[4] docs/phase_status.md（PM 独占）XML 合法性与内容指纹
+==============================================================================
+  ElementTree.fromstring 等价解析: OK，根 tag = phase_status
+  gate_review 计数 = 12
+  gate_review id 列表 = ['GR-A-001', 'GR-B-001', 'GR-B-002', 'GR-B-003', 'GR-C-001', 'GR-C-002', 'GR-C-003', 'GR-C-004', 'GR-D-001', 'GR-D-002', 'GR-D-003', 'GR-E-001']
+  GR-C-004 在列 = True ; GR-D-003 在列 = True ; GR-E-002 在列 = False
+  OK: 含 GR-C-004/GR-D-003 且无 GR-E-002（devops 未抢发门控）
+  log 计数 = 87
+  input 计数 = 23
+  GROUP_C gate_decision = R4_PASS（GR-C-004；FND-GROUP-D-03 修复 + B-05 依赖清单补齐，经独立 verifier 复核；GR-C-001/002/003 继续有效）
+    GROUP_C/PHASE_05 status=APPROVED r4_invocation_id=INV-GROUP_C-INTELBASE-004
+    GROUP_C/PHASE_06 status=APPROVED r4_invocation_id=INV-GROUP_C-INTELBASE-004
+    GROUP_C/PHASE_06b status=APPROVED r4_invocation_id=INV-GROUP_C-INTELBASE-004
+  GROUP_E gate_decision = PHASE_10_PASS_WITH_CONDITIONS（GR-E-001，仅计划层评审；R4 修订中，待出 GR-E-002）；PHASE_11 仍 PENDING，待用户 PRODUCTION_DEPLOY_CONFIRM
+    GROUP_E/PHASE_10 status=IN_PROGRESS r4_invocation_id=INV-GROUP_E-INTELBASE-002
+    GROUP_E/PHASE_11 status=PENDING r4_invocation_id=None
+  phase_status.md mtime = 2026-09-26 09:06:27.140092
+  首处 devops 产物 mtime = 2026-09-26 09:09:06.669459
+  OK: phase_status.md mtime 早于 devops 全部产物 → 非本轮 devops 写入
+
+==============================================================================
+[5] docs/ 改动面（R4-devops 窗口）
+==============================================================================
+  docs/** 按 mtime 降序前 10 条：
+    1790385305  docs/evidence/verify_r4_devops_scan.log
+    1790385302  docs/evidence/verify_r4_devops_scan.py
+    1790384976  docs/cicd_pipeline.md
+    1790384947  docs/deployment_plan.md
+    1790384787  docs/phase_status.md
+    1790384544  docs/evidence/verify_r4_runs.log
+    1790384436  docs/evidence/verify_r4_netguard.py
+    1790384355  docs/evidence/verify_r4_probe_fnd_d03.log
+    1790384350  docs/evidence/verify_r4_probe_fnd_d03.py
+    1790384040  docs/test_report.md
+
+  mtime >= 09:00 的 docs 文件 = ['docs/evidence/verify_r4_devops_scan.log', 'docs/evidence/verify_r4_devops_scan.py', 'docs/cicd_pipeline.md', 'docs/deployment_plan.md', 'docs/phase_status.md', 'docs/evidence/verify_r4_runs.log', 'docs/evidence/verify_r4_netguard.py']
+  OK: tech_stack/module_design/test_*/architecture 均未在本轮改动
+
+==============================================================================
+[6] file_header status / 调用 ID（不得自称 APPROVED）
+==============================================================================
+  docs/deployment_plan.md: 全文调用ID=['INV-GROUP_E-INTELBASE-001', 'INV-GROUP_E-INTELBASE-002'] | 头部调用ID=INV-GROUP_E-INTELBASE-002
+      status 行: **REVISED_PENDING_REVIEW**（R4 修订；GR-E-001 对 R4 前版本有效，待 PM 重新门控 GR-E-002）
+      含 APPROVED:False | 含 REVISED_PENDING_REVIEW:True
+      版本行: 1.1.0（R4 修订；闭合 P1 项 C-02~C-06，并反映 B-05 依赖清单已补）
+  OK: docs/deployment_plan.md status 未越权、头部调用 ID = 002
+  docs/cicd_pipeline.md: 全文调用ID=['INV-GROUP_E-INTELBASE-001', 'INV-GROUP_E-INTELBASE-002'] | 头部调用ID=INV-GROUP_E-INTELBASE-002
+      status 行: **REVISED_PENDING_REVIEW**（R4 修订；GR-E-001 对 R4 前版本有效，待 PM 重新门控 GR-E-002）
+      含 APPROVED:False | 含 REVISED_PENDING_REVIEW:True
+      版本行: 1.1.0（R4 修订；补部署前硬门 D-1/D-2，其余不动）
+  OK: docs/cicd_pipeline.md status 未越权、头部调用 ID = 002
+
+==============================================================================
+[7] 文档事实一致性抽查
+==============================================================================
+  ib-web.service --port = 18080（第 51 行: --port=18080 \）
+  plan §7.5 反代目标含 127.0.0.1:18080 = yes
+  §7.5 警告 nginx 不得用 18080（EADDRINUSE 与 Waitress 冲突）= yes
+  §1.2 C-01 仍为未闭合（无 ✅ 标记）= yes
+  §12.2 O-07 明示 C-01 待定 = True
+  §6.1 含「两条链路合并评估」 = True
+  §6.1 含目标机最小探针（import + 一次真实推理） = True
+  C-04 叙述与实际 unit 一致（ExecStart=/usr/bin/qdrant）= True
+  src/deploy/checklists.txt 未在本轮窗口内被改 = True
+  src/deploy/systemd/ib-worker.service 未在本轮窗口内被改 = True
+  src/deploy/systemd/ib-web.service 未在本轮窗口内被改 = True
+  src/deploy/systemd/ib-embed.service 未在本轮窗口内被改 = True
+
+==============================================================================
+[7b] 文档内行号引用核验
+==============================================================================
+  §7.3 引 ib-web.service:51: L51 = '--port=18080 \\' -> OK
+  OK: §7.3 引 ib-web.service:51
+  §7.4 引 ib-worker.service:42: L42 = 'EnvironmentFile=/etc/intelligentbase/ib-worker.env' -> OK
+  OK: §7.4 引 ib-worker.service:42
+  修订记录引 qdrant.service:35: L35 = 'ExecStart=/usr/bin/qdrant --config-path /etc/qdrant/config.yaml' -> OK
+  OK: 修订记录引 qdrant.service:35
+  C-02 引 vite.config.ts 注释: L10 = '* 生产由 nginx 把 `/api` 与 `/healthz` 反代到 `127.0.0.1:18080`（见 `deploy/systemd/ib-web.service`' -> OK
+  OK: C-02 引 vite.config.ts 注释
+
+==============================================================================
+[7c] 新发现：src/deploy/checklists.txt 未含 nginx/SSE 条目（C-02 未同步）
+==============================================================================
+  checklists.txt mtime = 2026-09-26 07:57:41.599630（不在本轮窗口）
+  checklists.txt 中 'nginx' 出现次数 = 1（仅 B10 日志纪律那条）
+  checklists.txt 含 'nginx -t' = False
+  checklists.txt 含 'proxy_buffering' = False
+  [B12] 原文：
+    [B12] 四个 unit 与静态资源
+        $ systemctl is-active qdrant ib-embed ib-web ib-worker
+        $ curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18080/healthz
+        [ ] 四个服务均 active
+        [ ] /healthz 返回 200
+        [ ] 前端构建产物已就位且由 ib-web 托管（`npm run build` 的 dist/ 已部署）
+  [B12] 中写「由 ib-web 托管 dist/」 = True
+  而 settings.py 无 STATIC_ROOT = True
+  BAD: plan §11.2 断言 B12 含 nginx -t / proxy_buffering off，实际 checklists.txt B12 无任何 nginx 条目（plan↔artifact 引用不一致，且未登记为开放项）
+
+==============================================================================
+[9] FreeArk 仓库只读核验
+==============================================================================
+  git status --porcelain 行数 = 15（全部 ?? 未跟踪 = 15）
+  含 M/A/D/R 的行 = 0 -> []
+  OK: FreeArk 无任何 M/A/D（仅既存 ??）
+
+==============================================================================
+[8] 目标机 192.168.31.133 接触痕迹（间接判定）
+==============================================================================
+  探针自身不发起任何网络连接；本项只能事后查残留：
+  known_hosts mtime = 2026-09-26 00:18:08.799892（早于本轮窗口）
+  known_hosts 含目标 IP = True（历史轮次已学习主机键）
+  intelligentbase 内 ssh/scp/rsync 命名文件 = []
+  结论：无本轮 SSH 痕迹；但无审计钩子，不能排除窗口内一次已建立即断开的连接 -> NOT_FULLY_DETERMINABLE
+
+==============================================================================
+[SUM] 总判定
+==============================================================================
+  异常项 1 条：
+    - plan §11.2 断言 B12 含 nginx -t / proxy_buffering off，实际 checklists.txt B12 无任何 nginx 条目（plan↔artifact 引用不一致，且未登记为开放项）

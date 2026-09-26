@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+
+# Node / frontend
+node_modules/
+dist/
+
+# Secrets & runtime data (real values never committed)
+.env
+*.sqlite3
+*.sqlite3-*
+
+# bge-m3 模型权重（本地下载，约 2.3GB，**不入 git**）
+# `IB_EMBED_MODEL_PATH` 指向的目录；离线加载，不联网下载。
+# 见 src/requirements-embed.txt 头部「模型权重来源」。
+models/bge-m3/
+*.bge-m3/
+**/bge-m3/
+
+# misc
+.DS_Store
+Thumbs.db
+
+# Test & runtime artifacts
+.coverage
+.pytest_cache/
+htmlcov/
+.groupd_blobs/
+
+# Claude Code agent-internal state (KB distillation, machine-local)
+.claude/

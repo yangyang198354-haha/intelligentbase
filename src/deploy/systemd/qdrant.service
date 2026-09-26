@@ -1,0 +1,53 @@
+# @module MOD-IB-25
+# @implements IFC-IB-261 systemd 单元之一：qdrant（向量库）
+# @author sub_agent_software_developer
+#
+# 向量库（Qdrant）单元。**本文件是交付物，不由此代理安装到目标机**
+# （GROUP_E 负责部署；GROUP_C 只产出单元定义与检查清单）。
+#
+# 安装（目标机上执行，需 root）：
+#   install -m 0644 qdrant.service /etc/systemd/system/qdrant.service
+#   systemctl daemon-reload && systemctl enable --now qdrant
+#
+# 为什么用**专用系统用户**而非 root：
+#   Qdrant 会把快照写到 storage/snapshots，其中含全部知识库向量（可反推正文语义）。
+#   以 root 运行时，任何路径穿越/写文件漏洞都会以 root 权限落地 —— 这是本项目
+#   唯一一个「外部 C/Rust 二进制 + 长期监听端口」的组件，最小权限在这里收益最大。
+#
+# 为什么 Qdrant 不在容器里跑：
+#   项目硬约束「禁止 Docker / 任何容器化方案」。物理机直装是可接受的替代。
+
+[Unit]
+Description=Qdrant vector database (intelligentbase)
+Documentation=https://qdrant.tech/documentation/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=qdrant
+Group=qdrant
+WorkingDirectory=/var/lib/qdrant
+
+# 只监听回环：向量库**不应对内网其他主机开放**。
+# 一旦暴露到内网，任何能访问该端口的主机都能列举/删除 collection —— 而端口上没有鉴权。
+# 跨机访问需求应经 SSH 隧道或反向代理加鉴权，而不是把端口放出去。
+ExecStart=/usr/bin/qdrant --config-path /etc/qdrant/config.yaml
+
+# 文件描述符上限：Qdrant 的内存映射段数量随 collection 数线性增长。
+# 默认 1024 在「多项目 × 多版本 collection」下会被打满，表现为启动期报
+# `Too many open files` —— 而错误信息指向 storage 层，很难联想到 limit。
+LimitNOFILE=65536
+
+Restart=on-failure
+RestartSec=5s
+
+# 快照目录必须可写；其余路径只读（见 checklists.txt 的目录准备清单）
+ReadWritePaths=/var/lib/qdrant/storage /var/lib/qdrant/snapshots
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

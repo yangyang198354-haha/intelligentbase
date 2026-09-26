@@ -1,0 +1,48 @@
+# GROUP_C R3 — AFTER fix 症状探针（最终状态）
+# command: PYTHONUTF8=1 python docs/evidence/groupc_r3_probe.py
+# python: Python 3.14.6
+
+==============================================================================
+FND-GROUP-D-01  capability_digest / 路由提示
+==============================================================================
+deps.capability_digest  = '- search_knowledge: 在企业知识库中检索与问题相关的资料片段，返回文件名与位置（需要范围绑定）'
+router prompt           = '- search_knowledge: 在企业知识库中检索与问题相关的资料片段，返回文件名与位置（需要范围绑定）'
+bind_tools(p_alpha)     = ['search_knowledge']
+digest 含 search_knowledge ? True
+摘要与实绑工具一致 ?       True
+==============================================================================
+FND-GROUP-D-02 (a) 尚无事发生 → 删除必须成功，且不留幽灵
+==============================================================================
+启动后已建 collection   = ['ib_p_alpha_v1', 'ib_p_beta_v1']
+删除前 store 绑定       = None
+上传                    = f329c17901364210b6ba7d7e9df6ce60 pending
+delete_document         = DeleteReport(vectors_deleted=0, blob_deleted=True, ledger_deleted=True)
+台账行（应为 None）     = None
+worker process_pending  = ProcessReport(processed=0, succeeded=0, failed=0, skipped=0)
+worker 后台账行         = None
+retrieval hits（应为 []）= []
+vectors count（应为 0） = 0
+==============================================================================
+FND-GROUP-D-02 (b) worker 写入向量后、置位前被删 → skipped 且无残留
+==============================================================================
+process_pending         = ProcessReport(processed=1, succeeded=0, failed=0, skipped=1)
+删除确在 upsert 时发生 = True
+台账行（应为 None）     = None
+vectors count（应为 0） = 0
+retrieval hits（应为 []）= []
+==============================================================================
+FND-GROUP-D-02 (c) 第一次向量清扫之后、删台账之前被 worker 写入 → 竞态清扫必须清掉
+==============================================================================
+入库后 vectors count    = 1
+delete_document         = DeleteReport(vectors_deleted=2, blob_deleted=True, ledger_deleted=True)
+delete_by_doc 调用次数  = 2 (清扫 + 竞态清扫 = 2)
+幽灵点在窗口内写入 ?     True
+vectors count（应为 0） = 0
+台账行（应为 None）     = None
+retrieval hits（应为 []）= []
+==============================================================================
+既有语义不变：不存在 → NotFoundError（404）；先删派生物后删台账
+==============================================================================
+delete 不存在文档       = NotFoundError -> [not_found] 文档不存在或不在当前作用域内
+
+EXIT=0

@@ -1,0 +1,261 @@
+# =============================================================================
+# @module MOD-IB-25  部署与真机验证清单
+# @implements IFC-IB-264（依赖真机验证清单）/ IFC-IB-265（Qdrant 安装检查清单）
+# @author sub_agent_software_developer
+#
+# 本文件是**核对用清单**，不是脚本。每条都要在目标机上**真跑**并留下可复查证据
+# （命令 + 原始输出 + 时间），因为本基座最危险的一类事故是「配置写对了、依赖其实没装上」：
+#   - bge-m3 的权重未就绪 → Embedder 冷启动失败 → 检索静默降级为「无知识库」，
+#     问答照常出答案（fail-open 是产品要求），于是**没人发现知识库其实没接上**；
+#   - OCR 引擎未装 → NullOcrEngine 静默接管 → 扫描件文档「成功入库 0 字」，
+#     状态是 indexed，看起来一切正常。
+# 这两条都不是「报错」，而是「静默降级」。清单的价值就在于把它们从静默变成显式。
+#
+# 纪律：
+#   - 凭据一律经环境变量/EnvironmentFile 注入；本文件及任何入库文件**不得**出现真实值；
+#   - 所有 secret 相关命令的输出**不得**带 -v/--show-secrets，不得 redirect 到入库文件。
+# =============================================================================
+
+##############################################################################
+# A. IFC-IB-265 —— Qdrant 安装检查清单
+##############################################################################
+
+[A1] 专用系统用户（不以 root 运行 Qdrant）
+    $ id -u qdrant && getent passwd qdrant
+    证据：输出显示 qdrant 用户存在、shell 为 nologin、无 sudo 组
+    [ ] 已核对
+
+[A2] 目录与属主（storage 与 snapshots 必须**分开**且均由 qdrant 可写）
+    $ ls -ld /var/lib/qdrant/storage /var/lib/qdrant/snapshots
+    [ ] storage/ 与 snapshots/ 属主均为 qdrant:qdrant
+    [ ] 二者不在同一子目录下（否则快照会被当成数据文件扫到）
+    说明：快照目录若与存储目录混用，恢复时可能把快照文件本身当段文件加载。
+
+[A3] 端口仅监听回环（**不得** 0.0.0.0）
+    $ ss -lntp | grep 6333
+    [ ] 显示 127.0.0.1:6333，**没有** 0.0.0.0:6333 或 [::]:6333
+    理由：Qdrant 无内建鉴权（本部署未启用 api-key）。对外暴露 = 任何人可读写全部项目的向量。
+    若必须跨机访问，走 frp/隧道 + api-key，且 api-key 经 EnvironmentFile 注入。
+
+[A4] unit 文件与开机自启
+    $ systemctl cat qdrant | diff - src/deploy/systemd/qdrant.service
+    $ systemctl is-enabled qdrant && systemctl is-active qdrant
+    [ ] 与仓库内 unit 一致；is-enabled=enabled；is-active=active
+
+[A5] 文件描述符上限（`LimitNOFILE`）—— 这是最容易漏、且症状最迷惑的一条
+    $ systemctl show qdrant -p LimitNOFILE
+    [ ] 输出 LimitNOFILE=65536（或更高）
+    症状说明：默认 1024 时，集合数量/段文件增长到一定规模后开始
+    `Too many open files`，**只在负载上来时才出现**，表现为查询随机 500。
+    这也是本清单不写成「看起来没问题就行」的原因。
+
+[A6] 健康检查真跑（不是看 unit 状态，而是看服务真能应答）
+    $ curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:6333/readyz
+    [ ] 返回 200
+
+[A7] 集合命名前缀核对（隔离是「每项目一个 collection」的硬隔离）
+    $ curl -sS http://127.0.0.1:6333/collections
+    [ ] 出现的集合名全部形如 `ib_<project_id>_v<version>`
+    [ ] 没有任何不带前缀的集合（无前缀集合意味着存在绕过 CollectionResolver 的写入路径）
+
+[A8] 数据目录所在文件系统有余量（向量化是「先建新版本集合再切换」，重建期间会**双份**占盘）
+    $ df -h /var/lib/qdrant
+    [ ] 可用空间 >= 现有数据量的 2 倍（重建窗口内新旧集合并存）
+
+##############################################################################
+# B. IFC-IB-264 —— 依赖真机验证清单
+##############################################################################
+
+[B1] Python 版本与虚拟环境
+    $ /opt/intelligentbase/venv/bin/python -V
+    [ ] 3.12.x（与 requirements.txt 的钉版一致；版本漂移是「本地能跑线上不能」的常见根因）
+
+[B2] 依赖装齐且版本受钉（**特别检查 langchain-openai <0.3**）
+    $ /opt/intelligentbase/venv/bin/pip install -r requirements.txt --dry-run 2>&1 | tail -5
+    $ /opt/intelligentbase/venv/bin/python -c "import importlib.metadata as m; print('langchain-openai', m.version('langchain-openai'))"
+    [ ] 无待安装项（说明 requirements 与实际环境一致）
+    [ ] langchain-openai 版本 < 0.3
+    理由（FreeArk 已踩）：0.3.x 移除了 `_convert_chunk_to_generation_chunk`，
+    langchain 集成会在调用期抛 AttributeError —— 而且是**流式路径**上才炸。
+
+[B3] 【硬约束】确认**没有** PyMuPDF / fitz 进入环境
+    $ /opt/intelligentbase/venv/bin/python -c "import importlib.util as u; print(u.find_spec('fitz'), u.find_spec('pymupdf'))"
+    [ ] 两个均为 None
+    理由：PyMuPDF 为 AGPL-3.0，已**否决**（不得以「内部平台合规」口径放行）。
+    若某个包把它当传递依赖带进来，此处会暴露 —— 所以要在真机上查，不能只看 requirements.txt。
+    替代方案已在代码中落地：pypdf（主）+ pdfminer.six（备）+ pdfplumber（可选）+ pypdfium2（栅格化）。
+
+[B4] PDF 三路径真跑（用一个**文本层 PDF** 和一个**纯扫描件 PDF** 各测一次）
+    说明：清单给**可直接粘贴的真命令**而不是「跑一下解析」——否则执行人各自发挥，
+    证据无法互相复核。`ParserRegistry.parse()` 是唯一解析入口（IFC-IB-052），它要求
+    显式传入 ocr / renderer / spec，正是为了让「用了哪个 OCR、走了哪条 PDF 路径」
+    在调用点就一目了然（默认注册表**不含**兜底解析器：未知扩展名必须报错而非静默吞掉）。
+
+    $ /opt/intelligentbase/venv/bin/python - /path/文本层样本.pdf <<'PY'
+      import sys
+      from ib.core import ChunkingSpec
+      from ib.ocr import RapidOcrEngine
+      from ib.parsing import default_registry
+      from ib.rendering import PdfiumRenderer
+
+      spec = ChunkingSpec(chunk_size=800, chunk_overlap=100)
+      with open(sys.argv[1], "rb") as fh:
+          doc = default_registry.parse(
+              "pdf", fh, ocr=RapidOcrEngine(), renderer=PdfiumRenderer(), spec=spec
+          )
+      chars = sum(len(c.content) for c in doc.chunks)
+      print("page_count=", doc.page_count, "chunks=", len(doc.chunks), "chars=", chars)
+      print("warnings=", doc.warnings)
+      PY
+
+    对**扫描件**换文件路径重复同一段命令。判据：
+    [ ] 文本层 PDF：chars 明显大于 0，且未触发栅格化/OCR（耗时应在毫秒级，warnings 为空）
+    [ ] 扫描件 PDF：触发 pypdfium2 栅格化 + OCR，chars 大于 0
+    [ ] 两个样本都拿到非空文本（拿不到 = 该格式静默入库 0 字，而文档状态仍是 indexed）
+    提示：若扫描件某页识别为空，按 AC-IB-04-07 是**允许**的（跳过该页 + WARNING，文档仍可
+    indexed）。核对时看**整篇**是否为零，并查 `warnings` / 日志中是否确有该页的 WARNING ——
+    若整篇为零却没有任何 warning，那是缺陷（静默失败），不是正常降级。
+
+
+[B5] OCR 引擎真加载并真识别（不能只看「导入成功」）
+    $ /opt/intelligentbase/venv/bin/python -c "
+      from ib.ocr import RapidOcrEngine
+      e = RapidOcrEngine()
+      print('engine=', type(e).__name__, 'available=', e.available())
+      print(repr(e.recognize(<一小张含清晰文字的 png>)))"
+    [ ] type 是 RapidOcrEngine（**不是** NullOcrEngine）
+    [ ] available() is True
+    [ ] recognize() 输出包含预期文字
+    说明：`available()=False` 时系统会用 NullOcrEngine 静默降级（AC-IB-04-07 要求不阻塞流程），
+    因此**必须显式核对引擎类型**，否则「扫描件全都没文字」会被当成正常的空文档。
+
+[B6] bge-m3 embedding 服务真跑（`ib-embed`，监听 127.0.0.1:8100）
+    先用**基座自己的** Embedder 去调，而不是自己手拼 HTTP —— 这样同时验证了
+    「服务起来了」与「客户端契约对得上」（超时/重试/批量参数都走真实代码路径）。
+
+    $ systemctl is-active ib-embed
+    $ /opt/intelligentbase/venv/bin/python - <<'PY'
+      from ib.config import ConfigurationResolver, FileConfigurationSource
+      from ib.embedding import build_embedder
+
+      cfg = ConfigurationResolver(FileConfigurationSource("/etc/intelligentbase/config.json")).global_config()
+      embedder = build_embedder(cfg)              # 生产实现是 LocalHttpEmbedder
+      print("impl=", type(embedder).__name__, "url=", cfg.embedding.url)
+      vecs = embedder.embed_documents(            # 冷路径：批量 / 长超时 / 多重试
+          ["测试"],
+          timeout_s=cfg.embedding.cold_timeout_s,
+          max_retries=cfg.embedding.cold_max_retries,
+          batch_size=cfg.embedding.cold_batch_size,
+      )
+      print("dim=", len(vecs[0]), "expected=", cfg.embedding.dim, "declared=", embedder.dim())
+      print("hot=", len(embedder.embed_query("测试", timeout_s=cfg.embedding.hot_timeout_s)))
+      PY
+    [ ] 服务 active
+    [ ] impl 是 LocalHttpEmbedder（**不是** FakeEmbedder —— 后者只用于离线自测）
+    [ ] dim 与配置 `embedding.dim` 一致（bge-m3 为 1024；对不上说明模型与配置不匹配）
+    [ ] 冷路径与热路径**都**返回向量（热路径走短超时；若热路径超时而冷路径正常，
+        说明 `hot_timeout_s` 对当前硬件过小，问答会被误判降级）
+    [ ] 首次冷启动耗时被记录（模型加载慢，冷/热超时值据此确认是否合理）
+    说明：端口契约里冷/热是**两个方法**（`embed_documents` / `embed_query`），
+    上面的调用刻意把各自超时与重试显式传进去 —— 这两条路径的参数不同正是设计要点
+    （AC-IB-07-03），不该被一句「测一下能不能向量化」掩盖掉。
+    症状说明：服务未起来时 Embedder 调用超时 → 检索 degraded → 问答**照常出答案**
+    （fail-open 是产品要求，降级横幅也会显示）。所以这一步**不能**靠「问答能出字」验收，
+    必须像上面这样直连验证，否则「知识库其实没接上」会被长期掩盖。
+    归属（R3 订正）：`ib-embed` 服务端**已有模块归属** = MOD-IB-26（module_design §1 / §3），
+    线协议契约（IFC-IB-266~274）的唯一落点是 `docs/ib_embed_service_contract.md`；
+    基座侧客户端契约仍由 MOD-IB-09 承载。故上面的直连验证只覆盖**客户端契约**，
+    服务端自身的 `/embed`、`/healthz`、`/warmup`、`/descriptor` 验收按该契约文件
+    §3~§9 执行，本清单不重复。（R2 前「只有 systemd 单元与客户端、无模块归属」的表述已作废。）
+
+[B7] 远端 LLM（DeepSeek）连通性与外发边界声明
+    $ /opt/intelligentbase/venv/bin/python - <<'PY'
+      from ib.config import ConfigurationResolver, FileConfigurationSource
+      from ib.llm import build_llm_provider
+
+      # 凭据由配置指向的环境变量注入（api_key_env），本段**不读、不回显**密钥
+      cfg = ConfigurationResolver(FileConfigurationSource("/etc/intelligentbase/config.json")).global_config()
+      provider = build_llm_provider(cfg)
+      print("egress=", provider.describe_egress())
+      print("health=", provider.health())
+
+      # LlmRole.impl 是 provider 私有对象（端口刻意把它藏起来，MOD-IB-01 不静态依赖 langchain），
+      # 故用编排层同一套调用惯用法：有 invoke 就 invoke，否则当可调用对象用。
+      impl = provider.build_aggregator().impl
+      reply = impl.invoke("ping") if hasattr(impl, "invoke") else impl("ping")
+      print("reply=", repr(str(getattr(reply, "content", reply))[:60]))
+      PY
+    [ ] 返回一次成功的极小调用（就是那句 ping 的回复）
+    [ ] egress 输出含 endpoint_host 与 data_categories（这就是对外的**数据外发声明**）
+    [ ] 在**离线/无外网**环境下该检查失败，且系统据此把路由降级到关键词档位（不崩、不空转）
+    声明：问句文本与命中的检索片段会**外发**到云端模型端点。该事实已由
+    `EgressDescriptor` 在启动日志与 `/healthz/deps` 中显式暴露（IFC-IB-215 / NFR-08），
+    属**已知且已声明**的数据外发，不是泄漏。凭据本身**不得**出现在任何输出/日志中。
+    注意：若 `langchain-openai` 版本 >= 0.3，`build_llm_provider` 应在构造期即报错
+    （`assert_langchain_openai_version`）—— 这正是 B2 要单独核对版本的原因。
+
+[B8] 台账（SQLite）WAL 与并发参数真生效
+    $ /opt/intelligentbase/venv/bin/python -c "
+      import sqlite3; c=sqlite3.connect('<ledger_path>');
+      print(c.execute('PRAGMA journal_mode').fetchone(),
+            c.execute('PRAGMA busy_timeout').fetchone())"
+    [ ] journal_mode = wal
+    [ ] busy_timeout = 5000
+    理由：WAL 缺失时读（浏览器列表/进度）会阻塞写（worker 租约续期），
+    表现为重建中途「卡死」；busy_timeout 缺失时并发写直接抛 `database is locked`。
+    二者都在连接层生效，**不在** schema 里，故必须运行时核对（见 migrations/001 的说明）。
+
+[B9] 启动期必填校验真的会拒绝启动（AC-IB-12-03）
+    $ env -u IB_AUTHZ_POLICY ... /opt/intelligentbase/venv/bin/python -m ibweb.bootstrap --ensure-schema; echo "exit=$?"
+    [ ] 退出码非零
+    [ ] 错误信息指出**缺失的键名**，且**不回显任何值**
+    说明：AuthzPolicy 未注入必须**启动失败**，绝不能退化为「匿名放行」——
+    鉴权缺失静默放行的后果是全部数据对所有请求者可见。
+
+[B10] SSE 端点鉴权纪律（FreeArk 教训：令牌出现在查询串会被 access log 完整记录）
+    $ curl -sS -o /dev/null -w '%{http_code}\n' 'http://127.0.0.1:18080/api/chat/stream?q=hi&token=xxx'
+    [ ] 返回 4xx（本项目对 `?token=` 显式拒绝），**不是** 200
+    $ curl -sS -N -H "Authorization: Bearer <令牌>" 'http://127.0.0.1:18080/api/chat/stream?q=hi' | head -5
+    [ ] 返回 `text/event-stream`，可见 `event:` 帧
+    附带：确认真实令牌**从不**出现在 nginx / waitress 的 access log 中（抽查日志行）。
+
+[B11] 原文件留存与重建回滚真跑（OQ-IB-01 已确认「原文件留存 ON」）
+    $ 依次执行：上传一个文档 → 记录 content_sha256 → 删除 → 确认 BlobStore 中该 sha256 对象已移除
+    [ ] 上传后 BlobStore 中存在以 sha256 命名的对象
+    [ ] 删除后该对象被移除（不留孤儿）
+    重建回滚：
+    [ ] 触发重建，中途让一个文档失败 → 确认 active_collection_version **未**切换
+    [ ] 旧集合仍可查询（服务未中断，内容为重建前版本）
+
+[B12] 四个 unit、nginx 与静态资源
+    $ systemctl is-active qdrant ib-embed ib-web ib-worker nginx
+    $ curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:18080/healthz
+    $ nginx -t
+    $ grep -q 'proxy_buffering off;' /etc/nginx/sites-available/intelligentbase && echo OK
+    [ ] 四个服务 + nginx 均 active
+    [ ] /healthz 返回 200
+    [ ] nginx -t 通过
+    [ ] proxy_buffering off 已生效
+    [ ] 前端构建产物已就位，由 nginx 托管（/var/www/intelligentbase，非 ib-web）
+
+[B13] 长连接容量与超时（R1 的已知容量风险）
+    [ ] `ib-web` 用 Waitress，`--threads` 与 `--channel-timeout` 与 unit 一致
+    [ ] 并发发起 N 个 SSE 长连接（N >= threads），确认**超出部分明确排队/超时**
+        （fail-closed 明确报错，不静默空转 —— 见降级矩阵「WSGI 工作进程」行）
+    [ ] 结论写入容量记录；`[TBD-T15]` 复核前按保守 worker 数与 SSE 超时配置
+
+[B14] 日志纪律抽查（no-body / no-credential）
+    $ grep -c -iE 'Bearer |token=|password|api[_-]?key' <日志文件>
+    [ ] 命中数为 0
+    [ ] 抽查若干条问答相关日志：确认**没有**问句正文、没有检索片段原文、没有完整向量
+    说明：结构化日志经 `LOG_FIELDS` 白名单过滤（未列入的键被**静默丢弃**），
+    因此新增日志字段时必须同步加入白名单 —— 否则会出现「以为记了、其实没记」，
+    或更糟「以为过滤了、其实漏了」。
+
+##############################################################################
+# C. 验收签署
+##############################################################################
+[ ] A1–A8 全部勾选，证据归档（命令原文 + 时间戳）
+[ ] B1–B14 全部勾选，证据归档
+[ ] 本文件不含任何真实凭据（自检：grep -nE 'sk-|ghp_|BEGIN .*PRIVATE KEY' 本文件应无命中）
+执行人：____________  复核人：____________  日期：____________

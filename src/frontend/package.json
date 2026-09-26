@@ -1,0 +1,30 @@
+{
+  "name": "intelligentbase-frontend",
+  "@module": "MOD-IB-24",
+  "@implements": "IFC-IB-256 / 257 / 258 / 259（上传·列表·重建页 + 问答页 + 类型化 API 客户端）",
+  "@author": "sub_agent_software_developer",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0",
+    "vue-tsc": "^2.0.0"
+  },
+  "_comment": [
+    "刻意不加 UI 组件库（Element Plus 等）：本前端只有 3 个页面，一次性引入组件库会带来",
+    "几十 MB 的构建产物与一套需要跟随升级的依赖。目标机是 4GB 内存的树莓派，静态资源体积",
+    "直接影响首屏；用原生 CSS 足以覆盖这 3 个页面的需求。",
+    "无 axios：HTTP 一律经 src/api/client.ts 的 fetch 封装（见该文件的 IC-IB-01 说明）。"
+  ]
+}

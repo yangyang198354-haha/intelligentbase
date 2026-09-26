@@ -1,0 +1,53 @@
+# @module MOD-IB-25
+# @implements IFC-IB-261 systemd 单元之一：ib-embed（bge-m3 常驻 embedding 服务）
+# @author sub_agent_software_developer
+#
+# Embedding 常驻服务单元。**本文件是交付物，不由此代理安装到目标机。**
+#
+# 为什么 embedding 必须是**独立常驻进程**（而不是在 Web 进程里 import 模型）：
+#
+#   1. 模型加载（bge-m3 约 2GB 权重）耗时数十秒且吃内存。若放在 Web 进程，
+#      每次重启 Web 都要重新加载 —— 目标机 4GB 内存，Web 与模型同时驻留会互相挤爆。
+#   2. 入库（冷路径，长超时）与问答（热路径，短超时）对同一模型的需求相反。
+#      独立进程 + HTTP 接口让两边各自设超时，互不影响。
+#   3. 崩溃隔离：模型 OOM 只会杀死本服务，`ib-web` 仍能对外服务（检索降级而非全站不可用）。
+#
+# 端口只监听回环：embedding 接口无鉴权（内网专用），不应暴露到内网其他主机。
+
+[Unit]
+Description=intelligentbase embedding service (bge-m3 over HTTP)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ib-embed
+Group=ib-embed
+WorkingDirectory=/opt/ib-embed
+
+# 凭据与环境一律经 EnvironmentFile 注入（**单元文件内不得出现任何真实值**）。
+# `-` 前缀表示文件缺失时不报错 —— 但模板里没有必填项，故此处不加 `-`：
+# 缺文件应当失败（否则会以「无配置」状态静默启动）。
+EnvironmentFile=/etc/intelligentbase/ib-embed.env
+
+ExecStart=/opt/ib-embed/venv/bin/python -m ib_embed.server --host 127.0.0.1 --port 8100
+
+# 模型常驻内存，给它自己的上限但不与 Web 争抢：物理 4GB，此处留 2.5GB 给模型 + 运行时。
+# R2（IFC-IB-274 / L-03 核对）：本值**必须**与 `IB_EMBED_MEMORY_LIMIT_MB`（默认 2560，
+# 见 docs/ib_embed_service_contract.md §9 / src/deploy/ib-embed.env.example）**数值一致** ——
+# 二者是同一约束的两个落点（内核 cgroup 上限 vs 服务自述），不一致会让运维无从判断真实预算。
+# 目标机实为 11GiB（原注释按 4GB 写就）：数值与注释须在 [TBD-T4] 实测后一并重定（仅参数与注释）。
+MemoryMax=2560M
+
+Restart=always
+RestartSec=10s
+
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+# 模型权重目录只读挂载（权重不应被运行期改写）
+ReadOnlyPaths=/opt/ib-embed/models
+
+[Install]
+WantedBy=multi-user.target

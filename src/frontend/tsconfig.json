@@ -1,0 +1,33 @@
+{
+  "@module": "MOD-IB-24",
+  "@implements": "IFC-IB-256 / 257 / 258 / 259 类型检查配置",
+  "@author": "sub_agent_software_developer",
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": false,
+    "jsx": "preserve",
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["vite/client"],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue", "vite.config.ts"],
+  "_comment": [
+    "strict + noUnusedLocals 是刻意的：本前端承担『把后端契约的字段名写错』这类错误的",
+    "唯一防线。例如把 DocumentRecord.kb_id 写成 kbId、把 SSE 事件 kind 拼错，",
+    "TypeScript 会在 `npm run build` 阶段直接失败，而不是等到运行时静默显示空白。",
+    "verbatimModuleSyntax 强制 `import type`，避免把类型当值导入后在运行时炸掉。"
+  ]
+}

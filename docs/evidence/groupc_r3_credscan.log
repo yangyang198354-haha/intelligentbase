@@ -1,0 +1,7 @@
+# GROUP_C R3 凭据扫描（改动文件 + 证据文件；不含本扫描输出自身）
+# 扫描文件数: 12
+# 模式: sk-*16+/ghp_*/AKIA*/-----BEGIN/(api_key|apikey|password) 赋字面量
+# 注意: 'token' 一词单独不作模式，因为探针/日志中的 IB_OFFLINE_TOKEN 值是本机自造离线占位串
+
+
+grep EXIT=1  (1 = 无命中 = 零凭据形态)

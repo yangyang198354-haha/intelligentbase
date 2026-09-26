@@ -1,0 +1,67 @@
+# @module MOD-IB-25
+# @implements IFC-IB-261 systemd 单元之一：ib-worker（入库队列 + 重建推进）
+# @author sub_agent_software_developer
+#
+# 后台 worker 单元。**本文件是交付物，不由此代理安装到目标机。**
+#
+# ## 为什么 worker 必须与 Web 分开（而不是 Web 里开线程）
+#
+# 解析 + OCR + 向量化是分钟级、吃满 CPU/内存的重活。放在 Web 进程内（无论线程还是
+# asyncio 任务）都会与 SSE 请求争抢同一份资源：一次大文件 OCR 就能让并发的问答明显卡顿，
+# 而两者的根因是同一条执行资源 —— 这不是调参能解决的问题，是架构问题。
+# 拆开之后：worker 被 OOM 杀掉，Web 照常服务；systemd 按 Restart 拉起 worker 继续处理队列。
+#
+# ## 为什么 `Restart=always`（不是 `on-failure`）
+#
+# worker 是常驻轮询进程，正常路径下**永不自行退出**。因此任何退出（包括退出码 0）
+# 都是异常信号，都应当被拉起。用 `on-failure` 会让「被 SIGTERM 正常停止」之外的
+# 退出码 0 场景变成永久停摆（队列持续堆积，而 systemd 认为一切正常）。
+#
+# ## 为什么不需要 `ExecStartPre` 建表
+#
+# 台账由 `ib-web` 的 `ExecStartPre` 初始化；本单元 `After=ib-web.service`，
+# 启动顺序由 systemd 保证。让两个单元都建表虽然幂等，但会产生「谁先建」的不必要耦合。
+#
+# ## 单实例约束（**重要**）
+#
+# 多实例并非不安全（租约用条件 UPDATE 实现，见 ADR-07-R1），但本项目目标机是 4GB 内存的
+# 树莓派：两个 worker 同时做 OCR 会双双 OOM。因此本单元**不加** `@` 模板化后缀，
+# 且检查清单第 4 项要求确认只有一份在运行。
+
+[Unit]
+Description=intelligentbase indexing/rebuild worker
+After=network-online.target ib-web.service qdrant.service ib-embed.service
+Wants=network-online.target
+After=ib-web.service
+
+[Service]
+Type=simple
+User=ib-worker
+Group=ib-worker
+WorkingDirectory=/opt/intelligentbase
+EnvironmentFile=/etc/intelligentbase/ib-worker.env
+
+# 与 Web 共用同一份代码与配置（`IB_CONFIG_FILE` 指向同一个 config.json）。
+# 配额上给 worker 更宽松的内存：OCR 峰值远超 Web。
+ExecStart=/opt/intelligentbase/venv/bin/python -m ibweb.worker --interval 5 --limit 8
+
+Restart=always
+RestartSec=5s
+
+# 收到 SIGTERM 后让当前一轮跑完（worker 内部把信号转成「停下标志」）——
+# 直接杀死会留下 `parsing` 状态的文档，要等租约超时才被回收，部署频繁时持续堆积。
+KillSignal=SIGTERM
+TimeoutStopSec=300
+
+MemoryMax=2048M
+# OCR 是 CPU 密集型：限制为 2 核，避免占满目标机导致 Web 请求排队。
+CPUQuota=200%
+
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ReadWritePaths=/var/lib/intelligentbase
+
+[Install]
+WantedBy=multi-user.target

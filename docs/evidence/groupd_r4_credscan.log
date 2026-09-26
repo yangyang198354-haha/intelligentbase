@@ -1,0 +1,3 @@
+scan scope: src tests docs (excluding docs/evidence)
+hit_count=0
+conclusion: ZERO_CREDENTIALS

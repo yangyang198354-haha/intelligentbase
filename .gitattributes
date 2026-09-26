@@ -1,0 +1,14 @@
+# 统一 LF：开发机是 Windows，部署目标是 Linux（Ubuntu）。
+# CRLF 会破坏 systemd unit、shell 脚本 shebang 与 nginx 配置。
+* text=auto eol=lf
+
+# 明确按二进制处理（避免 Git 误判 / 转码破坏）
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+*.gz binary

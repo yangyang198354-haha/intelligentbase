@@ -1,0 +1,5 @@
+# GROUP_D R3 增量 — 凭据扫描（tests/ + docs/evidence/ 本轮产物）
+# 模式: sk-*16+/ghp_*/AKIA*/-----BEGIN/(api_key|apikey|password) 赋字面量
+
+强凭据形态命中数（排除日志自述）: 0
+EXIT=0

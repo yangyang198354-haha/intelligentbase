@@ -1,0 +1,119 @@
+# =============================================================================
+# intelligentbase —— ib-embed 推理运行时依赖（**独立 venv 专属，不进基座 venv**）
+# =============================================================================
+#
+# 归属：`ib-embed` 服务端（MOD-IB-26 / `docs/ib_embed_service_contract.md`）。
+# 本文件**不是** `src/requirements.txt` 的一部分，二者面向**两个不同的 venv**：
+#
+#   ┌─ 基座 venv（business base）──────── src/requirements.txt ────────────────┐
+#   │  Django + DRF + Waitress/Gunicorn、解析（pypdf/pdfminer/pdfplumber/      │
+#   │  pypdfium2）、OCR（rapidocr-onnxruntime + onnxruntime）、向量库          │
+#   │  （qdrant-client）、中文切分（jieba）。                                  │
+#   │  **刻意不含** FlagEmbedding / torch / transformers —— 见「为什么分离」。 │
+#   └─────────────────────────────────────────────────────────────────────────┘
+#   ┌─ ib-embed venv（inference runtime）──── src/requirements-embed.txt ──────┐
+#   │  FlagEmbedding（首选）+ torch(CPU) + transformers。                      │
+#   │  仅承载 bge-m3 的**推理**，对外只经 HTTP 线协议，不 import `ib.*`（C8）。 │
+#   └─────────────────────────────────────────────────────────────────────────┘
+#
+# 为什么分离（不是「省体积」，是三条硬理由）：
+#   1. **C8 进程隔离**：`ib_embed` 是「不被任何 `ib.*` 模块 import」的独立顶层包
+#      （自检 `ib_embed_isolation` 守住）；把它的重库塞进基座 venv，会让「服务端
+#      依赖」在基座进程里可被 import，隔离形同虚设。基座经 `IbEmbedClient` 走 HTTP
+#      连 ib-embed（`IB_EMBED_BACKEND=http`，**默认且推荐**）。
+#   2. **内存 / 磁盘面**：目标机内存小（部署计划登记 ~11GiB，且 OCR 链路已常驻
+#      onnxruntime）。torch 及其传递依赖体积与常驻内存很大，基座进程**不需要**它们。
+#   3. **SIGILL 爆炸半径收敛**（tech_stack §5.2 / [TBD-T18]）：目标机 CPU 若缺 AVX2，
+#      torch 的预编译 wheel 可能在导入/推理时触发 SIGILL（**进程级崩溃、不可捕获**）。
+#      把 torch 关在 ib-embed 单独进程里，最坏只让 embedding 服务挂（基座按 MOD-IB-15
+#      fail-open 降级为「无知识库」），**不会**连累 Web/编排进程一起崩。
+#
+# ★ 若必须用**进程内**形态（`IB_EMBED_BACKEND=inproc`，见 `ib/embedding/inproc.py`）：
+#   此时由**基座进程自己**载权重，故须在**基座 venv**里额外安装本文件。
+#   默认 `http`，inproc 只在显式配置时启用（契约 §8「形态可逆」）。
+#   → 结论：torch/FlagEmbedding **任何时候都不进** `src/requirements.txt`，
+#     需要 inproc 时是「往基座 venv 装本文件」，而不是「把本文件合并进基座清单」。
+#
+# -----------------------------------------------------------------------------
+# 安装（CPU-only；**严禁 CUDA 依赖**）
+# -----------------------------------------------------------------------------
+# torch 在 PyPI 上的 Linux 默认 wheel 是 **CUDA 版**（会拖入 nvidia-* 包）。为保证
+# CPU-only，须**先从 PyTorch 官方 CPU 索引**装 torch，再装本文件其余项：
+#
+#   python -m venv .venv-ibembed && . .venv-ibembed/bin/activate
+#   pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.2,<2.6"
+#   pip install -r src/requirements-embed.txt
+#
+# 不要在本文件里加全局 `--index-url`：那会把 FlagEmbedding / transformers 的获取
+# 也重定向到 torch 的 CPU 索引（那里没有它们）。故 torch 的 CPU 来源用**显式命令**
+# 表达，而非写进本文件。
+#
+# -----------------------------------------------------------------------------
+# 运行时选型（tech_stack §1 R2：三候选，三者择一，**不得并行安装**）
+# -----------------------------------------------------------------------------
+# ① FlagEmbedding（MIT，BAAI 官方）—— **首选**，见下方「PRIMARY」段。
+# ② sentence-transformers（Apache-2.0）—— **备选**，见下方「BACKUP」段（默认注释掉）。
+# ③ 直接 onnxruntime 载 bge-m3 的 ONNX 导出 —— 唯一**不引入 torch** 的路径；
+#    其运行时（onnxruntime）已在**基座** `src/requirements.txt` 里（OCR 链路共用），
+#    该路径另需 `transformers` 仅作 tokenizer —— 本文件默认不启用，登记于此仅供参考。
+#
+# **最终择一须在目标机以真推理实测为依据**（[TBD-T1] 延迟 / [TBD-T4] 内存 /
+# [TBD-T18] 指令集基线），本文件不替目标机拍板。
+#
+# ★★ 版本 pin 的诚实性说明 ★★
+# 本项目**离线**执行，无法在此确证任何依赖的确切可用版本。以下给出的是**保守区间**
+# （下界=已知兼容的最低线，上界=已观测可能引入不兼容的大版本），**不是**锁定值。
+# 凡未能离线确证者一律标注「**待目标机实测锁定**」；部署时须 `pip install` 后
+# `pip freeze` 回填精确版本到部署记录，**不得**把本文件的区间当作已锁定版本引用。
+# Python 版本约束沿用 tech_stack：`>=3.11,<3.14`（torch 的 cp 轮子随 Python 小版本变化，
+# 若目标为 3.13 则 torch 下界须抬到 >=2.6 —— 同属「待目标机实测锁定」）。
+#
+# -----------------------------------------------------------------------------
+# 模型权重来源（bge-m3）—— **权重不进 git**
+# -----------------------------------------------------------------------------
+# 双源，**国内可达优先**：
+#   * HuggingFace：`BAAI/bge-m3`（官方源；`huggingface.co/BAAI/bge-m3`）
+#   * ModelScope ：`BAAI/bge-m3`（国内镜像；`modelscope.cn/models/BAAI/bge-m3`）
+# 推荐下载（国内网络优先 ModelScope）：
+#   pip install modelscope
+#   modelscope download --model BAAI/bge-m3 --local_dir /opt/ib/models/bge-m3
+# 或 HuggingFace：
+#   huggingface-cli download BAAI/bge-m3 --local-dir /opt/ib/models/bge-m3
+#
+# 离线加载约定（契约 §9 / AC-IB-12-04 第 2 项）：
+#   * `IB_EMBED_MODEL_PATH` 指向**本地权重目录**（如 `/opt/ib/models/bge-m3`）；
+#     服务启动时**不联网下载**，只从该目录加载。
+#   * 权重约 2.3GB，**不入 git**（见仓库根 `.gitignore` 的 `models/bge-m3/` 规则）。
+#   * 缺失该键即拒绝启动（`ib_embed/config.py::REQUIRED_KEYS`），且**只报键名**不回显值。
+#
+# =============================================================================
+
+# --- PRIMARY：FlagEmbedding 路径（默认启用）----------------------------------
+# 选用理由（tech_stack §1）：对 bge 系列适配最直接、抽象层最少，BAAI 官方维护（MIT）。
+# 代价：带入 torch + transformers 两条重传递依赖（体积与内存面最大，且是 SIGILL 风险源）。
+FlagEmbedding>=1.2,<1.4          # 待目标机实测锁定（1.2.x / 1.3.x 分支）
+torch>=2.2,<2.6                  # CPU-only wheel（务必经上面的 CPU 索引安装；含 CUDA 版即违规）
+transformers>=4.44,<4.50         # bge-m3（XLM-RoBERTa）所需；FlagEmbedding 的下界约 4.44
+
+# 说明：FlagEmbedding 会**传递引入**一批库（accelerate / datasets / peft /
+# sentencepiece / sentence-transformers / ir-datasets 等），无需在此逐条 pin ——
+# 它们的实际解析版本同样「待目标机实测锁定」，并须以 `pip freeze` 回填部署记录。
+# 若网关/制品库需**离线预下载**，请以 `pip download -r` 的实际解析结果为准。
+
+# --- BACKUP：sentence-transformers 路径（默认**不启用**）---------------------
+# 切换方式（择一，**不得与 PRIMARY 并行安装**）：
+#   1. 注释掉上面的 FlagEmbedding 行；
+#   2. 取消下面 sentence-transformers 行的注释（torch / transformers 仍需要，保留）；
+#   3. 无需改任何代码 —— 运行时候选顺序为 `("flagembedding", "sentence_transformers",
+#      "onnxruntime")`，缺 FlagEmbedding 时自动落到 sentence_transformers
+#      （见 `ib_embed/runtime.py::_CANDIDATES` 与 `ib/embedding/inproc.py`）。
+#   选用理由：生态最广、CPU 支持成熟；代价：对 bge-m3 的多向量能力支持弱于 FlagEmbedding。
+# sentence-transformers>=2.7,<4.0  # 待目标机实测锁定（v3.x 起支持 bge-m3 稠密）
+
+# --- 候选③（仅登记，不启用）：onnxruntime 直载 bge-m3 的 ONNX 导出 ----------
+# 唯一**不引入 torch** 的路径（内存面最小，且与 OCR 共用 onnxruntime）。
+# 其 onnxruntime 已在基座 `src/requirements.txt`；此路径**仅额外需要 transformers**
+# 作为 tokenizer（`ib_embed/runtime.py::_OnnxRuntime` 惰性 import AutoTokenizer）。
+# 若切换到本路径：需自备 bge-m3 的 `model.onnx` + `tokenizer.json` 于 IB_EMBED_MODEL_PATH，
+# 且须选 **CPU 版** onnxruntime wheel（**不得**装 GPU 版）。此路径的 tokenizer 依赖：
+# transformers>=4.44,<4.50        # 待目标机实测锁定（与 PRIMARY 同区间）

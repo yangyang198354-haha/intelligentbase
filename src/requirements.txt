@@ -1,0 +1,45 @@
+# intelligentbase 运行期依赖（Python 3.12）
+#
+# 版本策略：**下界 + 上界都写**。只写 `>=` 会在不知不觉中被拖进不兼容的主版本
+# （`langchain-openai` 已经实际发生过一次：0.3.x 删除了生产代码依赖的内部函数）。
+#
+# 安装：
+#   pip install -r requirements.txt
+# 离线自测（不装向量库/OCR/云客户端）：
+#   pip install -r requirements-offline.txt   # 见 src/requirements-offline.txt
+
+# --- 载体：HTTP / WSGI -------------------------------------------------------
+# Waitress 为主（Windows 与低内存 ARM 上纯 Python，无 C 扩展编译负担），
+# Gunicorn 为备（仅 Linux）。二者都提供，由 systemd 单元决定实际使用哪一个。
+Django>=5.0,<6.1
+djangorestframework>=3.15,<4.0
+waitress>=3.0,<4.0
+gunicorn>=22.0,<24.0; sys_platform != "win32"
+
+# --- 编排 --------------------------------------------------------------------
+# 注意：`langchain-openai` 必须 pin `<0.3`。
+# 0.3.x 移除了 `_convert_chunk_to_generation_chunk`，而本项目的流式适配器依赖它 ——
+# FreeArk 生产环境已经因此漂移过一次（表现为流式响应直接断流）。
+langgraph>=0.2,<2.0
+langchain-core>=0.3,<2.0
+langchain-openai>=0.2,<0.3
+
+# --- 解析（三路径；**禁止 PyMuPDF/fitz**）------------------------------------
+# 许可合规硬约束：PyMuPDF 为 AGPL-3.0，已否决。不得以「内部平台合规」为由引入。
+pypdf>=4.0,<7.0                  # 主路径：纯 Python，许可 BSD
+pdfminer.six>=20231228,<20260101 # 备路径：主路径解析失败时的回退
+pdfplumber>=0.11,<1.0            # 可选路径：表格抽取
+
+# --- 栅格化（扫描件 → 图像 → OCR）--------------------------------------------
+pypdfium2>=4.20,<5.0             # PDFium 绑定；许可 Apache-2.0/BSD
+
+# --- OCR ---------------------------------------------------------------------
+rapidocr-onnxruntime>=1.3,<2.0   # 离线中文 OCR（不依赖外部 OCR 服务）
+onnxruntime>=1.16,<2.0
+
+# --- 向量库 ------------------------------------------------------------------
+# 只在生产使用；离线自测用 InMemory 替身，不需要本依赖。
+qdrant-client>=1.7,<2.0
+
+# --- 中文切分（可选；缺失时回退到朴素定长切分，不阻塞）----------------------
+jieba>=0.42,<1.0

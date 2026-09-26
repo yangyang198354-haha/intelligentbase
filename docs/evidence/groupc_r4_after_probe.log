@@ -1,0 +1,50 @@
+=== GROUP_C R4 / FND-GROUP-D-03 探针（真实 HTTP 路径 + 文件系统路径）===
+
+--- 组 1：HTTP DELETE /api/files/{id}（resolve_scope → 项目级）---
+  [PASS] 上传返回 201 -- 201
+  [PASS] 上传确实落盘了原文件 -- 1
+  上传后 BlobStore 对象 = [('p_alpha', 'kb_a', 'cc401924fe764907968321472150a580')]
+  [PASS] 视图 scope 的 kb_ids 确为 None（项目级，即缺陷触发条件） -- None
+  HTTP DELETE 状态 = 200；DeleteReport = {'vectors_deleted': 0, 'blob_deleted': True, 'ledger_deleted': True}
+  [PASS] 删除返回 200 -- 200
+  [PASS] ledger_deleted is True -- True
+  [PASS] 【修复】blob_deleted is True（确删到原文件） -- True
+  删除后对象数 = 0；本 doc 残留 = 0
+  [PASS] 【修复】原文件无孤儿（BlobStore 内无本 doc 残留） -- 残留 0
+  [PASS] 台账行已删
+
+--- 组 2：对照组 —— 同一数据用 kb 级 scope 直接删除 ---
+  kb 级 delete_document = DeleteReport(vectors_deleted=0, blob_deleted=True, ledger_deleted=True)
+  [PASS] kb 级 scope 仍能删净（blob_deleted True） -- DeleteReport(vectors_deleted=0, blob_deleted=True, ledger_deleted=True)
+  [PASS] kb 级删除后对象数为 0 -- 0
+
+--- 组 3：本无 blob（data=None）→ blob_deleted 必须为 False（不虚报） ---
+  [PASS] 无内容 → blob_ref_for 为 None
+  data=None delete_document = DeleteReport(vectors_deleted=0, blob_deleted=False, ledger_deleted=True)
+  [PASS] 【正确置位】本无 blob → blob_deleted is False -- False
+  [PASS] 本无 blob 删除仍成功（ledger_deleted True）
+
+--- 组 4：真实文件系统 FsBlobStore（磁盘无孤儿文件 + 空 kb 目录清理） ---
+  期望落盘文件 = C:\Users\胖子熊\AppData\Local\Temp\ib-r4-blobs-yes7xvl1\p_alpha\kb_a\83c2303ab26f4d4f8e4d28d780b786c4\63dd20359adbe50ced591e87fdcc6d1e9c13e386aca34480c570e7d7399aef6d.txt（存在=True）
+  [PASS] 落盘文件存在（写路径 kb 段）
+  [PASS] 落盘 kb 段与 kb_segment 一致 -- kb_a
+  项目级 scope delete_document = DeleteReport(vectors_deleted=0, blob_deleted=True, ledger_deleted=True)
+  [PASS] 【修复】磁盘上原文件已移除（无孤儿文件）
+  [PASS] 【修复】doc 目录已清理
+  [PASS] 空 kb 目录已清理 -- C:\Users\胖子熊\AppData\Local\Temp\ib-r4-blobs-yes7xvl1\p_alpha\kb_a
+  [PASS] 【修复】FsBlobStore 路径 blob_deleted is True -- DeleteReport(vectors_deleted=0, blob_deleted=True, ledger_deleted=True)
+
+--- 组 5：跨项目隔离 —— 删 p_alpha 不伤 p_beta ---
+  [PASS] p_beta 的 blob 已落盘（前置条件）
+  [PASS] 【隔离】删除 p_alpha 的 doc 后 p_beta 的 blob 仍在
+
+--- 组 6：不回归 FND-GROUP-D-02（尚无事发生 → 删除成功，不留幽灵） ---
+  [PASS] 删除未抛（无 StartupError）
+  delete_document = DeleteReport(vectors_deleted=0, blob_deleted=True, ledger_deleted=True)
+  [PASS] vectors_deleted == 0（本项目尚无派生物） -- 0
+  [PASS] 台账行为 None
+  [PASS] process_pending 不再认领已删文档 -- ProcessReport(processed=0, succeeded=0, failed=0, skipped=0)
+  [PASS] 原文件亦无孤儿 -- 0
+
+=== 判定 ===
+结论: 全部判据通过（FND-GROUP-D-03 修复成立，且未回归 FND-GROUP-D-02）

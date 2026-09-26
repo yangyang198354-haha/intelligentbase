@@ -1,0 +1,274 @@
+=== R4 突变敏感性自证（在仓库副本 .r4_mutant_check 上施加，真实 src/ 全程只读）===
+新用例集合：TC-UNIT-055 + TC-INT-074/075/076/077/078；已强化既有守卫：TC-INT-041、TC-E2E-003
+
+--- 基线（未突变）---
+......                                                                   [100%]
+6 passed in 0.30s
+EXIT=0
+
+--- 突变 A：_blob_scope_of 回退为项目级（旧写法）---
+FFF.F.FF                                                                 [100%]
+================================== FAILURES ===================================
+____________ test_TC_UNIT_055_kb_segment_is_single_source_of_truth ____________
+
+tmp_path = WindowsPath('C:/Users/胖子熊/AppData/Local/Temp/pytest-of-胖子熊/pytest-7/test_TC_UNIT_055_kb_segment_is0')
+
+    def test_TC_UNIT_055_kb_segment_is_single_source_of_truth(tmp_path):
+        """[TC-UNIT-055] `kb_segment` 规则唯一，且写/读/删三处推导同源（AC-IB-03-02）。
+    
+        断言：
+          1. 规则本身：`None` / `""` → `"default"`；非空 kb 原样返回；
+          2. 读路径 `blob_ref_for`（`kb_id=""` 记录）产出第 2 段 == `kb_segment("")` == `"default"`；
+          3. 写路径 `FsBlobStore._doc_dir`（项目级 scope `kb_ids=None`）与显式空 kb 段落到**同一**目录段；
+          4. 删除路径 `_blob_scope_of` 由**记录**派生（携带真实 kb），落到与写路径**同一**目录段。
+        """
+        # 1) 规则本身（唯一真源）
+        assert kb_segment(None) == "default"
+        assert kb_segment("") == "default"
+        assert kb_segment("kb_a") == "kb_a"
+    
+        # 2) 读路径：blob_ref_for 的 kb 段 = kb_segment(record.kb_id)
+        ref = blob_ref_for(_record(kb_id=""))
+        assert ref is not None
+        assert ref.rel_path.split("/")[1] == kb_segment("") == "default"
+    
+        # 3) 写路径：项目级 scope（kb_ids=None）与显式空 kb 段的目录段一致
+        fs = FsBlobStore(str(tmp_path / "blobs"))
+        assert fs._doc_dir(Scope("p_alpha"), "doc-055") == fs._doc_dir(
+            Scope("p_alpha", ("",)), "doc-055"
+        )
+        assert fs._doc_dir(Scope("p_alpha"), "doc-055").split(os.sep)[-2] == "default"
+    
+        # 4) 删除路径：由记录派生的 scope 与写路径同段（kb 级记录 → kb 段）
+        derived = _blob_scope_of(_record(kb_id="kb_a"))
+        assert derived.project_id == "p_alpha"
+>       assert derived.kb_ids == ("kb_a",), f"删除 scope 未携带记录的真实 kb：{derived}"
+E       AssertionError: 删除 scope 未携带记录的真实 kb：Scope(project_id='p_alpha', kb_ids=None)
+E       assert None == ('kb_a',)
+E        +  where None = Scope(project_id='p_alpha', kb_ids=None).kb_ids
+
+..\tests\unit\test_blob_kb_segment.py:77: AssertionError
+______ test_TC_INT_074_kb_upload_project_scope_delete_purges_real_bytes _______
+
+deps = Deps(cfg=GlobalConfig(config_source='dict', offline_mode=True, ledger_backend='memory', ledger_path='./var/ledger/ledg...e, endpoint_host='', data_categories=[]), capability_digest='- search_knowledge: 在企业知识库中检索与问题相关的资料片段，返回文件名与位置（需要范围绑定）')
+tmp_path = WindowsPath('C:/Users/胖子熊/AppData/Local/Temp/pytest-of-胖子熊/pytest-7/test_TC_INT_074_kb_upload_proj0')
+
+    def test_TC_INT_074_kb_upload_project_scope_delete_purges_real_bytes(deps, tmp_path):
+        """[TC-INT-074] kb 级上传 + 项目级 scope 删除 → `blob_deleted=True` 且**磁盘上不残留任何字节**（AC-IB-03-02）。
+    
+        这是 FND-GROUP-D-03 的错配对：上传走 kb 级 scope（落真实 kb 段），删除走与 HTTP 视图**同源**的
+        项目级 scope（`resolve_scope` → `kb_ids=None`）。修复前删除在 `default` 段查找 → 删 0 个 → 孤儿。
+    
+        本用例对 `FsBlobStore.root` 做**真实文件系统断言**（`is_file` / `exists`），而非仅断言返回值。
+        """
+        fs = _swap_real_fs(deps, tmp_path)
+        body = "R4 原文件字节清理（kb 级上传 / 项目级删除）。".encode("utf-8")
+        record = deps.lifecycle.submit_upload(
+            request_ctx("p_alpha"),
+            deps.lifecycle.validate_upload("r4_kb.txt", len(body), body[:4096]),
+            "kb_a",
+            data=io.BytesIO(body),
+        )
+        ref = blob_ref_for(record)
+        assert ref is not None, "有内容的上传必须可推导原文件引用"
+        on_disk = pathlib.Path(fs.root, *ref.rel_path.split("/"))
+        assert on_disk.is_file(), "前置：kb 级上传应把原文件落盘到真实根目录"
+        assert on_disk.parent.name == record.doc_id and on_disk.parent.parent.name == "kb_a"
+    
+        # 与 HTTP 删除路径同源的 scope（项目级，kb_ids=None）—— 即缺陷触发条件
+        view_scope = resolve_scope(request_ctx("p_alpha"))
+        assert view_scope.kb_ids is None, "HTTP 视图 scope 必须为项目级，否则本用例未在复现真实路径"
+        report = deps.lifecycle.delete_document(view_scope, record.doc_id)
+    
+>       assert report.blob_deleted is True, f"删除未清理原文件：{report}"
+E       AssertionError: 删除未清理原文件：DeleteReport(vectors_deleted=0, blob_deleted=False, ledger_deleted=True)
+E       assert False is True
+E        +  where False = DeleteReport(vectors_deleted=0, blob_deleted=False, ledger_deleted=True).blob_deleted
+
+..\tests\integration\test_blob_delete_scope_r4.py:93: AssertionError
+___________ test_TC_INT_075_http_delete_purges_real_bytes_no_orphan ___________
+
+http_app = (Deps(cfg=GlobalConfig(config_source='dict', offline_mode=True, ledger_backend='memory', ledger_path='./var/ledger/led...]), capability_digest='- search_knowledge: 在企业知识库中检索与问题相关的资料片段，返回文件名与位置（需要范围绑定）'), <class 'django.test.client.Client'>)
+tmp_path = WindowsPath('C:/Users/胖子熊/AppData/Local/Temp/pytest-of-胖子熊/pytest-7/test_TC_INT_075_http_delete_pu0')
+
+    def test_TC_INT_075_http_delete_purges_real_bytes_no_orphan(http_app, tmp_path):
+        """[TC-INT-075] 真实 Django HTTP `DELETE /api/files/{id}` 路径 + 真实 FsBlobStore → 磁盘无残留（AC-IB-03-02）。
+    
+        复用 `docs/evidence/groupd_r3_blob_probe.py` 的构造方式（发送真实 HTTP 请求），
+        对核验者给出的**同一条真实 HTTP 路径**做文件系统级断言：修复前 `blob_deleted=False` 且对象残留；
+        修复后 `blob_deleted=True` 且存储根下无任何文件。
+        """
+        deps, Client = http_app
+        fs = _swap_real_fs(deps, tmp_path)
+        client = Client()
+    
+        payload = "R4 HTTP 真实路径原文件清理样本。".encode("utf-8")
+        up = SimpleUploadedFile("r4_http.txt", payload, content_type="text/plain")
+        r = client.post("/api/files", {"kb_id": "kb_a", "file": up}, **AUTH)
+        assert r.status_code == 201, r.content
+        doc_id = json.loads(r.content)["doc_id"]
+    
+        uploaded = _disk_bytes_under(fs.root)
+        assert len(uploaded) == 1, f"上传后应恰有 1 个原文件字节，实为 {uploaded}"
+        on_disk = uploaded[0]
+        assert on_disk.parent.name == doc_id, "落盘 doc 目录应与台账 doc_id 一致"
+    
+        d = client.delete(f"/api/files/{doc_id}", **AUTH)
+        assert d.status_code == 200, d.content
+        body = json.loads(d.content)
+>       assert body["blob_deleted"] is True, f"HTTP 删除未清理原文件：{body}"
+E       AssertionError: HTTP 删除未清理原文件：{'vectors_deleted': 0, 'blob_deleted': False, 'ledger_deleted': True}
+E       assert False is True
+
+..\tests\integration\test_blob_delete_scope_r4.py:127: AssertionError
+___ test_TC_INT_077_cross_project_delete_does_not_touch_other_project_blob ____
+
+deps = Deps(cfg=GlobalConfig(config_source='dict', offline_mode=True, ledger_backend='memory', ledger_path='./var/ledger/ledg...e, endpoint_host='', data_categories=[]), capability_digest='- search_knowledge: 在企业知识库中检索与问题相关的资料片段，返回文件名与位置（需要范围绑定）')
+tmp_path = WindowsPath('C:/Users/胖子熊/AppData/Local/Temp/pytest-of-胖子熊/pytest-7/test_TC_INT_077_cross_project_0')
+
+    def test_TC_INT_077_cross_project_delete_does_not_touch_other_project_blob(deps, tmp_path):
+        """[TC-INT-077] 删除项目 A 的 doc 不误删项目 B 的同内容 / 同 doc_id blob（隔离不变式）。
+    
+        存储布局为 `<root>/<project>/<kb>/<doc>/<sha>.<ext>`，前两级保证删除退化为**删目录**而不误伤；
+        本用例同时覆盖「同内容不同 project」（真实上传，doc_id 不同，sha 相同）与
+        「同 doc_id 不同 project」（人为放置，验证按 project 隔离而非按文件名/sha 全局匹配）。
+        """
+        fs = _swap_real_fs(deps, tmp_path)
+        shared = "跨项目同一内容字节 SAME-077。".encode("utf-8")
+    
+        rec_a = deps.lifecycle.submit_upload(
+            request_ctx("p_alpha"),
+            deps.lifecycle.validate_upload("iso_a.txt", len(shared), shared[:4096]),
+            "kb_a",
+            data=io.BytesIO(shared),
+        )
+        rec_b = deps.lifecycle.submit_upload(
+            request_ctx("p_beta"),
+            deps.lifecycle.validate_upload("iso_b.txt", len(shared), shared[:4096]),
+            "kb_b",
+            data=io.BytesIO(shared),
+        )
+        ref_b = blob_ref_for(rec_b)
+        assert ref_b is not None
+        b_on_disk = pathlib.Path(fs.root, *ref_b.rel_path.split("/"))
+        assert b_on_disk.is_file(), "前置：p_beta 的原文件应已落盘"
+    
+        # 人为在 p_beta 下放置与 rec_a **同 doc_id** 的同内容 blob
+        same_doc_ref = fs.put(Scope("p_beta", ("kb_b",)), rec_a.doc_id, io.BytesIO(shared), "txt")
+        same_on_disk = pathlib.Path(fs.root, *same_doc_ref.rel_path.split("/"))
+        assert same_on_disk.is_file(), "前置：p_beta 的同 doc_id blob 应已落盘"
+    
+        report = deps.lifecycle.delete_document(resolve_scope(request_ctx("p_alpha")), rec_a.doc_id)
+>       assert report.blob_deleted is True, f"p_alpha 的 doc 未清理：{report}"
+E       AssertionError: p_alpha 的 doc 未清理：DeleteReport(vectors_deleted=0, blob_deleted=False, ledger_deleted=True)
+E       assert False is True
+E        +  where False = DeleteReport(vectors_deleted=0, blob_deleted=False, ledger_deleted=True).blob_deleted
+
+..\tests\integration\test_blob_delete_scope_r4.py:201: AssertionError
+_________________ test_TC_INT_041_delete_before_bind_succeeds _________________
+
+http_app = (Deps(cfg=GlobalConfig(config_source='dict', offline_mode=True, ledger_backend='memory', ledger_path='./var/ledger/led...]), capability_digest='- search_knowledge: 在企业知识库中检索与问题相关的资料片段，返回文件名与位置（需要范围绑定）'), <class 'django.test.client.Client'>)
+
+    def test_TC_INT_041_delete_before_bind_succeeds(http_app):
+        """[TC-INT-041] 未绑定 collection 的项目删除刚上传的文档 → **成功**（R3 修复 FND-GROUP-D-02 的**正向回归守卫**）。
+    
+        修复前：删除路径假定「向量库恰好已被别处绑定」，而组合根启动期只 `ensure_collection`（建库）
+        而**不** `bind_collection`，于是「上传后立刻删除」（本项目尚无事发生）必抛 `StartupError`
+        → HTTP 500，且台账行残留（用户以为删了、内容仍在作答）。
+        修复后：删除路径经 `CollectionResolver` 自绑写路径 collection，「本项目尚无派生物」自然收敛为
+        `vectors_deleted=0` 的**成功**，台账行被删除。
+    
+        **R4 强化**：FND-GROUP-D-03 修复后，本路径的 `blob_deleted` 不再是「恒 False 的布尔」，
+        而应**如实为 True** 且原文件字节确实被清理（此前只按实断言为布尔）。本条现同时守卫
+        「未绑库删除不 500」（FND-GROUP-D-02）与「原文件字节被清理」（FND-GROUP-D-03）。
+    
+        本条**正向断言修复后的真值**；若退回 500、台账行残留或原文件残留，将**响亮失败**。
+        """
+        from django.core.files.uploadedfile import SimpleUploadedFile
+    
+        from ib.core import Scope
+        from ib.lifecycle import blob_ref_for
+    
+        client = _client(http_app)  # 该夹具每次 fresh 装配 → collection 尚未绑定
+        deps = http_app[0]
+        up = SimpleUploadedFile("fresh.txt", "刚上传还没被 worker 处理。".encode("utf-8"))
+        r = client.post("/api/files", {"kb_id": "kb_a", "file": up}, **AUTH)
+        assert r.status_code == 201
+        record = json.loads(r.content)
+    
+        # 删除前取得台账记录，以便删除后核对原文件引用是否已失效（R4）
+        stored = deps.ledger.get_document(Scope("p_alpha"), record["doc_id"])
+        ref = blob_ref_for(stored)
+        assert ref is not None and deps.blobs.exists(ref), "前置：上传应已落盘原文件"
+    
+        deleted = client.delete(f"/api/files/{record['doc_id']}", **AUTH)
+        assert deleted.status_code == 200, deleted.content
+        body = json.loads(deleted.content)
+        assert body["ledger_deleted"] is True
+        assert body["vectors_deleted"] == 0, "本项目尚无事发生，不应有任何向量被删"
+        # R4：HTTP 删除（项目级 scope）应仍能按记录的真实 kb 段清理原文件字节
+>       assert body["blob_deleted"] is True, f"原文件字节未被清理（FND-GROUP-D-03 复发？）：{body}"
+E       AssertionError: 原文件字节未被清理（FND-GROUP-D-03 复发？）：{'vectors_deleted': 0, 'blob_deleted': False, 'ledger_deleted': True}
+E       assert False is True
+
+..\tests\integration\test_http_contract.py:142: AssertionError
+________________ test_TC_E2E_003_delete_removes_from_retrieval ________________
+
+http_app = (Deps(cfg=GlobalConfig(config_source='dict', offline_mode=True, ledger_backend='memory', ledger_path='./var/ledger/led...]), capability_digest='- search_knowledge: 在企业知识库中检索与问题相关的资料片段，返回文件名与位置（需要范围绑定）'), <class 'django.test.client.Client'>)
+
+    def test_TC_E2E_003_delete_removes_from_retrieval(http_app):
+        """US-IB-03 删除文档后检索不再命中（下架生效，关键路径）。"""
+        from ib.core import Scope
+    
+        deps, Client = http_app
+        scope = Scope("p_alpha", ("kb_a",))
+        record = ingest_text(deps, "p_alpha", "kb_a", "tobedeleted.txt", "即将下架的独有内容 QQQ-13。")
+        assert deps.retrieval.search("QQQ-13", scope=scope).hits
+    
+        r = Client().delete(f"/api/files/{record.doc_id}", **AUTH)
+        assert r.status_code == 200, r.content
+        assert deps.retrieval.search("QQQ-13", scope=scope).hits == [], "下架后仍检索得到"
+        # 原文件字节亦已清理（R4 / FND-GROUP-D-03：HTTP 删除走项目级 scope 仍应删到 kb 段落盘的字节）
+        from ib.lifecycle import blob_ref_for
+    
+>       assert json.loads(r.content)["blob_deleted"] is True, "下架未清理原文件字节（孤儿）"
+E       AssertionError: 下架未清理原文件字节（孤儿）
+E       assert False is True
+
+..\tests\e2e\test_user_journeys.py:136: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/unit/test_blob_kb_segment.py::test_TC_UNIT_055_kb_segment_is_single_source_of_truth
+FAILED tests/integration/test_blob_delete_scope_r4.py::test_TC_INT_074_kb_upload_project_scope_delete_purges_real_bytes
+FAILED tests/integration/test_blob_delete_scope_r4.py::test_TC_INT_075_http_delete_purges_real_bytes_no_orphan
+FAILED tests/integration/test_blob_delete_scope_r4.py::test_TC_INT_077_cross_project_delete_does_not_touch_other_project_blob
+FAILED tests/integration/test_http_contract.py::test_TC_INT_041_delete_before_bind_succeeds
+FAILED tests/e2e/test_user_journeys.py::test_TC_E2E_003_delete_removes_from_retrieval
+6 failed, 2 passed in 0.42s
+EXIT=1
+
+--- 突变 B：kb_segment 回退为恒等（丢失 空/None → default）---
+F.....                                                                   [100%]
+================================== FAILURES ===================================
+____________ test_TC_UNIT_055_kb_segment_is_single_source_of_truth ____________
+
+tmp_path = WindowsPath('C:/Users/胖子熊/AppData/Local/Temp/pytest-of-胖子熊/pytest-8/test_TC_UNIT_055_kb_segment_is0')
+
+    def test_TC_UNIT_055_kb_segment_is_single_source_of_truth(tmp_path):
+        """[TC-UNIT-055] `kb_segment` 规则唯一，且写/读/删三处推导同源（AC-IB-03-02）。
+    
+        断言：
+          1. 规则本身：`None` / `""` → `"default"`；非空 kb 原样返回；
+          2. 读路径 `blob_ref_for`（`kb_id=""` 记录）产出第 2 段 == `kb_segment("")` == `"default"`；
+          3. 写路径 `FsBlobStore._doc_dir`（项目级 scope `kb_ids=None`）与显式空 kb 段落到**同一**目录段；
+          4. 删除路径 `_blob_scope_of` 由**记录**派生（携带真实 kb），落到与写路径**同一**目录段。
+        """
+        # 1) 规则本身（唯一真源）
+>       assert kb_segment(None) == "default"
+E       AssertionError: assert None == 'default'
+E        +  where None = kb_segment(None)
+
+..\tests\unit\test_blob_kb_segment.py:58: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/unit/test_blob_kb_segment.py::test_TC_UNIT_055_kb_segment_is_single_source_of_truth
+1 failed, 5 passed in 0.37s
+EXIT=1

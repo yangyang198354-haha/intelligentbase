@@ -1,0 +1,80 @@
+# @module MOD-IB-25
+# @implements IFC-IB-261 systemd 单元之一：ib-web（WSGI 载体）；IFC-IB-263 启动期校验
+# @author sub_agent_software_developer
+#
+# Web 服务单元（Django + Waitress）。**本文件是交付物，不由此代理安装到目标机。**
+#
+# ## 为什么是 Waitress 而不是 Gunicorn（以及为什么两个都留着）
+#
+# 主选 Waitress：纯 Python，无 C 扩展编译，在 aarch64 + 低内存目标机上安装最省事
+# （Gunicorn 需要 greenlet/事件循环依赖，交叉编译失败过一次）。
+# 备选 Gunicorn：Linux 上更成熟的进程管理（`--max-requests` 有助缓解内存缓慢增长）。
+# 两者都写在 requirements 里，实际用哪个由本单元的 ExecStart 决定 —— **不要同时起两个**，
+# 否则 18080 端口会争抢，且「哪个在服务」变得不可知。
+#
+# ## 线程数为什么不是越大越好
+#
+# 每个线程都可能触发一次 SSE 长连接（问答最慢到 60s）。线程数一旦超过 Waitress 的
+# 默认线程池预算，新请求就会排队 —— 表现为「服务没崩，但新用户转圈」。
+# 8 是「4GB 内存 + 大量等待 I/O」下的保守值，真机压测（checklists.txt 第 3 项）后调整。
+#
+# ## ExecStartPre 做 schema 初始化
+#
+# 台账 schema 由 `ensure_schema()` 幂等建立（`CREATE TABLE IF NOT EXISTS`）。
+# 放在启动前而不是「首次运行时」：若留给运行期，第一个上传请求会承担建表开销，
+# 而建表失败会以「上传 500」的形式出现，掩盖真正的原因（磁盘只读/权限错）。
+# 前置执行让它在启动日志里以明确的一行失败。
+
+[Unit]
+Description=intelligentbase web service (Django + Waitress)
+After=network-online.target qdrant.service ib-embed.service
+Wants=network-online.target
+# 依赖不是硬性的（`Wants` 而非 `Requires`）：向量库/embedding 挂了，Web 仍应可服务
+# —— 检索降级（fail-open）而不是全站不可用。这正是降级矩阵的设计意图。
+After=qdrant.service ib-embed.service
+
+[Service]
+Type=simple
+User=ib-web
+Group=ib-web
+WorkingDirectory=/opt/intelligentbase
+
+# **凭据唯一来源**：本文件不含任何真实值（IFC-IB-262）。
+# 权限必须是 0600 且属主为 ib-web（检查清单第 1 项会验证）。
+EnvironmentFile=/etc/intelligentbase/ib-web.env
+
+# 启动前幂等初始化台账 schema（失败即中止启动，`-` 前缀不可加）
+ExecStartPre=/opt/intelligentbase/venv/bin/python -m ibweb.bootstrap --ensure-schema
+
+ExecStart=/opt/intelligentbase/venv/bin/waitress-serve \
+    --host=127.0.0.1 \
+    --port=18080 \
+    --threads=8 \
+    --channel-timeout=120 \
+    --call=ibweb.wsgi:application
+
+# 反向代理（nginx）在 127.0.0.1:18080 前终止 TLS 并提供静态资源。
+# 之所以不直接对 0.0.0.0 监听：本服务无 TLS、无 CSRF 中间件，直接暴露等于把凭据
+# 放在明文 HTTP 上传输。
+#
+# `--channel-timeout=120` > SSE 最长静默期：调小会让长问答在中途被服务端断开，
+# 前端表现为「回答到一半停了」—— 而且**日志里看不到错误**（是正常超时关闭）。
+
+Restart=on-failure
+RestartSec=3s
+
+# 停机给足时间：正在跑的 SSE 请求要写回会话历史（会话内存态，进程一死即丢）。
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+MemoryMax=1024M
+
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+# 台账 + 原始文件目录必须可写；其余只读
+ReadWritePaths=/var/lib/intelligentbase
+
+[Install]
+WantedBy=multi-user.target

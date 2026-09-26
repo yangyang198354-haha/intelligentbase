@@ -1,0 +1,8 @@
+# GROUP_D R3 增量 — 集成测试（真跑，原始输出）
+# command: PYTHONUTF8=1 IB_OFFLINE_MODE=1 python -m pytest tests/integration -q
+# python: Python 3.14.6
+
+........................................................................ [ 98%]
+.                                                                        [100%]
+73 passed in 13.71s
+EXIT=0

@@ -1,0 +1,16 @@
+=== C6 / FND-GROUP-D-01 独立探针 ===
+  deps.capability_digest repr = '- search_knowledge: 在企业知识库中检索与问题相关的资料片段，返回文件名与位置（需要范围绑定）'
+  [PASS] Deps.capability_digest 非空
+  [PASS] 含 search_knowledge
+  [PASS] 与 build_capability_digest() 相等 -- pure='- search_knowledge: 在企业知识库中检索与问题相关的资料片段，返回文件名与位置（需要范围绑定）'
+  IntentRouter._capability_digest() repr = '- search_knowledge: 在企业知识库中检索与问题相关的资料片段，返回文件名与位置（需要范围绑定）'
+  [PASS] 路由摘要非空
+  [PASS] 路由摘要不是占位串
+  [PASS] 路由摘要含 search_knowledge
+  [PASS] 路由摘要 == Deps 摘要
+  摘要声称的工具 = ['search_knowledge']
+  bind_tools 实绑工具 = ['search_knowledge']
+  [PASS] 摘要声称集合 == 实绑集合
+  [PASS] 空注册表 → 空摘要（摘要函数本身正确）
+
+结论: PASS —— FND-GROUP-D-01 已闭合（摘要非空、含自带工具、路由侧可见、与实绑一致）

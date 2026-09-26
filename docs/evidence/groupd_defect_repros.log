@@ -1,0 +1,11 @@
+..                                                                       [100%]
+=================================== PASSES ====================================
+__________________ test_TC_INT_041_delete_before_bind_is_500 __________________
+---------------------------- Captured stderr call -----------------------------
+Internal Server Error: /api/files/5b1ebc482d9d451092b97bbf91e60183
+------------------------------ Captured log call ------------------------------
+ERROR    django.request:log.py:249 Internal Server Error: /api/files/5b1ebc482d9d451092b97bbf91e60183
+=========================== short test summary info ===========================
+PASSED tests/integration/test_composition_retrieval.py::test_TC_INT_009_capability_digest_registry_gap_is_registered
+PASSED tests/integration/test_http_contract.py::test_TC_INT_041_delete_before_bind_is_500
+2 passed in 0.30s

@@ -1,0 +1,24 @@
+# intelligentbase **离线**自测依赖（不触网、不连生产库、不装云客户端）
+#
+# 用途：本地/CI 上跑 `python manage.py check` 与 `python scripts/selfcheck.py`。
+# 该集合刻意**不含** qdrant-client / rapidocr / pypdfium2 / onnxruntime /
+# langchain-openai —— 理由不是「省体积」，而是：
+#
+#   1. 装了就会有人用它连生产（`IB_OFFLINE_MODE=1` 只是开关，防不住手写脚本）；
+#   2. 离线自测的**判据**是「替身行为与端口契约一致」，真客户端在场反而会掩盖
+#      「代码偷偷直连外部服务」这类缺陷。
+#
+# 用：
+#   pip install -r requirements-offline.txt
+#   IB_OFFLINE_MODE=1 python manage.py check --settings=ibweb.settings
+
+Django>=5.0,<6.1
+djangorestframework>=3.15,<4.0
+
+# 编排：离线自测用 `StubLlmProvider`，但编排模块本身 import langgraph。
+# 若目标环境无法安装 langgraph，编排相关自测会以 ImportError 显式失败（不静默跳过）。
+langgraph>=0.2,<2.0
+langchain-core>=0.3,<2.0
+
+# 解析：仅主路径（纯 Python）。备路径/可选路径在离线自测中会被显式跳过并记账。
+pypdf>=4.0,<7.0

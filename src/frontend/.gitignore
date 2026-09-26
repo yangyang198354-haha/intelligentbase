@@ -1,0 +1,11 @@
+# @module MOD-IB-24
+# @author sub_agent_software_developer
+#
+# 构建产物与依赖不入库：
+#   node_modules/ 体积大且可用 `npm ci` 复现（版本由 package.json 锁定）；
+#   dist/ 由 `npm run build` 生成，入库会让「源码」与「产物」漂移（改了源码忘了重新构建，
+#          部署时把旧产物发上去 —— 这类故障排查成本极高）。
+node_modules/
+dist/
+*.local
+.vite/

@@ -1,0 +1,14 @@
+# GROUP_C R3 — AFTER fix 全量回归（最终状态；与交付代码逐字对应）
+# command: python -m pytest tests/ -q
+# python: Python 3.14.6
+
+E       Failed: DID NOT RAISE Exception
+
+tests\integration\test_ops_contract.py:42: Failed
+=========================== short test summary info ===========================
+FAILED tests/integration/test_composition_retrieval.py::test_TC_INT_009_capability_digest_registry_gap_is_registered
+FAILED tests/integration/test_http_contract.py::test_TC_INT_041_delete_before_bind_is_500
+FAILED tests/integration/test_ops_contract.py::test_TC_INT_061_ghost_document_after_failed_delete_is_registered
+3 failed, 135 passed in 13.99s
+
+EXIT=1

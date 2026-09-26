@@ -1,0 +1,47 @@
+=== VERIFIER 独立复跑留档（verify_r4_runs.log） ===
+note: 本文件由 verifier 自建；每条命令为本机实跑，输出为原始截取。
+
+--- [1] 全量第 1 次 ---
+....                                                                     [100%]
+148 passed in 13.71s
+EXIT=0
+--- [2] 全量第 2 次 ---
+....                                                                     [100%]
+148 passed in 13.66s
+EXIT=0
+--- [3] 全量在出网守卫下（仅回环允许）---
+------------------------------------------------------------------------
+NETGUARD 回环连接次数 = 66；唯一样本 = ['127.0.0.1']
+NETGUARD 拦截的非回环目标数 = 0
+NETGUARD 结论: ZERO_NON_LOOPBACK_EGRESS（未触碰 192.168.31.133 或任何外部主机）
+EXIT=0
+--- [4] collect-only 逐目录 ---
+collected unit = 56 tests collected in 0.04s
+collected integration = 78 tests collected in 0.06s
+collected e2e = 14 tests collected in 0.01s
+collected total = 148 tests collected in 0.07s
+--- [5] 静态 def test_ 逐文件计数（与 [4] 对账）---
+14  tests/e2e/test_user_journeys.py
+5  tests/integration/test_blob_delete_scope_r4.py
+11  tests/integration/test_composition_retrieval.py
+5  tests/integration/test_embed_conformance.py
+7  tests/integration/test_gaps_acceptance.py
+13  tests/integration/test_http_contract.py
+12  tests/integration/test_ib_embed_wire.py
+7  tests/integration/test_lifecycle_page_images.py
+11  tests/integration/test_ops_contract.py
+7  tests/integration/test_orchestration_related_images.py
+1  tests/unit/test_blob_kb_segment.py
+23  tests/unit/test_core_config_chunk_parse_stream.py
+12  tests/unit/test_embed_ledger.py
+20  tests/unit/test_routing_experts_tools.py
+static total = 148
+--- [6] 三条既有守卫 ---
+...                                                                      [100%]
+3 passed in 0.29s
+EXIT=0
+--- [7] 自建探针（真实 HTTP + 真实 FsBlobStore）---
+[PASS] P8 不回归 FND-GROUP-D-02：项目级删除成功(非500路径) 且 worker 不再认领（无 pending 幽灵） :: report=DeleteReport(vectors_deleted=0, blob_deleted=True, ledger_deleted=True) process=ProcessReport(processed=0, succeeded=0, failed=0, skipped=0) 残留=[]
+------------------------------------------------------------------------
+TOTAL=19 PASS=19 FAIL=0
+EXIT=0

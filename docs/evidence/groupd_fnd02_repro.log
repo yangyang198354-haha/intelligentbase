@@ -1,0 +1,5 @@
+FND-GROUP-D-02
+  uploaded doc_id         = af0c5fe0b84f43c4af66e22be044b150 status = pending
+  collection bound?       = None
+  delete_document raised  = StartupError - [startup_error] InMemoryVectorStore 未绑定 collection 名；必须由组合根经 bind_collection(...) 注入（FM-5）
+  ledger row after delete = ('af0c5fe0b84f43c4af66e22be044b150', 'pending')
