@@ -420,7 +420,7 @@ class InMemoryLedgerRepository:
                     and job.lease_expires_at is not None
                     and job.lease_expires_at < now
                 ):
-                    job.state = "pending"
+                    job.state = "planned"
                     job.lease_owner = None
                     job.lease_expires_at = None
                     job.updated_at = utc_now_iso()
@@ -528,7 +528,7 @@ class InMemoryLedgerRepository:
                 to_version=to_version,
                 target_collection=target_collection,
                 doc_count=doc_count,
-                state="pending",
+                state="planned",
                 created_at=now,
                 updated_at=now,
             )
@@ -582,6 +582,24 @@ class InMemoryLedgerRepository:
     def list_rebuild_jobs(self, project_id: str) -> list[RebuildJobRow]:
         with self._lock:
             return [job for job in self._jobs.values() if job.project_id == project_id]
+
+    def reset_documents_for_rebuild(self, project_id: str, to_version: str) -> int:
+        """重建启动：把该项目下 `indexed`/`failed` 文档重置回 `pending`（D-4b，与 SQLite 语义对齐）。"""
+        with self._lock:
+            reset = 0
+            for doc_id, record in list(self._documents.items()):
+                if record.project_id == project_id and record.status in ("indexed", "failed"):
+                    self._documents[doc_id] = _replace(
+                        record,
+                        status="pending",
+                        error_code=None,
+                        target_collection_version=to_version,
+                        lease_owner=None,
+                        lease_expires_at=None,
+                        updated_at=utc_now_iso(),
+                    )
+                    reset += 1
+            return reset
 
 
 def _replace(record: Any, **changes: Any) -> Any:

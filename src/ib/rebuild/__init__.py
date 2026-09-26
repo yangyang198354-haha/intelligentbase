@@ -85,7 +85,8 @@ FINGERPRINT_FACTORS = (
 FINGERPRINT_LEN = 8
 
 #: 重建任务的**未完成**状态集合（用于判定是否处于重建中）。
-IN_FLIGHT_REBUILD_STATES = ("pending", "running")
+#: `planned` 是 `RebuildState` 的初态（枚举里**没有** `pending` —— 那是文档状态，见 D-4a）。
+IN_FLIGHT_REBUILD_STATES = ("planned", "running")
 
 #: 重建任务的事件间隔：任务级租约 600s > 单批最长处理时间，避免同批被两个 worker 抢。
 REBUILD_LEASE_SECONDS = 600
@@ -291,6 +292,9 @@ class RebuildService:
             target_collection=plan.target_collection,
             doc_count=plan.doc_count,
         )
+        # D-4b：把已 indexed/failed 的文档重置回 pending 并标记目标版本。否则 worker
+        # 认领不到任何文档，`done` 判据还会被旧 indexed 计数骗成假阳性（目标集合空）。
+        self._ledger.reset_documents_for_rebuild(project_id, plan.to_version)
         return RebuildJob(job_id=job.job_id, state=str(job.state))
 
     # ================================================================== #

@@ -43,6 +43,9 @@ urlpatterns = [
         name="ib-file-image",
     ),
     path("api/rebuild", views.rebuild_endpoint, name="ib-rebuild"),
+    # 字面量路由必须在 `<str:job_id>` 之前：否则 `activate`/`rollback` 会被当成 job_id 捕获。
+    path("api/rebuild/activate", views.rebuild_activate_endpoint, name="ib-rebuild-activate"),
+    path("api/rebuild/rollback", views.rebuild_rollback_endpoint, name="ib-rebuild-rollback"),
     path("api/rebuild/<str:job_id>", views.rebuild_progress_endpoint, name="ib-rebuild-progress"),
     path("api/chat/stream", views.chat_stream_endpoint, name="ib-chat-stream"),
 ]

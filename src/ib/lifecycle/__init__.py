@@ -665,15 +665,15 @@ class DocumentLifecycle:
         （`vectors_deleted` / `blob_deleted` / `ledger_deleted`）**语义不变**，
         删除重放对账（IFC-IB-131 `list_orphan_doc_ids`）亦**不新增用例**。
 
-        **R3（FND-GROUP-D-02）两处修正，均不减损上面的不变式**：
+        **R3（FND-GROUP-D-02）与 R5（D-5）的修正，均不减损上面的不变式**：
 
-        1. **向量删除前先自绑 collection**（`_bind_write_collection`）。此前删除**假定**
-           向量库「恰好已被别处绑定」；但组合根在启动期只 `ensure_collection`（建库）而
-           **不** `bind_collection`，于是「上传后立刻删除」（本项目尚无事发生）必然抛
-           `StartupError` → HTTP 500、台账行残留 → worker 稍后照常索引，用户以为删了的
-           内容仍在作答。绑 collection 的唯一真源仍是 `CollectionResolver`（FM-5），
-           绝无 `ib_<project>_v1` 之类的静默回退。
-        2. **台账行删除后做一次「竞态清扫」**（第二次 `delete_by_doc`）。清的是
+        1. **向量删除改为「跨全部版本集合」删除**（`delete_doc_everywhere`，D-5）。
+           此前删除先 `_bind_write_collection` 再 `delete_by_doc`：在存在在飞重建任务时，
+           写路径被 `RebuildAwareProjectProvider` 重定向到目标版本（如 v2），而文档向量
+           实际在旧集合（v1）里 → 删 0 个点，v1 向量成「看不见但检索得到」的幽灵向量。
+           现按 `project_id` 前缀枚举**所有** `ib_<project_id>_v*` 集合逐个删除，不再依赖
+           「当前写集合恰好是点所在的集合」这一隐含假设，也不要求向量库已绑定 collection。
+        2. **台账行删除后做一次「竞态清扫」**（第二次 `delete_doc_everywhere`）。清的是
            「worker 在本次删除的向量清扫与台账行删除之间重新写入的点」——
            那正是「行已删但仍可被检索到」的最后一小段窗口（AC-IB-02-04）。
 
@@ -697,9 +697,8 @@ class DocumentLifecycle:
         if record is None:
             raise NotFoundError("文档不存在或不在当前作用域内")
 
-        # 1) 派生物之一：向量（先自绑 collection，再删；FM-5 唯一真源）
-        self._bind_write_collection(scope, record.project_id)
-        vectors_deleted = int(self._vectors.delete_by_doc(scope, doc_id))
+        # 1) 派生物之一：向量（删除该文档在**全部版本集合**中的点；D-5 跨版本孤儿清扫）
+        vectors_deleted = int(self._vectors.delete_doc_everywhere(record.project_id, scope, doc_id))
 
         # 2) 派生物之二：原文件字节
         blob_deleted = self._blobs.delete(_blob_scope_of(record), doc_id) > 0
@@ -708,7 +707,7 @@ class DocumentLifecycle:
         self._ledger.mark_deleted(scope, doc_id)
 
         # 4) 【R3】竞态清扫：清掉窗口内被 worker 重新写入的点（正常路径恒为 0）
-        vectors_deleted += int(self._vectors.delete_by_doc(scope, doc_id))
+        vectors_deleted += int(self._vectors.delete_doc_everywhere(record.project_id, scope, doc_id))
 
         log_event("deletion", "succeeded", project_id=scope.project_id, doc_id=doc_id)
         return DeleteReport(
@@ -716,19 +715,6 @@ class DocumentLifecycle:
             blob_deleted=bool(blob_deleted),
             ledger_deleted=True,
         )
-
-    def _bind_write_collection(self, scope: Scope, project_id: str) -> None:
-        """把向量库绑到该项目的**写路径** collection（与 `_process_one` 第 6 步同源）。
-
-        组合根启动期只 `ensure_collection`（建库）而**不** `bind_collection` —— 绑定此前
-        只在写路径/读路径**惰性**发生。删除若继续假定「已被别处绑定」，就会在
-        「本项目尚无事发生」的窗口内抛 `StartupError`（FND-GROUP-D-02）。
-        这里现取现绑，使删除**不依赖**别的调用点先跑过。
-        """
-        project = self._project_provider(project_id)
-        collection = self._resolver.resolve(scope, project)
-        self._resolver.assert_prefix(collection, project_id)
-        self._vectors.bind_collection(collection)
 
     # ================================================================== #
     # IFC-IB-145 人工重试

@@ -22,7 +22,12 @@ import pytest
 
 
 class _SpyVectors:
-    """透明代理，记录 `VectorStore.delete_by_doc` 的每次返回值（其余原样转发）。"""
+    """透明代理，记录 `VectorStore.delete_doc_everywhere` 的每次返回值（其余原样转发）。
+
+    记录 `delete_doc_everywhere` 而非 `delete_by_doc`：D-5 之后 `delete_document` 的两次
+    向量清扫都走跨版本删除（`delete_doc_everywhere`），`delete_by_doc` 只用于索引写路径的
+    delete-then-write。
+    """
 
     def __init__(self, target, calls):
         object.__setattr__(self, "_t", target)
@@ -33,7 +38,7 @@ class _SpyVectors:
         if callable(real):
             def _wrapped(*args, **kwargs):
                 result = real(*args, **kwargs)
-                if attr == "delete_by_doc":
+                if attr == "delete_doc_everywhere":
                     self._calls.append(result)
                 return result
 
@@ -138,6 +143,35 @@ def test_TC_INT_069_delete_indexed_document_counts_and_orphan_reconciliation(dep
     assert deps.ledger.get_document(scope, record.doc_id) is None
     assert deps.ledger.list_chunks(scope, record.doc_id) == [], "删除后仍有切块残留"
     assert deps.vectors.count(scope) == 0, "删除后仍有向量残留"
+    assert deps.ledger.list_orphan_doc_ids("p_alpha", []) == []
+
+
+def test_TC_INT_072_delete_during_inflight_rebuild_clears_all_versions(deps):
+    """[TC-INT-072] D-5 定向回归：在飞重建期间删除文档，须清除**全部版本集合**中的向量。
+
+    构造：文档先 indexed 到 v1 → 启动重建（v1 向量仍在物理层、台账状态重置为 pending、
+    v2 建出为空）→ 删除该文档。修复前删除只打向被重定向的写集合（v2）→ 删 0 个点，
+    v1 向量成「看不见但检索得到」的幽灵向量（D-5）。修复后 `delete_doc_everywhere`
+    遍历所有 `ib_<project>_v*`，旧集合里的点一并清除。
+    """
+    from ib.core import Scope
+    from conftest import ingest_text
+
+    scope = Scope("p_alpha", ("kb_a",))
+    record = ingest_text(deps, "p_alpha", "kb_a", "during_rebuild.txt", "重建期间被删的正文 DDD-72。")
+    assert deps.ledger.get_document(scope, record.doc_id).status == "indexed"
+
+    # 启动重建：文档被重置回 pending（台账层面），但 v1 向量仍在物理层；v2 建出为空
+    plan = deps.rebuild.plan_rebuild("p_alpha")
+    deps.rebuild.start_rebuild("p_alpha", plan)
+    assert deps.ledger.get_document(scope, record.doc_id).status == "pending"
+
+    # 删除：须清掉旧集合（v1）里的向量，而非只删空的目标集合（v2）
+    report = deps.lifecycle.delete_document(scope, record.doc_id)
+    assert report.vectors_deleted >= 1, f"应清除旧版本集合里的向量：{report}"
+
+    # 全部版本集合里都不再残留该文档的点
+    assert deps.vectors.count(scope) == 0, "v1 仍有幽灵向量（D-5 复发）"
     assert deps.ledger.list_orphan_doc_ids("p_alpha", []) == []
 
 

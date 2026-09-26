@@ -46,6 +46,7 @@ HTTP 端点（MOD-IB-23 的对外面）。本模块**只做三件事**：
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from rest_framework import serializers, status
@@ -81,6 +82,8 @@ __all__ = [
     "file_image_endpoint",
     "rebuild_endpoint",
     "rebuild_progress_endpoint",
+    "rebuild_activate_endpoint",
+    "rebuild_rollback_endpoint",
     "chat_stream_endpoint",
     "healthz_endpoint",
     "healthz_deps_endpoint",
@@ -414,6 +417,59 @@ def rebuild_endpoint(request: Any) -> Any:
         return error_response(exc)
     log_event("rebuild", "started", project_id=ctx.authz.project_id, job_id=job.job_id)
     return _json(RebuildJobSerializer(job).data, status.HTTP_202_ACCEPTED)
+
+
+def rebuild_activate_endpoint(request: Any) -> Any:
+    """`POST /api/rebuild/activate` → 把 active 版本切到请求体里的 `version`（200）。
+
+    请求体为 JSON：`{"version": "2"}`，`version` 是 `plan_rebuild` 产出的目标版本号
+    （`to_version`）。切换是**显式决策**（而非 `step_rebuild` 自动触发）：运维需要确认点。
+    """
+    deps = composition.get_deps()
+    try:
+        ctx = _require_manage(request)
+        project_id = ctx.authz.project_id
+        version = _rebuild_version_of(request)
+        deps.rebuild.activate_version(project_id, version)
+    except IbError as exc:
+        return error_response(exc)
+    except Exception as exc:  # noqa: BLE001
+        return error_response(exc)
+    log_event("rebuild", "activated", project_id=ctx.authz.project_id, version=version)
+    return _json({"project_id": ctx.authz.project_id, "active_collection_version": version}, status.HTTP_200_OK)
+
+
+def rebuild_rollback_endpoint(request: Any) -> Any:
+    """`POST /api/rebuild/rollback` → 把 active 版本回滚到请求体里的 `version`（200）。
+
+    回滚不重索引（旧集合从未被删），是 O(1) 的台账单值切换。请求体同上：`{"version": "1"}`。
+    """
+    deps = composition.get_deps()
+    try:
+        ctx = _require_manage(request)
+        project_id = ctx.authz.project_id
+        version = _rebuild_version_of(request)
+        deps.rebuild.rollback(project_id, version)
+    except IbError as exc:
+        return error_response(exc)
+    except Exception as exc:  # noqa: BLE001
+        return error_response(exc)
+    log_event("rebuild", "rolled_back", project_id=ctx.authz.project_id, version=version)
+    return _json({"project_id": ctx.authz.project_id, "active_collection_version": version}, status.HTTP_200_OK)
+
+
+def _rebuild_version_of(request: Any) -> str:
+    """读取并校验重建请求体里的 `version` 字段（返回非空字符串，否则 `ValidationError`）。"""
+    try:
+        body = json.loads((request.body or b"").decode("utf-8") or "{}")
+    except (ValueError, UnicodeDecodeError):
+        raise ValidationError("请求体必须为 JSON 对象")
+    if not isinstance(body, dict):
+        raise ValidationError("请求体必须为 JSON 对象")
+    version = str(body.get("version", "") or "").strip()
+    if not version:
+        raise ValidationError("缺少字段 version")
+    return version
 
 
 def rebuild_progress_endpoint(request: Any, job_id: str) -> Any:

@@ -351,18 +351,53 @@ def test_TC_E2E_010_startup_rejects_missing_projects(raw):
 
 
 def test_TC_E2E_011_rebuild_journey(http_app):
-    """US-IB-16 变更模型/维度后可触发重建：POST 202 → 进度可查（Should Have）。"""
+    """US-IB-16 变更模型/维度后可触发重建：POST 202 → 重置重排 → worker 推进 → 激活切版本。
+
+    D-4 修复后，重建启动会把已 `indexed` 文档重置回 `pending`（目标集合 v2 建出但尚未写入），
+    经 worker 重跑入库后，**显式激活**才切换 active 版本（切换是决策而非 `step_rebuild` 的隐式副作用）。
+    """
     deps, Client = http_app
     client = Client()
     ingest_text(deps, "p_alpha", "kb_a", "rebuild.txt", "重建用正文内容。")
+    assert deps.ledger.active_collection_version("p_alpha") == "1"
+
     started = client.post("/api/rebuild", **AUTH)
     assert started.status_code == 202, started.content
     job_id = json.loads(started.content)["job_id"]
+
+    # 启动即重置：已 indexed 文档回到 pending，尚未由 worker 推进（D-4b 生效）
     prog = client.get(f"/api/rebuild/{job_id}", **AUTH)
     assert prog.status_code == 200
     body = json.loads(prog.content)
     assert {"job_id", "state", "indexed", "failed", "pending", "done"} <= set(body)
-    assert body["indexed"] >= 1
+    assert body["pending"] >= 1, f"启动后文档应被重置为 pending：{body}"
+
+    # 模拟 worker 推进重建（生产由 ib-worker 异步跑）：pending → indexed（写入 v2）
+    deps.lifecycle.process_pending("rebuild-w", 10)
+    prog2 = client.get(f"/api/rebuild/{job_id}", **AUTH)
+    body2 = json.loads(prog2.content)
+    assert body2["indexed"] >= 1, f"推进后应有 indexed 文档：{body2}"
+    assert body2["pending"] == 0, f"推进后不应残留 pending：{body2}"
+
+    # 显式激活切版本：active 1 -> 2（D-4c 新增端点）
+    act = client.post(
+        "/api/rebuild/activate",
+        data=json.dumps({"version": "2"}),
+        content_type="application/json",
+        **AUTH,
+    )
+    assert act.status_code == 200, act.content
+    assert deps.ledger.active_collection_version("p_alpha") == "2"
+
+    # 回滚：active 2 -> 1（O(1)，旧集合从未被删）
+    rb = client.post(
+        "/api/rebuild/rollback",
+        data=json.dumps({"version": "1"}),
+        content_type="application/json",
+        **AUTH,
+    )
+    assert rb.status_code == 200, rb.content
+    assert deps.ledger.active_collection_version("p_alpha") == "1"
 
 
 # --------------------------------------------------------------------------- #

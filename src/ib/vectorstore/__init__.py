@@ -252,6 +252,30 @@ class InMemoryVectorStore:
     def delete_by_scope(self, scope: Scope) -> int:
         return self._delete_where(scope, None)
 
+    def delete_doc_everywhere(self, project_id: str, scope: Scope, doc_id: str) -> int:
+        """删除该文档在**全部版本集合**中的点（跨版本孤儿清扫；FM-3）。
+
+        与 `delete_by_doc` 的区别：后者只作用于**已绑定** collection；本方法遍历
+        `project_id` 名下的所有 collection（`ib_<project_id>_v*`），逐集合删除。
+        用于删除路径在「存在在飞重建、写集合被重定向到目标版本」时也能清掉旧版本里的点
+        （D-5：否则旧集合里的向量会变成「看不见但检索得到」的幽灵向量）。
+        """
+        prefix = f"{COLLECTION_PREFIX}{project_id}_v"
+        total = 0
+        with self._lock:
+            for name, collection in list(self._collections.items()):
+                if not name.startswith(prefix):
+                    continue
+                doomed = [
+                    pid
+                    for pid, (_vec, payload) in collection.points.items()
+                    if _matches(payload, project_id=project_id, kb_ids=scope.kb_ids, doc_ids=(doc_id,))
+                ]
+                for pid in doomed:
+                    collection.points.pop(pid, None)
+                total += len(doomed)
+        return total
+
     def count(self, scope: Scope) -> int:
         with self._lock:
             collection = self._collections.get(self._require_collection())
@@ -484,10 +508,10 @@ class QdrantVectorStore:
 
     # --- 删除 --- #
 
-    def _delete_by(self, scope: Scope, doc_id: str | None) -> int:
+    def _delete_in(self, collection: str, scope: Scope, doc_id: str | None) -> int:
+        """在**指定 collection** 内按 filter 删除点；返回删除点数（Qdrant 无 delete 返回值）。"""
         client = self._qdrant()
         models = self._models()
-        collection = self._require_collection()
         count_filter = self._build_filter(
             project_id=scope.project_id, kb_ids=scope.kb_ids, doc_ids=((doc_id,) if doc_id is not None else None)
         )
@@ -503,14 +527,31 @@ class QdrantVectorStore:
             raise DependencyUnavailableError(
                 f"Qdrant 删除失败：{type(exc).__name__}", dependency="qdrant"
             ) from exc
-        # 删除后同名 filter 的计数应归零；差额即被删除的点数（Qdrant 无 delete 返回值）
+        # 删除后同名 filter 的计数应归零；差额即被删除的点数
         return max(0, int(before) - int(after))
+
+    def _delete_by(self, scope: Scope, doc_id: str | None) -> int:
+        """按 filter 删除**已绑定 collection** 内的点。"""
+        return self._delete_in(self._require_collection(), scope, doc_id)
 
     def delete_by_doc(self, scope: Scope, doc_id: str) -> int:
         return self._delete_by(scope, doc_id)
 
     def delete_by_scope(self, scope: Scope) -> int:
         return self._delete_by(scope, None)
+
+    def delete_doc_everywhere(self, project_id: str, scope: Scope, doc_id: str) -> int:
+        """删除该文档在**全部版本集合**中的点（跨版本孤儿清扫；见 InMemory 同名方法）。
+
+        Qdrant 侧无「按项目列出集合」的专有接口，故由 `list_collections()` 全量列出后按
+        `ib_<project_id>_v` 前缀命中。任一集合删除失败即上抛（fail-closed，不留半删残留）。
+        """
+        prefix = f"{COLLECTION_PREFIX}{project_id}_v"
+        total = 0
+        for collection in self.list_collections():
+            if collection.startswith(prefix):
+                total += self._delete_in(collection, scope, doc_id)
+        return total
 
     def count(self, scope: Scope) -> int:
         client = self._qdrant()

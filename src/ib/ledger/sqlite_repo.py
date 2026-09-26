@@ -526,7 +526,7 @@ class SqliteLedgerRepository:
             return cursor.rowcount > 0
 
     def reap_expired_leases(self, now: str) -> int:
-        """回收过期租约：文档 `parsing -> pending`，重建任务 `running -> pending`（§6.3）。"""
+        """回收过期租约：文档 `parsing -> pending`，重建任务 `running -> planned`（§6.3）。"""
         with self._write() as connection:
             reaped = connection.execute(
                 "UPDATE documents SET status = 'pending', lease_owner = NULL, lease_expires_at = NULL,"
@@ -535,7 +535,7 @@ class SqliteLedgerRepository:
                 (utc_now_iso(), now),
             ).rowcount
             reaped += connection.execute(
-                "UPDATE rebuild_jobs SET state = 'pending', lease_owner = NULL, lease_expires_at = NULL,"
+                "UPDATE rebuild_jobs SET state = 'planned', lease_owner = NULL, lease_expires_at = NULL,"
                 " updated_at = ? WHERE state = 'running' AND lease_expires_at IS NOT NULL"
                 " AND lease_expires_at < ?",
                 (utc_now_iso(), now),
@@ -699,7 +699,7 @@ class SqliteLedgerRepository:
                     to_version,
                     target_collection,
                     int(doc_count),
-                    "pending",
+                    "planned",
                     None,
                     None,
                     now,
@@ -768,6 +768,26 @@ class SqliteLedgerRepository:
             (project_id,),
         ).fetchall()
         return [_row_to_job(row) for row in rows]
+
+    def reset_documents_for_rebuild(self, project_id: str, to_version: str) -> int:
+        """重建启动：把该项目下 `indexed`/`failed` 文档重置回 `pending` 并标记目标版本。
+
+        为什么必须显式重置：`claim_pending` 只认领 `status='pending'` 的行，而重建是
+        「用新配置重跑一遍入库」。若不把已 `indexed` 的文档清回 `pending`，worker 永远
+        找不到待处理文档，`step_rebuild` 的 `done` 判据还会因旧 `indexed` 计数误判为
+        「已完成」（D-4b 的根因）。同时写入 `target_collection_version`，把此前从未落
+        非空值的死列变成重建的目标锚点。
+
+        `parsing`/`pending` 行**不动**：它们本就待处理，重置只会覆盖其租约与错误信息。
+        """
+        with self._write() as connection:
+            cursor = connection.execute(
+                "UPDATE documents SET status = 'pending', error_code = NULL,"
+                " target_collection_version = ?, lease_owner = NULL, lease_expires_at = NULL,"
+                " updated_at = ? WHERE project_id = ? AND status IN ('indexed', 'failed')",
+                (to_version, utc_now_iso(), project_id),
+            )
+            return int(cursor.rowcount)
 
     # ------------------------------------------------------------------ #
     # 生命周期
