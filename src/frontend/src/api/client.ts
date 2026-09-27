@@ -79,16 +79,35 @@ export type HealthzDeps = {
   egress: EgressDescriptor;
 };
 
-/** SSE 事件类型（与后端 `StreamEventKind` 枚举值一致）。 */
+/** SSE 事件类型（与后端 `StreamEventKind` 枚举值一致）。
+ *
+ * R8（IFC-IB-301）：**追加** `confirmation_required`（确认中间态呈递）。既有 6 个取值
+ * **一字不动** —— 后端是「追加成员」而非「改集合」，前端取值域是它的超集。
+ */
 export type StreamEventKind =
   | 'reasoning'
   | 'content'
   | 'degraded'
   | 'related_images'
   | 'error'
-  | 'done';
+  | 'done'
+  | 'confirmation_required';
 
 export type StreamEvent = { kind: StreamEventKind; data: string };
+
+/** `confirmation_required` 事件的载荷（IFC-IB-301 / 308；与后端 JSON 对齐）。
+ *
+ * `summary` 由**接入方**构造（骨架不生成业务话术）；`gate_id` 供决策回传对账
+ * （`POST /api/chat/resume` 以它做归属断言，见 `chatResume`）。
+ */
+export type ConfirmationPrompt = {
+  gate_id: string;
+  expert_name: string;
+  summary: string;
+};
+
+/** 决策回传载荷（IFC-IB-301：`ConfirmationDecision`）。 */
+export type ConfirmationDecision = { gate_id: string; approved: boolean };
 
 /**
  * `related_images` 事件的载荷条目（IFC-IB-282 / 283；与后端 `RelatedImageItem` 逐字段对齐）。
@@ -434,9 +453,16 @@ export class ApiClient {
     onEvent: (event: StreamEvent) => void,
     signal?: AbortSignal,
   ): Promise<void> {
+    const session_id = (sessionId || '').trim();
+    // FND-R11-01 / AC-IB-20-01：**不得**回退到字面量 'default' —— 服务端会对缺失的
+    // 会话标识显式 4xx。这里提前拦住，避免一次注定失败的往返；且「缺标识」与「显式用
+    // default 会话」在前端也必须可区分（否则不同标签页会静默共用一个会话）。
+    if (!session_id) {
+      throw new ApiClientError({ status: 400, code: 'bad_request', message: '缺少会话标识 session_id' });
+    }
     const query$ = new URLSearchParams();
     query$.set('q', query);
-    query$.set('session_id', sessionId || 'default');
+    query$.set('session_id', session_id);
     const response = await fetch(`${this.baseUrl}/api/chat/stream?${query$.toString()}`, {
       method: 'GET',
       headers: this.headers({ Accept: 'text/event-stream' }),
@@ -444,6 +470,46 @@ export class ApiClient {
     });
     if (!response.ok) {
       await this.decode(response); // 抛 ApiClientError（含 400/401/403 的中文提示）
+      return;
+    }
+    if (!response.body) {
+      throw new ApiClientError({ status: 0, code: 'no_body', message: '流式响应缺少响应体' });
+    }
+    for await (const frame of parseSseStream(response.body)) {
+      onEvent(frame);
+      if (frame.kind === 'done') return;
+    }
+  }
+
+  /**
+   * 回传确认决策并续跑（IFC-IB-307）：`POST /api/chat/resume` → 续跑 SSE。
+   *
+   * **仅经 `Authorization` 头**（`headers()` 已注入）；请求体只放 `session_id` 与决策，
+   * **不放令牌**。`403` / `404` / `409` / `503` 由 `decode()` 翻成可读 `ApiClientError`
+   * （含中文提示）—— 调用方据此给出「会话已失效，请重新发起」这类回执，**不自动重跑**
+   * （AC-IB-20-05 / 20-06）。
+   */
+  async chatResume(
+    sessionId: string,
+    decision: ConfirmationDecision,
+    onEvent: (event: StreamEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const session_id = (sessionId || '').trim();
+    if (!session_id) {
+      throw new ApiClientError({ status: 400, code: 'bad_request', message: '缺少会话标识 session_id' });
+    }
+    const response = await fetch(`${this.baseUrl}/api/chat/resume`, {
+      method: 'POST',
+      headers: this.headers({ Accept: 'text/event-stream', 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        session_id,
+        decision: { gate_id: decision.gate_id, approved: decision.approved },
+      }),
+      signal,
+    });
+    if (!response.ok) {
+      await this.decode(response);
       return;
     }
     if (!response.body) {

@@ -3,12 +3,12 @@
   <artifact>module_design</artifact>
   <path>docs/module_design.md</path>
   <doc_id>MOD-INTELBASE-001</doc_id>
-  <version>1.3.0</version>
-  <revision>R7</revision>
+  <version>1.4.0</version>
+  <revision>R8</revision>
   <status>DRAFT_FOR_GATE_REVIEW</status>
   <phase>GROUP_B / PHASE_04 模块详细设计</phase>
   <author>system-architect</author>
-  <invocation_id>INV-GROUP_B-INTELBASE-002</invocation_id>
+  <invocation_id>INV-GROUP_B-INTELBASE-006</invocation_id>
   <created_at>2026-09-25</created_at>
   <revision_history>
     <rev no="R1" date="2026-09-25" by="system-architect" basis="REV-01（框架切换 FastAPI→Django）">
@@ -20,11 +20,14 @@
     <rev no="R7" date="2026-09-27" by="system-architect" invocation_id="INV-GROUP_B-INTELBASE-005" basis="GROUP_A REV-06 下游贯通（诉求③「UI 可视化配置」纳入 v1：REQ-FUNC-IB-25 / IB-26 / IB-27）">
       **不新增模块、不新增依赖边**（REV-07-1）：定义文档数据层（装载 / 完备性校验 / 原子写回 / 装配期派生）并入 MOD-IB-02；契约与**第 14 个端口** `DefinitionDocumentStore` 并入 MOD-IB-01；可视化端点与装配期 fail-fast 准入闸门并入 MOD-IB-23；可视化视图（白名单表单 + 编排图只读渲染）并入 MOD-IB-24。新增 IFC 编号 287~297（11 条，全部类型化、frozen dataclass / Protocol、零第三方依赖）；IFC-IB-285 仍预留未分配。既有 MOD-IB-01~26、IFC-IB-001~286、13 个既有端口名、§4.1 依赖边清单、DAG 拓扑与既有 REQ 覆盖归属**一字不动**（纯追加；零新增边的再声明见 §4.2.2）。增补位置：§0 门控证据行与 §1 总览行（计数 24/24 → 27/27）、R7 性质段与 R7 补充纪律段、§2.1 四行数据结构与 R7 字段集说明、§2.2 端口行与 R7 增记、§2.2.2 R7 IFC 段号索引、§3 的 MOD-IB-01/02/16/22/23/24 增补、§4.2.2 R7 无环性再声明、§5 装配表行与 R7 说明、§7.4 两行降级、§8 替身行与离线可测单元、§9.1 三行覆盖与计数同步、§9.2 R7 说明、§9.5 R7 覆盖率再声明、§11 R7 自检。**REV-07-6 施工前置判定 = (a) 可登记前置条件 / 风险，本轮继续**（见 §9.5）。未修改 FreeArk 任何文件；需求侧文档只读；未写入任何凭据或配置值（只登记键名）。
     </rev>
+    <rev no="R8" date="2026-09-27" by="system-architect" invocation_id="INV-GROUP_B-INTELBASE-006" basis="GROUP_A REV-11-1 下游贯通（REQ-FUNC-IB-20 补入 US-IB-19 / US-IB-20 与 11 组 AC 后的设计覆盖闭环）">
+      **不新增模块、不新增端口、不新增依赖边**：会话状态 / 持久化策略 / 完成产物 / 确认中间态的类型化契约并入 **MOD-IB-01**；键名登记与值域显式化并入 **MOD-IB-02**；流式终态与可见性判据并入 **MOD-IB-21**；恢复判定与确认门装配语义并入 **MOD-IB-22**；会话恢复端点与 fail-closed 准入并入 **MOD-IB-23**；确认中间态的呈递与决策回传渲染约束并入 **MOD-IB-24**。新增 IFC 编号 **298~308**（11 条，全部类型化、frozen dataclass / Protocol、零第三方依赖）；**IFC-IB-285 仍预留未分配**。`IFC-IB-221/222` 的**签名文本不改**（仅补齐其悬置引用的 `SessionState` 定义）、`IFC-IB-233` 的 `payload: dict` **签名文本不改**（仅新增其载荷类型 `ResumePayload`）；`IB_SESSION_BACKEND` 键名与默认值不变（**仅扩展值域**，沿用 R2 先例）。既有 MOD-IB-01~26、`IFC-IB-001~297`、14 个端口名、§4.1 依赖边清单与 DAG 拓扑**一字不动**（纯追加；零新增边的再声明见 §4.2.3）。增补位置：R8 性质段、§2.1 五组数据结构与 R8 说明、§2.2 R8 增记与 §2.2.3 R8 IFC 段号索引、§3 的 MOD-IB-01/02/21/22/23/24 增补、§4.2.3 R8 无环性再声明、§7.3 四条规范化补充、§7.4 两行降级、§8 R8 离线可测单元、§9.1 IB-20 行与 R8 覆盖闭环段、§9.6 R8 覆盖率再声明、§11 R8 自检。需求侧文档（v1.3.0）只读；未修改 FreeArk 任何文件；未写入任何凭据或配置值（只登记键名：`IB_CONFIRMATION_GATE_ENABLED` / `IB_SESSION_PERSISTENCE_POLICY` / `IB_REASONING_STREAM_ENABLED`）。
+    </rev>
   </revision_history>
   <inputs>
-    <input path="docs/requirements_spec.md" version="1.2.0" status="APPROVED"/>
-    <input path="docs/user_stories.md" version="1.2.0" status="APPROVED"/>
-    <input path="docs/architecture_design.md" version="1.3.0" revision="R7" status="DRAFT_FOR_GATE_REVIEW"/>
+    <input path="docs/requirements_spec.md" version="1.3.0" status="APPROVED"/>
+    <input path="docs/user_stories.md" version="1.3.0" status="APPROVED"/>
+    <input path="docs/architecture_design.md" version="1.4.0" revision="R8" status="DRAFT_FOR_GATE_REVIEW"/>
     <readonly_reference path="FreeArk 仓库" note="只读参考；未修改任何文件"/>
     <input path="docs/ib_embed_service_contract.md" version="1.0.0" revision="R2" status="DRAFT_FOR_GATE_REVIEW" note="MOD-IB-26 契约唯一落点；本文件 §3 MOD-IB-26 为摘要视图，冲突时以其为准"/>
   </inputs>
@@ -33,8 +36,10 @@
 
 # 模块详细设计 — intelligentbase
 
-**版本**: 1.3.0 (R7) | **状态**: DRAFT_FOR_GATE_REVIEW | **日期**: 2026-09-27
+**版本**: 1.4.0 (R8) | **状态**: DRAFT_FOR_GATE_REVIEW | **日期**: 2026-09-27
 **R7 性质**: 本修订为**追加式增量**（GROUP_A REV-06 裁决：诉求③「UI 可视化配置」纳入 v1，新增 REQ-FUNC-IB-25 / IB-26 / IB-27），**只追加、不改写**：**不新增模块、不新增依赖边**。定义文档的**数据层**（装载 `IFC-IB-288` / 完备性校验 `IFC-IB-290` / 原子写回 `IFC-IB-289` / 装配期派生 `IFC-IB-291` / 白名单 `IFC-IB-292` / 新增键名 `IFC-IB-297`）并入 **MOD-IB-02**；契约（端口 + 数据结构）并入 **MOD-IB-01**；可视化端点与**装配期准入闸门**（`IFC-IB-293~295`）并入 **MOD-IB-23**；可视化视图约束（`IFC-IB-296`）并入 **MOD-IB-24**。新增 `IFC-IB-287 ~ 297`（**IFC-IB-285 仍预留未分配**）。既有 MOD-IB-01~26、`IFC-IB-001~286`、13 个既有端口名、§4.1 依赖边清单与 DAG 拓扑**一字不动**（零新增边的再声明见 §4.2.2）。**REV-07-6 施工前置判定 = (a) 可登记的前置条件 / 风险，本轮继续**（见 §9.5；另见 `architecture_design.md` [ARCH-ASSUMPTION-A7]）。
+
+**R8 性质**: 本修订为**追加式增量**（GROUP_A REV-11-1：REQ-FUNC-IB-20「流式输出契约与会话生命周期」补入 US-IB-19 / US-IB-20 与 11 组 AC 后的**设计覆盖闭环**），**只追加、不改写**：**不新增模块、不新增端口、不新增依赖边**。会话状态（`SessionState` / `SessionTurn`）、持久化策略枚举、完成产物（`CompletionPayload` / `CitationItem`）与确认中间态（`ConfirmationPrompt` / `ConfirmationDecision` / `ConfirmationGateState`）的类型化契约并入 **MOD-IB-01**（`IFC-IB-298~301`，其中 **IFC-IB-298 补齐 `IFC-IB-221/222` 的既有悬置引用，不改其签名文本**）；键名登记与值域显式化并入 **MOD-IB-02**（`IFC-IB-304`）；流式终态单发与可见性判据并入 **MOD-IB-21**（`IFC-IB-302/303`）；恢复判定与确认门装配语义并入 **MOD-IB-22**（`IFC-IB-305/306`，其中 **IFC-IB-305 类型化 `IFC-IB-233` 的 `payload: dict`，不改其签名文本**）；会话恢复端点与 fail-closed 准入并入 **MOD-IB-23**（`IFC-IB-307`）；确认中间态的呈递与决策回传渲染约束并入 **MOD-IB-24**（`IFC-IB-308`）。新增 `IFC-IB-298 ~ 308`（**IFC-IB-285 仍预留未分配**）。既有 MOD-IB-01~26、`IFC-IB-001~297`、14 个端口名、§4.1 依赖边清单与 DAG 拓扑**一字不动**（零新增边的再声明见 §4.2.3）。**OQ-IB-07 / OQ-IB-08 保持开放**（架构默认取值见 `architecture_design.md` §10.1 R8 行与 ADR-17）。
 
 **R2 性质**: 本修订为**补交式增量**（L-03：`ib-embed` 此前只有 systemd 单元与客户端、缺服务端模块归属与完整契约），**只追加、不改写**：新增 MOD-IB-26 与 IFC-IB-266~284 / 286（IFC-IB-285 预留）。既有 MOD-IB-01~25、IFC-IB-001~265、13 个端口名与 DAG 拓扑**一字不动**。MOD-IB-26 的契约**唯一落点**为 `docs/ib_embed_service_contract.md`，本文件 §3 为其**摘要视图**，二者冲突时以契约文件为准。
 **配套**: 架构决策与背景见 `docs/architecture_design.md`；技术选型见 `docs/tech_stack.md`。
@@ -120,9 +125,16 @@
 | `ExpertSpecInput` / `RouteSpecInput` / `ToolGrantSpec`（R7 新增，定义于 MOD-IB-01） | `ExpertSpecInput`: `name: str`；`cn_label: str`；`keywords: tuple[str, ...]`；`exemplars: tuple[str, ...]`；`is_data_expert: bool`；`fallback_prompt: str`；`is_delegating: bool`；`is_default: bool`。`RouteSpecInput`: `tau: float`；`margin: float`；`max_expert_steps: int`；`default_expert: str`。`ToolGrantSpec`: `expert_name: str`；`tool_names: tuple[str, ...]` |
 | `OrchestrationSpecInput` / `ConditionalEdgeSpec`（R7 新增，定义于 MOD-IB-01） | `OrchestrationSpecInput`: `nodes: tuple[str, ...]`；`conditional_edges: tuple[ConditionalEdgeSpec, ...]`。`ConditionalEdgeSpec`: `from_node: str`；`branch_map: tuple[tuple[str, str], ...]`（元素为 `(branch_key: str, target_node: str)` 的有序对；**缺失或为空即非法** —— 界面无法判定可达性，由 IFC-IB-290 拒绝） |
 | `DerivedView` / `ValidationErrorItem` / `ValidationReport` / `SaveResult`（R7 新增，定义于 MOD-IB-01） | `DerivedView`: `experts: tuple[ExpertSpecInput, ...]`；`capability_digest: str`；`graph_config: OrchestrationSpecInput`。`ValidationErrorItem`: `path: str`；`code: str`；`message: str`（**不回显任何凭据值**）。`ValidationReport`: `ok: bool`；`errors: tuple[ValidationErrorItem, ...]`（**无 `force` / `ignore` / `warn_only` 字段**）。`SaveResult`: `ok: bool`；`content_hash: str`；`conflict: bool`；`errors: tuple[ValidationErrorItem, ...]` | |
+| `SessionState` / `SessionTurn`（R8 新增，定义于 MOD-IB-01；**补齐** `IFC-IB-221/222` 的既有悬置引用） | `SessionState`: `session_key: str`；`project_id: str`；`actor_id: str`；`turns: tuple[SessionTurn, ...]`；`gate: ConfirmationGateState 或 None`；`updated_at: str`。`SessionTurn`: `role: Literal["user","assistant"]`；`text: str`；`citations: tuple[CitationItem, ...]`；`created_at: str` |
+| `SessionPersistencePolicy` / `SessionStateLossOutcome`（R8 新增，定义于 MOD-IB-01） | `SessionPersistencePolicy` = `Literal["in_process","external"]`（默认 `in_process`，**须显式声明**）。`SessionStateLossOutcome` = `Literal["fail_closed_restart_required"]`（**唯一取值**：状态丢失时只允许安全失败） |
+| `CompletionPayload` / `CitationItem`（R8 新增，定义于 MOD-IB-01） | `CompletionPayload`: `citations: tuple[CitationItem, ...]`（**可为空元组**，无引用即空、不臆造）；`had_content: bool`（空内容边界）。`CitationItem`: `doc_id: str`；`doc_name: str`；`page_or_section: str`；`locator: str`；`score: float`（**均为定位信息；不内联字节、不含正文全文**） |
+| `ConfirmationPrompt` / `ConfirmationDecision` / `ConfirmationGateState`（R8 新增，定义于 MOD-IB-01） | `ConfirmationPrompt`: `gate_id: str`；`expert_name: str`；`summary: str`（**由接入方构造**，骨架不生成业务话术）。`ConfirmationDecision`: `gate_id: str`；`approved: bool`。`ConfirmationGateState`: `gate_id: str`；`prompt: ConfirmationPrompt`；`decision: ConfirmationDecision 或 None`（`None` = 待决策） |
+| `StreamEventKind` **值域追加成员**（R8，定义于 MOD-IB-01） | 既有 6 个成员（`reasoning` / `content` / `degraded` / `related_images` / `error` / `done`）**一字不动**；**追加** `confirmation_required`（确认中间态的呈递事件；**仅在 `IB_CONFIRMATION_GATE_ENABLED=true` 时出现**） |
 
 **R2 说明（字段集不变式）**：以上三行为**追加**，既有两个结构（`ParsedChunk` / `RetrievedChunk`）的字段集**不变**——页面图的图文关联经**独立结构 + 独立关联表**承载，不改 `IFC-IB-009` / `IFC-IB-007` 的既有字段（编号只增不改）。
 **R7 说明（字段集不变式续）**：以上四行为**追加**，R1 / R2 既有结构（`ParsedChunk` / `RetrievedChunk` 与 R2 三行）的字段集**均不变**。`ValidationReport` 的字段集是**刻意**的：除 `ok` / `errors` 外**不存在** `force` / `ignore` / `warn_only`，使 REQ-FUNC-IB-27「**不提供**强制继续 / 忽略错误开关」成为**类型层事实**而非纪律约定（ADR-16）。`DerivedView` 为**只读派生结果**：不落盘、不可反写文档；`ValidationErrorItem` 只出 `path` / `code` / `message`，**不回显任何凭据值**（AC-IB-18-04）。全部结构为 **frozen dataclass / 纯 stdlib**（REV-07-5）。
+
+**R8 说明（字段集不变式续）**：以上**五组为追加**，R1 / R2 / R7 既有结构（`ParsedChunk` / `RetrievedChunk` 与 R2 三行、R7 四行）的字段**均不变**。`SessionState` 是**既有悬置引用的补齐**：`IFC-IB-221/222` 早已引用该类型但 §2.1 **从未定义**，本轮补齐其字段级定义，**`IFC-IB-221/222` 的签名文本一字不改**。`SessionStateLossOutcome` 的**唯一取值** `fail_closed_restart_required` 使「重启丢弃待确认状态 = **安全失败**」成为**类型层事实**而非纪律约定（AC-IB-20-05）；`CompletionPayload.citations` **可为空元组**使「无引用即空、不臆造」成为结构事实（AC-IB-19-05）。全部结构为 **frozen dataclass / 纯 stdlib**（REV-07-5 延续）。
 
 ### 2.1.1 Web 层载体等价映射（R1 新增；FastAPI → Django）
 
@@ -163,6 +175,8 @@
 
 **R7 增记（第 14 个端口）**：`DefinitionDocumentStore`（IFC-IB-287）为**第 14 个端口**（13 → 14，**纯追加**）。它与 `ConfigurationSource` 的区别是**工件不同**：后者装载进程级配置（凭据只登记键名），前者装载**项目级定义文档**（专家 / 路由 / 编排 / 工具授权）并保证 round-trip 一致性（乐观并发 + 原子写）。所有需要「按项目取定义文档 / 派生结果」的上层模块（MOD-IB-16 / 17 / 19 / 22）**不得**各自读文件或各自解析，一律由组合根在**装配期**经该端口取得派生物后构造注入（同 `CollectionResolver` 的「唯一入口」精神；ADR-15）。
 
+**R8 增记（不新增端口；类型化既有载荷）**：端口数仍为 **14**（`SessionStore` 仍为 **3 方法** `IFC-IB-221~223`，**方法数与签名一字不改**）。R8 的两处「类型化既有载荷」遵循 **IFC-IB-282 先例**（只定义载荷类型、不改父签名）：① **IFC-IB-298** 补齐 `IFC-IB-221/222` 悬置引用的 `SessionState` 定义；② **IFC-IB-305** 类型化 `IFC-IB-233` 的 `payload: dict`（改为语义等价的类型化载荷），**`IFC-IB-233` 的签名文本与参数个数不变**。另：装配表键 `IB_SESSION_BACKEND` 的**值域**由 `memory` 扩展为 `memory 或 external`，**键名与默认值（`memory`）不变** —— 沿用 R2 对 `IB_EMBED_BACKEND` 的「**仅扩展值域；键名与默认值不变**」先例（§5）。
+
 ### 2.2.1 R2 新增 IFC 段号索引（追加式编号；IFC-IB-001~265 一字不动）
 
 | IFC 段 | 归属模块 | 内容 | 权威落点 |
@@ -197,6 +211,24 @@
 
 **R7 编号规范（强制，延续 R2）**：新增号只许**追加**；`IFC-IB-001 ~ 286` 的号、名、签名、字段集**一字不动**；**`IFC-IB-285` 仍预留未分配**（不得被本轮占用或改义）；既有重号（`IFC-IB-131`）**登记不修**（残余项 R-9）。以上 11 条 IFC 全部为**类型化契约**（`name: type` + 可空性），**不含任何实现体**。
 
+### 2.2.3 R8 新增 IFC 段号索引（追加式编号；IFC-IB-001~297 一字不动）
+
+| IFC 段 | 归属模块 | 内容 | 权威落点 |
+|--------|----------|------|----------|
+| IFC-IB-298 | MOD-IB-01 | `SessionState` / `SessionTurn` 字段级定义（**补齐** `IFC-IB-221/222` 的悬置引用；不改其签名） | §3 MOD-IB-01 |
+| IFC-IB-299 | MOD-IB-01 | 枚举 `SessionPersistencePolicy`（`in_process` / `external`）与 `SessionStateLossOutcome`（唯一取值 `fail_closed_restart_required`） | §3 MOD-IB-01 |
+| IFC-IB-300 | MOD-IB-01 | `CompletionPayload` / `CitationItem`（完成事件结构化产物；`citations` 可空、`had_content` 标空内容边界） | §3 MOD-IB-01 |
+| IFC-IB-301 | MOD-IB-01 | `ConfirmationPrompt` / `ConfirmationDecision` / `ConfirmationGateState`；`StreamEventKind` **追加**成员 `confirmation_required` | §3 MOD-IB-01 |
+| IFC-IB-302 | MOD-IB-21 | `completion_event(payload: CompletionPayload 或 None) -> StreamEvent`（终态恰一次单发；其后无 `content`；不臆造） | §3 MOD-IB-21 |
+| IFC-IB-303 | MOD-IB-21 | `is_user_visible(kind: StreamEventKind) -> bool`（纯函数；`reasoning` 默认不可见；内部产物永不映射为可见 `kind`） | §3 MOD-IB-21 |
+| IFC-IB-304 | MOD-IB-02 | 配置**键名登记与值域显式化**（**仅键名，不含值**）：`IB_CONFIRMATION_GATE_ENABLED` / `IB_SESSION_PERSISTENCE_POLICY` / `IB_REASONING_STREAM_ENABLED`；`IB_SESSION_BACKEND` 值域扩展 | §3 MOD-IB-02 |
+| IFC-IB-305 | MOD-IB-22 | `ResumePayload`（`session_key: str`；`decision: ConfirmationDecision 或 None`）—— **类型化** `IFC-IB-233` 的 `payload: dict`，**不改其签名文本** | §3 MOD-IB-22 |
+| IFC-IB-306 | MOD-IB-22 | `can_resume(state: SessionState 或 None, gate_id: str, payload: ResumePayload) -> bool`（纯函数；状态丢失 / 未携决策 / 归属不符 → `False` = fail-closed） | §3 MOD-IB-22 |
+| IFC-IB-307 | MOD-IB-23 | `POST /api/chat/resume`（SSE，`Authorization` 头）→ 续跑流 或 `403` 或 `404`/`409`（fail-closed）或 `503` | §3 MOD-IB-23 |
+| IFC-IB-308 | MOD-IB-24 | 前端对 `confirmation_required` 的**呈递与决策回传**约束（与答复片段可区分；未决策不继续） | §3 MOD-IB-24 |
+
+**R8 编号规范（强制，延续 R2 / R7）**：新增号只许**追加**（本轮取 **298 ~ 308**）；`IFC-IB-001 ~ 297` 的号、名、签名、字段集**一字不动**；**`IFC-IB-285` 仍预留未分配**（不得被本轮占用或改义）；既有重号（`IFC-IB-131`）**登记不修**（残余项 R-9）。以上 11 条 IFC 全部为**类型化契约**（`name: type` + 可空性），**不含任何实现体**。
+
 ---
 
 ## 3. 模块详情
@@ -206,7 +238,7 @@
 ### MOD-IB-01 核心契约 (L0)
 
 - **职责**: 定义全部端口 Protocol、枚举与不可变数据结构；**不 import 任何第三方框架**（仅 stdlib）。
-- **覆盖需求**: REQ-NFR-IB-01、IB-11、IB-14（可替换性与可测性的结构基础）；**REQ-FUNC-IB-25 / IB-26 / IB-27（R7，辅：只承载新增契约与第 14 个端口，见 IFC-IB-287）**
+- **覆盖需求**: REQ-NFR-IB-01、IB-11、IB-14（可替换性与可测性的结构基础）；**REQ-FUNC-IB-25 / IB-26 / IB-27（R7，辅：只承载新增契约与第 14 个端口，见 IFC-IB-287）**；**REQ-FUNC-IB-20（R8，辅：会话状态 / 持久化策略 / 完成产物 / 确认中间态的类型化契约落点，见 IFC-IB-298~301）**
 - **公开接口契约（数据结构定义，非行为）**:
   - IFC-IB-001: `Scope(project_id: str, kb_ids: tuple[str, ...] | None)`
   - IFC-IB-002: `CollectionSpec(collection: str, dim: int, distance: Literal["cosine"], on_disk_vectors: bool, hnsw: HnswParams)`
@@ -221,13 +253,17 @@
   - IFC-IB-011: 枚举 `DocStatus` / `SourceKind` / `DegradeReason` / `RouteTier` / `StreamEventKind`
   - IFC-IB-012: 异常类型层次 `IbError` → `ConfigError` / `ScopeViolationError` / `DependencyUnavailableError` / `ValidationError`
   - **IFC-IB-287（R7 新增）**: 端口 `DefinitionDocumentStore`（`Protocol`，5 方法：`load` / `save` / `validate` / `derive` / `editable_field_whitelist`）+ 数据结构 `DefinitionDocument` / `ExpertSpecInput` / `RouteSpecInput` / `ToolGrantSpec` / `OrchestrationSpecInput` / `ConditionalEdgeSpec` / `DerivedView` / `ValidationErrorItem` / `ValidationReport` / `SaveResult`（字段级定义见 §2.1 末四行）。**类型化**（`name: type` + 可空性）；**frozen dataclass / Protocol，纯 stdlib、零第三方依赖**；**无实现体**。
+  - **IFC-IB-298（R8 新增）**: 数据结构 `SessionState` / `SessionTurn`（字段级定义见 §2.1 R8 行）。**用途**：补齐 `IFC-IB-221/222` 的既有悬置引用（`SessionStore.load/save` 的 `SessionState`），**不改 `IFC-IB-221/222` 的签名文本**；**frozen dataclass、纯 stdlib、无实现体**。
+  - **IFC-IB-299（R8 新增）**: 枚举 `SessionPersistencePolicy` = `Literal["in_process","external"]`（默认 `in_process`，**须显式声明**）；`SessionStateLossOutcome` = `Literal["fail_closed_restart_required"]`（**唯一取值**，使「状态丢失 = 安全失败」成为类型层事实，AC-IB-20-05）。
+  - **IFC-IB-300（R8 新增）**: 数据结构 `CompletionPayload`（`citations: tuple[CitationItem, ...]` **可为空元组**；`had_content: bool`）与 `CitationItem`（`doc_id` / `doc_name` / `page_or_section` / `locator` / `score`，**均为定位信息，不内联字节、不含正文全文**）。供 `IFC-IB-302` 的单发完成事件使用（AC-IB-19-02 / 19-05）。
+  - **IFC-IB-301（R8 新增）**: 数据结构 `ConfirmationPrompt`（`gate_id` / `expert_name` / `summary: str` **由接入方构造**）/ `ConfirmationDecision`（`gate_id` / `approved: bool`）/ `ConfirmationGateState`（`gate_id` / `prompt` / `decision: ConfirmationDecision 或 None`）；`StreamEventKind` **值域追加**成员 `confirmation_required`（**既有 6 个成员一字不动**）。**骨架只承载通道，不判定业务语义、不生成确认话术**（ADR-09 / ADR-17）。
 - **依赖模块**: 无
 - **外部依赖**: 无
 
 ### MOD-IB-02 配置 (L0)
 
 - **职责**: 装载全局配置与**项目级**配置；凭据仅从环境变量读取；启动期校验必填项并给出可读错误；**R7 追加**：装载**定义文档**（项目级）、完备性校验、原子写回与**装配期派生**（framework-free 纯数据层，见 IFC-IB-288~292、IFC-IB-297）。
-- **覆盖需求**: REQ-FUNC-IB-01、IB-02、IB-05（上限可配）、IB-22（配置模板）、IB-23（项目级配置）、**IB-25 / IB-26 / IB-27（R7 新增：定义文档的装载 / 白名单 / 完备性校验与派生）**；REQ-NFR-IB-02、IB-07
+- **覆盖需求**: REQ-FUNC-IB-01、IB-02、IB-05（上限可配）、IB-22（配置模板）、IB-23（项目级配置）、**IB-25 / IB-26 / IB-27（R7 新增：定义文档的装载 / 白名单 / 完备性校验与派生）**、**IB-20（R8 辅：会话持久化策略与确认门开关的键名登记与值域显式化，见 IFC-IB-304）**；REQ-NFR-IB-02、IB-07
 - **公开接口契约**:
   - IFC-IB-021: `ConfigurationSource.load() -> RawConfig`（文件 + 环境变量合并）
   - IFC-IB-022: `resolve_project_config(project_id: str) -> ProjectConfig | ConfigError`
@@ -239,6 +275,11 @@
   - **IFC-IB-291（R7 新增）**: `derive(doc: DefinitionDocument) -> DerivedView`（**纯函数**；注册表 / 路由阈值 / 图配置的装配期派生；**不落盘、不可反写文档**）
   - **IFC-IB-292（R7 新增）**: `editable_field_whitelist() -> frozenset[str]`（可视化可编辑字段白名单；须与 IFC-IB-290 的校验项**成对维护**）
   - **IFC-IB-297（R7 新增）**: 新增配置**键名**（**仅登记键名，不含值**）：`IB_DEFINITION_DOC_PATH`（定义文档路径）、`IB_VISUAL_CONFIG_ENABLED`（可视化配置页开关）
+  - **IFC-IB-304（R8 新增）**: 配置**键名登记与值域显式化**（**仅登记键名，不含任何值**）：
+    - `IB_CONFIRMATION_GATE_ENABLED`：确认中间态开关，**默认 `false`**（默认不启用即零行为差异；**OQ-IB-07 保持开放**）。
+    - `IB_SESSION_PERSISTENCE_POLICY`：会话持久化策略，取值 `in_process`（默认）或 `external`；**须显式声明**（未声明即启动期报错，AC-IB-20-02）；v1 不提供 `external` 适配器（[ARCH-ASSUMPTION-A8]）。
+    - `IB_REASONING_STREAM_ENABLED`：思考分区流式开关，**默认 `false`**（AC-IB-19-03）。
+    - `IB_SESSION_BACKEND`：**值域扩展**为 `memory`（默认）或 `external`；**键名与默认值不变**（沿用 R2 对 `IB_EMBED_BACKEND` 的「仅扩展值域」先例）。
 - **依赖模块**: MOD-IB-01
 - **外部依赖**: 配置文件解析库（YAML/JSON）；**凭据仅走环境变量**（C-IB-02 / REQ-NFR-IB-07）
 
@@ -495,7 +536,7 @@
 ### MOD-IB-21 流式契约与会话 (L4)
 
 - **职责**: 类型化流事件与 SSE 编码；会话状态端口（默认内存实现，fail-closed）。
-- **覆盖需求**: REQ-FUNC-IB-20、IB-21；AC-IB-14-01（降级事件可见）
+- **覆盖需求**: REQ-FUNC-IB-20、IB-21；AC-IB-14-01（降级事件可见）；**US-IB-19（流式交付最终答复；AC-IB-19-01 ~ 05）、US-IB-20（会话生命周期；AC-IB-20-01 ~ 03）（R8 补登记）**
 - **R1 承载声明（ADR-11-R1）**: 事件流由 **Django `StreamingHttpResponse`** 以原生 SSE（`Content-Type: text/event-stream`）承载，运行于同步 WSGI（Waitress 主 / Gunicorn 备）；**不引入 Channels、不引入 Redis**。本模块只负责「事件 → 帧」编码（IFC-IB-224/225），与具体 Web 载体解耦，故框架切换对其**零改动**。
 - **R1 鉴权纪律（强制）**: SSE 端点的身份令牌**只允许**经 `Authorization` 请求头（或请求体）注入，**禁止** `?token=` 查询串承载（FreeArk 教训：access log 会完整打印含 token 的 URL，导致令牌泄露）。该纪律落到 §3 MOD-IB-23 IFC-IB-247 与部署检查清单（IFC-IB-264）。
 - **公开接口契约**:
@@ -505,26 +546,31 @@
   - IFC-IB-224: `StreamEvent(kind: StreamEventKind, data: str)`（`kind ∈ {reasoning, content, degraded, related_images, error, done}`）
   - IFC-IB-225: `to_sse(event: StreamEvent) -> str`（`event:` / `data:` 帧编码）
   - IFC-IB-282（R2）: `related_images` 事件的**载荷类型化** = `RelatedImagesPayload`（§2.1）。`data` 为该结构的 JSON 编码；**只传 `image_id` 与 `url_path`（站内相对路径），绝不内联图片字节或 base64** —— 帧体积有界，不阻塞流。事件在 `content` 之后、`done` 之前发出；**无图时不发该事件**（而非发空载荷）。`StreamEventKind` 的取值集合**不变**（`related_images` 早已在 IFC-IB-224 中枚举，R2 只定义其 data）。
+  - **IFC-IB-302（R8 新增）**: `completion_event(payload: CompletionPayload 或 None) -> StreamEvent`（**纯函数**：构造**唯一**的终态事件；`kind=done`；**恰一次单发**，其后**不再有**该次交互的任何 `content` 片段，AC-IB-19-01；`payload` 缺省时**不臆造**引用，AC-IB-19-05；**不发空的 `content` 帧**；`payload` 定义见 IFC-IB-300）。
+  - **IFC-IB-303（R8 新增）**: `is_user_visible(kind: StreamEventKind) -> bool`（**纯函数**：`content` / `degraded` / `related_images` / `error` / `done` → `True`；`reasoning` **默认不可见**（受 `IB_REASONING_STREAM_ENABLED` 门控）；**内部子任务产物永不属于任何 `StreamEventKind` 可见取值**，故**永不外流**，AC-IB-19-04；**默认不混帧** —— 同一事件不承载两个分区的语义）。
 - **依赖模块**: MOD-IB-01、MOD-IB-02、MOD-IB-04
 - **外部依赖**: 无
 
 ### MOD-IB-22 编排图 (L4)
 
 - **职责**: StateGraph（route → 条件边 fan-out → expert×N / general → gate → aggregate → END）；并行扇出、聚合、流式透传。
-- **覆盖需求**: REQ-FUNC-IB-18、IB-19、IB-20、IB-21；AC-IB-09-01~07、AC-IB-11-06
+- **覆盖需求**: REQ-FUNC-IB-18、IB-19、IB-20、IB-21；AC-IB-09-01~07、AC-IB-11-06；**US-IB-20（会话生命周期；AC-IB-20-03 / 20-04 / 20-05）、US-IB-19（AC-IB-19-04）（R8 补登记）**
 - **R7 图编译约束（新增）**: 图的编译输入 = **经准入闸门校验通过的定义文档**派生的 `OrchestrationSpecInput`（IFC-IB-291 → IFC-IB-293）；图**编译一次、进程常驻**，**运行期不得由任何图外输入改变拓扑** —— 节点 / 边集合与条件边**存在性**不是可编辑对象（REQ-FUNC-IB-26 ②）。拓扑变更的唯一路径 = 改定义文档 → 装配期校验 → 重新编译（AC-IB-18-01）。条件边**必须**带 `branch_map`，否则由 IFC-IB-290 拒绝（界面无法判定可达性）。`IFC-IB-231` 的签名**不变**（新增的图配置仍经 `GraphConfig` 参数注入，**不新增参数**）；`IFC-IB-232/233` 与 State 键（含 `MAX_EXPERT_STEPS = 8`）**不变**。
 - **公开接口契约**:
   - IFC-IB-231: `build_graph(*, llm: LlmProvider, experts: ExpertRegistry, tools: list[BoundTool], sessions: SessionStore, config: GraphConfig) -> CompiledGraph`（**业务零依赖**：人格/身份文本、scope 一律由调用方已在参数中构造完成）
   - IFC-IB-232: `run(query: str, *, ctx: RequestContext, session_key: str) -> AsyncIterator[StreamEvent]`
   - IFC-IB-233: `resume(session_key: str, payload: dict) -> AsyncIterator[StreamEvent]`
   - State 键（含 reducer）: `messages: Annotated[list[Message], operator.add]`；`expert_results: Annotated[list[ExpertResult], operator.add]`；`plan: list[tuple[str, str]]`；`route_tier: RouteTier`；`query: str`；`degraded: bool`；`step_count: int`（上限 `MAX_EXPERT_STEPS = 8`）
+  - **IFC-IB-305（R8 新增）**: `ResumePayload`（`session_key: str`；`decision: ConfirmationDecision 或 None`）—— **类型化** `IFC-IB-233` 的既有 `payload: dict`（**不改 `IFC-IB-233` 的签名文本与参数个数**；沿用 IFC-IB-282 先例）。`decision is None` = 未携带决策。
+  - **IFC-IB-306（R8 新增）**: `can_resume(state: SessionState 或 None, gate_id: str, payload: ResumePayload) -> bool`（**纯函数**，无 IO：`state is None`（状态丢失）/ `state.gate` 为 `None` 或 `gate_id` 不符 / `payload.decision is None`（未携决策）→ **一律 `False`** = **fail-closed**；**仅当三门全过才 `True`**。AC-IB-20-04 / 20-05；配合 `SessionStateLossOutcome` 的唯一取值，使「安全失败」成为类型层事实）。
+  - **确认门装配语义（R8，ADR-17）**: `IB_CONFIRMATION_GATE_ENABLED` **默认 `false`**；为 `false` 时 `gate` 节点**直接通过**（零行为差异：不写 `gate` 状态、不发 `confirmation_required`、`resume` 不可用）。为 `true` 时：`gate` 节点构造 `ConfirmationGateState`（`prompt.summary` **由接入方提供的业务构造器产出**，**骨架不生成业务话术**）并发出**一个** `confirmation_required` 事件后**挂起该会话**（保持中间态）；决策经 `POST /api/chat/resume`（IFC-IB-307）回传后经 `can_resume` 判定并续跑。**骨架不判定「哪些动作需要确认」**（ADR-09 / ADR-17 约束 2）。
 - **依赖模块**: MOD-IB-01、IB-02、IB-03、IB-04、MOD-IB-16、IB-17、IB-18、IB-19、IB-20、IB-21
 - **外部依赖**: `langgraph`
 
 ### MOD-IB-23 HTTP API 与组合根 (L5)
 
 - **职责**: **唯一装配点**；REST + SSE 端点；鉴权注入与 `project_id` 解析（不信请求体）；健康检查。
-- **覆盖需求**: REQ-FUNC-IB-05、IB-06、IB-09、IB-17、IB-21、IB-23、**IB-25 / IB-27（R7 新增：定义文档的读写端点与装配期准入闸门）**；REQ-NFR-IB-09
+- **覆盖需求**: REQ-FUNC-IB-05、IB-06、IB-09、IB-17、IB-21、IB-23、**IB-25 / IB-27（R7 新增：定义文档的读写端点与装配期准入闸门）**、**IB-20（R8 新增：会话恢复端点与 fail-closed 准入；US-IB-20 / AC-IB-20-04 ~ 20-06）**；REQ-NFR-IB-09
 - **公开接口契约（HTTP 契约）**:
   - IFC-IB-241: `build_application(deps: CompositionRoot) -> WSGIApplication`（**组合根**：装配全部适配器与替身，见 §5；**R1**：返回类型由 v1.0.0 的 `ASGIApp` 改为 `WSGIApplication`，装配语义不变）
   - IFC-IB-242: `POST /api/files`（multipart）→ `201 DocumentRecord`；`400` 校验失败；`403` 归属断言失败；`5xx` **fail-closed**（台账/Blob 不可用）
@@ -551,11 +597,14 @@
   - **R7 装配序列（显式化，任一步失败即启动失败）**: `装载定义文档（IFC-IB-288）→ 准入闸门（IFC-IB-293，内含 IFC-IB-290）→ 派生注册表 / 图配置（IFC-IB-291）→ 构造并注入（MOD-IB-16 / 17 / 19 / 22）→ 图编译一次常驻`。闸门位于**序列第一步**（ADR-16）。
   - **鉴权与凭据纪律（强制，扩展到全部新端点）**: 沿用 IFC-IB-247 口径，**仅允许 `Authorization` 头 / 中间件鉴权**；两个新端点**不接受** `?token=`；错误体**不回显任何凭据值**（AC-IB-18-04）；归属断言失败一律 `403`（**不因「是不是你的配置」而区分 `404`** —— 定义文档按 `project_id` 归属，同 §1.4 第 2 条精神）。
   - **R7 配置键不变声明**: 除 IFC-IB-297 新增的两个键名（`IB_DEFINITION_DOC_PATH` / `IB_VISUAL_CONFIG_ENABLED`）外，§5 装配表的**既有开关名与默认值一字不动**；**新增键名不含任何值**。
+  - **R8 新增端点（会话恢复；IFC-IB-307）**: `POST /api/chat/resume`（**SSE**，`Content-Type: text/event-stream`；**仅允许 `Authorization` 头**鉴权，**不接受 `?token=`**）→ 续跑流（`text/event-stream`）| `403`（归属断言失败，AC-IB-20-06）| `404` / `409`（会话或待确认状态**不存在 / 已丢失** → **fail-closed，不新建会话**，AC-IB-20-05）| `503`（容量，与 `IFC-IB-247` 同源，池满**快速失败**，[TBD-T15] / [TBD-T21]）。
+  - **准入顺序（强制，R8）**: `鉴权（Authorization 头）→ 归属断言（session_key 前缀，FM-7）→ SessionStore.load（IFC-IB-221）→ can_resume（IFC-IB-306）→ 续跑（IFC-IB-233）`。**任一前置不满足即 fail-closed**，**不得**退化为「新建会话后重跑」。
+  - **R8 配置声明（强制）**: `IB_SESSION_PERSISTENCE_POLICY` 须在 `ib-web` 单元的 `EnvironmentFile` 模板（`IFC-IB-262`）中**显式声明**（AC-IB-20-02）；**只登记键名，不写入任何值**。
 
 ### MOD-IB-24 Web 前端 (L5)
 
 - **职责**: 上传/列表/删除/重试/重建页 + 问答页 + **可视化配置页（R7）**；仅通过类型化 HTTP/SSE 契约与后端交互。
-- **覆盖需求**: REQ-FUNC-IB-09、IB-17、**IB-25（主）、IB-26（并列主，与 MOD-IB-22）、IB-27（辅）**
+- **覆盖需求**: REQ-FUNC-IB-09、IB-17、**IB-25（主）、IB-26（并列主，与 MOD-IB-22）、IB-27（辅）**；**IB-20（R8 新增：问答页对确认中间态与恢复的呈递、流式交付渲染；US-IB-20 / AC-IB-20-04、US-IB-19 / AC-IB-19-01、AC-IB-19-03）**
 - **公开接口契约（TS 类型与后端契约一一对应）**:
   - IFC-IB-256: `UploadPage`（消费 242/243/244/245）
   - IFC-IB-257: `ChatPage`（消费 247；渲染 `content`/`degraded`；`degraded` 时展示「当前未接入知识资料库」）
@@ -575,6 +624,13 @@
   - **凭据不回显**：配置项只显示**键名**，不显示任何值 / 掩码 / 前缀（AC-IB-17-05）。
   - **离线与数据本地化**：图可视化库及其传递依赖须**随构建产物本地打包**；**禁止运行期 CDN 加载**与任何外发请求（AC-IB-17-06、REQ-NFR-IB-08）。
   - **前端不做校验的最终裁决者**：前端预校验仅为体验优化；**服务端校验器（IFC-IB-290）为唯一裁决者**（界面编辑与直接改文档**一视同仁**）。
+- **R8 问答页流式与确认约束（IFC-IB-308）**（R8 新增）:
+  - **增量渲染**：`content` 片段到达即渲染，**不得等待 `done`**（AC-IB-19-01）；`done` 到达后**不再追加**该次交互的正文。
+  - **完成与产物一次性呈现**：完成事件携带的结构化引用清单（`CompletionPayload`）在**该轮回答下方**一次性呈现；**无引用时不显示引用区**（不显示空占位、不臆造引用，AC-IB-19-05）。
+  - **思考分区默认不渲染**：`reasoning` 分区**仅在服务端启用且明确标记为可见时**以可折叠区域呈现；**默认不渲染**（AC-IB-19-03）。
+  - **确认中间态独立区呈现 + 决策回传**：收到 `confirmation_required` 时以**独立区域**呈现（**与答复片段视觉可区分**，不并入正文），经 `POST /api/chat/resume`（IFC-IB-307）回传 `ConfirmationDecision`；**未决策则界面不显示为「已完成」**、不自动继续（AC-IB-20-04）。
+  - **恢复失败可读回执**：`404` / `409` / `403` 时给出可读提示（如「会话已失效，请重新发起或重新确认」），**不静默丢弃、不自动重跑**（AC-IB-20-05 / 20-06）。
+  - **凭据不回显**：只显示**键名**，不显示任何值 / 掩码 / 前缀（延续 IFC-IB-296 口径）。
 
 ### MOD-IB-25 部署运维 (L5)
 
@@ -679,6 +735,16 @@ MOD-IB-26 → 01, 02, 04（**本模块不被任何模块 import**；只走线协
 - **既有单一入口纪律未被绕开**：定义文档是**项目级**工件，`Scope` 仍为必填（ADR-04）；「取定义文档 / 派生结果的唯一入口」与 `CollectionResolver` 的单一入口纪律同构（§2.2 R7 增记）。
 - 因此「编号即拓扑序」继续适用于 GROUP_C，并**追加一条边界纪律**：**新增工件若被低编号模块（尤其组合根）依赖，不得新开编号更高的模块**。
 
+### 4.2.3 R8 无环性再声明（零新增依赖边）
+
+**结论：DAG 拓扑在 R8 下不变，无环证明（§4.2）继续成立。**
+
+- **零新增依赖边**：R8 的全部新增落在 **MOD-IB-01 / 02 / 21 / 22 / 23 / 24** 内部（会话与确认的类型化契约 / 键名登记与值域显式化 / 终态与可见性判据 / 恢复判定与装配语义 / 恢复端点与准入 / 呈递与回传约束），**§4.1 依赖边清单逐行未改**；因此 `w(MOD-IB-n) = n` 严格递减的构造性证明**不受影响**。
+- **不新增模块**：与 R7 同理 —— 会话状态与确认中间态**必然被 MOD-IB-21 / 22（低编号）持有并被 MOD-IB-23（组合根）装配**，若新开模块只能取 **≥27** 的编号，会产生 `23 → 27` 的边，**违反 `w(A) > w(B)`**；故并入既有模块（§4.2.2 边界纪律继续适用）。
+- **既有边被复用而非新增**：`IFC-IB-307` 的端点在 **MOD-IB-23**（既有边 `23 → 21 / 22` 已存在，无需新边）；`can_resume`（IFC-IB-306）与 `ResumePayload`（IFC-IB-305）定义在 **MOD-IB-22**（依赖 MOD-IB-01 为既有边）；`is_user_visible` / `completion_event` 在 **MOD-IB-21**（依赖 MOD-IB-01 为既有边）。
+- **单一入口纪律未被绕开**：会话状态仍**只**经 `SessionStore`（MOD-IB-21 端口）读写，`session_key` 前缀断言（FM-7）沿用；前端仍**只**经 HTTP/SSE 契约（MOD-IB-24 → MOD-IB-23）取数，**不新增任何绕过路径**。
+- 因此「编号即拓扑序」继续适用于 GROUP_C；R8 的**边界纪律同 §4.2.2 末句**：新增工件若被低编号模块（尤其组合根）依赖，**不得新开编号更高的模块**。
+
 ### 4.3 分层视图
 
 ```
@@ -712,7 +778,7 @@ L0  MOD-IB-01  02  03  04
 | `PageRenderer` | `PdfiumRenderer` | `NullRenderer`（返回 `None`） | `IB_RENDER_ENABLED=true\|false` |
 | `LedgerRepository` | `SqliteLedgerRepository` | `InMemoryLedgerRepository` | `IB_LEDGER_BACKEND=sqlite\|memory` |
 | `BlobStore` | `FsBlobStore` | `InMemoryBlobStore` | `IB_BLOB_STORE_ENABLED=true\|false` |
-| `SessionStore` | `MemorySessionStore` | 同（内存实现即替身） | `IB_SESSION_BACKEND=memory` |
+| `SessionStore` | `MemorySessionStore` | 同（内存实现即替身） | `IB_SESSION_BACKEND=memory\|external`（**R8 仅扩展值域（`memory` 或 `external`）；键名与默认值 `memory` 不变**） |
 | `AuthzPolicy` | 接入方注入 | `DenyAllPolicy` | **未注入即启动失败** |
 | `ConfigurationSource` | 文件 + 环境变量 | 测试用固定字典 | `IB_CONFIG_SOURCE=file\|dict` |
 | `DefinitionDocumentStore`（**R7 新增**） | `FileDefinitionDocumentStore`（本地文件；原子写 + 语义哈希乐观并发） | `InMemoryDefinitionDocumentStore`（内存字典 + 同一校验器） | `IB_DEFINITION_DOC_PATH`（路径）；`IB_VISUAL_CONFIG_ENABLED=true\|false` |
@@ -812,6 +878,13 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 
 事件 `kind`：`reasoning`（若可得）/ `content` / `degraded` / `related_images` / `error` / `done`。**降级必须在流内可见**（AC-IB-14-01 的界面落点）。单专家时透传该专家 token；多专家时输出聚合结果。会话键 `session_key = f"{project_id}:{actor_id}:{session_id}"`，读取时断言前缀（FM-7）。
 
+**（R8）流式与会话的四条规范化补充（REQ-FUNC-IB-20；US-IB-19 / US-IB-20）**：
+
+1. **增量推送与终态单发**（AC-IB-19-01）：`content` 为增量片段，客户端不得等 `done`；完成事件**恰一次**，其后不再有该次交互的内容片段；终态构造经 `completion_event`（IFC-IB-302）。空内容时**不发空的 `content` 帧**（AC-IB-19-05）。
+2. **完成事件附结构化产物**（AC-IB-19-02 / 19-05）：终态携带 `CompletionPayload`（IFC-IB-300）；`citations` **可为空元组**，**不编造引用**；引用项为定位信息，不内联字节、不含正文全文。
+3. **思考分区与内部产物**（AC-IB-19-03 / 19-04）：`reasoning` **可选且默认不启用**（`IB_REASONING_STREAM_ENABLED` 默认 `false`）；**内部子任务产物永不映射为可见 `kind`**（`is_user_visible`，IFC-IB-303）；**不混帧**。
+4. **会话状态与确认中间态**（AC-IB-20-02 / 20-03 / 20-04 / 20-05）：状态经 `SessionStore` 承载（默认内存实现）；**持久化策略须显式声明**（`IB_SESSION_PERSISTENCE_POLICY`），**重启丢弃待确认状态 = fail-closed**（`SessionStateLossOutcome` 唯一取值）；确认门**机制保留、默认关闭、不绑定业务语义**，呈递与回传见 ADR-17；**OQ-IB-07 / OQ-IB-08 保持开放**。
+
 ### 7.4 降级矩阵（依赖 × 故障 × 行为 × 用户可见 × 日志级别 × fail 语义）
 
 | 依赖 | 故障情形 | 系统行为 | 用户可见 | 日志级别 | fail 语义 |
@@ -832,6 +905,8 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 | **WSGI 工作进程**（R1 新增） | SSE 长连接占满同步 worker（Waitress / Gunicorn sync worker 被长连接占据，新请求排队） | 排队超时或返回 `503`；**fail-closed 明确报错，不静默空转**（并发上限 `[TBD-T15]` 复核前按保守 worker 数与 SSE 超时配置） | 「服务繁忙，请稍后重试」 | WARN | **fail-closed（容量）** |
 | **定义文档（装配期）**（R7 新增） | 文档缺失 / 不可解析 / 完备性校验不通过 | **拒绝装配，服务不启动**（fail-fast）；错误逐条定位到 `path` / `code` / `message`（**不回显凭据值**） | 部署者见启动失败日志（界面尚不可用） | ERROR | **fail-closed（装配期）** |
 | **定义文档（运行期读）**（R7 新增） | 运行期文档不可读（被移走 / 权限变化） | `GET /api/config/definition` 返回 `503`（**不返回空文档**）；**问答主链路不受影响**（派生结果已于装配期常驻内存，不重新读文档） | 「配置暂时不可读，请稍后重试」 | ERROR | **fail-closed（配置读）**；对问答链路无影响 |
+| **会话状态（待确认中间态）**（R8 新增） | 状态丢失 / 未携决策 / 归属不符 / 会话不存在 | `POST /api/chat/resume`（IFC-IB-307）返回 `404` / `409` / `403`；**不新建会话、不重跑、不静默续跑**（`can_resume` = `False`） | 「会话已失效，请重新发起或重新确认」 | WARN | **fail-closed（会话状态）** |
+| **完成事件的结构化产物**（R8 新增） | 本轮无可交付引用（`citations` 为空）或无可交付正文 | **不臆造引用**（`citations=()`）、**不发空的 `content` 帧**；仅以完成事件收束（`had_content=false`），**不追加降级文案**（无引用 ≠ 降级） | 无感（无引用时不显示引用区） | INFO | **fail-open（增强项）**；对问答主链路无影响 |
 
 ---
 
@@ -853,6 +928,8 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 
 **离线可测的纯逻辑单元**（无外部 IO，AC-IB-15-02）：MOD-IB-01（契约校验）、MOD-IB-02（配置合并与校验）、MOD-IB-07（切分）、MOD-IB-05（注册表分派）、MOD-IB-18（打分与判定）、MOD-IB-19（`parse_route_output` 脏输出）、MOD-IB-14（`fingerprint`）。
 **R7 追加的离线可测单元**（纯函数、无外部 IO）：**MOD-IB-02** 的 `validate`（IFC-IB-290）与 `derive`（IFC-IB-291）—— 前者对 **≥7 类**校验项逐条可测（AC-IB-18-01/02/05），后者对派生结果做结构等价断言；配合 `InMemoryDefinitionDocumentStore` 即可在**无任何外部服务**下完成装配期全链路离线验证（AC-IB-18-05）。
+
+**R8 追加的离线可测单元**（**纯函数、无外部 IO、无第三方依赖**）：**MOD-IB-21** 的 `is_user_visible`（IFC-IB-303，含「内部产物永不外流」与「默认不混帧」的判据）与 `completion_event`（IFC-IB-302，含「恰一次」「其后无 `content`」「不臆造」「不发空帧」）；**MOD-IB-22** 的 `can_resume`（IFC-IB-306，含「状态丢失 / 未携决策 / 归属不符 → `False`」的 fail-closed 三例）。配合 **`MemorySessionStore`**（§8 替身表既有行，**未改动**）即可在**无任何外部服务**下完成「会话 → 确认中间态 → 恢复」的**全链路离线验证**（AC-IB-19-01 ~ 05、AC-IB-20-02 ~ 06）。
 
 ---
 
@@ -881,7 +958,7 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 | IB-17 | 检索结果供专家使用（工具化） | **MOD-IB-17** / 15 |
 | IB-18 | 多智能体问答 | **MOD-IB-22** / 16, 19, 20 |
 | IB-19 | 多级意图路由 | **MOD-IB-19** / 18 |
-| IB-20 | 会话生命周期 | **MOD-IB-21** / 22 |
+| IB-20 | 会话生命周期（流式输出契约 + 会话生命周期；**R8 补设计覆盖**） | **MOD-IB-21** / 22, 23, 24, 01, 02（**US-IB-19 / AC-IB-19-01 ~ 05；US-IB-20 / AC-IB-20-01 ~ 06**） |
 | IB-21 | 流式输出 | **MOD-IB-21** / 22, 23 |
 | IB-22 | 部署（systemd 单元、配置模板） | **MOD-IB-25** / 02 |
 | IB-23 | 多项目隔离（贯穿全链路） | **MOD-IB-03** / 02, 09(Resolver), 10, 11, 12, 15, 17, 23 |
@@ -891,6 +968,8 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 | IB-27 | 装配期完备性校验与 fail-fast 准入闸门（可读定位；**无**强制继续开关；界面与直改文档一视同仁；默认专家恰好一个） | **MOD-IB-23, MOD-IB-02** / 01, 24 |
 
 **无缺口**：**27 条 REQ-FUNC**（R7 同步计数；R1 / R2 时点基线 24 条）每条至少一个「主」模块，且每条均可被至少一个 AC 验证（R7 新增 3 条见上三行，AC 落点分别为 AC-IB-17-01~06、AC-IB-17-04 / AC-IB-18-01、AC-IB-18-01~06）。
+
+**（R8）REQ-FUNC-IB-20 的设计覆盖闭环**：需求侧补入 **US-IB-19**（流式交付最终答复；AC-IB-19-01 ~ 05）与 **US-IB-20**（会话生命周期；AC-IB-20-01 ~ 06）后，本需求的设计覆盖由「仅登记 REQ 与模块归属」升级为「**US / AC → ADR / IFC 逐条可追溯**」（见 §9.6 的逐 AC 映射表）：`ADR-17`（承载方式与状态丢失语义）+ `IFC-IB-298 ~ 308`（11 条类型化契约）+ §7.3 / §7.4 / §8 的相应补充。**本轮不重写既有设计**（`IFC-IB-221 ~ 225` / `IFC-IB-231 ~ 233` / `IFC-IB-247` 一字不动）。
 
 ### 9.2 非功能需求（REQ-NFR-IB-01 ~ IB-14）
 
@@ -941,6 +1020,31 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 - **模块与依赖不变**：R7 **未新增模块、未新增依赖边**（§1 R7 补充纪律、§4.2.2）；`IFC-IB-001~286` 与 13 个既有端口名一字不动（新增 287~297 为纯追加，`IFC-IB-285` 仍预留）。
 - **无在库悬置项**：`implementation_plan.md`（GROUP_C）内的「24/24 PASS」为**离线自检用例数**，与本文件的 REQ 计数 **27** 属**不同口径**，本文件**不得**据此改写该文件。
 
+### 9.6 R8 覆盖率再声明（REQ-FUNC-IB-20 的设计覆盖闭环）
+
+**结论：27/27 REQ-FUNC + 14 REQ-NFR 覆盖达成，无新增缺口；REQ-FUNC-IB-20 由「模块归属已登记」升级为「US / AC 逐条可追溯」。**
+
+| AC | 需求要点 | 设计落点（R8） | 状态 |
+|----|----------|----------------|------|
+| AC-IB-19-01 | 增量交付、终态恰一次单发 | `IFC-IB-302`（`completion_event`）；§7.3 补充 1 | **新增** |
+| AC-IB-19-02 | 完成事件附结构化产物 | `IFC-IB-300`（`CompletionPayload` / `CitationItem`）+ `IFC-IB-302`；§7.3 补充 2 | **新增** |
+| AC-IB-19-03 | 思考分区可选且默认不启用 | `IFC-IB-304`（`IB_REASONING_STREAM_ENABLED`，默认 `false`）+ `IFC-IB-303`；§7.3 补充 3 | **新增** |
+| AC-IB-19-04 | 内部子任务产物不外流 | `IFC-IB-303`（`is_user_visible`：内部产物永不映射为可见 `kind`）；§7.3 补充 3 | **新增（ADR-09 的具体化）** |
+| AC-IB-19-05 | 空内容边界、不臆造 | `IFC-IB-300`（`citations` 可空 + `had_content`）+ `IFC-IB-302`；§7.4 第二新增行 | **新增** |
+| AC-IB-20-01 | 会话键与状态承载 | `IFC-IB-298`（`SessionState`，补齐悬置引用）+ 既有 `IFC-IB-221/222` + FM-7（§7.3） | **补齐既有缺口** |
+| AC-IB-20-02 | 持久化策略须显式声明 | `IFC-IB-299`（枚举）+ `IFC-IB-304`（键名）+ `IFC-IB-307`；部署落点 `IFC-IB-262`（MOD-IB-25） | **新增** |
+| AC-IB-20-03 | 机制存在、默认不启用、不绑定业务语义 | `IFC-IB-301`（结构 + `confirmation_required` 值域追加）+ `IFC-IB-304`（默认 `false`）+ `IFC-IB-306`；ADR-17 约束 1 / 2 | **新增** |
+| AC-IB-20-04 | 呈递与决策回传 | `IFC-IB-301`（呈递）+ `IFC-IB-307`（回传端点）+ `IFC-IB-308`（界面约束）；ADR-17 约束 3 | **新增** |
+| AC-IB-20-05 | 携决策则续跑 / 未携或丢失则 fail-closed | `IFC-IB-299`（唯一取值）+ `IFC-IB-305` + `IFC-IB-306`（`can_resume`）+ `IFC-IB-307`；§7.4 第一新增行 | **新增** |
+| AC-IB-20-06 | 归属断言与不新建会话 | `IFC-IB-307`（`403` / `404` / `409`，准入顺序显式化）+ FM-7（§7.3） | **新增** |
+
+**边界声明（R8）**：
+
+- **既有设计一字未改**：`IFC-IB-221 ~ 225`（`SessionStore` 3 方法 + `StreamEvent` / `to_sse`）、`IFC-IB-231 ~ 233`（`build_graph` / `run` / `resume`）、`IFC-IB-247`（既有 SSE 端点）的**号 / 名 / 签名 / 字段集一字不动**；R8 只**追加** `IFC-IB-298 ~ 308`。
+- **模块与依赖不变**：模块数仍 **26**、端口数仍 **14**、**§4.1 依赖边逐行未改**（§4.2.3）；REQ→MOD 覆盖仍 **27/27 + 14 NFR**（**无新 REQ**）。
+- **OQ 处置**：**OQ-IB-07 / OQ-IB-08 均保持开放**；R8 只落地「默认关闭 / 会话内隔离」的**安全默认**，**不裁决业务语义**（ADR-17；`architecture_design.md` §10.1 R8 行）。
+- **架构侧对应**：`architecture_design.md` 1.4.0（R8）的 **ADR-17**、**§2.0.3 R8 影响复核表**、§1.3 R8 注、§6 四条规范化补充、[ARCH-ASSUMPTION-A8]、[TBD-T21]。
+
 ## 10. FreeArk 参考模块映射（只读对照，说明复用与改写边界）
 
 | FreeArk 现有资产 | 本基座对应 | 复用方式 |
@@ -987,3 +1091,11 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
       - **编号纪律未破**：`IFC-IB-001~286` 一字不动；新增 287~297 为**纯追加**；**`IFC-IB-285` 仍预留未分配**；既有重号 `IFC-IB-131` **登记不修**（残余项 R-9）。
       - **施工前置已登记且不阻断**：§9.5 显式声明前置与其非缺口性质；**REV-07-6 判定 = (a)**；本轮**未**设计 REQ-FUNC-IB-01 / IB-02 的实现方案（超 GROUP_B 边界，需求侧亦未立项）。
       - **边界合规**：R7 增量**不含实现代码**（无函数体、无伪代码）；**未修改 FreeArk 任何文件**；需求侧文档（`requirements_spec.md` / `user_stories.md`）**只读未改**；`implementation_plan.md`（GROUP_C）**未改**（其 L471 / L603 / L621 / L732 的「24/24 PASS」为**离线自检用例数**，与本文件 REQ 计数 27 **不同口径**）；**未写入任何凭据或配置值**（只登记键名：`IB_DEFINITION_DOC_PATH` / `IB_VISUAL_CONFIG_ENABLED`）；本阶段**止于 GROUP_B**。
+    - **R8 自检（REQ-FUNC-IB-20 设计覆盖闭环，GROUP_A REV-11-1 下游贯通）**：
+      - **覆盖闭环已贯通**：§9.1 的 `| IB-20 |` 行登记 **US-IB-19 / US-IB-20** 与 11 组 AC；§9.1 追加 R8 覆盖闭环段；**§9.6 给出逐 AC 映射表**（`AC-IB-19-01 ~ 05`、`AC-IB-20-01 ~ 06` 共 11 条**全部有落点**）；MOD-IB-21 / 22 / 23 / 24 / 01 / 02 的「覆盖需求」均补登记其 R8 归属。
+      - **零新增模块 / 端口 / 依赖边**：模块数仍 **26**、端口数仍 **14**（`SessionStore` 仍 3 方法）；**§4.1 依赖边清单逐行未改**；新增工件并入 MOD-IB-01 / 02 / 21 / 22 / 23 / 24（§4.2.3 给出无环性再声明与「为何不新增模块」的编号论证）。
+      - **类型化未降级**：新增 `IFC-IB-298 ~ 308`（11 条）全部为 `name: type` + 可空性的**类型化契约**，均为 **frozen dataclass / 纯 stdlib、零第三方依赖**；`SessionStateLossOutcome` 的**唯一取值**使「状态丢失 = 安全失败」成为类型层事实；`CompletionPayload.citations` 可为空元组使「不臆造引用」成为结构事实。
+      - **编号纪律未破**：`IFC-IB-001 ~ 297` 的号 / 名 / 签名 / 字段集**一字不动**（含 `IFC-IB-221/222` / `IFC-IB-233` 的签名文本）；新增 298 ~ 308 为**纯追加**；**`IFC-IB-285` 仍预留未分配**；既有重号 `IFC-IB-131` **登记不修**（残余项 R-9）。
+      - **既有设计未被改写**：`IFC-IB-221 ~ 225`、`IFC-IB-231 ~ 233`、`IFC-IB-247`、§5 装配表既有行、§6 状态机、§7.1 / §7.2 表、§10 FreeArk 映射表**均未改动**；`IB_SESSION_BACKEND` **键名与默认值不变**（仅扩展值域，沿用 R2 先例）。
+      - **OQ 未越权**：**OQ-IB-07 / OQ-IB-08 保持开放**；R8 只落地「默认关闭 / 会话内隔离」的安全默认，**不裁决**「是否应默认启用确认门」「历史是否跨会话」；架构层不自行扩围或缩围。
+      - **边界合规**：R8 增量**不含实现代码**（无函数体、无伪代码）；**未修改 FreeArk 任何文件**；需求侧文档（`requirements_spec.md` v1.3.0 / `user_stories.md` v1.3.0）**只读未改**；`implementation_plan.md`（GROUP_C）**未改**；`tech_stack.md` **未改**（无新第三方依赖）；**未写入任何凭据或配置值**（只登记键名：`IB_CONFIRMATION_GATE_ENABLED` / `IB_SESSION_PERSISTENCE_POLICY` / `IB_REASONING_STREAM_ENABLED`）；本阶段**止于 GROUP_B**。

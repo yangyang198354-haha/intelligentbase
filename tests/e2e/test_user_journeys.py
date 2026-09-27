@@ -10,7 +10,7 @@ import io
 import json
 import os
 
-from conftest import ingest_text, request_ctx
+from conftest import ingest_text, offline_raw, request_ctx
 
 import pytest
 
@@ -610,3 +610,173 @@ def test_TC_E2E_016_invalid_config_refused_at_assembly(http_app):
     view = admit(deps.definitions["p_alpha"], store=deps.definition_store)
     runtime_names = [e.name for e in deps.derived_views["p_alpha"].experts]
     assert [e.name for e in view.experts] == runtime_names
+
+
+# --------------------------------------------------------------------------- #
+# US-IB-19：流式交付最终答复（R11 新增，关键路径）
+# --------------------------------------------------------------------------- #
+
+
+def test_TC_E2E_017_stream_delivery_journey_single_terminal(http_app):
+    """US-IB-19 流式交付最终答复（关键路径，R11 新增）：真实 HTTP SSE 旅程。
+
+    旅程：文档入库 → 真实 `GET /api/chat/stream` → 逐条 SSE 帧。
+    验收点（AC-IB-19-01 / 19-05）：HTTP 200 + `text/event-stream`；恰一个 `done`
+    且为最后一帧（终态不收尾后追加）；正文片段非空。
+    """
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    deps, Client = http_app
+    client = Client()
+    content = "冷水机组报警排查顺序：先查 PLC 在线状态，再查传感器读数。"
+    up = SimpleUploadedFile("inspect-e2e17.txt", content.encode("utf-8"))
+    r = client.post("/api/files", {"kb_id": "kb_a", "file": up}, **AUTH)
+    assert r.status_code == 201
+    deps.lifecycle.process_pending("e2e-worker", 10)
+
+    stream = client.get("/api/chat/stream?q=设备故障怎么排查&session_id=e2e17", **AUTH)
+    assert stream.status_code == 200
+    assert stream.headers.get("Content-Type", "").startswith("text/event-stream")
+
+    body = _sse_body(stream)
+    kinds = [ln[len("event: ") :] for ln in body.splitlines() if ln.startswith("event: ")]
+    assert kinds.count("done") == 1, f"终止事件必须恰一次：{kinds}"
+    assert kinds[-1] == "done", f"终止事件必须收尾（其后无帧）：{kinds}"
+    assert "content" in kinds, f"应有正文片段：{kinds}"
+
+    # 正文片段的 data: 行非空（不推送空内容片段，AC-IB-19-05）
+    frames = [f for f in body.split("\n\n") if f.strip()]
+    content_frames = [f for f in frames if f.startswith("event: content")]
+    assert content_frames, f"无 content 帧：{kinds}"
+    for frame in content_frames:
+        data_lines = [ln[len("data: ") :] for ln in frame.splitlines() if ln.startswith("data: ")]
+        assert any(line.strip() for line in data_lines), "content 帧不得为空内容片段"
+
+
+# --------------------------------------------------------------------------- #
+# US-IB-20：会话生命周期（R11 新增，关键路径）
+# --------------------------------------------------------------------------- #
+
+
+def test_TC_E2E_018_session_lifecycle_journey_over_http(http_app):
+    """US-IB-20 会话生命周期（关键路径，R11 新增）：真实 HTTP 两个会话各自独立成流。
+
+    验收点（AC-IB-20-01）：显式会话标识被识别并独立成流（各自恰一次终态收尾），
+    两个进行中的会话互不阻断 —— 会话生命周期可独立存续。
+    """
+    deps, Client = http_app
+    client = Client()
+    bodies: dict[str, str] = {}
+    for sid in ("e2e18a", "e2e18b"):
+        r = client.get(f"/api/chat/stream?q=设备故障怎么排查&session_id={sid}", **AUTH)
+        assert r.status_code == 200, (sid, r.status_code)
+        assert r.headers.get("Content-Type", "").startswith("text/event-stream"), sid
+        body = _sse_body(r)
+        kinds = [ln[len("event: ") :] for ln in body.splitlines() if ln.startswith("event: ")]
+        assert kinds.count("done") == 1 and kinds[-1] == "done", (sid, kinds)
+        bodies[sid] = body
+
+    assert bodies["e2e18a"] and bodies["e2e18b"], "两个会话均应各自成流"
+
+
+# --------------------------------------------------------------------------- #
+# US-IB-20：确认中间态 + 续跑（R12 新增，关键路径）
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture()
+def gate_http_app(django_ready):
+    """确认门**已启用**的 HTTP 装配（`confirmation_gate_enabled=True`）。"""
+    from django.test import Client
+    from ibweb.composition import build_application, build_deps
+
+    raw = offline_raw()
+    raw["confirmation_gate_enabled"] = True
+    d = build_deps(raw, force=True)
+    build_application(d)
+    return d, Client
+
+
+def test_TC_E2E_019_confirmation_gate_resume_journey_over_http(gate_http_app):
+    """US-IB-20 会话「挂起 → 决策回传 → 续跑 → 不可重复恢复」的真实 HTTP 旅程（R12 新增，关键路径）。
+
+    覆盖 AC-IB-20-04（呈递中间态 + 决策回传恢复）与 AC-IB-20-05（状态丢失/决策缺失即
+    fail-closed，不静默重跑）：
+
+      1. 确认门**默认关闭**的 HTTP 路径**零行为差异**（无 `confirmation_required`，直接走完）；
+      2. 待确认中间态经**流路径同键**（3 段 `{project}:{actor}:{session_id}`）落库后，
+         `POST /api/chat/resume` 携决策 → **200 SSE** 且 `content` 后 `done`（用户可见地续跑完成）；
+      3. 续跑完成后待确认中间态**已清除**，同一会话再走普通问答正常成流；
+      4. 对**已恢复**的会话再次携决策恢复 → **404**（中间态已不存在，fail-closed，**不重跑**）；
+         未携决策恢复 → **409**（拒绝，不默认放行）。
+    """
+    import os as _os
+
+    from ib.core import ConfirmationGateState, ConfirmationPrompt, SessionState, SessionTurn
+
+    deps, Client = gate_http_app
+    client = Client()
+    auth = {"HTTP_AUTHORIZATION": f"Bearer {_os.environ.get('IB_OFFLINE_TOKEN', 'groupd-offline-token')}"}
+    project, actor = "p_alpha", "service-account"
+
+    def _post_resume(body):
+        return client.post(
+            "/api/chat/resume", data=json.dumps(body), content_type="application/json", **auth
+        )
+
+    def _kinds_of(body):
+        return [ln[len("event: ") :] for ln in body.splitlines() if ln.startswith("event: ")]
+
+    # 1) 普通会话（无待确认中间态）→ 默认即走完，不引入任何确认等待
+    plain = client.get("/api/chat/stream?q=设备故障怎么排查&session_id=e2e19-plain", **auth)
+    assert plain.status_code == 200 and plain.headers.get("Content-Type", "").startswith("text/event-stream")
+    plain_kinds = _kinds_of(_sse_body(plain))
+    assert "confirmation_required" not in plain_kinds and plain_kinds[-1] == "done"
+
+    # 2) 预置「已呈递、待决策」的中间态（键 = 流路径同键），携决策续跑 → 200 SSE 完成
+    sid = "e2e19-gate"
+    key = f"{project}:{actor}:{sid}"
+    deps.sessions.save(
+        key,
+        SessionState(
+            messages=[], last_expert=None, sticky_turns_left=0,
+            session_key=key, project_id=project,
+            turns=(SessionTurn(role="user", text="把温度设定为 26", created_at=""),),
+            gate=ConfirmationGateState(
+                gate_id="g-e2e19",
+                prompt=ConfirmationPrompt(gate_id="g-e2e19", expert_name="data-expert", summary="确认执行写操作？"),
+            ),
+        ),
+    )
+    resumed = _post_resume({"session_id": sid, "decision": {"gate_id": "g-e2e19", "approved": True}})
+    assert resumed.status_code == 200, resumed.content
+    assert resumed.headers.get("Content-Type", "").startswith("text/event-stream")
+    resumed_kinds = _kinds_of(_sse_body(resumed))
+    assert "content" in resumed_kinds and resumed_kinds.count("done") == 1 and resumed_kinds[-1] == "done"
+    assert "confirmation_required" not in resumed_kinds, "续跑不得再次触发确认（自我死锁）"
+
+    # 3) 中间态已清除；同一会话再走普通问答正常成流
+    assert deps.sessions.load(key) is not None and deps.sessions.load(key).gate is None
+    again = client.get(f"/api/chat/stream?q=设备故障怎么排查&session_id={sid}", **auth)
+    again_kinds = _kinds_of(_sse_body(again))
+    assert again_kinds.count("done") == 1 and again_kinds[-1] == "done"
+
+    # 4) 已恢复的会话再次携决策恢复 → 404（中间态不再存在，fail-closed，不重跑）
+    redo = _post_resume({"session_id": sid, "decision": {"gate_id": "g-e2e19", "approved": True}})
+    assert redo.status_code == 404, redo.content
+    assert not redo.headers.get("Content-Type", "").startswith("text/event-stream"), "不得开流重跑"
+
+    # 5) 未携决策恢复（对不存在的中间态）→ 404；对存在的中间态缺决策 → 409（此处覆盖后者）
+    deps.sessions.save(
+        key,
+        SessionState(
+            messages=[], last_expert=None, sticky_turns_left=0, session_key=key, project_id=project,
+            turns=(SessionTurn(role="user", text="再确认一次", created_at=""),),
+            gate=ConfirmationGateState(
+                gate_id="g-e2e19b",
+                prompt=ConfirmationPrompt(gate_id="g-e2e19b", expert_name="data-expert", summary="确认？"),
+            ),
+        ),
+    )
+    assert _post_resume({"session_id": sid}).status_code == 409
+

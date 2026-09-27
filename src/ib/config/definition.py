@@ -223,9 +223,11 @@ def validate(
       8. 工具授权：专家名已知、工具名在已知注册表内、同一专家不重复授权；
       9. `content_hash` 非空；
       10. **跨专家路由关键词撞车**（R8 追加；归一化 = `strip().lower()`，见下方实现注释）；
-      11. **`cn_label` 唯一性**（R8 追加；去首尾空白后比较）。
+      11. **`cn_label` 唯一性**（R8 追加；去首尾空白后比较）；
+      12. **专家内部路由关键词的空 / 重复**（R8 追加，BLK-R8-02；先归一化 `strip().lower()` 再比较）。
 
-    第 10 / 11 类为 **R8 纯追加**：既有 1~9 类的语义与顺序**一字未改**，新增项仅在末尾追加。
+    第 10 / 11 / 12 类为 **R8 纯追加**：既有 1~9 类的语义与顺序**一字未改**，新增项仅在末尾追加。
+    第 12 类不削弱 `ib.experts.validate_specs` 的派生安装期兜底（后者仍对空 / 重复关键词 fail-fast）。
     `known_tools` 为空集时不校验工具名（离线可测；装配期由组合根传入真实注册表）。
     """
     errors: list[ValidationErrorItem] = []
@@ -409,6 +411,44 @@ def validate(
             )
         else:
             label_owner[label] = e.name
+
+    # 12. 专家**内部**路由关键词的空 / 重复（BLK-R8-02；R8 **纯追加**）
+    #     背景：第 10 项只判「跨专家撞车」，把「同一专家内」的空 / 重复关键词留给派生安装期的
+    #     `ib.experts.validate_specs`（以 ValueError 兜底）。但「直接改文档」的写入路径在
+    #     `validate` 通过后才会走到派生安装 —— 若文档层放行，装配期才 ValueError，错误定位
+    #     （哪个专家、哪个词）与 `ValidationErrorItem` 的可读回执都会丢失，且与
+    #     REQ-FUNC-IB-27「不提供强制继续 / 忽略错误开关」的 fail-fast 口径不一致。
+    #     故在**文档层**补一条同类校验（更早、可定位），**不削弱** validate_specs 的兜底
+    #     （后者仍保留：绕过文档路径直接 install() 时照常 fail-fast）。
+    #     口径与第 10 项一致：归一化 = `strip().lower()`，先归一化再比较。
+    #       * 空 / 纯空白关键词 → `expert_keyword_empty`（空关键词永不参与路由命中，属录入错误）；
+    #       * 归一化后重复 → `expert_keyword_duplicate`（会**虚高**命中计数、破坏「唯一命中」判据）。
+    #     空值不计入重复集合，避免同一关键词同时报两条（与第 11 项 cn_label 的处理一致）。
+    for e in doc.experts:
+        within: dict[str, str] = {}
+        for kw in e.keywords:
+            normalized = kw.strip().lower()
+            if not normalized:
+                errors.append(
+                    _err(
+                        f"experts[{e.name}].keywords[{kw}]",
+                        "expert_keyword_empty",
+                        f"专家 '{e.name}' 含空关键词（空关键词永不参与路由命中，属录入错误）",
+                    )
+                )
+                continue
+            first = within.get(normalized)
+            if first is not None:
+                errors.append(
+                    _err(
+                        f"experts[{e.name}].keywords[{kw}]",
+                        "expert_keyword_duplicate",
+                        f"专家 '{e.name}' 的关键词重复：'{kw}' 与 '{first}' 归一化后相同"
+                        f"（会虚高命中计数、破坏唯一命中判据）",
+                    )
+                )
+            else:
+                within[normalized] = kw
 
     return ValidationReport(ok=not errors, errors=tuple(errors))
 

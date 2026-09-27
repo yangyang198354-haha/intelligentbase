@@ -51,6 +51,7 @@ import { onBeforeUnmount, ref } from 'vue';
 import {
   ApiClientError,
   type ApiClient,
+  type ConfirmationPrompt,
   type RelatedImageItem,
   type StreamEvent,
 } from '../api/client';
@@ -76,13 +77,20 @@ type Turn = {
   images: TurnImage[];
   error: string;
   streaming: boolean;
+  /** R8（IFC-IB-308）：待确认中间态（独立区域呈现）。非空即「**未完成**、等待用户决策」。 */
+  confirmation: ConfirmationPrompt | null;
+  /** 决策是否已回传（回传后确认区不再接受二次点击，改由续跑流驱动）。 */
+  decided: boolean;
 };
 
 /** 已创建的 `blob:` URL（卸载时统一释放 —— 不释放会让整页图片常驻内存）。 */
 const createdUrls = new Set<string>();
 
 const query = ref('');
-const sessionId = ref('default');
+// FND-R11-01 / AC-IB-20-01：**不得**预填字面量 'default' —— 预填等于「用户没填也照发」，
+// 与后端「缺会话标识即显式 4xx」的纪律自相矛盾（且多标签页会静默共用一个会话）。
+// 留空由用户在下方输入；`client.chatStream/chatResume` 对空标识提前拒绝并给出可读回执。
+const sessionId = ref('');
 const turns = ref<Turn[]>([]);
 const showReasoning = ref(true);
 
@@ -139,12 +147,48 @@ function apply(turn: Turn, event: StreamEvent): void {
       // 这里不追加任何降级文案（降级文案只对 degraded 事件负责，见文件头第 3 条）。
       collectImages(turn, event.data);
       break;
+    case 'confirmation_required': {
+      // IFC-IB-308：确认中间态以**独立区域**呈现，**不并入正文**（`turn.answer` 不被触碰）。
+      // 载荷形如 {"gate_id","expert_name","summary"}；解析失败则给可读泛化文案并保留决策能力
+      // （宁可显示泛化话术，也不静默吞掉「需要你确认」这件事 —— 那会让界面看起来「已完成」）。
+      const prompt = parseConfirmation(event.data);
+      if (prompt) {
+        turn.confirmation = prompt;
+        turn.decided = false;
+      } else {
+        turn.confirmation = { gate_id: '', expert_name: '', summary: '有一步操作需要你确认后才会继续。' };
+        turn.decided = false;
+      }
+      break;
+    }
     case 'done':
+      // IFC-IB-308：`done` 只表示**本次流已收束**，不表示「答复已完成」——
+      // 若仍挂有待确认中间态，界面必须保持「未完成」外观（见模板 `awaitingDecision`）。
       turn.streaming = false;
       break;
     default:
       break;
   }
+}
+
+/** 解析 `confirmation_required` 载荷；结构不符返回 `null`（调用方给泛化文案）。 */
+function parseConfirmation(data: string): ConfirmationPrompt | null {
+  try {
+    const parsed = JSON.parse(data) as Partial<ConfirmationPrompt>;
+    if (!parsed || typeof parsed !== 'object' || !parsed.gate_id) return null;
+    return {
+      gate_id: String(parsed.gate_id),
+      expert_name: String(parsed.expert_name ?? ''),
+      summary: String(parsed.summary ?? ''),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** 该轮是否仍**等待用户决策**（未决策则界面不显示为「已完成」，且不自动继续）。 */
+function awaitingDecision(turn: Turn): boolean {
+  return !!turn.confirmation && !turn.decided;
 }
 
 /** 解析载荷为条目列表；任何异常/结构不符一律当「没有图」（不抛、不提示）。 */
@@ -211,6 +255,8 @@ async function ask(): Promise<void> {
     images: [],
     error: '',
     streaming: true,
+    confirmation: null,
+    decided: false,
   };
   turns.value.push(turn);
   query.value = '';
@@ -222,6 +268,41 @@ async function ask(): Promise<void> {
       turn.error = describe(err);
     }
   } finally {
+    turn.streaming = false;
+    controller = null;
+  }
+}
+
+/**
+ * 回传确认决策并续跑（IFC-IB-308 / IFC-IB-307）。
+ *
+ * **只能由用户显式点击触发**（不做任何自动继续）：未决策前界面保持「未完成」，
+ * 且**不自动重跑**（AC-IB-20-04）。`403`/`404`/`409`/`503` 由 `describe` 翻成可读回执
+ * （如「会话已失效，请重新发起或重新确认」），**不静默丢弃**（AC-IB-20-05 / 20-06）。
+ */
+async function decide(turn: Turn, approved: boolean): Promise<void> {
+  const prompt = turn.confirmation;
+  if (!prompt || !prompt.gate_id || controller) return;
+  turn.decided = true;
+  turn.error = '';
+  turn.streaming = true;
+  controller = new AbortController();
+  try {
+    await props.client.chatResume(
+      sessionId.value,
+      { gate_id: prompt.gate_id, approved },
+      (event) => apply(turn, event),
+      controller.signal,
+    );
+  } catch (err) {
+    if (!(err instanceof DOMException && err.name === 'AbortError')) {
+      // 恢复失败（403/404/409/503）：给出可读回执，**不自动重跑**（AC-IB-20-05 / 20-06）
+      turn.error = describe(err);
+    }
+  } finally {
+    // 无论批准或拒绝，本次未决呈现都已了结：清空待确认区（拒绝/失败时由 error 区承接）。
+    turn.confirmation = null;
+    turn.decided = false;
     turn.streaming = false;
     controller = null;
   }
@@ -263,7 +344,13 @@ onBeforeUnmount(() => {
 
     <p class="hint">
       会话标识
-      <input v-model="sessionId" class="session" type="text" aria-label="会话标识" />
+      <input
+        v-model="sessionId"
+        class="session"
+        type="text"
+        placeholder="必填，如 s1"
+        aria-label="会话标识"
+      />
       （多轮上下文按此标识隔离；回答经云端模型生成，问题文本与检索片段会外发，见部署说明）
     </p>
 
@@ -298,6 +385,27 @@ onBeforeUnmount(() => {
       </div>
 
       <p v-if="turn.error" class="error" role="alert">{{ turn.error }}</p>
+
+      <!-- R8（IFC-IB-308）：确认中间态**独立区域**呈现（与答复片段视觉可区分、**不并入正文**）。
+           只能由用户显式点击决策；未决策前**不自动继续**，且该轮**不显示为「已完成」**。 -->
+      <div v-if="awaitingDecision(turn)" class="confirm" role="alertdialog" aria-live="assertive">
+        <p class="confirm-title">有一步操作需要你确认</p>
+        <p class="confirm-summary">
+          {{ turn.confirmation?.summary || '请确认是否继续执行该操作。' }}
+        </p>
+        <div class="confirm-actions">
+          <button type="button" class="approve" @click="decide(turn, true)">同意并继续</button>
+          <button type="button" class="reject" @click="decide(turn, false)">拒绝</button>
+        </div>
+      </div>
+
+      <!-- 仅当**不在待确认态**且本轮已收束时才标记完成（待确认态下绝不显示「已完成」）。 -->
+      <p
+        v-if="!turn.streaming && !awaitingDecision(turn) && !!turn.answer && !turn.error"
+        class="done-mark"
+      >
+        本轮已完成
+      </p>
     </article>
 
     <p v-if="!turns.length" class="hint">还没有提问。回答会标注是否接入知识资料库。</p>
@@ -406,5 +514,36 @@ button:disabled {
   padding: 3px 6px;
   border: 1px solid #d8dee4;
   border-radius: 4px;
+}
+/* R8（IFC-IB-308）：确认区与答复区**视觉可区分**（独立边框/底色，绝不与正文混排）。 */
+.confirm {
+  border: 1px solid #d4a72c;
+  background: #fff8c5;
+  border-radius: 6px;
+  padding: 12px;
+  margin: 8px 0;
+}
+.confirm-title {
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+.confirm-summary {
+  margin: 0 0 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+.confirm-actions .reject {
+  background: #fff;
+  color: #cf222e;
+  border-color: #cf222e;
+}
+.done-mark {
+  color: #57606a;
+  font-size: 12px;
+  margin: 8px 0 0;
 }
 </style>

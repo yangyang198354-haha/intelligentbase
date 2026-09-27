@@ -3,6 +3,10 @@
 @implements IFC-IB-231 build_graph / 232 run / 233 resume
             R2：`related_images` 事件的**生产接缝**（新增可选关键字 `related_images_provider`；
             载荷类型化与「空即不发」纪律属 IFC-IB-282 / MOD-IB-21）
+            IFC-IB-305（R8）`ResumePayload` 类型化恢复载荷
+            IFC-IB-306（R8）`can_resume` fail-closed 三判据（纯函数）
+            IFC-IB-302（R8）终态经 `completion_event` 单发（MOD-IB-21）
+            REV-12-2（G2）专家交接：`is_delegating` / `delegating_experts()` 落地为**计划展开**
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-03, MOD-IB-04, MOD-IB-16, MOD-IB-17,
          MOD-IB-18, MOD-IB-19, MOD-IB-20, MOD-IB-21
 @author software-developer
@@ -67,9 +71,13 @@ REQ-FUNC-IB-18/19/20/21；AC-IB-09-01~07、AC-IB-11-06）。
 from __future__ import annotations
 
 import operator
+from dataclasses import dataclass
 from typing import Annotated, Any, Iterator, Sequence, TypedDict
 
 from ib.core import (
+    ConfirmationDecision,
+    ConfirmationGateState,
+    ConfirmationPrompt,
     ExpertResult,
     GraphConfig,
     Message,
@@ -78,6 +86,7 @@ from ib.core import (
     RouteTier,
     Scope,
     SessionState,
+    SessionTurn,
     StartupError,
     StreamEventKind,
 )
@@ -93,6 +102,9 @@ __all__ = [
     "aresume",
     "StreamEvent",
     "AGGREGATION_FORBIDDEN_LABELS",
+    # R8（IFC-IB-305 / 306）
+    "ResumePayload",
+    "can_resume",
 ]
 
 #: 专家步数上限（module_design §7.1 明文常量；防「委托链」无限展开）。
@@ -114,6 +126,104 @@ AGGREGATION_FORBIDDEN_LABELS = (
     "巡检诊断",
     "知识库问答",
 )
+
+
+# --------------------------------------------------------------------------- #
+# IFC-IB-305 / 306：恢复载荷与 fail-closed 判据（R8）
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True, slots=True)
+class ResumePayload:
+    """恢复载荷（IFC-IB-305）。
+
+    **类型化** `IFC-IB-233` 的既有 `payload: dict`（**不改 `IFC-IB-233` 的签名文本与
+    参数个数**，沿用 IFC-IB-282 的「只定义载荷类型、不改父签名」先例）。
+
+    `decision is None` = **未携带决策**（`can_resume` 据此 fail-closed）。
+    """
+
+    session_key: str = ""
+    decision: ConfirmationDecision | None = None
+
+    @classmethod
+    def from_dict(cls, raw: Any, *, session_key: str = "") -> "ResumePayload":
+        """由原始 `dict`（HTTP 请求体 / 既有调用方）构造。
+
+        容错解析：`decision` 支持 `ConfirmationDecision` 实例、或形如
+        `{"gate_id": ..., "approved": bool}` 的映射；无法解析为一则**显式**决策时，
+        `decision` 保持 `None`（即「未携带决策」，由 `can_resume` fail-closed 拒绝）——
+        **绝不**把残缺载荷补成「默认批准」（那正是 AC-IB-20-05 明令禁止的「默认放行」）。
+        """
+        if isinstance(raw, ResumePayload):
+            return raw
+        data = raw if isinstance(raw, dict) else {}
+        raw_decision = data.get("decision")
+        decision: ConfirmationDecision | None = None
+        if isinstance(raw_decision, ConfirmationDecision):
+            decision = raw_decision
+        elif isinstance(raw_decision, dict) and "gate_id" in raw_decision and "approved" in raw_decision:
+            decision = ConfirmationDecision(
+                gate_id=str(raw_decision.get("gate_id", "")),
+                approved=bool(raw_decision.get("approved", False)),
+            )
+        return cls(
+            session_key=str(data.get("session_key", session_key) or session_key),
+            decision=decision,
+        )
+
+
+def can_resume(state: SessionState | None, gate_id: str, payload: ResumePayload | None) -> bool:
+    """[IFC-IB-306] 是否允许恢复（**纯函数**，无 IO；fail-closed）。
+
+    ## 三判据（任一不满足即 `False`；AC-IB-20-04 / 20-05）
+
+    1. **状态丢失**：`state is None`（进程重启后内存后端读回 `None`）→ `False`；
+    2. **归属不符**：`state.gate is None`（无待确认中间态）或 `state.gate.gate_id != gate_id`
+       → `False`（决策/恢复请求指向的中间态与状态里的不是同一个 → 拒绝）；
+    3. **未携决策**：`payload is None` 或 `payload.decision is None` → `False`。
+
+    另加一条**fail-closed 加固**（实现决策，属保守方向、不放松任何判据）：
+    `payload.decision.gate_id` 必须等于 `gate_id` —— 载荷里的决策不得指向**另一个**中间态。
+
+    ## 为什么必须纯函数 + fail-closed
+
+    该判据是「重启丢弃待确认状态 = 安全失败」的**唯一执行点**（AC-IB-20-05）。
+    纯函数使其可离线穷举三判据的每一种组合；fail-closed 使其**默认拒绝** ——
+    任何判据实现出错的后果是「拒绝恢复」（用户需重新发起），而非「静默执行未经确认的动作」。
+    """
+    if state is None:
+        return False
+    gate = getattr(state, "gate", None)
+    if gate is None:
+        return False
+    if not gate_id or str(getattr(gate, "gate_id", "")) != str(gate_id):
+        return False
+    if payload is None or getattr(payload, "decision", None) is None:
+        return False
+    decision = payload.decision
+    if str(getattr(decision, "gate_id", "")) != str(gate_id):
+        return False
+    return True
+
+
+def _requested_gate_id(payload: ResumePayload | None, raw: Any) -> str:
+    """恢复请求**指向的**中间态 id（`can_resume` 的 `gate_id` 入参；IFC-IB-306）。
+
+    **必须是「请求指向的中间态」，而不是从 `state` 派生的中间态**：若从
+    `state.gate` 派生 `gate_id` 再回传，`can_resume` 内「状态里的中间态 vs 请求指向的
+    中间态」对账（`state.gate.gate_id != gate_id`）**恒为假而空转** —— 这正是本轮修复的
+    病灶（请求指向别的中间态却仍被放行）。
+
+    取自载荷的 `decision.gate_id`（决策是「恢复到哪个中间态」的权威声明）；决策未声明
+    非空 `gate_id` 时回退到请求体显式的顶层 `gate_id`。均缺失则返回 `""` → `can_resume`
+    fail-closed 拒绝。**不在此处判定**，判定权仍留给纯函数 `can_resume`。
+    """
+    decision = getattr(payload, "decision", None)
+    requested = str(getattr(decision, "gate_id", "") or "")
+    if not requested and isinstance(raw, dict):
+        requested = str(raw.get("gate_id") or "")
+    return requested
 
 
 class GraphState(TypedDict, total=False):
@@ -151,6 +261,7 @@ class Orchestrator:
         llm: Any,
         tools_by_expert: dict[str, list[Any]] | None = None,
         related_images_provider: Any = None,
+        confirmation_prompt_builder: Any = None,
     ) -> None:
         self._graph = graph
         self._router = router
@@ -161,6 +272,10 @@ class Orchestrator:
         self._tools_by_expert = tools_by_expert or {}
         #: R2 增量接缝（**可选关键字**，缺省 `None` = 完全不发 `related_images` 事件）。
         self._related_images_provider = related_images_provider
+        #: R8（ADR-17）确认话术构造器接缝（**可选关键字**）。缺省 `None` = 即使
+        #: `confirmation_gate_enabled=True` 也**不触发**确认门（骨架不生成业务话术，
+        #: 无话术构造器即无可呈递内容）。见 `docs/code_review_report.md` 设计缺口登记。
+        self._confirmation_prompt_builder = confirmation_prompt_builder
 
     # ------------------------------------------------------------------ #
     # IFC-IB-232 同步主入口
@@ -171,26 +286,44 @@ class Orchestrator:
     ) -> Iterator[Any]:
         """[IFC-IB-232] 执行一轮问答，逐条产出 `StreamEvent`（同步迭代器）。
 
-        事件顺序刻意固定：`reasoning`（进度）→ `degraded`（若有）→ `content`（最终答案）
-        → `related_images`（若有，R2）→ `done`。**`degraded` 必须在正文之前到达**：
-        前端据此决定是否显示「当前未接入知识资料库」的提示条，若晚于正文到达，
-        提示会出现在答案下方，用户会把它当成对答案的补充说明（语义完全错了）。
-        同理 `related_images` **必须在 `content` 之后**：缩略图是对**已给出的回答**的补充，
-        先出图会让用户先看到一堆图片再等答案（顺序反了，读者无法把图与文对应起来）。
+        事件顺序刻意固定：`reasoning`（进度）→ `confirmation_required`（仅确认门启用时）
+        或 `degraded`（若有）→ `content`（最终答案）→ `related_images`（若有，R2）→ `done`。
+        **`degraded` 必须在正文之前到达**：前端据此决定是否显示「当前未接入知识资料库」
+        的提示条，若晚于正文到达，提示会出现在答案下方，用户会把它当成对答案的补充说明
+        （语义完全错了）。同理 `related_images` **必须在 `content` 之后**：缩略图是对
+        **已给出的回答**的补充，先出图会让用户先看到一堆图片再等答案（顺序反了）。
 
         **只发一条 `content`（最终答案），不逐专家发**。这一点是被实测行为逼出来的：
         若把每个专家的原始作答都作为 `content` 发出去、再发聚合结果，单专家场景下**同一段
         文字会出现两次**（聚合对单结果不改写），双专家场景下则是「先给两段、再给一段改写」
         ——用户看到的是答案被推翻重写。与其伪造逐字流式，不如让 UI 用 `reasoning` 显示
         「正在分析」，正文一次到位。
+
+        R8：本方法委托给 `_run_inner(..., gate=True)`，使 `resume` 能复用同一实现但**跳过**
+        确认门（否则续跑会再次触发确认门而自我死锁）。
         """
-        from ib.streaming import StreamEvent
+        yield from self._run_inner(query, ctx=ctx, session_key=session_key, gate=True)
+
+    def _run_inner(
+        self, query: str, *, ctx: RequestContext, session_key: str, gate: bool
+    ) -> Iterator[Any]:
+        """`run` 的实现体（`gate` 参数区分「新问答」与「恢复续跑」）。"""
+        from ib.streaming import StreamEvent, completion_event
 
         history = self._load_history(session_key)
         decision = self._decide(query, history=history, scope=self._scope)
 
         # 路由事件（reasoning 折叠框内容；不含内部分工，只给进度感）
         yield StreamEvent(StreamEventKind.REASONING, "正在分析问题…")
+
+        # R8（ADR-17）：确认中间态。开关关闭 / 无话术构造器 → 零行为差异（不触发）。
+        if gate:
+            gate_events = self._maybe_gate(query, decision, session_key=session_key, ctx=ctx)
+            if gate_events is not None:
+                for event in gate_events:
+                    yield event
+                return
+
         if not decision.experts:
             yield from self._run_general(query, session_key=session_key, history=history)
             return
@@ -199,7 +332,7 @@ class Orchestrator:
             "query": query,
             "messages": list(history) + [Message(role="user", content=query)],
             "expert_results": [],
-            "plan": [(name, self._prompt_of(name)) for name in decision.experts],
+            "plan": self._expand_plan(query, decision),
             "route_tier": str(decision.tier),
             "degraded": False,
             "step_count": 0,
@@ -218,40 +351,242 @@ class Orchestrator:
         for event in self._related_images_events():
             yield event
         self._save_history(session_key, history, query, answer, decision)
-        yield StreamEvent(StreamEventKind.DONE)
+        # R8（IFC-IB-302）：终态经 `completion_event` 单发（`payload=None` → `data=""`，
+        # 与既有 `StreamEvent(DONE)` 逐字节相同；未产出结构化产物即不臆造引用，AC-IB-19-05）。
+        yield completion_event(None)
 
     def resume(self, session_key: str, payload: dict) -> Iterator[Any]:
         """[IFC-IB-233] 恢复被确认门挂起的会话。
 
-        OQ-IB-07 = 「确认门默认关闭」，故本方法在当前配置下只做一件事：
-        把挂起的写操作**确认后重放**。若确认门未开启而收到 resume，返回 `error` 事件
-        而非静默成功 —— 静默成功会让调用方以为写操作已执行。
+        语义（R8；AC-IB-20-04 / 20-05）：
+          * 确认门未开启 → `error` + `done`（**不静默成功** —— 静默成功会让调用方以为
+            写操作已执行）；
+          * 会话不存在 / 待确认状态丢失 / 未携决策 / 归属不符（`can_resume` = `False`）
+            → `error` + `done`（**fail-closed**，**不新建会话、不重跑**）；
+          * 三门全过且决策为**批准** → 自该中间态继续（复用 `_run_inner(gate=False)`）；
+          * 三门全过但决策为**拒绝** → 明确终止，不执行待确认动作。
+
+        载荷经 `ResumePayload.from_dict` 类型化；残缺载荷一律视为「未携决策」（fail-closed）。
         """
-        from ib.streaming import StreamEvent
+        from ib.streaming import StreamEvent, completion_event
 
         if not self._config.confirmation_gate_enabled:
             yield StreamEvent(
                 StreamEventKind.ERROR,
                 "确认门未开启（OQ-IB-07 默认关闭），无可恢复的挂起操作",
             )
-            yield StreamEvent(StreamEventKind.DONE)
+            yield completion_event(None)
             return
-        state = self._sessions.load(session_key)
-        if state is None:
-            yield StreamEvent(StreamEventKind.ERROR, "会话不存在或已过期，无法恢复")
-            yield StreamEvent(StreamEventKind.DONE)
+
+        raw = payload or {}
+        state = None
+        try:
+            state = self._sessions.load(session_key)
+        except Exception:  # noqa: BLE001 - 存储读取失败即「状态不可得」→ fail-closed
+            state = None
+        resume_payload = ResumePayload.from_dict(raw, session_key=session_key)
+        # 「请求指向的 gate_id」取自载荷决策（或请求体显式 gate_id），**不**从 state 派生 ——
+        # 否则 can_resume 内的归属对账空转（见 `_requested_gate_id`）。
+        gate_id = _requested_gate_id(resume_payload, raw)
+        if not can_resume(state, gate_id, resume_payload):
+            yield StreamEvent(
+                StreamEventKind.ERROR,
+                "会话不存在、待确认状态已丢失或未携带有效决策，无法恢复（fail-closed）",
+            )
+            yield completion_event(None)
             return
-        query = str(payload.get("query", "")) if payload else ""
-        for event in self.run(query, ctx=payload.get("ctx"), session_key=session_key):  # type: ignore[arg-type]
-            yield event
+
+        decision = resume_payload.decision
+        assert decision is not None  # can_resume 已保证
+        if not decision.approved:
+            # 决策为「拒绝」：不执行待确认动作，以可识别终态收束（**不续跑**）。
+            yield StreamEvent(StreamEventKind.ERROR, "用户未批准该待确认动作，已终止且未执行")
+            yield completion_event(None)
+            return
+
+        query = self._pending_query_of(state)
+        ctx = raw.get("ctx")
+        if ctx is None or not query:
+            # 缺少续跑所需的上下文 / 原提问：**不臆造**，fail-closed。
+            yield StreamEvent(StreamEventKind.ERROR, "缺少续跑上下文或原提问，无法恢复（fail-closed）")
+            yield completion_event(None)
+            return
+        # 续跑：跳过确认门（否则再次触发确认而自我死锁）。
+        yield from self._run_inner(query, ctx=ctx, session_key=session_key, gate=False)
+
+    def _pending_query_of(self, state: SessionState) -> str:
+        """待确认中间态所挂起的**原提问**（存于 `SessionState.turns` 的末条 user 轮）。
+
+        续跑所需的「原提问」由骨架在挂起时写入 `turns`（见 `_persist_gate`）——
+        这是**最小一致**的承载（设计未规定恢复载荷携带原提问，见报告设计缺口登记）。
+        """
+        for turn in reversed(tuple(getattr(state, "turns", ()) or ())):
+            if str(getattr(turn, "role", "")) == "user" and str(getattr(turn, "text", "")):
+                return str(turn.text)
+        return ""
+
+    # ------------------------------------------------------------------ #
+    # R8（ADR-17）：确认中间态（装配语义见 module_design §3 MOD-IB-22）
+    # ------------------------------------------------------------------ #
+
+    def _maybe_gate(
+        self, query: str, decision: RouteDecision, *, session_key: str, ctx: RequestContext
+    ) -> Iterator[Any] | None:
+        """确认门判定入口。返回 `None` = **不触发**（正常继续）；返回事件迭代器 = **已挂起**。
+
+        ## 零行为差异的两种情形（任一即不触发）
+
+        1. `confirmation_gate_enabled=False`（**默认**）—— ADR-17 约束 1。此时不写 `gate`
+           状态、不发 `confirmation_required`，`resume` 亦不可用。
+        2. 开关为 `True` 但组合根**未注入确认话术构造器** —— 骨架**不生成业务话术**
+           （IFC-IB-301 / ADR-09），无话术即无可呈递内容，故不触发（而非呈递空话术）。
+
+        ## 骨架不判定「哪些动作需要确认」
+
+        业务判定由**注入的构造器**完成（`confirmation_prompt_builder`，组合根提供）：它返回
+        `None` 表示本轮无需确认 → 不触发；返回 `ConfirmationPrompt` → 构造
+        `ConfirmationGateState` 并挂起。骨架只做「构造 → 落状态 → 呈递一个事件」。
+
+        **fail-closed**：开关已启用而话术构造**抛异常**时，**不**继续正常问答
+        （继续会执行未经确认的动作），而是以 `error` + 终态安全终止。
+        """
+        if not bool(getattr(self._config, "confirmation_gate_enabled", False)):
+            return None
+        builder = self._confirmation_prompt_builder
+        if builder is None:
+            return None
+        try:
+            prompt = builder(query, decision=decision, scope=self._scope)
+        except Exception as exc:  # noqa: BLE001 - 已启用确认门却无法造话术 → fail-closed
+            from ib.observability import log_event
+
+            log_event("chat", "confirmation_prompt_failed", error_type=type(exc).__name__)
+            return self._gate_error_events("确认话术构造失败，已安全终止（fail-closed）")
+        if prompt is None:
+            return None
+        gate_id = str(getattr(prompt, "gate_id", "") or "")
+        if not gate_id:
+            # 无法对账（resume 必然 fail-closed）的中间态不呈现 —— 呈递不可恢复的门是缺陷。
+            return None
+        gate = ConfirmationGateState(gate_id=gate_id, prompt=prompt, decision=None)
+        self._persist_gate(session_key, gate, query=query)
+        return self._gate_suspend_events(gate)
+
+    def _gate_suspend_events(self, gate: ConfirmationGateState) -> Iterator[Any]:
+        """挂起时的**恰一条** `confirmation_required` + 终态单发（保持流可正常收束）。"""
+        from ib.streaming import completion_event, confirmation_required_event
+
+        yield confirmation_required_event(gate)
+        yield completion_event(None)
+
+    def _gate_error_events(self, message: str) -> Iterator[Any]:
+        """确认门 fail-closed 的可读失败（`error` + 终态单发；**不发 content**）。"""
+        from ib.streaming import StreamEvent, completion_event
+
+        yield StreamEvent(StreamEventKind.ERROR, message)
+        yield completion_event(None)
+
+    def _persist_gate(self, session_key: str, gate: ConfirmationGateState, *, query: str) -> None:
+        """把待确认中间态写入会话（保留既有历史；同时记录原提问以便续跑）。
+
+        * 既有 `messages` / `last_expert` / `sticky_turns_left` **原样保留**（不因挂起而丢历史）；
+        * `turns` 追加一条 user 轮承载**原提问**（续跑用 `_pending_query_of` 取回）；
+        * `session_key` / `project_id` / `updated_at` 一并补齐（`can_resume` / 归属断言需要）。
+
+        写入失败**不抛**：与 `_save_history` 同口径 —— 会话写入不可用不该让请求 500。
+        """
+        try:
+            prev = self._sessions.load(session_key)
+        except Exception:  # noqa: BLE001
+            prev = None
+        from ib.streaming import project_of_session_key
+
+        messages = list(getattr(prev, "messages", ()) or ())
+        messages.append(Message(role="user", content=query))
+        turns = tuple(getattr(prev, "turns", ()) or ()) + (
+            SessionTurn(role="user", text=query, created_at=_now_iso()),
+        )
+        state = SessionState(
+            messages=messages,
+            last_expert=getattr(prev, "last_expert", None),
+            sticky_turns_left=int(getattr(prev, "sticky_turns_left", 0) or 0),
+            session_key=session_key,
+            project_id=project_of_session_key(session_key),
+            actor_id=str(getattr(prev, "actor_id", "") or ""),
+            turns=turns,
+            gate=gate,
+            updated_at=_now_iso(),
+        )
+        try:
+            self._sessions.save(session_key, state)
+        except Exception:  # noqa: BLE001
+            pass
+
+    # ------------------------------------------------------------------ #
+    # REV-12-2（G2）：专家交接 —— 计划展开
+    # ------------------------------------------------------------------ #
+
+    def _expand_plan(self, query: str, decision: RouteDecision) -> list[tuple[str, str]]:
+        """把「路由命中的专家」展开为图计划（含 G2 **单跳交接**，REV-12-2）。
+
+        * **关闭**（`expert_handoff_enabled=False`，默认）→ 与既有行为**逐位一致**：
+          `[(name, self._prompt_of(name)) for name in decision.experts]`（`is_delegating` 不参与）。
+          这保证了「非交接的常规作答路径」在任何配置下都原样保留（护栏③）。
+        * **开启** → 对每个命中且属 `delegating_experts()` 的专家，把其**默认同侪**
+          （`default_expert()`）以**单跳**补入计划（若尚未在计划内）；计划条数受
+          `min(config.max_expert_steps, MAX_EXPERT_STEPS)` 约束（**往返次数上限**，护栏①）。
+          `_fan_out` 仍以 `step_count > max_expert_steps → general` 做二次上限校验（纵深防线）。
+
+        护栏②（敏感写操作强制人工确认）**不在本函数内判定**：它复用确认门
+        （`_maybe_gate` / IFC-IB-301/307/308，默认关闭）—— 骨架不判定「哪些动作需要确认」。
+
+        **未决设计项（登记为缺口，不擅自决定）**：本函数**不判定「哪一轮需要交接」**；
+        其触发仅由 `expert_handoff_enabled` 开关控制，交接目标取「默认同侪」这一确定性选择，
+        并无业务触发规则（见 `docs/code_review_report.md` 设计缺口登记 GAP-R8-02）。
+        """
+        if not bool(getattr(self._config, "expert_handoff_enabled", False)):
+            # 默认关闭：与 G2 之前**严格逐位零差异** —— 直接按 `decision.experts` 原序、原样
+            # 展开，**不做去重 / 过滤**（任何 `seen` 去重都会让重复命中的计划被静默改写，
+            # 从而让默认路径与既有行为产生差异，破坏「关闭即零行为差异」这条护栏③的前提）。
+            return [
+                (str(name), self._prompt_of(str(name))) for name in (decision.experts or ())
+            ]
+
+        from ib.experts import default_expert, delegating_experts
+
+        # 开启分支：**保留**去重（避免同一专家被重复补入）与上限约束。
+        base: list[str] = []
+        seen: set[str] = set()
+        for name in decision.experts or ():
+            key = str(name)
+            if key and key not in seen:
+                base.append(key)
+                seen.add(key)
+
+        cap = max(1, min(int(getattr(self._config, "max_expert_steps", MAX_EXPERT_STEPS)), MAX_EXPERT_STEPS))
+        delegating = set(delegating_experts())
+        delegate = default_expert()
+        expanded = list(base)
+        if delegate:
+            for name in list(base):
+                if len(expanded) >= cap:
+                    break
+                if name in delegating and delegate not in seen:
+                    expanded.append(delegate)
+                    seen.add(delegate)
+        return [(name, self._prompt_of(name)) for name in expanded]
 
     # ------------------------------------------------------------------ #
     # 异步变体（契约形状兼容；供支持 async 的宿主使用）
     # ------------------------------------------------------------------ #
 
     async def arun(self, query: str, *, ctx: RequestContext, session_key: str) -> Any:
-        """真异步迭代版本（`run` 的 async 孪生；**同一张图、同一套节点**）。"""
-        from ib.streaming import StreamEvent
+        """真异步迭代版本（`run` 的 async 孪生；**同一张图、同一套节点**）。
+
+        R8：与 `run` 共享 `_expand_plan` / 终态单发口径，使两条路径**不分叉**
+        （确认门的呈递在 `run` 侧实现；async 宿主若需确认门，应经 `_maybe_gate` 同源扩展）。
+        """
+        from ib.streaming import StreamEvent, completion_event
 
         history = self._load_history(session_key)
         decision = self._decide(query, history=history, scope=self._scope)
@@ -264,7 +599,7 @@ class Orchestrator:
             "query": query,
             "messages": list(history) + [Message(role="user", content=query)],
             "expert_results": [],
-            "plan": [(name, self._prompt_of(name)) for name in decision.experts],
+            "plan": self._expand_plan(query, decision),
             "route_tier": str(decision.tier),
             "degraded": False,
             "step_count": 0,
@@ -282,22 +617,40 @@ class Orchestrator:
         for event in self._related_images_events():
             yield event
         self._save_history(session_key, history, query, answer, decision)
-        yield StreamEvent(StreamEventKind.DONE)
+        yield completion_event(None)
 
     async def aresume(self, session_key: str, payload: dict) -> Any:
-        """[IFC-IB-233] 的 async 孪生。"""
-        from ib.streaming import StreamEvent
+        """[IFC-IB-233] 的 async 孪生（与同步 `resume` 同口径，见其 docstring）。"""
+        from ib.streaming import StreamEvent, completion_event
 
         if not self._config.confirmation_gate_enabled:
             yield StreamEvent(StreamEventKind.ERROR, "确认门未开启（OQ-IB-07 默认关闭）")
-            yield StreamEvent(StreamEventKind.DONE)
+            yield completion_event(None)
             return
-        payload = payload or {}
-        async for event in self.arun(
-            str(payload.get("query", "")),
-            ctx=payload.get("ctx"),
-            session_key=session_key,
-        ):
+        raw = payload or {}
+        try:
+            state = self._sessions.load(session_key)
+        except Exception:  # noqa: BLE001
+            state = None
+        resume_payload = ResumePayload.from_dict(raw, session_key=session_key)
+        # 同 `resume`：gate_id 取「请求指向的中间态」，不从 state 派生（对账不得空转）。
+        gate_id = _requested_gate_id(resume_payload, raw)
+        if not can_resume(state, gate_id, resume_payload):
+            yield StreamEvent(StreamEventKind.ERROR, "会话不存在或未携带有效决策，无法恢复（fail-closed）")
+            yield completion_event(None)
+            return
+        decision = resume_payload.decision
+        if decision is not None and not decision.approved:
+            yield StreamEvent(StreamEventKind.ERROR, "用户未批准该待确认动作，已终止且未执行")
+            yield completion_event(None)
+            return
+        query = self._pending_query_of(state)  # type: ignore[arg-type]
+        ctx = raw.get("ctx")
+        if ctx is None or not query:
+            yield StreamEvent(StreamEventKind.ERROR, "缺少续跑上下文或原提问，无法恢复（fail-closed）")
+            yield completion_event(None)
+            return
+        async for event in self.arun(query, ctx=ctx, session_key=session_key):
             yield event
 
     # ------------------------------------------------------------------ #
@@ -348,8 +701,12 @@ class Orchestrator:
             yield {"expert_results": [self._degraded_result("graph")]}
 
     def _run_general(self, query: str, *, session_key: str, history: Sequence[Message]) -> Iterator[Any]:
-        """通用应答路径（OOD 或路由为空）：不检索、不暴露分工。"""
-        from ib.streaming import StreamEvent
+        """通用应答路径（OOD 或路由为空）：不检索、不暴露分工。
+
+        REV-12-2 护栏③：**不交接亦有人应答** —— 本路径在任何配置下都产出可读正文，
+        使「无人应答」在结构上不可能（handoff 绝不是唯一出口）。
+        """
+        from ib.streaming import StreamEvent, completion_event
 
         text = self._general_answer(query)
         yield StreamEvent(StreamEventKind.CONTENT, text)
@@ -360,7 +717,7 @@ class Orchestrator:
             text,
             RouteDecision(experts=[], tier=RouteTier.OOD, confidence=0.0),
         )
-        yield StreamEvent(StreamEventKind.DONE)
+        yield completion_event(None)
 
     def _general_answer(self, query: str) -> str:
         try:
@@ -523,6 +880,7 @@ def build_graph(
     scope: Scope | None = None,
     tools_by_expert: dict[str, list[Any]] | None = None,
     related_images_provider: Any = None,
+    confirmation_prompt_builder: Any = None,
 ) -> Orchestrator:
     """[IFC-IB-231] 构造并编译编排图，返回可直接 `run()` 的 `Orchestrator`。
 
@@ -533,6 +891,12 @@ def build_graph(
     `related_images_provider` 是 **R2 新增的可选关键字**（向后兼容的超集，
     与 `submit_upload(data=...)` 的 `D-08` 同一先例）：缺省 `None` 时行为与 R1 逐字相同，
     不产出任何 `related_images` 事件。显式传 `None` 与不传等价 —— 不存在「必须显式关闭」的陷阱。
+
+    `confirmation_prompt_builder` 是 **R8 新增的可选关键字**（同一「兼容超集」先例）：
+    确认门的话术**构造器**（由接入方提供业务话术，骨架不生成，IFC-IB-301 / ADR-09）。
+    缺省 `None` 时：即便 `config.confirmation_gate_enabled=True` 也**不触发**确认门
+    （无可呈递内容）。**不使用 `confirmation_prompt_builder` 时 IFC-IB-231 的
+    `GraphConfig` 传入参数与既有调用逐字相同**（R7 图配置约束不被绕过）。
     """
     if config is None:
         raise StartupError("GraphConfig 必填（缺失即启动失败，不静默使用默认步数上限）")
@@ -563,6 +927,7 @@ def build_graph(
         llm=llm,
         tools_by_expert=tools_by_expert or {},
         related_images_provider=related_images_provider,
+        confirmation_prompt_builder=confirmation_prompt_builder,
     )
     global _ORCHESTRATOR
     _ORCHESTRATOR = orchestrator
@@ -798,6 +1163,17 @@ def _is_timeout(exc: BaseException) -> bool:
     if isinstance(exc, TimeoutError):
         return True
     return "timeout" in type(exc).__name__.lower() or "超时" in str(exc)
+
+
+def _now_iso() -> str:
+    """UTC 时间戳（ISO8601）。用于 `SessionState.updated_at` / `SessionTurn.created_at`。
+
+    只取 UTC、带时区偏移，使跨进程/跨机器的会话时间戳**可直接比较**（本地时间会因时区
+    不同而产生看似「时间倒流」的假象）。
+    """
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat()
 
 
 #: 延迟导入以便 `__all__` 暴露（`StreamEvent` 定义在 MOD-IB-21，避免循环 import）。

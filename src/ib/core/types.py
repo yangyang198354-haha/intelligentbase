@@ -712,28 +712,140 @@ class OcrDescriptor:
 
 
 # --------------------------------------------------------------------------- #
-# 会话与流（IFC-IB-221 / 224）
+# 会话与流（IFC-IB-221 / 224；R8 追加 IFC-IB-298~301）
 # --------------------------------------------------------------------------- #
+
+
+#: 会话持久化策略（IFC-IB-299）。**默认 `in_process`**（进程内、重启即失忆，v1 刻意保守）。
+#: 取值域 `{"in_process","external"}` —— `external` 只**声明值域**，v1 不提供适配器
+#: （[ARCH-ASSUMPTION-A8] / ADR-17 约束 4）。
+SessionPersistencePolicy: TypeAlias = Literal["in_process", "external"]
+
+#: 「待确认状态丢失」的**唯一结局**（IFC-IB-299）。**唯一取值**使「重启丢弃待确认状态 =
+#: 安全失败」成为**类型层事实**而非纪律约定（AC-IB-20-05）。
+SessionStateLossOutcome: TypeAlias = Literal["fail_closed_restart_required"]
+
+#: `SessionPersistencePolicy` 的默认值（与 IFC-IB-304 的 `IB_SESSION_PERSISTENCE_POLICY` 对齐）。
+DEFAULT_SESSION_PERSISTENCE_POLICY: SessionPersistencePolicy = "in_process"
+
+#: `SessionStateLossOutcome` 的唯一取值常量（便于调用方引用而不硬编码字符串）。
+SESSION_STATE_LOSS_OUTCOME: SessionStateLossOutcome = "fail_closed_restart_required"
+
+
+@dataclass(frozen=True, slots=True)
+class CitationItem:
+    """引用的**定位信息**（IFC-IB-300）。
+
+    **只给定位，不给正文**：`locator` 指向原始文档中的位置（页码 / 章节 / 锚点），
+    `score` 是检索得分供调用方按相关性呈现。**绝不内联字节、不含正文全文** ——
+    内联正文会让完成事件的体积随命中数线性膨胀（几百 KB 级），并诱发「回答与引用
+    各带一份同样的文本」的漂移。
+    """
+
+    doc_id: str
+    doc_name: str
+    page_or_section: str
+    locator: str
+    score: float
+
+
+@dataclass(frozen=True, slots=True)
+class CompletionPayload:
+    """完成事件的结构化产物（IFC-IB-300；AC-IB-19-02 / 19-05）。
+
+    `citations` **可为空元组**（无引用即空、**不臆造**引用 —— 结构事实而非纪律约定）；
+    `had_content` 标记本次交互是否产出了可交付正文（空内容边界）。
+    """
+
+    citations: tuple[CitationItem, ...] = ()
+    had_content: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class ConfirmationPrompt:
+    """确认呈递的**业务话术载体**（IFC-IB-301）。
+
+    `summary` **由接入方构造**，骨架**不生成**任何业务话术（ADR-09 / ADR-17 约束 2）；
+    `expert_name` 只作定位用。骨架只做「**呈递 + 等待 + 回传**」的通道。
+    """
+
+    gate_id: str
+    expert_name: str
+    summary: str
+
+
+@dataclass(frozen=True, slots=True)
+class ConfirmationDecision:
+    """确认决策（IFC-IB-301）。`approved=False` 表示明确拒绝（同样是一条决策）。"""
+
+    gate_id: str
+    approved: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ConfirmationGateState:
+    """待确认中间态（IFC-IB-301；AC-IB-20-04）。
+
+    `decision is None` = **待决策**（尚未收到决策，该次执行保持在此中间态）。
+    """
+
+    gate_id: str
+    prompt: ConfirmationPrompt
+    decision: ConfirmationDecision | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SessionTurn:
+    """单轮会话记录（IFC-IB-298；补齐 `IFC-IB-221/222` 的悬置引用）。
+
+    `citations` 为**定位信息**（IFC-IB-300），默认空元组。
+    """
+
+    role: str
+    text: str
+    citations: tuple[CitationItem, ...] = ()
+    created_at: str = ""
 
 
 @dataclass(frozen=True, slots=True)
 class SessionState:
-    """会话状态（IFC-IB-221）。
+    """会话状态（IFC-IB-221；字段级定义由 IFC-IB-298 / R8 补齐）。
 
-    `last_expert` 支撑粘性路由（AC-IB-09-05）；`messages` 供多轮上下文，
-    但**路由判据只取当前提问**（历史前缀须剥离）。
+    ## 两类字段并存（R8 实现说明，登记为设计缺口）
+
+    本类在实现中**先于** R8 设计而存在（承载 `messages` / `last_expert` / `sticky_turns_left`
+    —— 支撑多轮上下文与粘性路由，AC-IB-09-05），R8 设计（§2.1，IFC-IB-298）按
+    `session_key` / `project_id` / `actor_id` / `turns` / `gate` / `updated_at` **另立字段集**。
+
+    设计文档明言「`IFC-IB-221/222` 早已引用该类型但 §2.1 从未定义」，即设计者在**看不到
+    既有实现**的前提下给出字段集。两套字段子集对**既有调用方**（`orchestration` / `streaming`
+    与 GROUP_D R11 用例，均构造 `SessionState(messages=..., last_expert=..., sticky_turns_left=...)`）
+    是**既成事实**，删除即破坏既有断言（违反本轮硬约束）。
+
+    故本轮按**最小一致原则**：保留既有三个字段**一字不动**，**追加** R8 的六个字段
+    （全部带安全默认值）。`IFC-IB-221/222` 的**签名文本一字不改**（仍收 / 返 `SessionState`）；
+    新增字段只被新契约（`can_resume` / 确认门）消费。**此为设计缺口**（两套字段集的归一
+    应由 PM / 架构裁决），已登记于 `docs/code_review_report.md`。
     """
 
+    # --- 既有字段（R1~R7；一字不动） --- #
     messages: list[Message] = field(default_factory=list)
     last_expert: str | None = None
     sticky_turns_left: int = 0
+    # --- R8 追加字段（IFC-IB-298；全部带默认值，构造兼容） --- #
+    session_key: str = ""
+    project_id: str = ""
+    actor_id: str = ""
+    turns: tuple[SessionTurn, ...] = ()
+    gate: "ConfirmationGateState | None" = None
+    updated_at: str = ""
 
 
 @dataclass(frozen=True, slots=True)
 class StreamEvent:
     """类型化流事件（IFC-IB-224）。**本类是唯一实现**（`ib.streaming` 直接复用，不另立同名类）。
 
-    `kind ∈ {reasoning, content, degraded, related_images, error, done}`。
+    `kind ∈ {reasoning, content, degraded, related_images, error, done, confirmation_required}`。
 
     `data` 给默认空串：除正文外的事件（`done` / `error` / 纯进度 `reasoning`）都没有载荷，
     若强制调用方每次写 `data=""`，只会诱导出「随手传个占位串」的坏习惯 ——
@@ -769,6 +881,12 @@ class GraphConfig:
 
     max_expert_steps: int = 8
     confirmation_gate_enabled: bool = False
+    #: REV-12-2（G2）专家**单跳交接**开关。**默认关闭** —— 关闭时 `_expand_plan` 与既有
+    #: 行为逐位一致（计划 == 路由命中的专家，`is_delegating` 不参与）；开启时允许可委托专家
+    #: 把问题**单跳转交**给默认同侪，受 `max_expert_steps` 上限约束，且**保留**不通交时的
+    #: 常规作答路径。**触发时机**（哪些轮次需要交接）属未决设计项，故此处只提供受控接缝并
+    #: **默认关闭**（见 `docs/code_review_report.md` 设计缺口登记），不擅自决定业务语义。
+    expert_handoff_enabled: bool = False
     max_history_messages: int = 20
     aggregation_forbids_internal_labels: bool = True
 

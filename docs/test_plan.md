@@ -7,15 +7,15 @@
 | 文档 ID | DOC-IB-TP-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 测试计划 |
 | 产出代理 | test-engineer |
-| 调用 ID | INV-GROUP_D-INTELBASE-007（R10 增量；原 INV-GROUP_D-INTELBASE-001 ~ -006） |
+| 调用 ID | INV-GROUP_D-INTELBASE-010（R12 增量；原 INV-GROUP_D-INTELBASE-001 ~ -009） |
 | 项目 | intelligentbase |
-| 阶段 | GROUP_D / PHASE_07（测试计划）+ R7 增量（US-IB-17 / US-IB-18「UI 可视化配置」纳入测试范围）+ **R8 增量（FND-R7-01 修复回归：装配期唯一性校验）** + **R9 增量（FLAKE-IB-01 测试侧稳定性治理：连接级有界重试）** + **R10 增量（前端冒烟测试层正式化：`src/frontend/tests/frontend.smoke.test.js` 6 例纳入测试计划）** |
-| 版本 | 1.5.1（R10 增量 + 修复：**Python 三层用例数不变 171**（unit 67 / integration 88 / e2e 16）；**新增「前端冒烟测试层」6 例**（TC-FE-001~006）自立一层、**不计入 171 的算术**；运行方式 `node --test`（Node 20 内置，零新增依赖），CI 接入 `.github/workflows/ci.yml` 阶段9（`npm ci && npm run build && npm test`）；**R10 修复（REV-10-2 续）**：TC-INT-086 末尾「磁盘不存在性」近似判定与 R10 `npm ci` 冲突 → 已改为**分发纪律（git 跟踪状态）**环境自适应判定（见 §14.5）<br>R9 = 1.4.0（用例数不变 171；传输助手有限有界重试；FLAKE-IB-01 → MITIGATED）<br>**版本线**：1.0.0(R1) → 1.1.0(R3) → 1.2.0(R7) → 1.3.0(R8) → 1.4.0(R9) → 1.5.0(R10) → **1.5.1(R10 修复)**；执行报告文件版本线另见 `docs/test_report.md` 1.6.1/R10） |
+| 阶段 | GROUP_D / PHASE_07（测试计划）+ R7 增量（US-IB-17 / US-IB-18「UI 可视化配置」纳入测试范围）+ **R8 增量（FND-R7-01 修复回归：装配期唯一性校验）** + **R9 增量（FLAKE-IB-01 测试侧稳定性治理：连接级有界重试）** + **R10 增量（前端冒烟测试层正式化：`src/frontend/tests/frontend.smoke.test.js` 6 例纳入测试计划）** + **R11 增量（REQ-FUNC-IB-20 测试补全：US-IB-19「流式交付最终答复」/ US-IB-20「会话生命周期」纳入测试范围，含 5 条既有用例重挂 + 13 条新增）** + **R12 增量（R8 实现到位后的补测轮 REV-12-5：闭合 AC-IB-19-02 / AC-IB-20-04，补全 19-03 / 20-02 / 20-03 / 20-05 与 FND-R11-01 / BLK-R8-02，新增 16 条）** |
+| 版本 | 1.7.0（**R12 增量（REV-12-5，补测轮）**：R8 设计（IFC-IB-298~308）**已落地于 `src/`**，本轮把 R11 登记的 2 项「未覆盖」AC（AC-IB-19-02 / AC-IB-20-04）**闭合**、4 项「部分覆盖」补全，并回补 **FND-R11-01**（`/api/chat/stream` 缺 `session_id` → 400）与 **BLK-R8-02**（专家**内部**关键词空/重复 → `expert_keyword_empty` / `expert_keyword_duplicate`）；**Python 三层用例数 184 → 200**（unit 70→76 / integration 96→105 / e2e 18→19，编号只增不改）；**前端冒烟层 6 例仍自立一层、不计入 200**）<br>1.6.1（R11 修复补丁：§3.2 主登记表 TC-INT-039 的归属列补齐为 US-IB-19 / AC-IB-19-01；用例数不变 184）<br>1.6.0（R11 增量：171 → 184；US-IB-19 / US-IB-20 纳入；5 条重挂 + 13 条新增）<br>R10 = 1.5.1（用例数不变 171；前端冒烟层 6 例独立计数）<br>R9 = 1.4.0（用例数不变 171；FLAKE-IB-01 → MITIGATED）<br>**版本线**：1.0.0(R1) → 1.1.0(R3) → 1.2.0(R7) → 1.3.0(R8) → 1.4.0(R9) → 1.5.0(R10) → 1.5.1(R10 修复) → 1.6.0(R11) → 1.6.1(R11 修复补丁) → **1.7.0(R12 补测)**；执行报告文件版本线另见 `docs/test_report.md` 1.8.0/R12） |
 | status | DRAFT（待 PM 门控） |
 | 创建日期 | 2026-09-26 |
-| 更新日期 | 2026-09-27（R10 增量） |
-| 上游输入 | `docs/user_stories.md`（**1.2.0 / APPROVED，18 US / 90 AC**）、`docs/requirements_spec.md`（**1.2.0 / APPROVED**，含 REQ-FUNC-IB-25/26/27）、`docs/implementation_plan.md`（**2.4.0 / R8**，GROUP_C 门控 GR-C-005 = R7_PASS；其文件头 `<status>` 字段仍为 DRAFT，以 `docs/phase_status.md` 为权威）、`docs/architecture_design.md`（**1.3.0 / R7**，ADR-16）/ `docs/module_design.md` / `docs/tech_stack.md`（均 **1.3.0 / R7**）、`docs/code_review_report.md`（R7 增量 §12）、`docs/cicd_pipeline.md`（**1.1.1 / R10**，阶段9 定义）、`src/ib/**` + `src/ibweb/**` + `src/ib_embed/**` + `src/frontend/**`（只读） |
-| 下游产物 | `docs/test_report.md`（PHASE_08/09 执行报告；R7 增量见其 §12、R8 增量见其 §13、R9 增量见其 §14、R10 增量见其 §15） |
+| 更新日期 | 2026-09-28（R12 增量（REV-12-5）：闭合 AC-IB-19-02 / AC-IB-20-04 + 补测 + §16） |
+| 上游输入 | `docs/user_stories.md`（**1.3.0 / APPROVED，20 US / 101 AC**；R11 新增 US-IB-19 / US-IB-20，共 11 组 G/W/T）、`docs/requirements_spec.md`（**1.3.0 / APPROVED**，含 REQ-FUNC-IB-20 承接（US-IB-19/20）与 REQ-FUNC-IB-25/26/27）、`docs/implementation_plan.md`（**2.6.0 / R11–R12**，GROUP_C 门控 GR-C-005 = R7_PASS；其文件头 `<status>` 字段仍为 DRAFT，以 `docs/phase_status.md` 为权威）、`docs/architecture_design.md`（**1.4.0 / R8**，ADR-17 + IFC-IB-298~308）/ `docs/module_design.md`（**1.4.0 / R8**，§9.6 逐 AC 归属）/ `docs/tech_stack.md`（**1.3.0 / R7**）、`docs/code_review_report.md`（R7 增量 §12）、`docs/cicd_pipeline.md`（**1.1.1 / R10**，阶段9 定义）、`src/ib/**` + `src/ibweb/**` + `src/ib_embed/**` + `src/frontend/**`（只读） |
+| 下游产物 | `docs/test_report.md`（PHASE_08/09 执行报告；R7 增量见其 §12、R8 增量见其 §13、R9 增量见其 §14、R10 增量见其 §15、R11 增量见其 §16、R12 增量见其 §17） |
 | 环境约束 | 全部测试离线可跑：SQLite/内存替身/临时文件系统；**严禁**连接生产库 / 真实 Qdrant / DeepSeek / bge-m3 真实服务 / 任何外部网络 |
 | 凭据纪律 | 任何 secret 只经环境变量注入，测试代码与夹具中不含真实 token/key/密码 |
 ---
@@ -33,8 +33,8 @@
 
 | # | 目标 | 度量 |
 |---|------|------|
-| G1 | 用户故事级功能正确：**18** 个 US 的验收标准在离线装配下被真实执行验证 | 可测 AC 覆盖率 100%（79/79；11 项 NOT_TESTABLE 不计，见 §5） |
-| G2 | 关键路径端到端可用：Must Have 故事的完整用户旅程跑通 | 关键路径 E2E 覆盖率 100%（**14/14** Must Have US，含 US-IB-17/18） |
+| G1 | 用户故事级功能正确：**20** 个 US 的验收标准在离线装配下被真实执行验证 | 可测 AC 覆盖率 **100%（90/90）**；11 项 NOT_TESTABLE 不计（见 §5）。**R12 进展**：AC-IB-19-02 / AC-IB-20-04 已闭合（R8 实现到位，见 §16）；AC-IB-19-02 / 19-03 / 20-02 的部分契约/部署子句登记为**残余**（§16.5） |
+| G2 | 关键路径端到端可用：Must Have 故事的完整用户旅程跑通 | 关键路径 E2E 覆盖率 100%（**16/16** Must Have US，含 US-IB-17/18 与 R11 新增 US-IB-19/20；R12 新增 TC-E2E-019 强化 US-IB-20 旅程） |
 | G3 | 依赖故障可降级不中断：检索 fail-open、台账/字节 fail-closed | 降级场景用例全绿 |
 | G4 | 项目/知识库隔离：结构化（collection-per-project）+ 软隔离（filter）双重验证 | 隔离用例全绿 |
 | G5 | 契约纪律：`?token=` 一律 400、令牌不进 URL、外发边界如实声明 | 契约用例全绿 |
@@ -101,11 +101,11 @@ PM 未在本轮 `special_instructions` 中覆盖阈值，故采用默认值（�
 
 ## §3 测试用例清单
 
-共 **171** 个用例：单元 67 / 集成 88 / E2E 16。所有用例 ID、所属 US、关联 AC、前置、动作、预期如下。（R3 增量：§3.2 新增 TC-INT-069/070/071/073，并翻转 TC-INT-009/041/061 为正向回归守卫，详见 §9。R4 增量：新增 TC-UNIT-055 与 TC-INT-074~078，并强化既有守卫 TC-INT-041 / TC-E2E-003，详见 §10。**R7 增量**：新增 16 条（单元 TC-UNIT-056~061 / 集成 TC-INT-079~086 / E2E TC-E2E-015~016），落在 **§11**；另，任务书简报所称「148 例」与实测不符 —— 实测基线为 **149 例**，其中 `TC-INT-072`（`test_ops_contract.py`，R5/R6 重建修复轮引入、见 `docs/deployment_report.md`）此前未登记入本文件，本轮行 **诚实标注** 而不掩盖。**R8 增量**：登记 software-developer 交付的 TC-UNIT-062~064（3 条，此前未入册）+ 本代理新增 TC-UNIT-065/066、TC-INT-087（3 条），合计净增 **6** 条，落在 **§12**。）
+共 **200** 个用例：单元 76 / 集成 105 / E2E 19。所有用例 ID、所属 US、关联 AC、前置、动作、预期如下。（R3 增量：§3.2 新增 TC-INT-069/070/071/073，并翻转 TC-INT-009/041/061 为正向回归守卫，详见 §9。R4 增量：新增 TC-UNIT-055 与 TC-INT-074~078，并强化既有守卫 TC-INT-041 / TC-E2E-003，详见 §10。**R7 增量**：新增 16 条（单元 TC-UNIT-056~061 / 集成 TC-INT-079~086 / E2E TC-E2E-015~016），落在 **§11**；另，任务书简报所称「148 例」与实测不符 —— 实测基线为 **149 例**，其中 `TC-INT-072`（`test_ops_contract.py`，R5/R6 重建修复轮引入、见 `docs/deployment_report.md`）此前未登记入本文件，本轮行 **诚实标注** 而不掩盖。**R8 增量**：登记 software-developer 交付的 TC-UNIT-062~064（3 条，此前未入册）+ 本代理新增 TC-UNIT-065/066、TC-INT-087（3 条），合计净增 **6** 条，落在 **§12**。**R11 增量**：就 REQ-FUNC-IB-20 的新 US-IB-19 / US-IB-20 **补测 13 条**（单元 TC-UNIT-067~069 / 集成 TC-INT-088~095 / E2E TC-E2E-017~018），并把 5 条既有流式/会话用例**重挂**到正确 US/AC（TC-UNIT-016/017/018/022、TC-INT-039）；落 **§15**。**既有 171 条编号一律不变**；新增能力中「完成事件附结构化产物」（AC-IB-19-02）与「确认中间态呈递/决策回传」（AC-IB-20-04）依赖架构 1.4.0/R8 的 IFC-IB-298~308、本轮 `src/` 未实现 → 如实登记覆盖缺口，不伪造断言。**R12 增量**：R8 实现已落地，就 AC-IB-19-02 / AC-IB-20-04 **闭合** + 其余补测 **新增 16 条**（单元 TC-UNIT-070~075 / 集成 TC-INT-096~104 / E2E TC-E2E-019），落 **§16**；**既有 184 条编号一律不变**。）
 
-### 3.1 单元测试（67）
+### 3.1 单元测试（76）
 
-文件：`tests/unit/test_core_config_chunk_parse_stream.py`（23）、`tests/unit/test_routing_experts_tools.py`（20）、`tests/unit/test_embed_ledger.py`（12）、`tests/unit/test_blob_kb_segment.py`（1）、`tests/unit/test_definition_data_layer_r7.py`（6，R7 新增）、`tests/unit/test_definition_uniqueness_r8.py`（3，R8 / software-developer 交付）、`tests/unit/test_definition_uniqueness_extra_r8.py`（2，R8 / test-engineer 补测）。
+文件：`tests/unit/test_core_config_chunk_parse_stream.py`（23）、`tests/unit/test_routing_experts_tools.py`（20）、`tests/unit/test_embed_ledger.py`（12）、`tests/unit/test_blob_kb_segment.py`（1）、`tests/unit/test_definition_data_layer_r7.py`（6，R7 新增）、`tests/unit/test_definition_uniqueness_r8.py`（3，R8 / software-developer 交付）、`tests/unit/test_definition_uniqueness_extra_r8.py`（2，R8 / test-engineer 补测）、`tests/unit/test_stream_session_lifecycle_unit_r11.py`（**3，R11 新增**）、`tests/unit/test_stream_session_lifecycle_unit_r12.py`（**4，R12 新增**）、`tests/unit/test_definition_keyword_intra_r12.py`（**2，R12 新增**）。
 
 | TC-ID | 关联 US | 关联 AC | 前置 | 动作 | 预期结果 |
 |-------|--------|--------|------|------|---------|
@@ -125,13 +125,13 @@ PM 未在本轮 `special_instructions` 中覆盖阈值，故采用默认值（�
 | TC-UNIT-013 | US-IB-04 | AC-IB-04-05 | 未注册扩展名 | 注册表解析 | 显式报错；新格式可注册 |
 | TC-UNIT-014 | US-IB-04 | AC-IB-04-01/03 | Markdown 文档 | 解析 | 溯源地标可读（标题层级/段落序号） |
 | TC-UNIT-015 | US-IB-04 | AC-IB-04-03 | 空文本 | 解析 | 记 WARNING，不崩 |
-| TC-UNIT-016 | US-IB-08 | AC-IB-08-01 | 事件流 | 渲染 SSE 帧 | 帧格式合法，done 收尾 |
-| TC-UNIT-017 | US-IB-08 | AC-IB-08-01 | StreamEvent 别名 | 比较 | 别名恒等（同一对象） |
-| TC-UNIT-018 | US-IB-11 | AC-IB-11-02 | 两会话 | 会话存储 | 项目间会话隔离 |
+| TC-UNIT-016 | US-IB-19（R11 重挂，原 US-IB-08） | AC-IB-19-01（R11 重挂，原 AC-IB-08-01） | 事件流 | 渲染 SSE 帧 | 帧格式合法，done 收尾（终态事件恰一次；注：19-02 的结构化完成载荷见 §15 缺口登记） |
+| TC-UNIT-017 | US-IB-19（R11 重挂，原 US-IB-08） | AC-IB-19-01（R11 重挂，原 AC-IB-08-01） | StreamEvent 别名 | 比较 | 别名恒等（同一对象；流式交付契约只有一个事件类型定义） |
+| TC-UNIT-018 | US-IB-20（R11 重挂，原 US-IB-11） | AC-IB-20-01（R11 重挂，原 AC-IB-11-02） | 两会话 | 会话存储 | 项目间会话隔离（会话 A/B 不互相注入） |
 | TC-UNIT-019 | US-IB-15 | AC-IB-15-01 | 空载荷 | 生成 related_images 事件 | 空即抑制，不发事件 |
 | TC-UNIT-020 | US-IB-02/13 | AC-IB-02-01/13-04 | 含敏感键字段 | redact | 敏感键丢弃/掩码，日志无凭据 |
 | TC-UNIT-021 | US-IB-13 | AC-IB-13-04 | 超长字符串 | redact | 截断，不长吐 |
-| TC-UNIT-022 | US-IB-11 | AC-IB-11-02 | 会话键 | 断言前缀 | 非法前缀被拒 |
+| TC-UNIT-022 | US-IB-20（R11 重挂，原 US-IB-11） | AC-IB-20-06（R11 重挂，原 AC-IB-11-02） | 会话键 | 断言前缀 | 非法/跨项目前缀被拒（拒绝可识别） |
 | TC-UNIT-023 | US-IB-07/08 | AC-IB-07-02 | 向量对 | cosine | 值域与性质正确（自相似=1、对称） |
 | TC-UNIT-024 | US-IB-09 | AC-IB-09-02 | 专家分值 | score_experts | 取每专家最大命中分 |
 | TC-UNIT-025 | US-IB-09 | AC-IB-09-01 | τ/边际参数 | decide | 单专家/多专家/空按阈值判定 |
@@ -170,10 +170,19 @@ PM 未在本轮 `special_instructions` 中覆盖阈值，故采用默认值（�
 | TC-UNIT-064 | US-IB-18 | AC-IB-18-02 | 默认注册表 + 默认派生文档 | 校验默认数据无撞车/无重标签 | **（R8 登记）** 默认 `keywords_map()`/`cn_map()` 无跨专家撞车、标签唯一；默认派生文档 `validate.ok is True` 且无误报（反向护栏） |
 | TC-UNIT-065 | US-IB-18 | AC-IB-18-02 | 空/纯空白关键词；三名专家同词；大小写+空白叠加 | `validate` 关键词撞车的边界分支 | **（R8 新增）** 空/纯空白不误报；三名专家同词 → 2 条（首见者持有，`experts[b]/[c]` 各一）；叠加归一判撞车；精确 path `experts[b].keywords[<原样>]` |
 | TC-UNIT-066 | US-IB-18 | AC-IB-18-02 | 三名专家同标签；全空白标签；同时撞词+同标签 | `validate` 标签唯一性的边界分支与两项独立性 | **（R8 新增）** 三名同标签 → 2 条且 path 归属正确；全空白跳过（交 `expert_text_missing`）；两项校验独立（两错误码并存） |
+| TC-UNIT-067（R11 新增） | US-IB-19 | AC-IB-19-04 | 含内部分工词的交付文本；开关关/开 | `_strip_internal_labels` 确定性清洗 | **（R11 新增）** 内部标识（路由到/巡检诊断/专家/聚合）被删净、事实内容保留；开关关闭时原样返回——内部子任务产物不外流的确定性兜底 |
+| TC-UNIT-068（R11 新增） | US-IB-19 | AC-IB-19-03 | thinking/content 两类事件 | `to_sse` 编码 + kind 比较 | **（R11 新增）** 两分区 kind 互异（可辨）、一帧只承载一个事件（不混帧）、思考文本不并入正文 |
+| TC-UNIT-069（R11 新增） | US-IB-20 | AC-IB-20-05 | 已存会话 + 模拟进程重启 | `MemorySessionStore` 读写 | **（R11 新增）** 重启后的新存储读回 `None`（不静默复活旧会话）——状态丢失 fail-closed 的存储底座；delete 幂等 |
+| TC-UNIT-070（R12 新增） | US-IB-19 | AC-IB-19-02 | `completion_event` 载荷 `None` / 空元组 / 有引用 | 构造终态事件并解析载荷 | **（R12 新增）** `None`→`data==""`（不臆造）；空元组→`[]`（可区分事实）；`had_content` 边界可辨；引用只含定位（无正文/字节/base64）；终态恒为 `done`（从不产 content） |
+| TC-UNIT-071（R12 新增） | US-IB-19 | AC-IB-19-03 | `StreamEventKind` / `USER_VISIBLE_KINDS` | `is_user_visible` + kind 枚举 | **（R12 新增）** `reasoning` 默认**不可见**且不入白名单；6 个面向用户 kind 可见；未登记 kind 默认不可见（内部产物不外流）；既有 6 kind 逐位不变、`confirmation_required` 为追加第 7 |
+| TC-UNIT-072（R12 新增） | US-IB-20 | AC-IB-20-02/20-05 | `SessionPersistencePolicy` / `SessionStateLossOutcome` / `GlobalConfig` 默认 | 读类型取值域与配置默认 | **（R12 新增）** 策略取值域 `{in_process, external}`、默认 `in_process`；状态丢失结局**唯一取值** `fail_closed_restart_required`（类型层不可表达「默认放行」）；`confirmation_gate_enabled`/`reasoning_stream_enabled` 默认 `False` |
+| TC-UNIT-073（R12 新增） | US-IB-20 | AC-IB-20-04/20-05 | `SessionState`/`ConfirmationGateState`/`ResumePayload` | `can_resume` 三判据穷举 + `from_dict` 残缺载荷 | **（R12 新增）** 状态丢失/无中间态/gate_id 不符/未携决策/决策指向他门 → 全 `False`；残缺载荷恒 `decision=None`（绝不补成「默认批准」） |
+| TC-UNIT-074（R12 新增） | US-IB-18 | AC-IB-18-02 | 单专家含空/纯空白关键词 | `validate` 专家**内部**关键词校验（第 12 项） | **（R12 新增 / BLK-R8-02）** `""`/`"   "` → `expert_keyword_empty`（各一条，path 用原文）；空词不误报为重复；跨专家非空同词不产生内部空码（范围不外溢） |
+| TC-UNIT-075（R12 新增） | US-IB-18 | AC-IB-18-02 | 单专家归一化重复（大小写/空白）+ 跨专家对照 + 全异对照 | `validate` 专家**内部**重复校验（第 12 项） | **（R12 新增 / BLK-R8-02）** 归一化重复 → `expert_keyword_duplicate`（首见者持有，path 用后续词原文）；跨专家仍报旧码 `expert_keyword_collision`、**不**被新码误报；全异文档 `ok=True` 无误报 |
 
-### 3.2 集成测试（88）
+### 3.2 集成测试（105）
 
-文件：`test_composition_retrieval.py`（11）、`test_lifecycle_page_images.py`（7）、`test_ib_embed_wire.py`（12）、`test_http_contract.py`（13）、`test_orchestration_related_images.py`（7）、`test_embed_conformance.py`（5）、`test_gaps_acceptance.py`（7）、`test_ops_contract.py`（**12**）、`test_blob_delete_scope_r4.py`（5）、`test_definition_config_r7.py`（**9**：R7 新增 8 + R8 新增 TC-INT-087）。
+文件：`test_composition_retrieval.py`（11）、`test_lifecycle_page_images.py`（7）、`test_ib_embed_wire.py`（12）、`test_http_contract.py`（13）、`test_orchestration_related_images.py`（7）、`test_embed_conformance.py`（5）、`test_gaps_acceptance.py`（7）、`test_ops_contract.py`（**12**）、`test_blob_delete_scope_r4.py`（5）、`test_definition_config_r7.py`（**9**：R7 新增 8 + R8 新增 TC-INT-087）、`test_stream_session_lifecycle_int_r11.py`（**8，R11 新增**）、`test_stream_session_lifecycle_int_r12.py`（**9，R12 新增**）。
 
 > **计数订正（诚实标注）**：`test_ops_contract.py` 实为 **12** 例（含 R5/R6 重建修复轮引入的 `TC-INT-072`，见 `docs/deployment_report.md` §… ），此前本计划记为 11 —— 导致「集成 78 / 合计 148」的旧计数比实测少 1。本轮以**实测**为准：基线 **149**（单元 56 / 集成 79 / E2E 14）。
 
@@ -217,7 +226,7 @@ PM 未在本轮 `special_instructions` 中覆盖阈值，故采用默认值（�
 | TC-INT-036 | US-IB-04/03 | AC-IB-04-06 | 有字节的图关联 | GET 图片 | 200 + 固定 MIME + nosniff + private cache |
 | TC-INT-037 | US-IB-03/11 | AC-IB-03-03/11-02 | 图关联 | 多 404 变体（缺行/无字节/跨项目） | 一律 404，反存在性探测 |
 | TC-INT-038 | US-IB-11 | AC-IB-11-05 | 图片端点 | `?token=` | 400 |
-| TC-INT-039 | US-IB-08 | AC-IB-08-01 | SSE 端点 | 缺 q / 正常请求 | 400 / text/event-stream，事件序合法 |
+| TC-INT-039 | US-IB-19（R11 重挂，原 US-IB-08） | AC-IB-19-01（R11 重挂，原 AC-IB-08-01） | SSE 端点 | 缺 q / 正常请求 | 400 / text/event-stream，事件序合法 |
 | TC-INT-040 | US-IB-16 | AC-IB-16-01 | 重建端点 | POST /api/rebuild | 202 + job_id，进度可查 |
 | TC-INT-041 | US-IB-03 | AC-IB-03-02/03-03 | fresh 装配未绑库 | 上传后立即删除 | **（R3 翻转，R4 强化）** 200 且 `ledger_deleted=True`、`vectors_deleted=0`、`blob_deleted=True` 且原文件引用失效，列表消失，再删 404——FND-GROUP-D-02 + FND-GROUP-D-03 回归守卫 |
 | TC-INT-042 | US-IB-09 | AC-IB-09-03 | 编排器 | 运行一次问答 | 事件序 reasoning→content→done，content 仅一条 |
@@ -259,11 +268,29 @@ PM 未在本轮 `special_instructions` 中覆盖阈值，故采用默认值（�
 | TC-INT-078 | US-IB-03 | AC-IB-03-02/03-03 | fresh 装配 + 项目级 scope，未处理文档 | 上传→HTTP 删除→再跑 worker | **（R4 新增）** 200（无 500）、`vectors_deleted=0`、台账行消失、worker 不再认领（不回归 FND-GROUP-D-02） |
 | TC-INT-087 | US-IB-18 | AC-IB-18-02/18-06 | 非法文档（撞词 + 同标签）+ 真实端点 | `admit` 闸门 + `PUT /api/config/definition` | **（R8 新增）** 装配闸门聚合拒绝（`validation_items` 含两新码且条数一致）；端点改 `cn_label`/`keywords` → 400 逐条回执两新码；非法配置不静默生效（`content_hash` 未变）——FND-R7-01 跨模块回归守卫 |
 
-> **R7 集成用例明细**（TC-INT-079~086，8 条）不在本表重复列出，见 **§11.2**（R7 增量清单）；本表 TC-INT-087 为 R8 新增的跨模块接缝用例。
+| TC-INT-088（R11 新增） | US-IB-19 | AC-IB-19-01 | 编排器（单专家） | `run` 全事件序列 | **（R11 新增）** `done` 恰一次且收尾、其后无内容片段；内容分片顺序拼接 == 最终答复；无空内容片段 |
+| TC-INT-089（R11 新增） | US-IB-19 | AC-IB-19-04 | 强制双专家路由（fake llm 双标签作答） | `run` 事件载荷 | **（R11 新增）** 面向用户只有一条 `content`（不逐专家推送）；专家原始作答与内部标签（数据管家/巡检诊断）不出现在任何事件 |
+| TC-INT-090（R11 新增） | US-IB-19 | AC-IB-19-03 | 编排器真实流 | reasoning 与 content 分区 | **（R11 新增）** 两分区 kind 互异且进度先于正文；思考文本不并入正文；每帧只承载一个事件 |
+| TC-INT-091（R11 新增） | US-IB-19 | AC-IB-19-05 | 全链路降级（fake llm unavailable） | `run` 事件序列 | **（R11 新增）** 不推送空内容片段；终止事件恰一次；无任何事件臆造引用列表 |
+| TC-INT-092（R11 新增） | US-IB-20 | AC-IB-20-01 | 共享会话存储 + 会话 A 预置标记 | 在会话 B 跑一轮 | **（R11 新增）** B 的历史不含 A 的标记（不跨会话注入）；A 状态保持独立不被覆写；未识别的会话标识读回 `None` |
+| TC-INT-093（R11 新增） | US-IB-20 | AC-IB-20-02/20-05 | 确认门关 / 门开但状态丢失 | `resume` 两情形 | **（R11 新增）** 两情形均 `error`+`done` 安全失败，**无** `content`（不静默续跑挂起动作） |
+| TC-INT-094（R11 新增） | US-IB-20 | AC-IB-20-03 | 默认 `GraphConfig` | 跑一轮正常问答 | **（R11 新增）** 确认门默认关闭；关闭时不出现确认等待事件，直接正常完成 |
+| TC-INT-095（R11 新增） | US-IB-20 | AC-IB-20-06 | 跨项目键 + 伪造/非法键 | 存储读写 + 归属断言 | **（R11 新增）** 无前缀 / 非法键读写均被拒（不静默当新会话）；跨项目归属断言抛 `ScopeViolationError`（拒绝可识别） |
+| TC-INT-096（R12 新增） | US-IB-20 | AC-IB-20-04 | 确认门启用 + 注入话术构造器 | `run` 全事件序列 + 会话落库 | **（R12 新增）** 事件恰为 `reasoning → confirmation_required → done`；呈递恰一次、无 content、无空帧（除终态）；待确认中间态落库（`gate` 可对账、原提问入 `turns`） |
+| TC-INT-097（R12 新增） | US-IB-20 | AC-IB-20-04 | 已挂起会话 + 携「批准」决策 | `resume` 续跑 | **（R12 新增）** 续跑产出 content + 终态 `done`；不再触发 `confirmation_required`（不自我死锁）；中间态被清除 |
+| TC-INT-098（R12 新增） | US-IB-20 | AC-IB-20-04/20-05 | 无中间态 / 无决策 / gate_id 不符 / 决策为拒 | `resume` 四种负例 | **（R12 新增）** 四种均 `error` + 终态、**无** content（不重跑未经确认的动作） |
+| TC-INT-099（R12 新增） | US-IB-20 | AC-IB-20-04 | 真实 HTTP + 真实流路径键（3 段） | `POST /api/chat/resume` 携决策 | **（R12 新增 / MAJOR-1）** 200 + `text/event-stream`，content 后 done；续跑后中间态清除——视图经唯一入口重建同键（不自造 2 段键） |
+| TC-INT-100（R12 新增） | US-IB-20 | AC-IB-20-01/20-04/20-05 | 会话不存在 / 无 gate / 自造 2 段键 / 无决策 / gate_id 不符 / `?token=` | HTTP 续跑负例族 | **（R12 新增 / MAJOR-1 守卫）** 404（不存在/无 gate/2 段键）、409（无决策/不符）、400（`?token=`）；自造 2 段键**不得**命中 3 段真实会话 |
+| TC-INT-101（R12 新增） | US-IB-20 | AC-IB-20-01 | 缺 `session_id` / 显式合法 `session_id` | `GET /api/chat/stream` | **（R12 新增 / FND-R11-01）** 缺 `session_id` → **400** 且**不开流**（不回退默认会话）；显式合法 → 200 + `text/event-stream` |
+| TC-INT-102（R12 新增） | US-IB-20 | AC-IB-20-03 | 门关（有构造器）/ 门开无构造器 / 构造抛异常 | `run` 事件序列对比 | **（R12 新增）** 前两态零行为差异（序列逐位相同、无 `confirmation_required`）；构造抛异常 → fail-closed（`error`+终态，**无** content） |
+| TC-INT-103（R12 新增） | US-IB-19 | AC-IB-19-02/19-05 | 真实 `run` | 终态载荷解析 | **（R12 新增）** `done` 恰一次且收尾、其后无 content；未产出产物时 `done.data==""`（**不臆造**引用清单）；无任何事件载荷含 `citations` 键 |
+| TC-INT-104（R12 新增） | US-IB-20 | AC-IB-20-03 | 确认门未启用（独立装配） | `POST /api/chat/resume` | **（R12 新增）** **409** `conflict`、**不开流**（不新建会话、不重跑） |
 
-### 3.3 E2E / 关键路径（16）
+> **R7 集成用例明细**（TC-INT-079~086，8 条）不在本表重复列出，见 **§11.2**（R7 增量清单）；本表 TC-INT-087 为 R8 新增的跨模块接缝用例，TC-INT-088~095 为 R11 新增的流式交付 / 会话生命周期用例（明细见 **§15**），TC-INT-096~104 为 R12 新增（明细见 **§16**）。
 
-文件：`tests/e2e/test_user_journeys.py`。关键路径以 Must Have 故事标注（R7 新增 TC-E2E-015/016）。
+### 3.3 E2E / 关键路径（19）
+
+文件：`tests/e2e/test_user_journeys.py`。关键路径以 Must Have 故事标注（R7 新增 TC-E2E-015/016；R11 新增 TC-E2E-017/018；R12 新增 TC-E2E-019）。
 
 | TC-ID | 关联 US | 关联 AC | 旅程 | 预期结果 |
 |-------|--------|--------|------|---------|
@@ -283,15 +310,20 @@ PM 未在本轮 `special_instructions` 中覆盖阈值，故采用默认值（�
 | TC-E2E-014（关键路径） | US-IB-07 | AC-IB-07-01/07-02 | embedding 接入端到端 | 维度一致、入库→检索通、冷热自相似≈1、无外发 |
 | TC-E2E-015（关键路径，R7 新增） | US-IB-17 | AC-IB-17-01/17-02/17-03/17-04 | 打开配置页 → 编辑白名单字段保存 → 重载以文档为准无漂移 → 改拓扑被拒 → 他处改动后重载以文档为准、陈旧回写 409 | 写回唯一真源、无第二副本、往返无漂移、拓扑不可编辑、不反向覆盖 |
 | TC-E2E-016（关键路径，R7 新增） | US-IB-18 | AC-IB-18-01/18-02/18-04/18-06 | 合法即装配且图编译一次常驻 → 非法提交 400 定位条目不静默生效 → 装配闸门聚合拒绝 → 缺失文档显式报错 | 装配期 fail-fast、聚合全部校验项、无强制继续、错误体无凭据值 |
+| TC-E2E-017（关键路径，R11 新增） | US-IB-19 | AC-IB-19-01/19-05 | 文档入库 → 真实 HTTP `GET /api/chat/stream` → 逐帧 SSE | 200 + `text/event-stream`；恰一个 `done` 且收尾；正文片段非空 |
+| TC-E2E-018（关键路径，R11 新增） | US-IB-20 | AC-IB-20-01 | 两个显式 `session_id` 各跑一轮真实 HTTP SSE | 两会话各自独立成流、各恰一次终态收尾、互不阻断 |
+| TC-E2E-019（关键路径，R12 新增） | US-IB-20 | AC-IB-20-04/20-05 | 普通会话（无门）→ 预置待确认中间态 → `POST /api/chat/resume` 携决策续跑 → 中间态清除 → 对已恢复会话再恢复被拒 | 默认零等待成流；续跑 200 SSE content+done；中间态清除后再走普通问答正常；再恢复 404（不重跑）、无决策 409 |
 
 ---
 
 ## §4 AC → TC 覆盖矩阵（可测性判定）
 
 > 判定口径：`Tested` = 有至少一条**真实执行**的 TC 覆盖；`NOT_TESTABLE` = 本机不可验证（原因见 §5）。
-> 可测 AC：**79/79 = 100%**；不可测 AC：11（已登记，不参与通过率）；AC 总数 **90**（1.2.0 / 18 US）。
+> 可测 AC：**90**（101 - 11 NOT_TESTABLE）；**已覆盖 90/90 = 100%**（R12 起，AC-IB-19-02 / AC-IB-20-04 已闭合；0 项未覆盖）；不可测 AC：11（已登记，不参与通过率）；AC 总数 **101**（1.3.0 / 20 US，R11 新增 US-IB-19/20 共 11 组）。
 > R7 新增 12 组 AC（AC-IB-17-01~06、AC-IB-18-01~06）逐条映射见本表末与 §11.2；其中
 > AC-IB-17-05 / AC-IB-17-06 为 `Tested（部分）`（服务端/源码级已覆盖，前端**运行期**子句离线不可验，见 §5 附表）。
+> **R11 新增 11 组 AC**（AC-IB-19-01~05 / AC-IB-20-01~06）逐条映射见本表末与 §15.3。
+> **R12 起**：AC-IB-19-02 / AC-IB-20-04 由「未覆盖」转 `Tested`；AC-IB-20-01 / 20-03 转 **`Tested`（完整）**（FND-R11-01 已修复、门启用行为已覆盖）；AC-IB-19-03 / 20-02 / 20-05 转 `Tested（完整，残余登记见 §16.5）`；AC-IB-19-02 端到端「命中→产物」装配来源登记为残余（§16.5）。
 
 | AC | 级别 | 覆盖 TC | 判定 |
 |----|------|---------|------|
@@ -329,7 +361,7 @@ PM 未在本轮 `special_instructions` 中覆盖阈值，故采用默认值（�
 | AC-IB-07-03 | INT | TC-INT-062 | Tested |
 | AC-IB-07-04 | — | — | NOT_TESTABLE（许可类型为文档性结论，无运行期可断言行为） |
 | AC-IB-07-05 | — | — | NOT_TESTABLE（目标机推理延迟需目标机实测） |
-| AC-IB-08-01 | INT/E2E | TC-INT-039, TC-E2E-001 | Tested |
+| AC-IB-08-01 | INT/E2E | TC-E2E-001（TC-INT-039 已于 R11 重挂至 AC-IB-19-01） | Tested |
 | AC-IB-08-02 | INT | TC-INT-007 | Tested |
 | AC-IB-08-03 | INT | TC-INT-003, TC-INT-005 | Tested |
 | AC-IB-08-04 | — | — | NOT_TESTABLE（千级文档 P95 延迟需目标机实测校准） |
@@ -380,11 +412,22 @@ PM 未在本轮 `special_instructions` 中覆盖阈值，故采用默认值（�
 | AC-IB-17-05 | UNIT/INT | TC-UNIT-060, TC-INT-084, TC-INT-086 | Tested（部分）——定义层/端点/源码级已覆盖；前端**渲染期**不回显子句属前端运行期，离线不可验（§5 附表） |
 | AC-IB-17-06 | INT | TC-INT-086 | Tested（部分）——「数据不出本机 + 本地打包无 CDN」已覆盖；「**禁 Docker / 全物理机裸装**运行形态」属部署，本轮冻结（§5 附表） |
 | AC-IB-18-01 | UNIT/INT/E2E | TC-UNIT-061, TC-INT-085, TC-E2E-016 | Tested |
-| AC-IB-18-02 | UNIT/INT/E2E | TC-UNIT-057, TC-UNIT-062~066, TC-INT-082, TC-INT-087, TC-E2E-016 | **Tested（完整，R8 起）**——全部非法项（含「路由关键词撞车」`expert_keyword_collision` 与「cn_label 重复」`expert_cn_label_duplicate`）均被拒并定位；FND-R7-01 已修复 → CLOSED_VERIFIED（报告 §13.8） |
+| AC-IB-18-02 | UNIT/INT/E2E | TC-UNIT-057, TC-UNIT-062~066, TC-UNIT-074, TC-UNIT-075, TC-INT-082, TC-INT-087, TC-E2E-016 | **Tested（完整，R8 起；R12 补齐专家内部项）**——全部非法项（含跨专家「路由关键词撞车」`expert_keyword_collision`、「cn_label 重复」`expert_cn_label_duplicate`，及 R12 补测的**专家内部**空/重复 `expert_keyword_empty` / `expert_keyword_duplicate`）均被拒并定位；FND-R7-01 → CLOSED_VERIFIED（报告 §13.8）、BLK-R8-02 → CLOSED_VERIFIED（报告 §17） |
 | AC-IB-18-03 | UNIT/E2E | TC-UNIT-057, TC-UNIT-061, TC-E2E-016 | Tested |
 | AC-IB-18-04 | UNIT/INT | TC-UNIT-060, TC-INT-082, TC-INT-084, TC-E2E-016 | Tested |
 | AC-IB-18-05 | UNIT | TC-UNIT-056 | Tested |
 | AC-IB-18-06 | INT/E2E | TC-INT-082, TC-INT-083, TC-E2E-016 | Tested |
+| AC-IB-19-01 | UNIT/INT/E2E | TC-UNIT-016, TC-UNIT-017, TC-INT-039, TC-INT-088, TC-E2E-017 | Tested |
+| AC-IB-19-02 | UNIT/INT | TC-UNIT-070, TC-INT-103 | **Tested（机制层完整，R12 起）**——`completion_event` 结构化载荷语义与边界（`None`→空 / 空元组→`[]` / `had_content` 边界 / 引用只含定位）、终态恰一次且不做内容分片、不臆造引用均覆盖；**端到端**「检索命中→`CompletionPayload` 装配来源」登记为**残余**（编排恒传 `payload=None`，见 §16.5） |
+| AC-IB-19-03 | UNIT/INT | TC-UNIT-068, TC-UNIT-071, TC-INT-090 | **Tested（R12 起覆盖默认口径）**——`reasoning` 默认不可见、可见性白名单、不混帧、「默认不出思考」（`IB_REASONING_STREAM_ENABLED` 默认 `False`）已覆盖；**启用后可见**的端上呈递属前端运行期，离线不可验（残余 §16.5） |
+| AC-IB-19-04 | UNIT/INT | TC-UNIT-067, TC-INT-089 | Tested |
+| AC-IB-19-05 | INT/E2E | TC-INT-091, TC-INT-103, TC-E2E-017 | Tested |
+| AC-IB-20-01 | UNIT/INT/E2E | TC-UNIT-018, TC-INT-092, TC-INT-101, TC-E2E-018 | **Tested（完整，R12 起）**——会话隔离 + 「会话标识缺失须**显式 400 拒绝**、不得静默用默认会话」已覆盖（`GET /api/chat/stream` 缺 `session_id` → 400）；FND-R11-01 已修复 → CLOSED_VERIFIED（报告 §17） |
+| AC-IB-20-02 | UNIT/INT | TC-UNIT-072, TC-INT-093 | **Tested（R12 起覆盖配置层声明）**——状态丢失 fail-closed + 持久化策略类型/配置默认（`SessionPersistencePolicy`、默认 `in_process`）已覆盖；「**部署文档**显式声明」属部署面，登记为残余（§16.5） |
+| AC-IB-20-03 | INT | TC-INT-094, TC-INT-102, TC-INT-104 | **Tested（完整，R12 起）**——机制保留且默认关闭、关闭时不引入等待（零行为差异：门关 vs 无构造器序列逐位相同）、门未启用时恢复 409 均覆盖 |
+| AC-IB-20-04 | UNIT/INT/E2E | TC-UNIT-073, TC-INT-096, TC-INT-097, TC-INT-099, TC-E2E-019 | **Tested（完整，R12 起）**——确认中间态呈递（`confirmation_required` 恰一次、无 content、落库）+ 决策回传恢复（HTTP 真实流路径键续跑至 `done`、不自我死锁）+ 负例 fail-closed 全族 |
+| AC-IB-20-05 | UNIT/INT/E2E | TC-UNIT-069, TC-UNIT-072, TC-UNIT-073, TC-INT-093, TC-INT-098, TC-E2E-019 | **Tested（完整，R12 起）**——状态丢失/未携决策 fail-closed、`can_resume` 三判据穷举、携决策续跑、决策为拒即终止均覆盖 |
+| AC-IB-20-06 | UNIT/INT | TC-UNIT-022, TC-INT-095 | Tested |
 
 ---
 
@@ -404,8 +447,8 @@ PM 未在本轮 `special_instructions` 中覆盖阈值，故采用默认值（�
 | AC-IB-12-04 | 目标机原生依赖真装真跑属部署 | 同上 |
 | AC-IB-14-04 | 单图 OCR 失败分支需 OCR 引擎，本机缺失 | 报告 §6 not-verified |
 
-**合计**：**90** AC 中 11 项标注 NOT_TESTABLE（12.2%），其余 **79** 项均有用例覆盖
-（其中 AC-IB-17-05 / AC-IB-17-06 为 `Tested（部分）`；**AC-IB-18-02 自 R8 起为 `Tested`（完整）**）。
+**合计**：**101** AC 中 **11** 项标注 NOT_TESTABLE（10.9%），其余 **90** 项可测；其中 **90** 项有用例覆盖（**100%**，R12 起，**0 项未覆盖**）——AC-IB-19-02 / AC-IB-20-04 已于 R12（R8 实现到位后）闭合（见 §16）
+（其中 AC-IB-17-05 / AC-IB-17-06 为 `Tested（部分）`；AC-IB-19-03 / 20-02 为 `Tested`（残余见 §16.5）；**AC-IB-18-02 自 R8 起为 `Tested`（完整）**）。
 
 ### 5.1 R7 部分不可验证子句（**仍计入 79/79，不改变 NOT_TESTABLE 计数**；诚实标注）
 
@@ -806,3 +849,191 @@ selfcheck 31/31；含抖动靶点复跑）见 `docs/test_report.md` **§14**。
   断言结果为空；**未装 / 已装但被 gitignore 均通过，被 `git add -f` 强加入库则失败**（不弱化、不 skip/xfail）。
   该用例为 **GROUP_D / PHASE_09 自有产物**（非 software-developer）。机制、两种磁盘态演示与**负向对照**证据见 `docs/test_report.md` §15.5 与 `docs/evidence/groupd_r10_tcint086_guard.log`。
   **复跑**：已装 `node_modules` 工作树 `python -m pytest tests -q` = **171 passed（EXIT=0）**；`tests/integration` = **88 passed**。
+
+---
+
+## §15 R11 增量（REQ-FUNC-IB-20 测试补全：US-IB-19 / US-IB-20 纳入测试范围；追加，不改写 §9~§14）
+
+> **本轮定位**：`REQ-FUNC-IB-20`（流式输出契约与会话生命周期）在 REV-11-1 补出 **US-IB-19**（流式交付最终答复，AC-IB-19-01~05）与 **US-IB-20**（会话生命周期，AC-IB-20-01~06），共 **11 组 G/W/T**；REV-11-2 在架构 1.4.0/R8 落 **ADR-17 + IFC-IB-298~308**（设计层）。本轮（REV-11-3）为 GROUP_D 测试补全：**重挂 5 条既有用例** + **新增 13 条用例**，把新 AC 纳入测试范围。
+>
+> **边界纪律（重要）**：本轮**仅动 `tests/`、`docs/test_plan.md`、`docs/test_report.md`**，**不改 `src/` 任何既有实现行为**。架构 1.4.0/R8 的 **IFC-IB-298~308 为设计层产物、本轮 `src/` 尚未实现**（经全仓 grep + `phase_status.md` + `implementation_plan.md` 交叉核实）——故对本轮**未实现**的接口**不伪造断言、不写红测**，一律在 §15.5 如实登记为**覆盖缺口**，交 PM 路由 developer。
+
+### 15.1 用例变更清单（重挂 5 + 新增 13；**既有 171 条编号一律不变**）
+
+| 类别 | 用例 ID | 变更 | 依据 |
+|------|---------|------|------|
+| 重挂 | TC-UNIT-016 | US-IB-08 → **US-IB-19**；AC-IB-08-01 → **AC-IB-19-01** | SSE 帧渲染 / done 收尾 = 流式交付契约（user_stories.md §US-IB-19 下游挂接） |
+| 重挂 | TC-UNIT-017 | US-IB-08 → **US-IB-19**；AC-IB-08-01 → **AC-IB-19-01** | `StreamEvent` 别名恒等 = 流式交付契约「只有一个事件类型定义」 |
+| 重挂 | TC-INT-039 | US-IB-08 → **US-IB-19**；AC-IB-08-01 → **AC-IB-19-01** | SSE 端点（缺 q → 400 / 正常 → `text/event-stream`）= 流式交付契约入出口 |
+| 重挂 | TC-UNIT-018 | US-IB-11 → **US-IB-20**；AC-IB-11-02 → **AC-IB-20-01** | 会话存储按项目隔离 = 会话隔离（user_stories.md §US-IB-20 下游挂接） |
+| 重挂 | TC-UNIT-022 | US-IB-11 → **US-IB-20**；AC-IB-11-02 → **AC-IB-20-06** | 会话键前缀断言 / 非法前缀被拒 = 跨项目 / 伪造会话拒绝 |
+| 新增 | TC-UNIT-067~069 | 新增 3 条（单元） | 见 §15.3 |
+| 新增 | TC-INT-088~095 | 新增 8 条（集成） | 见 §15.3 |
+| 新增 | TC-E2E-017~018 | 新增 2 条（E2E / 关键路径） | 见 §15.3 |
+
+### 15.2 重挂判定（逐条：真实测试意图 → 归属 AC）
+
+| 用例 | 真实测试意图 | 归属判定 | 理由 |
+|------|-------------|---------|------|
+| TC-UNIT-016 | `to_sse` 帧格式（event/data 逐行 + 结尾空行）、done 帧收尾 | **AC-IB-19-01** | 该 AC 明写「以明确的终止事件结束」，帧合法性与 done 收尾是其编码层落点 |
+| TC-UNIT-017 | `ib.streaming.StreamEvent is ib.core.StreamEvent` | **AC-IB-19-01** | 流式交付契约「只有一个事件类型定义」，防跨模块 `isinstance` 恒假 |
+| TC-INT-039 | SSE 端点：缺 `q` → 400；正常 → `text/event-stream` + 合法事件序 | **AC-IB-19-01** | 端点入出口与事件序是「增量推送 + 终止事件」的契约边界 |
+| TC-UNIT-018 | `MemorySessionStore` 按项目前缀隔离读写 | **AC-IB-20-01** | 该 AC 明写「会话 A/B 隔离、不跨会话注入」 |
+| TC-UNIT-022 | `session_key` 构造 + `assert_session_key` 前缀断言（非法/跨项目被拒） | **AC-IB-20-06** | 该 AC 明写「跨项目 / 伪造会话标识被拒且可识别」 |
+
+> **未强制重挂者（如实声明）**：user_stories.md §US-IB-20 下游挂接建议「评估 **TC-INT-042**（事件序 reasoning→content→done、content 仅一条）是否改挂 US-IB-19」——该条**保持原归属 US-IB-09 / AC-IB-09-03 不变**（其核心断言是「聚合暴露内部分工」的守卫，属 US-IB-09 的验收面），R11 新增的 TC-INT-088/090 已从 US-IB-19 侧覆盖同一行为，**不为凑指标强制重挂**。
+
+### 15.3 新增用例清单（TC ↔ US ↔ AC）
+
+| TC-ID | 层 | 文件 | 关联 US | 关联 AC | 断言要点 |
+|-------|----|------|--------|--------|---------|
+| TC-UNIT-067 | 单元 | `tests/unit/test_stream_session_lifecycle_unit_r11.py` | US-IB-19 | AC-IB-19-04 | `_strip_internal_labels` 删净内部分工词（路由到/巡检诊断/专家/聚合）、事实内容保留；开关关闭时原样返回 |
+| TC-UNIT-068 | 单元 | 同上 | US-IB-19 | AC-IB-19-03 | reasoning/content 两 kind 互异；一帧只承载一个事件；思考文本不并入正文 |
+| TC-UNIT-069 | 单元 | 同上 | US-IB-20 | AC-IB-20-05 | 模拟重启的**新** `MemorySessionStore` 读回 `None`（不静默复活）；delete 幂等 |
+| TC-INT-088 | 集成 | `tests/integration/test_stream_session_lifecycle_int_r11.py` | US-IB-19 | AC-IB-19-01 | `done` 恰一次且收尾；其后无 content；分片拼接 == 最终答复；无空内容片段 |
+| TC-INT-089 | 集成 | 同上 | US-IB-19 | AC-IB-19-04 | 强制双专家：面向用户仅一条 content；专家原始作答与内部标签（数据管家/巡检诊断）不出现在任何事件 |
+| TC-INT-090 | 集成 | 同上 | US-IB-19 | AC-IB-19-03 | 真实流中 reasoning 先于 content、两 kind 可辨、思考不并入正文、每帧单事件 |
+| TC-INT-091 | 集成 | 同上 | US-IB-19 | AC-IB-19-05 | 全链路降级仍非空回退；不推空内容片段；`done` 恰一次；不臆造引用 |
+| TC-INT-092 | 集成 | 同上 | US-IB-20 | AC-IB-20-01 | 会话 B 历史不含 A 的标记；A 状态独立不被覆写；未识别会话读回 `None` |
+| TC-INT-093 | 集成 | 同上 | US-IB-20 | AC-IB-20-02/20-05 | 门关 / 状态丢失两情形均 `error`+`done` 安全失败，**无** content |
+| TC-INT-094 | 集成 | 同上 | US-IB-20 | AC-IB-20-03 | 默认 `confirmation_gate_enabled=False`；关闭时不出现确认等待、正常完成 |
+| TC-INT-095 | 集成 | 同上 | US-IB-20 | AC-IB-20-06 | 无前缀/非法键读写被拒；跨项目归属断言抛 `ScopeViolationError` |
+| TC-E2E-017 | E2E | `tests/e2e/test_user_journeys.py` | US-IB-19 | AC-IB-19-01/19-05 | 真实 HTTP SSE：200 + `text/event-stream`；`done` 恰一次且收尾；内容帧非空 |
+| TC-E2E-018 | E2E | 同上 | US-IB-20 | AC-IB-20-01 | 两个显式 `session_id` 各跑一轮：各自独立成流、各恰一次终态收尾、互不阻断 |
+
+### 15.4 覆盖与计数复核
+
+- **计数**：unit **67 → 70**、integration **88 → 96**、e2e **16 → 18**；合计 **171 → 184**（前端冒烟 6 例仍**独立计数、不并入**）。
+- **US 覆盖**：20/20 US 均有 ≥1 条用例；新 US-IB-19 由 8 条、US-IB-20 由 6 条用例承接。
+- **Must Have 关键路径 E2E 覆盖**：**16/16 = 100%**（含 R11 新增的 US-IB-19 / US-IB-20，各由 TC-E2E-017/018 承接）。
+- **可测 AC 覆盖**：**88/90 = 97.8%**（2 项缺口见 §15.5）。
+- **算术**：184 = 70 + 96 + 18。
+
+### 15.5 覆盖缺口登记（IFC-IB-298~308 本轮未实现；**只登记不擅修**）
+
+架构 1.4.0/R8 定义的 11 条类型化接口（IFC-IB-298~308）在 `src/` **尚未落地**（全仓 grep 无 `CompletionPayload` / `completion_event` / `is_user_visible` / `SessionPersistencePolicy` / `SessionStateLossOutcome` / `ConfirmationGateState` / `can_resume` / `ResumePayload` / `confirmation_required` / `POST /api/chat/resume` / `IB_CONFIRMATION_GATE_ENABLED` / `IB_SESSION_PERSISTENCE_POLICY` / `IB_REASONING_STREAM_ENABLED`）。
+
+| AC | 缺口内容 | 依赖接口 | 本轮处置 |
+|----|---------|---------|---------|
+| AC-IB-19-02 | 完成事件（`done`）附结构化产物（≥ 引用列表），一次性、不臆造 | `CompletionPayload` / `CitationItem` / `completion_event`（IFC-IB-300/302） | **未覆盖**（无断言；不写红测） |
+| AC-IB-19-03 | 「默认不出现思考片段；启用后可辨」（`IB_REASONING_STREAM_ENABLED`） | IFC-IB-302 | **部分覆盖**（kind 可辨/不混帧/不并入正文已测；开关未实现） |
+| AC-IB-20-02 | 持久化策略须在**配置 + 部署文档**显式声明 | `SessionPersistencePolicy`（IFC-IB-304/305） | **部分覆盖**（状态丢失 fail-closed 已测；策略声明未实现） |
+| AC-IB-20-03 | 「机制保留、默认不启用」的**启用后行为** | IFC-IB-301 | **部分覆盖**（默认关闭 + 关闭不等待已测） |
+| AC-IB-20-04 | 确认中间态**呈递**与**决策回传** | `confirmation_required` 事件 + `POST /api/chat/resume`（IFC-IB-301/307/308） | **未覆盖**（无断言；不写红测） |
+| AC-IB-20-05 | 「携带决策自中间态**续跑**」 | `ResumePayload` / `can_resume`（IFC-IB-306/308） | **部分覆盖**（未携带/状态丢失 fail-closed 已测；携带决策续跑未实现） |
+
+**另登记一项既有实现缺陷（FND-R11-01，MAJOR）**：
+- **现象**：`src/ibweb/views.py` 的 `chat_stream_endpoint` 对缺失 `session_id` 以字面量 `"default"` 静默兜底（`request.GET.get("session_id") or "default"`）——即所有未携带 `session_id` 的调用方**共享同一个默认会话**，历史随之互相注入。
+- **AC 依据**：**AC-IB-20-01** 明写「会话标识被正确识别（沿用其既有历史）**或显式拒绝**（**不静默新建 / 使用默认会话**）」。
+- **处置**：**只登记、不擅修**（`src/` 属软件代理职责）；本轮**不写红测**（避免红套件），registry 交 PM 路由 developer。
+- **本轮测试边界**：TC-INT-092 / TC-E2E-018 仅使用**显式** `session_id`，故不依赖该兜底行为；该缺陷**不使任何既有断言失败**。
+
+### 15.6 突变敏感性自证（证明新增守卫为**载荷性**，非空转）
+
+| 突变 | 期望失效的用例 | 实测 |
+|------|--------------|------|
+| 清空 `AGGREGATION_FORBIDDEN_LABELS` | TC-UNIT-067 | **FAIL**（内部标识未被清洗） |
+| 令 `_aggregate` 返回逐专家拼接（内部产物外流） | TC-INT-089 | **FAIL**（content 未融合为单一答复） |
+| 令 `resume` 静默产出 content+done（无门校验） | TC-INT-093 | **FAIL**（未携带状态却静默续跑） |
+| 令 `GraphConfig` 默认 `confirmation_gate_enabled=True` | TC-INT-094 | **FAIL**（默认须关闭） |
+| 令 `MemorySessionStore.load` 忽略隔离（任何键都返回状态） | TC-INT-092 | **FAIL**（跨会话注入） |
+| 令 `run` 产出两个 `done` | TC-INT-088 | **FAIL**（终止事件须恰一次） |
+| 令重启后的新存储读回旧状态 | TC-UNIT-069 | **FAIL**（状态丢失须 fail-closed） |
+
+（突变以临时 monkeypatch 在**进程内**执行，**未改动 `src/` 文件**；证据见 `docs/test_report.md` §16.4。）
+
+### 15.7 门控与度量
+
+- **三层门控**（沿用 §6）：unit **70/70 = 100%**（≥80% 门槛 **PASSED**）、integration **96/96 = 100%**（≥90% 门槛 **PASSED**）、e2e **18/18**；合计 **184/184 = 100%**（EXIT=0，0 skip/xfail）。
+- **前端冒烟层**（独立）：沿用 R10，**6/6**。
+- **命令与原始输出**见 `docs/test_report.md` §16 与 `docs/evidence/groupd_r11_*.log`。
+- **门控结论（本代理自评）**：三层全绿、算术一致、编号只增不改 → 建议 **PASS_WITH_CONDITIONS**；**唯一条件** = §15.5 的 2 项 AC 未覆盖 + 4 项部分覆盖（待 IFC-IB-298~308 实现轮闭合）+ FND-R11-01 待路由 developer。
+
+### 15.8 R11 修复补丁留痕（1.6.1）
+
+- **修复项（有界，仅一处文本 + 版本行）**：§3.2 集成测试主登记表的 **TC-INT-039** 行，「关联 US / 关联 AC」两列由旧值 `US-IB-08` / `AC-IB-08-01` **补齐**为 `US-IB-19（R11 重挂，原 US-IB-08）` / `AC-IB-19-01（R11 重挂，原 AC-IB-08-01）`，行文风格与 §3.1 已重挂的 4 条单元行（TC-UNIT-016/017/018/022）**完全对齐**。
+- **内部一致性自检**：修复后 §3.2 与 **§15.1 变更清单**（TC-INT-039 重挂行）、**§15.2 归属判定**（TC-INT-039 → AC-IB-19-01）、**§4（AC→TC 矩阵）**（`AC-IB-08-01` 行标注「TC-INT-039 已于 R11 重挂至 AC-IB-19-01」、`AC-IB-19-01` 行列出 TC-INT-039）以及 `docs/test_report.md` **§16.2(A)** **完全一致**，此前「主登记表自相矛盾」已消除。
+- **范围纪律**：**未改**任何其它用例行、任何断言、`tests/**`、`src/**`、`docs/test_report.md` 既有结论；用例数仍 **184**（unit 70 / integration 96 / e2e 18），**编号只增不改**。
+
+---
+
+## §16 R12 增量（R8 实现到位后的补测轮 REV-12-5：闭合 AC-IB-19-02 / AC-IB-20-04 并补全其余；追加，不改写 §9~§15）
+
+> **本轮定位**：R11（§15）登记 AC-IB-19-02 / AC-IB-20-04 因「IFC-IB-298~308 未实现」而**未覆盖**、且 19-03 / 20-02 / 20-03 / 20-05 仅**部分覆盖**。R8 实现（`CompletionPayload` / `completion_event` / `is_user_visible` / `ConfirmationGateState` / `can_resume` / `ResumePayload` / `POST /api/chat/resume` / `IB_REASONING_STREAM_ENABLED` / `IB_SESSION_PERSISTENCE_POLICY` / `IB_CONFIRMATION_GATE_ENABLED`）**已落地于 `src/`**。本轮（REV-12-5）据此**补齐测试**：闭合 2 项未覆盖 AC、补全 4 项部分覆盖、回补 **FND-R11-01** 与 **BLK-R8-02** 的修正/负例。
+>
+> **边界纪律（重要）**：本轮**仅动 `tests/`、`docs/test_plan.md`、`docs/test_report.md`、`docs/evidence/groupd_r12_*.log`**；**不改 `src/` 任何实现**（实现已收口），**不改** `docs/phase_status.md` 与设计真源四文档（`architecture_design` / `module_design` / `requirements_spec` / `user_stories`）。既有断言**不削弱**、**不新增 skip/xfail**、编号**只增不改**、AC 一律 G/W/T 语义对齐。
+
+### 16.1 新增用例清单（16 条；**既有 184 条编号一律不变**）
+
+| TC-ID | 层 | 文件 | 关联 US | 关联 AC | 断言要点 |
+|-------|----|------|--------|--------|---------|
+| TC-UNIT-070 | 单元 | `tests/unit/test_stream_session_lifecycle_unit_r12.py` | US-IB-19 | AC-IB-19-02 | `completion_event`：`None`→空串（不臆造）、空元组→`[]`（可区分）、`had_content` 边界、引用只含定位（无正文/字节）、终态恒 `done` |
+| TC-UNIT-071 | 单元 | 同上 | US-IB-19 | AC-IB-19-03 | `reasoning` 默认不可见且不入 `USER_VISIBLE_KINDS`；未登记 kind 默认不可见；既有 6 kind 逐位不变、`confirmation_required` 为追加第 7 |
+| TC-UNIT-072 | 单元 | 同上 | US-IB-20 | AC-IB-20-02/20-05 | 策略取值域/默认、状态丢失结局唯一取值、`GlobalConfig` 默认 `False` |
+| TC-UNIT-073 | 单元 | 同上 | US-IB-20 | AC-IB-20-04/20-05 | `can_resume` 三判据穷举（含决策指向他门）+ `ResumePayload.from_dict` 残缺载荷恒 `None` |
+| TC-UNIT-074 | 单元 | `tests/unit/test_definition_keyword_intra_r12.py` | US-IB-18 | AC-IB-18-02 | 专家内部空/纯空白关键词 → `expert_keyword_empty`；不误报重复；跨专家非空同词不产生内部空码 |
+| TC-UNIT-075 | 单元 | 同上 | US-IB-18 | AC-IB-18-02 | 专家内部归一化重复 → `expert_keyword_duplicate`；跨专家仍报 `expert_keyword_collision`（不误报新码）；全异文档无误报 |
+| TC-INT-096 | 集成 | `tests/integration/test_stream_session_lifecycle_int_r12.py` | US-IB-20 | AC-IB-20-04 | 门挂起：`confirmation_required` 恰一次、无 content、无空帧、终态单发、中间态落库 |
+| TC-INT-097 | 集成 | 同上 | US-IB-20 | AC-IB-20-04 | 批准续跑 → content+done；不再次触发门；中间态清除 |
+| TC-INT-098 | 集成 | 同上 | US-IB-20 | AC-IB-20-04/20-05 | 续跑四负例（无中间态/无决策/不符/决策为拒）均 `error`+终态、无 content |
+| TC-INT-099 | 集成 | 同上 | US-IB-20 | AC-IB-20-04 | HTTP 真实流路径键续跑成功（200 SSE）；视图经唯一入口重建同键（MAJOR-1） |
+| TC-INT-100 | 集成 | 同上 | US-IB-20 | AC-IB-20-01/20-04/20-05 | HTTP 续跑负例族：404/409/400；自造 **2 段**键不得命中 3 段真实会话（MAJOR-1 守卫） |
+| TC-INT-101 | 集成 | 同上 | US-IB-20 | AC-IB-20-01 | `GET /api/chat/stream` 缺 `session_id` → **400** 且不开流（FND-R11-01）；显式合法 → 200 SSE |
+| TC-INT-102 | 集成 | 同上 | US-IB-20 | AC-IB-20-03 | 门关 vs 门开无构造器 → 事件序列逐位相同（零行为差异）；构造抛异常 → fail-closed（无 content） |
+| TC-INT-103 | 集成 | 同上 | US-IB-19 | AC-IB-19-02/19-05 | 真实 `run`：`done` 恰一次且收尾；`done.data==""`（不臆造）；无任何载荷含 `citations` 键 |
+| TC-INT-104 | 集成 | 同上 | US-IB-20 | AC-IB-20-03 | 门未启用时恢复 → **409** `conflict`、不开流（不新建会话、不重跑） |
+| TC-E2E-019 | E2E | `tests/e2e/test_user_journeys.py` | US-IB-20 | AC-IB-20-04/20-05 | 真实 HTTP 旅程：默认无等待成流 → 预置中间态 → 携决策续跑 200 SSE 完成 → 中间态清除 → 再恢复 404、无决策 409 |
+
+> **既有用例零改动**：TC-UNIT-016~069、TC-INT-001~095、TC-E2E-001~018 的**代码与断言一字未改**；TC-UNIT-062 / TC-UNIT-065（跨专家撞车守卫）**未被削弱**（R12 的 TC-UNIT-074/075 另测**专家内部**项，见 §16.4 对照）。
+
+### 16.2 覆盖闭合判定（逐项）
+
+| AC | R11 状态（§15.5） | R12 状态 | 依据 TC | 备注 |
+|----|------------------|---------|---------|------|
+| AC-IB-19-02 | 未覆盖 | **Tested（机制层完整）** | TC-UNIT-070, TC-INT-103 | 端到端「命中→产物」装配来源登记残余（§16.5） |
+| AC-IB-19-03 | 部分 | **Tested**（默认口径） | TC-UNIT-068/071, TC-INT-090 | 「启用后可见」端上呈递属前端运行期（残余 §16.5） |
+| AC-IB-20-01 | 部分（FND-R11-01） | **Tested（完整）** | TC-UNIT-018, TC-INT-092/101, TC-E2E-018 | FND-R11-01 已修复并守住 |
+| AC-IB-20-02 | 部分 | **Tested**（配置层） | TC-UNIT-072, TC-INT-093 | 「部署文档声明」属部署面（残余 §16.5） |
+| AC-IB-20-03 | 部分 | **Tested（完整）** | TC-INT-094/102/104 | 含门启用后行为 |
+| AC-IB-20-04 | 未覆盖 | **Tested（完整）** | TC-UNIT-073, TC-INT-096/097/099, TC-E2E-019 | 呈递 + 决策回传恢复 + 负例全族 |
+| AC-IB-20-05 | 部分 | **Tested（完整）** | TC-UNIT-069/072/073, TC-INT-093/098, TC-E2E-019 | 含携决策续跑 |
+
+### 16.3 覆盖与计数复核
+
+- **计数**：unit **70 → 76**（+6）、integration **96 → 105**（+9）、e2e **18 → 19**（+1）；合计 **184 → 200**（前端冒烟 6 例仍**独立计数、不并入**）。
+- **US 覆盖**：20/20 US 均有 ≥1 条用例；US-IB-18 增 2 条、US-IB-19 增 3 条、US-IB-20 增 11 条。
+- **Must Have 关键路径 E2E 覆盖**：**16/16 = 100%**（US-IB-20 旅程由 TC-E2E-018/019 双覆盖）。
+- **可测 AC 覆盖**：**90/90 = 100%**（0 项未覆盖；残余见 §16.5）。
+- **算术**：**200 = 76 + 105 + 19**；全绿 **200 passed, 0 failed, 0 skipped, 0 xfail**。
+
+### 16.4 突变敏感性自证（证明 R12 新增守卫为**载荷性**，非空转）
+
+| 突变 | 期望失效的用例 | 实测 |
+|------|--------------|------|
+| 令 `completion_event(None)` 改为输出 `{"citations": []}` | TC-UNIT-070 / TC-INT-103 | **FAIL**（未产出产物须为空串，不得伪造成空引用清单） |
+| 令 `completion_payload_json` 对空元组输出 `None` | TC-UNIT-070 | **FAIL**（空元组须编码为 `[]`） |
+| 令 `USER_VISIBLE_KINDS` 加入 `"reasoning"` | TC-UNIT-071 | **FAIL**（默认不得可见） |
+| 令 `can_resume` 缺 `payload.decision` 时返回 `True` | TC-UNIT-073 / TC-INT-098 | **FAIL**（未携决策须 fail-closed） |
+| 令 `chat_stream_endpoint` 缺 `session_id` 回退 `"default"` | TC-INT-101 | **FAIL**（须 400，不得静默回退） |
+| 令 `chat_resume_endpoint` 自造 2 段键 | TC-INT-099 / TC-INT-100 | **FAIL**（真实 3 段会话恒 404） |
+| 令专家内部校验把空词跳过（不报 `expert_keyword_empty`） | TC-UNIT-074 | **FAIL**（空词须被定位） |
+| 令专家内部重复改用跨专家码 `expert_keyword_collision` | TC-UNIT-075 | **FAIL**（内部项须报 `expert_keyword_duplicate`） |
+
+（突变以临时 monkeypatch 在**进程内**执行，**未改动 `src/` 文件**；证据见 `docs/test_report.md` §17。）
+
+### 16.5 残余登记（**如实登记，不以空断言充数**）
+
+| AC | 已覆盖部分 | **残余（未断言）子句** | 理由 / 去向 |
+|----|-----------|----------------------|------------|
+| AC-IB-19-02 | `completion_event` 契约/编码语义、`had_content` 边界、不臆造引用、终态不拆分 | **端到端**把检索命中装配为 `CompletionPayload.citations` | 编排层 `Orchestrator._run_inner` 恒传 `payload=None`（未接线），本轮不擅改 `src/`；登记交 PM/developer（报告 §17） |
+| AC-IB-19-03 | `reasoning` 默认不可见、白名单、不混帧、`IB_REASONING_STREAM_ENABLED` 默认 `False` | **启用后**思考分区的端上可见呈递 | 属前端运行期（浏览器挂载/交互），离线无自动化浏览器环境（同 §5 口径） |
+| AC-IB-20-02 | 持久化策略类型/配置默认（`in_process`）、状态丢失 fail-closed | 「持久化策略须在**部署文档**显式声明」 | 属部署面（GROUP_E），本轮冻结（同 AC-IB-12-01/04 口径）|
+
+> **不再存在的缺口**：R11 §15.5 所列 2 项「未覆盖」（AC-IB-19-02 / AC-IB-20-04）已由本轮闭合；FND-R11-01（`chat_stream_endpoint` 缺 `session_id` 静默兜底默认会话）已由 developer 修复、本轮以 TC-INT-101 守住（**CLOSED_VERIFIED**，报告 §17）。BLK-R8-02（专家内部关键词空/重复）由 TC-UNIT-074/075 覆盖（**CLOSED_VERIFIED**，报告 §17）。
+
+### 16.6 门控与度量
+
+- **三层门控**（沿用 §6）：unit **76/76 = 100%**（≥80% 门槛 **PASSED**）、integration **105/105 = 100%**（≥90% 门槛 **PASSED**）、e2e **19/19**；合计 **200/200 = 100%**（EXIT=0，0 skip/xfail）。
+- **前端冒烟层**（独立）：沿用 R10，**6/6**。
+- **命令与原始输出**见 `docs/test_report.md` §17 与 `docs/evidence/groupd_r12_*.log`。
+- **门控结论（本代理自评）**：三层全绿、算术一致、编号只增不改、2 项未覆盖 AC 闭合 → 建议 **PASS**；残余 3 项（§16.5）**不阻塞**通过率，仅登记待后续轮（前端运行期 / 部署面 / 端到端装配来源）。

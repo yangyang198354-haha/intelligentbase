@@ -2,9 +2,11 @@
 
 **文档编号**: REQ-SPEC-INTELBASE-001
 **项目名称**: intelligentbase（通用 RAG + 多智能体可复用基础架构）
-**版本**: 1.2.0
-**状态**: APPROVED（2026-09-25 用户决策确认，需求定稿；2026-09-27 定向修订 REV-06 将诉求③「UI 可视化配置」纳入 v1，状态维持 APPROVED）
-**定稿依据**: 用户于 2026-09-25 拍板 8 项开放事项；OD-1 ~ OD-5 全部关闭（见 §6.0 决策确认记录）；两条原 `[INFERRED]` 需求转为已确认。**2026-09-27 定向修订（REV-06）**：用户裁决将诉求③「UI 可视化配置」纳入 v1，据此新增 REQ-FUNC-IB-25 ~ IB-27（规范化自 `docs/agent_platform_research.md` §3.4 候选点 A ~ E，见 §2.7）
+**版本**: 1.3.0
+**状态**: APPROVED（2026-09-27 GR-A-004 门控签署；1.3.0 定向修订（REV-11 / GROUP_A R7 增量）后维持 APPROVED；最近一次修订前版本为 1.2.0）
+**修订标识**: REV-11（GROUP_A R7 增量，revision=R7）
+**invocation_id**: INV-GROUP_A-INTELBASE-004
+**定稿依据**: 用户于 2026-09-25 拍板 8 项开放事项；OD-1 ~ OD-5 全部关闭（见 §6.0 决策确认记录）；两条原 `[INFERRED]` 需求转为已确认。**2026-09-27 定向修订（REV-06）**：用户裁决将诉求③「UI 可视化配置」纳入 v1，据此新增 REQ-FUNC-IB-25 ~ IB-27（规范化自 `docs/agent_platform_research.md` §3.4 候选点 A ~ E，见 §2.7）。**2026-09-27 定向修订（REV-11 / GROUP_A R7 增量）**：为既有 REQ-FUNC-IB-20（流式输出契约与会话生命周期）**补全用户故事与验收标准覆盖**（`docs/user_stories.md` 新增 US-IB-19 / US-IB-20 与 AC-IB-19-01 ~ 19-05、AC-IB-20-01 ~ 20-06），属既有 REQ 的**覆盖闭环补全**，**不新增需求条目**
 **创建日期**: 2026-09-25
 **作者**: requirement-analyst (via pm-orchestrator)
 **来源锁定**: 用户简报（2026-09-25）；FreeArk 仓库只读参考（`C:\Users\胖子熊\MyProject\FreeArk`）
@@ -19,6 +21,7 @@
 | 1.0.0 | 2026-09-25 | 初始草稿，基于用户简报（2026-09-25）与 FreeArk 代码锚点 |
 | 1.1.0 | 2026-09-25 | 用户拍板 8 项开放决策，OD-1~OD-5 关闭，两条 [INFERRED] 需求转为已确认 |
 | 1.2.0 | 2026-09-27 | 定向修订（REV-06）：用户裁决将诉求③「UI 可视化配置」纳入 v1，新增 REQ-FUNC-IB-25 ~ IB-27（规范化自 `agent_platform_research.md` §3.4 候选点 A ~ E）；功能需求总数 24 → 27；§1.2 OOS-06 与 §6.6 OQ-IB-04 的边界口径同步澄清；既有编号保持不变 |
+| 1.3.0 | 2026-09-27 | 定向修订（REV-11 / GROUP_A R7 增量）：为既有 REQ-FUNC-IB-20 补全覆盖闭环 —— §7.1 追溯矩阵该行补记 US 覆盖（US-IB-19 / US-IB-20，见 `docs/user_stories.md`），并追加本行与附录 C 自检行；**未新增需求条目**（功能需求 27 条、`[INFERRED]` 0 条均不变）；既有编号族（REQ-/US-/AC-/OOS-/OQ-/DR-/UB-/C-）全部保持不变 |
 
 ---
 
@@ -763,7 +766,7 @@ FreeArk 已建成一套可工作的「RAG + 多智能体聊天」能力，本项
 | REQ-FUNC-IB-17 | 用户简报 + 代码锚点 | UB-5；`FreeArk:api/langgraph_chat/fa_tools.py:L848–895`、`L897`、`L899–904`；`FreeArk:docs/requirements/v1.4.0_sanheng_rag/requirements_spec.md:L286–294` |
 | REQ-FUNC-IB-18 | 用户简报 + 代码锚点 | UB-4、UB-5；`FreeArk:api/langgraph_chat/orchestrator.py:L894–909`、`L471–505`、`L540–560`、`L127–155`、`L72`、`L829–870`、`L873–892`、`L195–210`；`FreeArk:FreeArkWeb/backend/requirements.txt:L49–51` |
 | REQ-FUNC-IB-19 | 用户简报 + 代码锚点 | UB-4；`FreeArk:api/langgraph_chat/router.py:L277–317`、`L65–69`、`L72–89`、`L92–110`、`L136–172`、`L240–274`、`L52–55`、`L114–130`；`FreeArk:api/langgraph_chat/semantic_router.py:L58–84`、`L87–147`；`FreeArk:api/langgraph_chat/orchestrator.py:L443–467` |
-| REQ-FUNC-IB-20 | 代码锚点 | `FreeArk:api/langgraph_chat/adapter.py:L46`、`L156–246`、`L256–260`、`L397`；`FreeArk:api/langgraph_chat/orchestrator.py:L764–826`、`L907–909`、`L716–761` |
+| REQ-FUNC-IB-20 | 代码锚点 | `FreeArk:api/langgraph_chat/adapter.py:L46`、`L156–246`、`L256–260`、`L397`；`FreeArk:api/langgraph_chat/orchestrator.py:L764–826`、`L907–909`、`L716–761`；**US 覆盖（REV-11 补）**：US-IB-19（流式输出契约）、US-IB-20（会话生命周期）—— 见 `docs/user_stories.md` 附录 A |
 | REQ-FUNC-IB-21 | 用户简报 + 代码锚点 | UB-5；`FreeArk:api/rag_service.py:L918–935`、`L381–385`；`FreeArk:api/langgraph_chat/semantic_router.py:L100–124`、`L141–147`；`FreeArk:api/langgraph_chat/router.py:L211–232`；`FreeArk:docs/requirements/v1.4.0_sanheng_rag/user_stories.md:L180–198` |
 | REQ-FUNC-IB-22 | 用户决策（2026-09-25）+ PM 指令 + 代码锚点 | 用户决策 DR-03（禁 Docker）；PM§五.5；`FreeArk:CLAUDE.md`（systemd 服务清单 / git pull 部署）；`FreeArk:freearkweb/settings.py:L406`、`L407–446`、`L696`、`L698–707`；FreeArk 仓库根 `.env.example` |
 | REQ-FUNC-IB-23 | **用户决策（2026-09-25）+ 用户简报** | 用户决策 DR-06：确认需要，拓扑 = 单实例多项目（§6.0）；原始推断来源 UB-6；现状参照 `FreeArk:api/models_rag.py:L93–98`（单层 FK 无项目维度） |
@@ -771,6 +774,8 @@ FreeArk 已建成一套可工作的「RAG + 多智能体聊天」能力，本项
 | REQ-FUNC-IB-25 | **用户裁决（2026-09-27）+ 调研文档** | 用户裁决：诉求③「UI 可视化配置」纳入 v1；`docs/agent_platform_research.md` §3.4 候选点 A / D / E；§2.1(b)2、§2.2(b)5、§2.5(b)2；§4.1 / §4.3 / §4.5 |
 | REQ-FUNC-IB-26 | **用户裁决（2026-09-27）+ 调研文档** | 用户裁决：诉求③「UI 可视化配置」纳入 v1；`docs/agent_platform_research.md` §3.4 候选点 B；§2.5(a)(b)3(c)、§3.3 顺序原则 |
 | REQ-FUNC-IB-27 | **用户裁决（2026-09-27）+ 调研文档** | 用户裁决：诉求③「UI 可视化配置」纳入 v1；`docs/agent_platform_research.md` §3.4 候选点 C；§3.3 P0、§4.2 / §4.4；承接 REQ-FUNC-IB-01 / REQ-NFR-IB-02 |
+
+> **REV-11 补注（2026-09-27）**：REQ-FUNC-IB-20 自 1.0.0 起即为正式需求并具备来源锚点，但此前**无用户故事 / 验收标准承接**（覆盖缺口）。本轮为其补全**覆盖闭环**：`docs/user_stories.md` 新增 US-IB-19（流式输出契约）与 US-IB-20（会话生命周期），共 **11 组** Given / When / Then 验收标准（AC-IB-19-01 ~ 19-05、AC-IB-20-01 ~ 20-06）。**为既有 REQ 补 US / AC 属闭环覆盖，不属新增需求**：功能需求总数维持 **27** 条、`[INFERRED]` 维持 **0 / 27 = 0%**（C-IB-07 上限 10%）；REQ-FUNC-IB-20 的能力描述（§2.5）**未作任何改写**。
 
 ### 7.2 非功能需求 → 来源
 
@@ -872,7 +877,7 @@ FreeArk 已建成一套可工作的「RAG + 多智能体聊天」能力，本项
 - [x] 用户 8 项决策已逐条登记并标注依据（§6.0 DR-01 ~ DR-08）；**未将分析师原推荐项当作决策依据**——DR-03 明确记录了用户选择（禁 Docker）与分析师原推荐（折中方案）不一致。
 - [x] 正文 / 决策记录两处对同一决策的表述一致（已核对 REQ-FUNC-IB-11/13/15/22/23/24、REQ-NFR-IB-03/04/05/08/10/12）。
 - [x] REQ-/US-/AC- 编号保持稳定（只改内容不改 ID）。
-- [x] 文档状态为 **APPROVED（2026-09-25 用户决策确认，需求定稿）**。
+- [x] 文档状态为 **APPROVED（2026-09-25 用户决策确认，需求定稿）**。**（REV-11 补注：1.3.0 增量经 GR-A-004 门控签署，仍维持 APPROVED。）**
 - [x] 未修改 FreeArk 仓库任何文件。
 - 口径说明 1：OQ-IB-01 由 DR-07 派生为前置条件，默认取「持久化原始文件」，**尚未拍板**，已单列请用户一行确认（§6.6）。
 - 口径说明 2：用户故事中的「故事点」占位符属输出格式标准字段，不计入 `[INFERRED]` 需求计数。
@@ -881,3 +886,7 @@ FreeArk 已建成一套可工作的「RAG + 多智能体聊天」能力，本项
 - [x] **无越界（REV-06）**：本次修订未产出任何架构决策、模块设计、接口签名（IFC-*）、技术选型结论或代码；仅把「候选需求点」规范化为需求条目与可验收标准；用户已拍板的纳入结论只作**决策登记**（本期边界见 C-IB-04）。
 - [x] **口径一致性（REV-06）**：§1.2 OOS-06 与 §6.6 OQ-IB-04 已同步澄清「配置侧可视化（本次纳入 v1）」与「问答侧产品化界面（仍范围外 / 保持开放）」的边界，全文**无自相矛盾表述**；全文旧计数（功能需求 24）已更新为 **27**（见 §1.1 汇总、§7.4 统计口径、本附录）。
 - [x] **交叉一致（REV-06）**：`docs/user_stories.md` 已同步修订至 1.2.0（新增 US-IB-17 / US-IB-18 与 AC-IB-17-* / AC-IB-18-*，并同步其附录 A / C / E）；两文件的追溯矩阵 ↔ US ↔ REQ 一一对应。
+- [x] **覆盖闭环补全（REV-11 / GROUP_A R7 增量）**：为既有 REQ-FUNC-IB-20 补全 US / AC 覆盖（`docs/user_stories.md` 新增 US-IB-19 / US-IB-20 与 AC-IB-19-01 ~ 19-05、AC-IB-20-01 ~ 20-06，共 11 组，全 Given / When / Then）；**未新增需求条目** —— 功能需求维持 **27** 条，`[INFERRED]` 维持 **0 / 27 = 0%**（C-IB-07 上限 10%）。
+- [x] **编号稳定性（REV-11）**：既有 `REQ-FUNC-IB-01 ~ IB-27`、`REQ-NFR-IB-01 ~ IB-14`、`C-IB-01 ~ C-IB-08`、`OOS-01 ~ OOS-10`、`OQ-IB-01 ~ OQ-IB-08`、`DR-01 ~ DR-08`、`UB-1 ~ UB-6` 的**编号与正文均未改动**；本轮仅**追加**版本行、§7.1 该行的 US 覆盖补记、§7.1 表后补注与本自检行。REQ-FUNC-IB-20 在 §2.5 的描述 / 输入 / 输出 / 约束 / 来源锚点**逐字保持 1.2.0 原文**。
+- [x] **无越界（REV-11）**：本次修订未产出任何架构决策、模块设计、接口签名（IFC-*）、技术选型结论或代码；新增内容仅描述「应当提供什么能力 + 可验证的验收标准」（本期边界见 C-IB-04）。
+- [x] **交叉一致（REV-11）**：`docs/user_stories.md` 已同步修订至 1.3.0（新增 US-IB-19 / US-IB-20，并同步其附录 A / B / C / E）；两文件对「REQ-FUNC-IB-20 为既有需求、本轮补覆盖闭环、不新增需求」的口径一致。

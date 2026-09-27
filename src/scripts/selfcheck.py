@@ -768,8 +768,10 @@ def http_contract_offline() -> None:
     r = client.delete("/api/files/does-not-exist", **auth)
     assert r.status_code == 404, f"删除不存在文档应 404，实际 {r.status_code}"
 
-    # SSE：头纪律 + 流以 done 结尾
+    # SSE：头纪律 + 流以 done 结尾（FND-R11-01：**必须**带 session_id，否则 4xx）
     r = client.get("/api/chat/stream?q=测试问题", **auth)
+    assert r.status_code == 400, f"缺 session_id 应显式 4xx（不得回退默认会话），实际 {r.status_code}"
+    r = client.get("/api/chat/stream?q=测试问题&session_id=selfcheck", **auth)
     assert r.status_code == 200, getattr(r, "content", b"")
     assert r["Content-Type"].startswith("text/event-stream"), r["Content-Type"]
     assert r["X-Accel-Buffering"] == "no", "缺少 X-Accel-Buffering: no（nginx 会缓冲，首字节永不外发）"
@@ -2166,6 +2168,628 @@ def frontend_config_discipline() -> None:
     assert "未提交" in cfg_src, "未提交草稿未显式标注（ADR-14）"
 
 
+# --------------------------------------------------------------------------- #
+# R8 增量（IB-20 流式交付 / 会话生命周期；IFC-IB-298~308）
+#
+# 全部离线：只走 InMemory / Fake 替身与纯函数，**不触达**任何外部服务。
+# --------------------------------------------------------------------------- #
+
+
+@_case("r8_contracts：SessionState 补齐 / 终态单发 / 可见性白名单（IFC-IB-298~303）")
+def r8_contracts_types_and_visibility() -> None:
+    """R8 契约形状与纯函数口径（离线、零外部依赖）。"""
+    from ib.core import (
+        SESSION_STATE_LOSS_OUTCOME,
+        CitationItem,
+        CompletionPayload,
+        SessionPersistencePolicy,
+        SessionState,
+        SessionStateLossOutcome,
+        StreamEventKind,
+    )
+    from ib.streaming import completion_event, is_user_visible
+
+    # StreamEventKind：既有 6 个成员**逐位不变**，仅**追加** confirmation_required（第 7 个）。
+    values = [k.value for k in StreamEventKind]
+    assert values[:6] == ["reasoning", "content", "degraded", "related_images", "error", "done"], values
+    assert values[6:] == ["confirmation_required"], values
+
+    # SessionState 既有三字段仍可单独构造（R8 字段全有默认值 → 构造兼容，IFC-IB-298）。
+    st = SessionState(messages=[], last_expert=None, sticky_turns_left=0)
+    assert st.turns == () and st.gate is None and st.session_key == "" and st.project_id == ""
+
+    # IFC-IB-299：持久化策略取值域；状态丢失结局**唯一取值** = fail-closed。
+    assert tuple(SessionPersistencePolicy.__args__) == ("in_process", "external")
+    assert tuple(SessionStateLossOutcome.__args__) == ("fail_closed_restart_required",)
+    assert SESSION_STATE_LOSS_OUTCOME == "fail_closed_restart_required"
+
+    # IFC-IB-302：终态单发。payload 缺省 → **不臆造引用**（data 为空串，与既有 StreamEvent(DONE) 等价）。
+    done_none = completion_event(None)
+    assert str(done_none.kind) == "done" and done_none.data == ""
+    # 「无引用」与「未产出结构化产物」必须可区分：空引用仍编码为可解析的 []（AC-IB-19-05）。
+    done_empty = completion_event(CompletionPayload())
+    assert str(done_empty.kind) == "done" and '"citations": []' in done_empty.data
+    # 有引用：只含定位信息，**不含字节 / 正文**（无 base64 / data: 内联）。
+    payload = CompletionPayload(
+        citations=(CitationItem("d1", "手册.pdf", "P12", "§3.2", 0.91),), had_content=True
+    )
+    done_hit = completion_event(payload)
+    assert "d1" in done_hit.data and "P12" in done_hit.data
+    assert "base64" not in done_hit.data.lower() and "data:image" not in done_hit.data.lower()
+
+    # IFC-IB-303：白名单 + 默认不可见。reasoning 默认不可见；未登记类别（内部子任务产物）不可见。
+    assert is_user_visible(StreamEventKind.CONTENT) is True
+    assert is_user_visible("done") is True
+    assert is_user_visible("confirmation_required") is True
+    assert is_user_visible(StreamEventKind.REASONING) is False
+    assert is_user_visible("internal_subtask_product") is False
+
+
+@_case("r8_can_resume：三判据 fail-closed，残缺载荷不补默认批准（IFC-IB-305/306）")
+def r8_can_resume_fail_closed() -> None:
+    from ib.core import (
+        ConfirmationDecision,
+        ConfirmationGateState,
+        ConfirmationPrompt,
+        SessionState,
+    )
+    from ib.orchestration import ResumePayload, can_resume
+
+    prompt = ConfirmationPrompt(gate_id="g1", expert_name="data-expert", summary="确认执行写操作？")
+    gate = ConfirmationGateState(gate_id="g1", prompt=prompt, decision=None)
+    state = SessionState(gate=gate)
+    approve = ResumePayload(decision=ConfirmationDecision(gate_id="g1", approved=True))
+
+    # 正向：待确认中间态 + 归属一致 + 携决策 → 允许（批准 / 拒绝由上层各自处置）。
+    assert can_resume(state, "g1", approve) is True
+    assert can_resume(state, "g1", ResumePayload(decision=ConfirmationDecision("g1", False))) is True
+
+    # 判据①：状态丢失（进程重启后内存后端读回 None）→ 拒绝（AC-IB-20-05）。
+    assert can_resume(None, "g1", approve) is False
+    # 判据②：无待确认中间态 / 归属不符 → 拒绝。
+    assert can_resume(SessionState(), "g1", approve) is False
+    assert can_resume(state, "g2", approve) is False
+    assert can_resume(state, "", approve) is False
+    assert can_resume(state, "g1", ResumePayload(decision=ConfirmationDecision("g2", True))) is False
+    # 判据③：未携决策（None / 残缺载荷）→ 拒绝。
+    assert can_resume(state, "g1", None) is False
+    assert can_resume(state, "g1", ResumePayload()) is False
+
+    # 残缺载荷**绝不**被补成「默认批准」（AC-IB-20-05 明令禁止的默认放行）；
+    # 显式「拒绝」不得被反转成批准。
+    assert ResumePayload.from_dict({"decision": {"approved": True}}).decision is None
+    assert ResumePayload.from_dict({"decision": {}}).decision is None
+    assert ResumePayload.from_dict({}).decision is None
+    rejected = ResumePayload.from_dict({"decision": {"gate_id": "g1", "approved": False}})
+    assert rejected.decision is not None and rejected.decision.approved is False
+
+
+@_case("r8_gate_resume：确认门默认关闭零行为差异；启用后挂起并经 resume 续跑（IFC-IB-301/307）")
+def r8_gate_and_resume() -> None:
+    deps = _deps()
+    from ib.context import make_request_context
+    from ib.core import ConfirmationPrompt, GraphConfig, Scope
+    from ib.experts import EXPERT_SPECS
+    from ib.orchestration import build_graph
+
+    def _llm() -> Any:
+        class _Stub:
+            def build_router(self) -> Any:
+                class _Role:
+                    name = "router"
+
+                    def __init__(self) -> None:
+                        self.impl = lambda prompt: '{"experts": ["data-expert"]}'
+
+                return _Role()
+
+            def build_expert(self, spec: Any) -> Any:
+                class _Expert:
+                    name = str(getattr(spec, "name", "expert"))
+
+                    def __init__(self) -> None:
+                        self.impl = lambda prompt: "据实作答：设备参数正常。"
+
+                return _Expert()
+
+            def build_aggregator(self) -> Any:
+                class _Agg:
+                    name = "aggregator"
+
+                    def __init__(self) -> None:
+                        self.impl = lambda prompt: "最终答案"
+
+                return _Agg()
+
+            def health(self) -> Any:
+                from ib.core import HealthStatus
+
+                return HealthStatus(ok=True)
+
+            def describe_egress(self) -> Any:
+                from ib.core import EgressDescriptor
+
+                return EgressDescriptor(remote=False, endpoint_host="", data_categories=[])
+
+        return _Stub()
+
+    def _orch(*, builder: Any = None, **cfg: Any) -> Any:
+        return build_graph(
+            llm=_llm(),
+            experts=EXPERT_SPECS,
+            tools=[],
+            sessions=deps.sessions,
+            config=GraphConfig(**cfg),
+            router=None,
+            scope=Scope(project_id="p_alpha"),
+            tools_by_expert={},
+            confirmation_prompt_builder=builder,
+        )
+
+    ctx = make_request_context(project_id="p_alpha", actor_id="u1", session_id="g-a")
+
+    # ① 默认关闭 → 零行为差异：无 confirmation_required，正常作答（护栏：不因新增接缝改变默认路径）。
+    off_kinds = [str(e.kind) for e in _orch().run("设备参数如何", ctx=ctx, session_key=ctx.session_key)]
+    assert "confirmation_required" not in off_kinds, off_kinds
+    assert "content" in off_kinds and off_kinds[-1] == "done", off_kinds
+    # 关闭时 resume 不可用：**显式** error + done（不得静默成功 —— 静默成功会让调用方以为写操作已执行）。
+    off_resume = [str(e.kind) for e in _orch().resume("p_alpha:u:g-a", {"query": "x"})]
+    assert off_resume == ["error", "done"], off_resume
+
+    # ② 开关启用但**未注入话术构造器** → 仍不触发（骨架不生成业务话术；ADR-09 / IFC-IB-301）。
+    no_builder = [
+        str(e.kind)
+        for e in _orch(confirmation_gate_enabled=True).run(
+            "设备参数如何", ctx=ctx, session_key="p_alpha:u:g-b"
+        )
+    ]
+    assert "confirmation_required" not in no_builder, no_builder
+
+    def _builder(query: str, *, decision: Any, scope: Any) -> Any:  # noqa: ANN001
+        return ConfirmationPrompt(
+            gate_id="g-1", expert_name="data-expert", summary="将写入温度设定，是否继续？"
+        )
+
+    orch = _orch(builder=_builder, confirmation_gate_enabled=True)
+
+    # ③ 启用 + 注入构造器 → **恰一条** confirmation_required 挂起，其后 done；
+    #    **未决策前不得给出正文**（否则用户会把待确认内容当成已完成）。
+    suspend = list(orch.run("把温度设定为 26 度", ctx=ctx, session_key="p_alpha:u:g1"))
+    kinds = [str(e.kind) for e in suspend]
+    assert kinds.count("confirmation_required") == 1, kinds
+    assert kinds[-1] == "done", kinds
+    assert "content" not in kinds, f"未确认前不得给出正文：{kinds}"
+    gate_payload = [e.data for e in suspend if str(e.kind) == "confirmation_required"][0]
+    assert "g-1" in gate_payload, gate_payload  # gate_id 供决策回传对账
+
+    # ④ resume：状态丢失 / 归属不符 → fail-closed（error + done，无 content；不新建会话、不重跑）。
+    lost = [
+        str(e.kind)
+        for e in orch.resume(
+            "p_alpha:u:nope",
+            {"decision": {"gate_id": "g-1", "approved": True}, "ctx": ctx},
+        )
+    ]
+    assert lost == ["error", "done"], lost
+
+    # ⑤ resume：批准 → 自中间态续跑（content + done），且**不**再次触发确认门（否则自我死锁）。
+    ok_kinds = [
+        str(e.kind)
+        for e in orch.resume(
+            "p_alpha:u:g1", {"decision": {"gate_id": "g-1", "approved": True}, "ctx": ctx}
+        )
+    ]
+    assert "content" in ok_kinds and ok_kinds[-1] == "done", ok_kinds
+    assert "confirmation_required" not in ok_kinds, ok_kinds
+
+    # ⑥ resume：拒绝 → 明确终止且**不执行**（error + done，无 content）。
+    list(orch.run("删除该文档", ctx=ctx, session_key="p_alpha:u:g3"))
+    rej = [
+        str(e.kind)
+        for e in orch.resume(
+            "p_alpha:u:g3", {"decision": {"gate_id": "g-1", "approved": False}, "ctx": ctx}
+        )
+    ]
+    assert rej == ["error", "done"], rej
+
+    # ⑦ MINOR-2：请求**指向的** gate_id 与状态里的中间态不一致 → 真实对账 fail-closed
+    #    （此前 gate_id 从 state 派生，can_resume 内归属对账恒为假而空转）。
+    list(orch.run("把温度设定为 27 度", ctx=ctx, session_key="p_alpha:u:g4"))
+    mismatch = [
+        str(e.kind)
+        for e in orch.resume(
+            "p_alpha:u:g4",
+            {"decision": {"gate_id": "gate-does-not-exist", "approved": True}, "ctx": ctx},
+        )
+    ]
+    assert mismatch == ["error", "done"], mismatch
+
+
+@_case("r8_config_keys：确认门 / 持久化策略 / 思考流式键名登记（IFC-IB-304）")
+def r8_config_keys_registered() -> None:
+    from ib.config import (
+        IB_RUNTIME_ENV_KEYS,
+        GlobalConfig,
+        SessionConfig,
+        resolve_global_config,
+        validate_required,
+    )
+    from ib.core import RawConfig
+
+    for key in (
+        "IB_CONFIRMATION_GATE_ENABLED",
+        "IB_SESSION_PERSISTENCE_POLICY",
+        "IB_REASONING_STREAM_ENABLED",
+    ):
+        assert key in IB_RUNTIME_ENV_KEYS, f"{key} 未登记为运行期配置键名"
+
+    # 安全默认：确认门关 / 思考流式关 / 会话策略进程内（ADF-17 约束 1；AC-IB-19-03）。
+    assert GlobalConfig.confirmation_gate_enabled is False
+    assert GlobalConfig.reasoning_stream_enabled is False
+    assert SessionConfig.persistence_policy == "in_process"
+
+    base = {
+        "config_source": "dict",
+        "offline_mode": False,
+        "llm": {"backend": "fake"},
+        "embedding": {"backend": "fake"},
+        "vectorstore": {"backend": "memory"},
+    }
+    # 值域内取值 → 无校验错误（IB_SESSION_BACKEND 值域**扩展**为 {memory, external}，键名/默认值不变）。
+    good = resolve_global_config(
+        RawConfig(
+            values={**base, "session": {"backend": "external", "persistence_policy": "external"}},
+            source="test",
+        )
+    )
+    assert good.session.backend == "external" and good.session.persistence_policy == "external"
+    assert validate_required(good, env={}) == [], validate_required(good, env={})
+
+    # 值域外取值 → **逐键**报错（键名不变，错误信息不含值）。
+    bad = resolve_global_config(
+        RawConfig(
+            values={**base, "session": {"backend": "redis", "persistence_policy": "disk"}},
+            source="test",
+        )
+    )
+    bad_keys = {e.key for e in validate_required(bad, env={})}
+    assert {"IB_SESSION_BACKEND", "IB_SESSION_PERSISTENCE_POLICY"} <= bad_keys, bad_keys
+
+
+@_case("r8_within_expert_keywords：同专家内空 / 重复关键词被拒（BLK-R8-02，归一化后比较）")
+def r8_within_expert_keyword_validation() -> None:
+    from ib.config import build_definition_document, validate
+    from ib.core import (
+        ConditionalEdgeSpec,
+        ExpertSpec,
+        ExpertSpecInput,
+        OrchestrationSpecInput,
+        RouteSpecInput,
+    )
+
+    def _expert(name: str, kws: tuple[str, ...], *, is_default: bool = False) -> Any:
+        return ExpertSpecInput(
+            name=name,
+            cn_label=f"{name}-标签",
+            keywords=kws,
+            exemplars=(),
+            is_data_expert=False,
+            fallback_prompt=f"prompt-{name}",
+            is_delegating=False,
+            is_default=is_default,
+        )
+
+    def _doc(a_kws: tuple[str, ...], b_kws: tuple[str, ...]) -> Any:
+        return build_definition_document(
+            project_id="p1",
+            experts=(_expert("a", a_kws, is_default=True), _expert("b", b_kws)),
+            route=RouteSpecInput(tau=0.65, margin=0.05, max_expert_steps=8, default_expert="a"),
+            orchestration=OrchestrationSpecInput(
+                nodes=("route", "a", "b"),
+                conditional_edges=(ConditionalEdgeSpec(from_node="route", branch_map=(("a", "a"),)),),
+            ),
+        )
+
+    def _codes(rep: Any) -> set[str]:
+        return {i.code for i in rep.errors}
+
+    # 同专家内**精确重复** → expert_keyword_duplicate（且不误报「跨专家撞车」）。
+    dup = validate(_doc(("用电", "用电"), ("故障",)))
+    assert "expert_keyword_duplicate" in _codes(dup), _codes(dup)
+    assert "expert_keyword_collision" not in _codes(dup), _codes(dup)
+    # 归一化后重复（大小写 / 首尾空白）→ 亦判重复（口径对齐 validate_specs 的 strip().lower()）。
+    assert "expert_keyword_duplicate" in _codes(validate(_doc(("KWH", " kwh "), ("故障",))))
+    # 空 / 纯空白关键词 → expert_keyword_empty。
+    assert "expert_keyword_empty" in _codes(validate(_doc(("用电", "   "), ("故障",))))
+    # 合法基线（同专家内互异、跨专家不撞车）→ 通过（新校验不误杀）。
+    ok = validate(_doc(("用电", "参数"), ("故障", "巡检")))
+    assert ok.ok is True and _codes(ok) == set(), _codes(ok)
+
+    # 派生安装期的兜底（`ib.experts.validate_specs`）**不被削弱**：同专家重复仍 fail-fast。
+    from ib.experts import validate_specs
+
+    bad_experts = [
+        ExpertSpec(
+            name="x",
+            cn_label="X",
+            keywords=("用电", "用电"),
+            is_data_expert=False,
+            fallback_prompt="p",
+            is_delegating=False,
+            is_default=True,
+        )
+    ]
+    try:
+        validate_specs(bad_experts)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("validate_specs 未对同专家重复关键词 fail-fast（安装期兜底被削弱）")
+
+
+@_case("r8_expert_handoff：交接接缝默认关闭零行为差异，开启后受步数上限约束（REV-12-2）")
+def r8_expert_handoff_seam() -> None:
+    deps = _deps()
+    from ib.core import GraphConfig, RouteDecision, Scope
+    from ib.experts import EXPERT_SPECS, default_expert, delegating_experts
+    from ib.orchestration import MAX_EXPERT_STEPS, Orchestrator
+
+    # `is_delegating` / `delegating_experts()` 已不再是死字段：至少有专家声明可交接。
+    delegating = delegating_experts()
+    assert delegating, "delegating_experts() 为空 —— is_delegating 仍是死字段（REV-12-2 未落地）"
+    delegate = default_expert()
+    assert delegate, "未解析出默认同侪（非交接出口缺失）"
+    assert MAX_EXPERT_STEPS == 8, f"往返次数上限漂移：{MAX_EXPERT_STEPS}"
+
+    def _orch(**cfg: Any) -> Any:
+        # `_expand_plan` 只依赖 config / experts 注册表 / scope，不需要图与 LLM。
+        return Orchestrator(
+            graph=None,
+            router=None,
+            sessions=deps.sessions,
+            config=GraphConfig(**cfg),
+            scope=Scope(project_id="p_alpha"),
+            llm=None,
+        )
+
+    # 选一个「可交接且非默认同侪」的专家，交接后计划应**补入**默认同侪。
+    source = next(name for name in delegating if name != delegate)
+    decision = RouteDecision(experts=[source], tier="keyword_unique", confidence=0.9)
+
+    # ① 默认关闭 → 计划与既有行为**逐位一致**（只有路由命中的专家）。
+    off = _orch()._expand_plan("q", decision)
+    assert [n for n, _ in off] == [source], off
+
+    # ② 开启 → 单跳补入默认同侪；**原专家仍在首位**（交接不是替代，常规作答路径保留，护栏③）。
+    on = _orch(expert_handoff_enabled=True)._expand_plan("q", decision)
+    on_names = [n for n, _ in on]
+    assert on_names == [source, delegate], on_names
+    assert all(prompt for _, prompt in on), "计划项缺少专家话术（无法执行）"
+
+    # ③ 往返上限（护栏①）：max_expert_steps=1 时不展开（不得突破上限）。
+    capped = _orch(expert_handoff_enabled=True, max_expert_steps=1)._expand_plan("q", decision)
+    assert [n for n, _ in capped] == [source], capped
+
+    # ④ 命中的已是默认同侪 → 不自交接（计划不重复）。
+    self_plan = _orch(expert_handoff_enabled=True)._expand_plan(
+        "q", RouteDecision(experts=[delegate], tier="keyword_unique", confidence=0.9)
+    )
+    assert [n for n, _ in self_plan] == [delegate], self_plan
+
+    # ⑤ 默认注册表键集合仍被 `EXPERT_SPECS` 唯一真源覆盖（不引入新专家）。
+    assert {s.name for s in EXPERT_SPECS} >= {source, delegate}
+
+
+@_case("r8_chat_resume_http：/api/chat/resume 准入顺序与状态码（IFC-IB-307）")
+def r8_chat_resume_endpoint_contract() -> None:
+    import json
+
+    os.environ["DJANGO_SETTINGS_MODULE"] = "ibweb.settings"
+    os.environ["IB_CONFIG_SOURCE"] = "dict"
+    from ibweb.composition import build_application, build_deps
+
+    deps = build_deps(OFFLINE_RAW)
+
+    import django
+
+    django.setup()
+    build_application(deps)
+
+    from django.test import Client
+
+    client = Client()
+    token = os.environ["IB_OFFLINE_TOKEN"]
+    auth = {"HTTP_AUTHORIZATION": f"Bearer {token}"}
+    url = "/api/chat/resume"
+
+    def _post(raw_body: str, **extra: Any) -> Any:
+        return client.post(url, data=raw_body, content_type="application/json", **extra)
+
+    def _body(payload: Any) -> str:
+        return json.dumps(payload, ensure_ascii=False)
+
+    # 无令牌 → 401（不得静默放行）
+    assert _post("{}").status_code == 401
+    # 查询串令牌 → 400（**仅** Authorization 头；本端点不接受 ?token=）
+    assert client.post(url + "?token=whatever", data="{}", content_type="application/json").status_code == 400
+    # 非法 JSON → 400
+    assert _post("not json", **auth).status_code == 400
+    # 缺会话标识 → 400（不回退默认会话）
+    assert _post(_body({}), **auth).status_code == 400
+    # 归属不符（前缀非当前项目）→ 403（不得改当作新会话）
+    assert _post(_body({"session_key": "p_beta:u1:s1"}), **auth).status_code == 403
+    # 前置全过但确认门未启用 → 409（fail-closed：不新建会话、不重跑）
+    r = _post(_body({"session_key": "p_alpha:u1:s1"}), **auth)
+    assert r.status_code == 409, (r.status_code, r.content)
+
+
+@_case("r8_chat_resume_http_success：真实键经 HTTP 成功续跑（MAJOR-1 正向取证）")
+def r8_chat_resume_http_success() -> None:
+    """用**流路径真实键**写入带 `gate` 的会话 → `POST /api/chat/resume` → 断言**成功续跑**。
+
+    MAJOR-1：`chat_resume_endpoint` 此前自造 **2 段**键 `f"{project}:{session_id}"`，与流路径
+    写入所用的 **3 段**键 `f"{project}:{actor}:{session_id}"` 永不相等 → 真实 HTTP 续跑恒 `404`。
+    本用例以**与流路径逐字相同**的键写入会话，断言拿到 `200 + StreamingHttpResponse`
+    且续跑流达终态 `done`（而非 `404`），并**不**再次触发确认门（防自死锁）。
+
+    **离线**：Django 进程内 test client + InMemory 会话替身；零外部网络。
+    既有 401 / 400 / 403 / 409 反向断言保留在同名系列的 `r8_chat_resume_http` 用例中。
+    """
+    import json as _json
+    from dataclasses import replace
+
+    os.environ["DJANGO_SETTINGS_MODULE"] = "ibweb.settings"
+    os.environ["IB_CONFIG_SOURCE"] = "dict"
+    from ibweb.composition import build_application, build_deps
+
+    deps = build_deps(OFFLINE_RAW)
+
+    import django
+
+    django.setup()
+    build_application(deps)
+
+    from django.http import StreamingHttpResponse
+    from django.test import Client
+
+    from ib.context import make_request_context
+    from ib.core import (
+        ConfirmationGateState,
+        ConfirmationPrompt,
+        SessionState,
+        SessionTurn,
+    )
+
+    # 流路径真实键 = `make_request_context(...).session_key`（actor 为离线解析器给出的主体）。
+    stream_ctx = make_request_context(
+        project_id="p_alpha", actor_id="service-account", session_id="resume-ok"
+    )
+    real_key = stream_ctx.session_key
+    # 键文本（**3 段**）：与流路径逐字一致（2 段键正是 MAJOR-1 的病灶，故显式钉住）。
+    assert real_key == "p_alpha:service-account:resume-ok", real_key
+
+    gate = ConfirmationGateState(
+        gate_id="gate-http-1",
+        prompt=ConfirmationPrompt(
+            gate_id="gate-http-1", expert_name="data-expert", summary="确认写入？"
+        ),
+        decision=None,
+    )
+    deps.sessions.save(
+        real_key,
+        SessionState(
+            session_key=real_key,
+            project_id="p_alpha",
+            actor_id="service-account",
+            turns=(SessionTurn(role="user", text="把温度设定为 26 度"),),
+            gate=gate,
+        ),
+    )
+
+    client = Client()
+    token = os.environ["IB_OFFLINE_TOKEN"]
+    auth = {"HTTP_AUTHORIZATION": f"Bearer {token}"}
+
+    original_cfg = deps.cfg
+    # 组合根默认**未启用**确认门（ADR-17 约束 1）；本用例显式启用，使端点越过
+    # 「门未开启 → 409」这一前置（该前置的反向断言见 `r8_chat_resume_http`）。
+    deps.cfg = replace(deps.cfg, confirmation_gate_enabled=True)
+    # 缓存编排器的 config 在**构造期**取自 `deps.cfg`，须清空以「门已启用」重建。
+    deps._orchestrators.clear()  # noqa: SLF001 - 自检可观测内部装配（同 deps.policy 用法）
+    try:
+        body = _json.dumps(
+            {"session_id": "resume-ok", "decision": {"gate_id": "gate-http-1", "approved": True}},
+            ensure_ascii=False,
+        )
+        r = client.post("/api/chat/resume", data=body, content_type="application/json", **auth)
+        # 成功续跑：`200 + StreamingHttpResponse`（**不是** 404 —— 404 即表示键派生不一致）。
+        assert r.status_code == 200, (r.status_code, getattr(r, "content", b""))
+        assert isinstance(r, StreamingHttpResponse), type(r)
+        assert r["Content-Type"].startswith("text/event-stream"), r["Content-Type"]
+        stream = b"".join(r.streaming_content).decode("utf-8")
+        assert "event: done" in stream, stream[:400]
+        # 续跑**不**再次触发确认门（否则自我死锁）。
+        assert "event: confirmation_required" not in stream, stream[:400]
+
+        # MINOR-2（views 调用点）：请求指向的 gate_id 与状态里的不一致 → 409（真实对账，非空转）。
+        bad_key = make_request_context(
+            project_id="p_alpha", actor_id="service-account", session_id="resume-bad"
+        ).session_key
+        deps.sessions.save(
+            bad_key,
+            SessionState(
+                session_key=bad_key,
+                project_id="p_alpha",
+                actor_id="service-account",
+                turns=(SessionTurn(role="user", text="把温度设定为 26 度"),),
+                gate=ConfirmationGateState(
+                    gate_id="gate-http-2",
+                    prompt=ConfirmationPrompt(
+                        gate_id="gate-http-2", expert_name="data-expert", summary="确认写入？"
+                    ),
+                    decision=None,
+                ),
+            ),
+        )
+        try:
+            bad = client.post(
+                "/api/chat/resume",
+                data=_json.dumps(
+                    {"session_id": "resume-bad", "decision": {"gate_id": "WRONG", "approved": True}},
+                    ensure_ascii=False,
+                ),
+                content_type="application/json",
+                **auth,
+            )
+            assert bad.status_code == 409, (bad.status_code, getattr(bad, "content", b""))
+        finally:
+            deps.sessions.delete(bad_key)
+    finally:
+        deps.cfg = original_cfg
+        deps.sessions.delete(real_key)
+        deps._orchestrators.clear()  # noqa: SLF001
+
+
+@_case("r8_frontend_confirmation：确认区独立 / 不自动续跑 / 决策回传（IFC-IB-308）")
+def r8_frontend_confirmation_discipline() -> None:
+    """前端（TS/Vue）静态纪律检查：注释先剥，避免「注释里写了就以为实现了」。"""
+    import pathlib
+    import re
+
+    def _strip(text: str) -> str:
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+        text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+        text = re.sub(r"^[ \t]*//.*$", "", text, flags=re.MULTILINE)
+        return text
+
+    frontend_src = pathlib.Path(_SRC) / "frontend" / "src"
+    page = _strip((frontend_src / "views" / "ChatPage.vue").read_text(encoding="utf-8"))
+    client_ts = _strip((frontend_src / "api" / "client.ts").read_text(encoding="utf-8"))
+
+    # 客户端契约：事件类别登记 + 决策回传端点 + 令牌不进查询串。
+    assert "'confirmation_required'" in client_ts, "client.ts 未登记 confirmation_required 事件类别"
+    assert "chatResume" in client_ts and "/api/chat/resume" in client_ts, "client.ts 未接入 /api/chat/resume"
+    assert "?token=" not in client_ts and "?key=" not in client_ts, "client.ts 出现查询串令牌"
+
+    # FND-R11-01 的前端同源约束：会话标识缺失不得回退到字面量 'default'。
+    assert "'default'" not in client_ts and '"default"' not in client_ts, "client.ts 仍回退默认会话"
+    assert "ref('default')" not in page, "ChatPage 仍预填默认会话标识"
+
+    # 确认区域：独立语义区域（role=alertdialog）+ 明确的「等待决策」态。
+    assert "confirmation_required" in page, "ChatPage 未处理 confirmation_required 事件"
+    assert "awaitingDecision" in page, "ChatPage 缺少「等待决策」态"
+    assert "alertdialog" in page, "确认区域未以独立语义区域呈现（role=alertdialog）"
+    assert "decide(" in page, "ChatPage 缺少决策回传入口"
+
+    # 分区呈现：confirmation_required 分支**不得**写入正文（不并入答案片段）。
+    branch = re.search(r"case 'confirmation_required':(.*?)\n\s*case ", page, flags=re.DOTALL)
+    assert branch, "未找到 confirmation_required 处理分支"
+    assert "turn.answer" not in branch.group(1), "确认事件被并入正文（IFC-IB-308：必须分区呈现）"
+
+    # 不做自动续跑：不得出现「定时器/挂起后自动调用 decide」这类自动继续。
+    assert not re.search(r"(setTimeout|setInterval)\s*\([^)]*\bdecide\b", page), "出现自动续跑定时器"
+
+
 def main() -> int:
     print("=" * 72)
     print("intelligentbase 离线自检（GROUP_C 自我验证；正式测试套件属 GROUP_D）")
@@ -2205,6 +2829,16 @@ def main() -> int:
         definition_config_endpoints,
         definition_assembly_injects_derived,
         frontend_config_discipline,
+        # R8 增量（IB-20 流式交付 / 会话生命周期；IFC-IB-298~308）
+        r8_contracts_types_and_visibility,
+        r8_can_resume_fail_closed,
+        r8_gate_and_resume,
+        r8_config_keys_registered,
+        r8_within_expert_keyword_validation,
+        r8_expert_handoff_seam,
+        r8_chat_resume_endpoint_contract,
+        r8_chat_resume_http_success,
+        r8_frontend_confirmation_discipline,
     ]
     for case in cases:
         case()

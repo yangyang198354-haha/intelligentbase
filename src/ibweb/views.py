@@ -3,6 +3,7 @@
 @implements IFC-IB-242 ~ IFC-IB-249（HTTP 端点）
             IFC-IB-283（R2）`GET /api/files/{doc_id}/images/{image_id}` 页面图字节
             IFC-IB-294/295（R7）`GET|PUT /api/config/definition` 定义文档读写
+            IFC-IB-307（R8）`POST /api/chat/resume` 会话续跑（fail-closed 准入顺序）
 @depends MOD-IB-23（authz/composition/serializers/sse）, MOD-IB-11/12/13/14/15/22（服务）
 @author software-developer
 
@@ -536,6 +537,11 @@ def chat_stream_endpoint(request: Any) -> Any:
 
     语料的检索范围**不在本函数里推导**：它由 `deps.orchestrator_for(project_id)`
     在构造期闭包绑定（ADR-09）。本函数只负责「把 query 和 ctx 交给编排器」。
+
+    **会话标识必填（FND-R11-01 / AC-IB-20-01）**：缺失 / 空白即**显式 4xx 拒绝**，
+    **绝不**回退到字面量 `"default"`。回退会让「没传会话标识」与「显式使用名为 default
+    的会话」在服务端不可区分，多个客户端于是**静默共用一个会话**（历史互相污染、
+    并且把 A 的上下文注入 B 的回答）—— 这类错误既不可见、也无法在日志里定位。
     """
     from ibweb.sse import streaming_sse_response
 
@@ -548,7 +554,10 @@ def chat_stream_endpoint(request: Any) -> Any:
     if not query:
         return error_response(ValidationError("缺少查询参数 q"))
 
-    session_id = (request.GET.get("session_id") or "default").strip() or "default"
+    session_id = (request.GET.get("session_id") or "").strip()
+    if not session_id:
+        # 显式拒绝，不猜测（AC-IB-20-01）。400 属 ValidationError 单点映射。
+        return error_response(ValidationError("缺少会话标识 session_id（不得回退到默认会话）"))
     try:
         orchestrator = deps.orchestrator_for(ctx.authz.project_id)
     except IbError as exc:
@@ -557,6 +566,122 @@ def chat_stream_endpoint(request: Any) -> Any:
     def _events() -> Any:
         log_event("chat", "started", project_id=ctx.authz.project_id, session_id=session_id)
         yield from orchestrator.run(query, ctx=ctx, session_key=ctx.session_key)
+
+    return streaming_sse_response(_events())
+
+
+def chat_resume_endpoint(request: Any) -> Any:
+    """`POST /api/chat/resume` → 续跑 SSE（IFC-IB-307；confirm gate 恢复）。
+
+    ## 准入顺序（**强制**，module_design §3 MOD-IB-23 IFC-IB-307）
+
+    `鉴权（Authorization 头）→ 归属断言（session_key 前缀，FM-7）→ SessionStore.load
+    （IFC-IB-221）→ can_resume（IFC-IB-306）→ 续跑（IFC-IB-233）`。
+
+    **任一前置不满足即 fail-closed**，且**不得**退化为「新建会话后重跑」—— 那等于把
+    「未经确认的动作」重新执行一遍，正是 ADR-17 约束 4 要防的失败模式。故本端点把
+    前置检查**放在打开 SSE 流之前**，以 `403` / `404` / `409` / `503` 显式终止；
+    只有在状态与决策都对得上时，才打开续跑流。
+
+    **令牌纪律**：沿用 IFC-IB-247 —— **仅允许 `Authorization` 头**；`?token=` 由中间件
+    直接 400。本端点**不接受**查询串令牌（访问日志会完整打印 URL）。
+
+    ## 会话键的**唯一**构造入口（FM-7；MAJOR-1 修复）
+
+    请求体给 `session_key` 时直传（仍经前缀归属断言）；只给 `session_id` 时，键**必须**经
+    `ib.context.session_key(project_id, actor_id, session_id)` 构造，`actor_id` 取自
+    `ctx.authz.actor_id` —— 与流路径（`chat_stream_endpoint` → `ctx.session_key`）**逐字一致**。
+    本视图**不得**自行拼接会话键（此前自造 2 段键导致真实续跑恒 404）。
+    """
+    from ib.context import assert_session_key, session_key as ib_session_key
+    from ib.orchestration import ResumePayload, can_resume
+    from ibweb.sse import streaming_sse_response
+
+    deps = composition.get_deps()
+    ctx = _ctx_of(request)
+
+    # 1) 鉴权（Authorization 头；查询串令牌已被中间件拒绝）
+    if not get_policy(request).can_query(ctx.authz):
+        return error_response(ScopeViolationError("当前主体无问答权限"))
+
+    try:
+        raw = json.loads((request.body or b"").decode("utf-8") or "{}")
+    except (ValueError, UnicodeDecodeError):
+        return error_response(ValidationError("请求体必须是合法 JSON 对象"))
+    if not isinstance(raw, dict):
+        return error_response(ValidationError("请求体必须是 JSON 对象"))
+
+    project_id = ctx.authz.project_id
+    session_key = str(raw.get("session_key") or "")
+    if not session_key:
+        session_id = str(raw.get("session_id") or "").strip()
+        if not session_id:
+            return error_response(ValidationError("缺少会话标识 session_key / session_id"))
+        # 会话键**必须**经**唯一入口** `ib.context.session_key(project_id, actor_id, session_id)`
+        # 构造，`actor_id` 取自鉴权结论 `ctx.authz.actor_id` —— 与流路径
+        # （`chat_stream_endpoint` → `ctx.session_key`，由 `make_request_context` 产出）**逐字一致**。
+        # **禁止**在视图内自造键：此前此处自造 **2 段**键 `f"{project_id}:{session_id}"`，而流路径
+        # 写入用的是中间件构造的 **3 段**键 `f"{project_id}:{actor_id}:{session_id}"` —— 两键永不相等，
+        # 真实 HTTP 续跑**恒 404**（本端点唯一的存在性入口失效）。段的构造规则只允许存在于 `ib.context`。
+        # 注：会话标识本身含 `:` 会破坏前缀断言，唯一入口将 fail-closed 拒绝（→ 403），不静默改写。
+        try:
+            session_key = ib_session_key(project_id, ctx.authz.actor_id, session_id)
+        except ScopeViolationError as exc:
+            return error_response(exc)
+
+    # 2) 归属断言（FM-7）：前缀与当前项目不符 → 403（不当作新会话）
+    try:
+        assert_session_key(session_key, project_id)
+    except ScopeViolationError as exc:
+        return error_response(exc)
+
+    # 3) 确认门未启用 → 不存在「待确认中间态」，恢复不可用（fail-closed，不新建会话）
+    if not bool(getattr(deps.cfg, "confirmation_gate_enabled", False)):
+        return error_response(ConflictError("确认门未开启（默认关闭），无可恢复的挂起操作"))
+
+    # 4) SessionStore.load（IFC-IB-221）；存储不可用 → 503（fail-closed）
+    try:
+        state = deps.sessions.load(session_key)
+    except IbError as exc:
+        return error_response(exc)
+    except Exception as exc:  # noqa: BLE001 - 会话存储不可用即 fail-closed
+        log_event("chat", "resume_store_failed", error_type=type(exc).__name__)
+        return error_response(DependencyUnavailableError("会话存储不可用，无法恢复", dependency="session"))
+    if state is None:
+        return error_response(NotFoundError("会话不存在或已过期，无法恢复（fail-closed）"))
+
+    # 5) can_resume（IFC-IB-306）三判据：状态丢失 / 无待确认中间态 / 未携决策
+    gate = getattr(state, "gate", None)
+    if gate is None:
+        return error_response(NotFoundError("该会话无待确认中间态（不存在 / 已丢失），fail-closed"))
+    payload = ResumePayload.from_dict(raw, session_key=session_key)
+    if payload.decision is None:
+        return error_response(ConflictError("未携带有效决策，拒绝恢复（fail-closed）"))
+    # 「请求指向的 gate_id」取自载荷决策（或请求体显式 gate_id），与 `state.gate.gate_id` 做
+    # **真实对账**（IFC-IB-306；签名文本一字不改）。此前以 `state.gate` 派生 gate_id 再回传，
+    # 使 can_resume 内「状态里的中间态 vs 请求指向的中间态」对账恒为假而空转 —— 现由请求侧给值；
+    # 不一致即 fail-closed（False → 409）。
+    requested_gate_id = str(getattr(payload.decision, "gate_id", "") or "") or str(raw.get("gate_id") or "")
+    if not can_resume(state, requested_gate_id, payload):
+        return error_response(ConflictError("决策与会话状态不一致，拒绝恢复（fail-closed）"))
+
+    try:
+        orchestrator = deps.orchestrator_for(project_id)
+    except IbError as exc:
+        return error_response(exc)
+
+    decision = payload.decision
+    assert decision is not None  # 上面已判定
+    # 6) 续跑：把 ctx 与原决策交给编排层（原提问从 state.turns 取回；**不新建会话**）
+    resume_input = {
+        "session_key": session_key,
+        "decision": {"gate_id": decision.gate_id, "approved": decision.approved},
+        "ctx": ctx,
+    }
+
+    def _events() -> Any:
+        log_event("chat", "resume_started", project_id=project_id, session_id=session_key)
+        yield from orchestrator.resume(session_key, resume_input)
 
     return streaming_sse_response(_events())
 

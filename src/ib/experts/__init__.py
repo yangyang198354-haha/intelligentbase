@@ -93,7 +93,8 @@ _DEFAULT_SPECS: list[ExpertSpec] = [
         is_data_expert=True,
         fallback_prompt=(
             "你是系统数据管家，负责能耗看板、设备实时参数查询与确认式参数控制。"
-            "故障诊断与知识库原理问题由专职专家处理。"
+            "同侪专家转来的实时数据问题由你据实作答；"
+            "故障诊断与知识库原理问题由专职专家处理，你无法取得所需数据时应直接说明，不得编造。"
         ),
         is_delegating=True,
         is_default=True,
@@ -103,7 +104,11 @@ _DEFAULT_SPECS: list[ExpertSpec] = [
         cn_label="巡检诊断",
         keywords=("故障", "巡检", "plc", "离线", "在线", "传感器", "报警", "诊断", "修复"),
         is_data_expert=True,
-        fallback_prompt="你是设备巡检诊断专家，结合 PLC 状态与故障汇总定位设备问题。",
+        fallback_prompt=(
+            "你是设备巡检诊断专家，结合 PLC 状态与故障汇总定位设备问题。"
+            "缺少实时参数或知识库资料时，可转交对应同侪专家获取支撑；"
+            "无法取得支撑时，据现场信息给出可执行的排查步骤并说明局限。"
+        ),
         is_delegating=True,
         is_default=False,
     ),
@@ -129,7 +134,8 @@ _DEFAULT_SPECS: list[ExpertSpec] = [
         is_data_expert=False,
         fallback_prompt=(
             "你是知识库问答专家，依「检索结果 > 领域通用知识 > 模型固有知识」的顺序作答；"
-            "需要实时数据支撑时可委托数据管家。"
+            "遇到需要实时数据支撑的问题，可转交数据管家协助（转交由编排层受步数上限约束地执行）；"
+            "无法转交时据已有知识作答，并说明结论的适用边界。"
         ),
         is_delegating=True,
         is_default=False,
@@ -251,7 +257,14 @@ def data_experts() -> tuple[str, ...]:
 
 
 def delegating_experts() -> tuple[str, ...]:
-    """可子委托同侪的专家。[IFC-IB-177]"""
+    """可子委托同侪的专家。[IFC-IB-177]
+
+    **REV-12-2（G2）落地**：本派生视图与 `is_delegating` 不再是死字段 —— 编排层
+    （MOD-IB-22 `Orchestrator._expand_plan`）在计划展开时**消费**本集合：仅当路由命中的
+    专家属于本集合，才允许把手上的问题**单跳转交**给同侪（受 `max_expert_steps` /
+    `MAX_EXPERT_STEPS` 步数上限约束，且**保留**不通交时的常规作答路径）。
+    本函数仍是**纯数据派生**，不含任何转交判定逻辑（转交时机与目标由编排层决定）。
+    """
     return tuple(spec.name for spec in EXPERT_SPECS if spec.is_delegating)
 
 

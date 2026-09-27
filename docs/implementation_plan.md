@@ -3,14 +3,14 @@
   <artifact>implementation_plan</artifact>
   <path>docs/implementation_plan.md</path>
   <doc_id>IMPL-INTELBASE-001</doc_id>
-  <version>2.5.0</version>
+  <version>2.6.0</version>
   <status>DRAFT</status>
-  <phase>GROUP_C / PHASE_05 实现计划（R7 定义外置增量 + R8 缺陷修复增量 + R10 前端构建阻断修复增量）</phase>
+  <phase>GROUP_C / PHASE_05 实现计划（R7 定义外置增量 + R8 缺陷修复增量 + R10 前端构建阻断修复增量 + R11 IB-20 流式/会话增量）</phase>
   <author>software-developer</author>
   <invocation_id>INV-GROUP_C-INTELBASE-002</invocation_id>
-  <latest_invocation_id>INV-GROUP_C-INTELBASE-008</latest_invocation_id>
+  <latest_invocation_id>INV-GROUP_C-INTELBASE-010</latest_invocation_id>
   <created_at>2026-09-25</created_at>
-  <updated_at>2026-09-27</updated_at>
+  <updated_at>2026-09-28</updated_at>
   <revision_note>R1（v1.0.0）为 GROUP_C 首轮交付（69 文件 / 16,396 行 / 25 模块）。
     R2（v2.0.0）为**增量**：只做两件事 ——（L-03）实现 MOD-IB-26 `ib-embed` 服务端 + 进程内第三种 Embedder 形态；
     （M-02）实现页面图关联的生产与读路径（related_images）。**R1 内容一律保留**，本轮只追加与最小改动（见 §12）。
@@ -34,7 +34,7 @@
     ⑥**配置键**（IFC-IB-297）：`IB_DEFINITION_DOC_PATH`、`IB_VISUAL_CONFIG_ENABLED`——**仅登记键名，任何文件与响应体均不含键值**。
     **未新增模块（仍 26，MOD-IB-01~26）/ 端口 13 → 14（纯追加）/ 未改既有 IFC 签名 / 未改既有配置键名与默认值 / 未改依赖边**，只追加（见 §15）。正文 §1~§14 为 R1~R4 的**历史记录，未改写**（§1 概览表仅追加 R7 计数订正行，见 §15.1）。（R7 门控订正：INV-GROUP_C-INTELBASE-006，PM 门控 GR-C-005 复核修正版本线与计数口径。）
     R8（v2.4.0，invocation INV-GROUP_C-INTELBASE-007）为**缺陷修复增量**（输入 = GROUP_D `docs/test_report.md` §12.6 / §12.10 登记的 **FND-R7-01（MAJOR）**；协调者裁决 A / REV-08）：在 `src/ib/config/definition.py::validate` **纯追加**两项装配期校验 —— ①**跨专家路由关键词撞车**（归一化 = `strip().lower()`，对齐路由消费方 `ib/routing/intent.py::_keyword_hits`）、②**`cn_label` 唯一性**（去首尾空白后比较）；违反即产出可定位的 `ValidationErrorItem`（`expert_keyword_collision` / `expert_cn_label_duplicate`），由既有 `admit` 聚合闸门在装配期 fail-fast 拒绝。**本文件沿用自身版本线 2.3.0 → 2.4.0**（R2=2.0.0 → R3=2.1.0 → R4=2.2.0 → R7=2.3.0 → R8=2.4.0），**与 GROUP_B 三份文档的 1.3.0/R7 属各自独立版本线，不互相覆盖**。**未新增模块（仍 26）/ 未改端口数（仍 14）/ 未改任何 IFC-IB 号或签名 / 未改模块边界 / 未改 `EXPERT_SPECS` 默认数据 / 未改 validate() 既有 9 项校验的语义与顺序（仅在其后追加）**，只追加（见 §16）。正文 §1~§15 为 R1~R7 的**历史记录，未改写**。
-    R10（v2.5.0，invocation INV-GROUP_C-INTELBASE-008）为**前端构建阻断修复增量**（输入 = PM 只读取证：CI 阶段9 在 `src/frontend` 执行 `npm ci` 因**锁文件与 `package.json` 失同步**而 EUSAGE 失败，`npm run build` 永不抵达）。修三处**交付管线阻断**：①**锁同步** —— `src/frontend/package-lock.json` 内**无** `@vue-flow/core` 任何条目（R7 引入该依赖时未随锁提交），重新 `npm install` 生成，纳入 `@vue-flow/core` **1.48.2** 及其 **14 个传递包**；②**未跟踪源文件** —— `src/frontend/src/views/ConfigPage.vue`（被已跟踪的 `App.vue` 导入）此前**未纳入 git**，CI checkout 后 `vue-tsc` 必因缺文件而失败，本轮 `git add` 纳入版本控制；③**类型错误** —— `ConfigPage.vue` 导入未使用的 `type ExpertSpecInput`，在 `noUnusedLocals: true` 下直接 `TS6133` 致 `vue-tsc --noEmit` 失败，删除该无用导入。另落地**前端冒烟测试最小入口**（`package.json` 新增 `test` = `node --test`，纯 Node 内建、**零新增依赖**；含「锁与 `package.json` 同步」回归闸）并据实登记传递依赖许可于 `tech_stack.md` §2.1。**本文件沿用自身版本线 2.4.0 → 2.5.0**，**与 GROUP_B 文档属各自独立版本线**。**未新增模块（仍 26）/ 未改端口数（仍 14）/ 未改任何 IFC-IB 号或签名 / 未改后端 `src/ib`·`src/ibweb`·`src/ib_embed` 任何行为 / 未改配置键名与默认值**，只追加（见 §17）。正文 §1~§16 为 R1~R8 的**历史记录，未改写**。</revision_note>
+    R10（v2.5.0，invocation INV-GROUP_C-INTELBASE-008）为**前端构建阻断修复增量**（输入 = PM 只读取证：CI 阶段9 在 `src/frontend` 执行 `npm ci` 因**锁文件与 `package.json` 失同步**而 EUSAGE 失败，`npm run build` 永不抵达）。修三处**交付管线阻断**：①**锁同步** —— `src/frontend/package-lock.json` 内**无** `@vue-flow/core` 任何条目（R7 引入该依赖时未随锁提交），重新 `npm install` 生成，纳入 `@vue-flow/core` **1.48.2** 及其 **14 个传递包**；②**未跟踪源文件** —— `src/frontend/src/views/ConfigPage.vue`（被已跟踪的 `App.vue` 导入）此前**未纳入 git**，CI checkout 后 `vue-tsc` 必因缺文件而失败，本轮 `git add` 纳入版本控制；③**类型错误** —— `ConfigPage.vue` 导入未使用的 `type ExpertSpecInput`，在 `noUnusedLocals: true` 下直接 `TS6133` 致 `vue-tsc --noEmit` 失败，删除该无用导入。另落地**前端冒烟测试最小入口**（`package.json` 新增 `test` = `node --test`，纯 Node 内建、**零新增依赖**；含「锁与 `package.json` 同步」回归闸）并据实登记传递依赖许可于 `tech_stack.md` §2.1。**本文件沿用自身版本线 2.4.0 → 2.5.0**，**与 GROUP_B 文档属各自独立版本线**。**未新增模块（仍 26）/ 未改端口数（仍 14）/ 未改任何 IFC-IB 号或签名 / 未改后端 `src/ib`·`src/ibweb`·`src/ib_embed` 任何行为 / 未改配置键名与默认值**，只追加（见 §17）。正文 §1~§16 为 R1~R8 的**历史记录，未改写**。R11（v2.6.0，invocation INV-GROUP_C-INTELBASE-010；协调者轮次口径亦记作 **REV-12**）为 **IB-20 流式交付 / 会话生命周期的实现增量**（输入 = `docs/module_design.md` **1.4.0/R8** §2.1 / §2.2.3 / §3 + `docs/architecture_design.md` **1.4.0/R8** **ADR-17**；上一轮 REV-11 第 1 项的遗留「4 项部分覆盖 + 2 项未覆盖 AC」正是因 `IFC-IB-298~308` 尚未实现，本轮闭合）。**命名口径声明**：GROUP_B 把该设计增量记为 **R8**（`module_design.md` 1.4.0/R8），而 GROUP_C 自身的版本线在 **v2.4.0** 已用掉「R8」这一标签（FND-R7-01 修复轮）—— 故本文件按协调者本轮口径记为 **R11**，并在本节内同时标注设计侧编号 **R8/ADR-17/IFC-IB-298~308**，避免两套版本线互相覆盖。**四件事**：①**REV-12-1** 落地 `IFC-IB-298~308`（会话状态与轮次 / 持久化策略与状态丢失结局 / 完成产物与引用 / 确认中间态三件套 + `StreamEventKind` **追加** `confirmation_required` / 终态单发 `completion_event` / 可见性白名单 `is_user_visible` / 三个键名登记与 `IB_SESSION_BACKEND` 值域扩展 / 类型化恢复载荷 `ResumePayload` / 纯函数 `can_resume` / `POST /api/chat/resume` 端点 / 前端确认区呈递与决策回传约束）；②**REV-12-2** 使 `ExpertSpec.is_delegating` / `delegating_experts()` 不再是死字段（G2 专家单跳交接落地，默认关闭；**三护栏口径按 R11 补丁轮 MAJOR-2 精确改写**——护栏①③**已实现**、护栏② = 机制就绪但**组合根未接线 → 不可经配置触发**（**OPEN：GAP-R11-07**），详见 §18.3 / §18.8）；③**REV-12-3** 修 **FND-R11-01**（`chat_stream_endpoint` 缺会话标识**不得**静默回退字面量 `"default"` → 显式 4xx）；④**REV-12-4** 落地 **BLK-R8-02**（`validate()` 追加第 3 子项：**同专家内**关键词空 / 重复，**先归一化再比较**）。**本文件沿用自身版本线 2.5.0 → 2.6.0**（R2=2.0.0 → R3=2.1.0 → R4=2.2.0 → R7=2.3.0 → R8=2.4.0 → R10=2.5.0 → R11=2.6.0），**与 GROUP_B 文档的 1.4.0/R8 属各自独立版本线**。**未新增模块（仍 26）/ 未改端口数（仍 14）/ 未改任何既有 IFC-IB 号或签名文本（`IFC-IB-221~225` / `231~233` / `247` 一字未改）/ 未改模块边界 / 未改依赖边（DAG 不变）/ 未改既有配置键名与默认值（`IB_SESSION_BACKEND` **仅扩展值域**）/ 未新增第三方依赖**，只追加（见 §18）。正文 §1~§17 为 R1~R10 的**历史记录，未改写**（受保护行在 §18.7 复核）。</revision_note>
   <inputs>
     <input path="docs/architecture_design.md" version="1.2.0" revision="R2" status="APPROVED (GROUP_B gate_decision=PASS / GR-B-003；文件头 status 字段仍为 DRAFT_FOR_GATE_REVIEW，以 phase_status.md 为权威 —— 见 §8 偏差 D-01)"/>
     <input path="docs/module_design.md" version="1.2.0" revision="R2" status="APPROVED（同上；R2 增补 MOD-IB-26 与 IFC-IB-266~286）"/>
@@ -945,3 +945,154 @@ scope 的 kb 段一致」），并**叠加**了共享 `kb_segment`（防止未�
 - **凭据纪律**：改动文件与证据日志**不含任何真实凭据**（证据仅为 npm 输出与包元数据）。
 - **FreeArk 仓库全程只读**；`docs/phase_status.md` **未触碰**（PM 专属）。
 - **受保护行复核（R10）**：本文件四处「24/24 PASS」保护行**逐字未改**。因 R8 / R10 各在文件头 `revision_note` 追加一段（各 +1 行），四行的**当前行号**为 **L483 / L615 / L633 / L744**（R7 时点记录为 L481 / L613 / L631 / L742）。R10 的改动仅落在文件头（L6 / L8 / L11 / L36）与本 §17，**与保护行无交集**。取证：`grep -n "24/24 PASS" docs/implementation_plan.md`。`src/scripts/selfcheck.py` 及其相关行**本轮未触碰**。
+
+---
+
+## 18. R11 增量实现（IB-20 流式交付 / 会话生命周期：IFC-IB-298~308 + G2 交接 + FND-R11-01 + BLK-R8-02；追加，不改写 §1~§17）
+
+> 依据：`docs/module_design.md` **1.4.0/R8** §2.1（数据结构行）/ §2.2.3（IFC-IB-298~308 索引）/ §3（MOD-IB-01 / 02 / 16 / 21 / 22 / 23 / 24 的 R8 增补）；`docs/architecture_design.md` **1.4.0/R8** **ADR-17**（可选手动确认中间态，4 条约束）；`docs/user_stories.md` 1.3.0/R7（US-IB-19 / US-IB-20，AC-IB-19-01~05 / AC-IB-20-01~06）；`docs/test_report.md` R11（184 基线 + 2 项未覆盖 / 4 项部分覆盖 AC 的归属缺口 + **FND-R11-01**）；`docs/rev11_group_b_apply_package*.md`（设计落盘包）。
+> **性质**：**只追加、不改写**。未新增模块（仍 26）、未改端口数（仍 14）、未改任何既有 IFC-IB 号或签名文本、未改模块边界、未改依赖边（DAG 不变）、未改既有配置键名与默认值、未引入任何第三方依赖。§1~§17 为 R1~R10 历史记录，**逐字未改**。
+>
+> **命名口径**：设计侧记为 **R8**（`module_design.md` 1.4.0/R8、ADR-17、IFC-IB-298~308），协调者轮次口径记为 **REV-12**，本文件自身版本线记为 **R11/2.6.0**（因 v2.4.0 已占用「R8」标签）。三套口径指向**同一批**改动。
+
+### 18.1 实现顺序（拓扑排序；被依赖模块先实现）
+
+DAG 未变，本轮触及的模块按拓扑序执行（MOD-IB-01 → 02 → 16 → 21 → 22 → 23 → 24）：
+
+```
+MOD-IB-01（core：类型 / 枚举 / 常量，纯 stdlib·framework-free）
+   ↓
+MOD-IB-02（config：键名登记 + 值域 + validate 第 3 子项）
+   ↓
+MOD-IB-16（experts：is_delegating / delegating_experts 消费侧话术对齐）
+   ↓
+MOD-IB-21（streaming：终态单发 + 可见性白名单 + 确认事件 + MemorySessionStore 逐字段复制）
+   ↓
+MOD-IB-22（orchestration：确认门装配 + resume fail-closed + G2 单跳交接计划展开）
+   ↓
+MOD-IB-23（ibweb：chat_stream 显式 4xx + POST /api/chat/resume 准入顺序）
+   ↓
+MOD-IB-24（frontend：确认区独立呈递 + 决策回传 + 会话标识纪律）
+```
+
+> 每层只 import 其前置（`ib/core` **零 Django import**，自检 `core_framework_free` 持续守护）。**无环**：本轮**零新增依赖边**。
+
+### 18.2 模块实现计划（按拓扑顺序）
+
+| 序号 | MOD-ID | 模块名 | 文件路径 | 依赖前置模块 | 复杂度 | 状态 |
+|------|--------|--------|---------|------------|--------|------|
+| 1 | MOD-IB-01 | core（类型 / 枚举） | `src/ib/core/types.py`、`src/ib/core/enums.py`、`src/ib/core/__init__.py` | — | H | DONE |
+| 2 | MOD-IB-02 | config（键名 / 校验 / 定义文档） | `src/ib/config/__init__.py`、`src/ib/config/definition.py` | MOD-IB-01 | M | DONE |
+| 3 | MOD-IB-16 | experts（注册表纯数据） | `src/ib/experts/__init__.py` | MOD-IB-01 | L | DONE |
+| 4 | MOD-IB-21 | streaming（事件 / 会话存储） | `src/ib/streaming/__init__.py` | MOD-IB-01 | M | DONE |
+| 5 | MOD-IB-22 | orchestration（图 / 门 / 恢复） | `src/ib/orchestration/__init__.py` | 01 / 16 / 21 | H | DONE |
+| 6 | MOD-IB-23 | ibweb（视图 / 路由） | `src/ibweb/views.py`、`src/ibweb/urls.py` | 01 / 22 | M | DONE |
+| 7 | MOD-IB-24 | frontend（视图 / 客户端） | `src/frontend/src/api/client.ts`、`src/frontend/src/views/ChatPage.vue` | 23 | M | DONE |
+
+### 18.3 逐任务落点与设计依据
+
+| 任务 | 落点（IFC / 文件） | 实现要点 |
+|------|------------------|---------|
+| **REV-12-1**（IFC-IB-298~308） | `ib/core/types.py`（298 / 299 / 300 / 301 / 305）、`ib/core/enums.py`（301 的 `StreamEventKind` 追加）、`ib/streaming/__init__.py`（302 / 303 / 301 呈递）、`ib/config/__init__.py`（304）、`ib/orchestration/__init__.py`（305 / 306 / 301 装配 / 307 语义）、`ibweb/views.py` + `ibweb/urls.py`（307）、`frontend/src/api/client.ts` + `views/ChatPage.vue`（308） | ①`SessionState` / `SessionTurn` 补齐 `IFC-IB-221/222` 的**悬置引用**（**签名文本一字未改**）；②`SessionPersistencePolicy`（`in_process`/`external`）与 `SessionStateLossOutcome`（**唯一取值** `fail_closed_restart_required`）；③`CompletionPayload` / `CitationItem`（`citations` 可空元组、`had_content`、**只含定位信息不含字节**）；④`ConfirmationPrompt` / `ConfirmationDecision` / `ConfirmationGateState` + `StreamEventKind` **追加** `confirmation_required`（既有 6 成员**逐位未动**）；⑤`completion_event(payload)` 终态**恰一次**、其后无 content、不臆造引用、不发空帧；⑥`is_user_visible(kind)` **白名单 + 默认不可见**（reasoning 受 `IB_REASONING_STREAM_ENABLED` 门控；内部子任务产物永不映射为可见类别）；⑦键名登记（**只登记名不写值**）：`IB_CONFIRMATION_GATE_ENABLED`（默认 `false`）/ `IB_SESSION_PERSISTENCE_POLICY` / `IB_REASONING_STREAM_ENABLED`，`IB_SESSION_BACKEND` **值域扩展**为 `{memory, external}`（键名 / 默认值不变）；⑧`ResumePayload`（**类型化** `IFC-IB-233` 的 `payload: dict`，**不改其签名文本**）；⑨`can_resume(state, gate_id, payload)` **纯函数·三判据·fail-closed**（状态丢失 / 无待确认中间态·归属不符 / 未携决策，任一不满足即 `False`）；⑩`POST /api/chat/resume` **准入顺序强制**：鉴权（**仅 Authorization 头**）→ 归属断言（session_key 前缀）→ `SessionStore.load` → `can_resume` → 续跑；任一前置失败 = fail-closed（`403`/`404`/`409`/`503`），**不新建会话、不重跑**；⑪前端确认区**独立呈现**（不与答案片段合并、未决前不显示「已完成」、**无自动续跑**），决策经**独立端点**回传 |
+| **REV-12-2**（G2 专家交接） | `ib/experts/__init__.py`（`delegating_experts()` 文档 + 三处兜底话术按**实际能力**改写）、`ib/orchestration/__init__.py::_expand_plan` | `is_delegating` / `delegating_experts()` **不再是死字段**。交接与既有图结构一致（`route → 条件边扇出 → expert×N / general → gate → aggregate`）：**单跳**把命中且可交接的专家的**默认同侪**补入计划。**三护栏口径（R11 补丁轮按 MAJOR-2 精确改写，见 §18.8）**：护栏①（往返上限）**已实现** —— 对齐 `min(config.max_expert_steps, MAX_EXPERT_STEPS=8)`（纵深防线：`_fan_out` 另有 `step_count > max_expert_steps → general`）；护栏③（非 handoff 出路）**已实现** —— 保留**非交接的常规作答路径**（默认关闭时计划与既有行为**逐位零差异**，且 `general` 域作答路径仍在，交接**不是唯一出口**）；护栏②（敏感写操作强制人工确认）**= 机制就绪 + 必批无自动批准**，**触发规则按设计由接入方提供（骨架不判定「哪些动作需要确认」）**，当前**组合根未接线 → 不可经配置触发**（登记为 **OPEN：GAP-R11-07**） |
+| **REV-12-3**（FND-R11-01） | `src/ibweb/views.py::chat_stream_endpoint`（+ 前端同源约束 `client.ts` / `ChatPage.vue`） | 原实现为 `request.GET.get("session_id") or "default"`（静默回退字面量默认会话，导致多标签页共用会话且无法区分「未填」与「显式用 default」）。现改为：取回并 `strip` 后**为空即显式 4xx**（`ValidationError` → `400`），**不得回退**（对齐 AC-IB-20-01）。前端 `chatStream/chatResume` 对空标识**提前拒绝**并给可读回执；会话标识输入框**不再预填** `'default'`（原 `ref('default')` 会使服务端纪律被前端兜底抹平） |
+| **REV-12-4**（BLK-R8-02） | `src/ib/config/definition.py::validate`（第 12 项，位于既有 11 项之后**追加**） | 新增第 3 子项：**同专家内**关键词的**空**（`expert_keyword_empty`）与**重复**（`expert_keyword_duplicate`），**先归一化**（`strip().lower()`，口径与既有跨专家撞车校验及路由消费方 `ib/routing/intent.py::_keyword_hits` 一致）**再比较**；产出可定位 `ValidationErrorItem`（含专家名与原关键词），由既有 `admit` 聚合闸门在装配期 fail-fast。既有 `ib.experts.validate_specs` 的派生 / 安装期兜底**保留、未削弱**（自检第 5 例以行为断言守护） |
+
+### 18.4 R11 变更文件清单（`git diff --stat` 口径：13 文件，+1596 / −59）
+
+| 文件 | 变更性质 | 对应 IFC / 项 |
+|------|---------|-------------|
+| `src/ib/core/enums.py` | `StreamEventKind` **追加** `CONFIRMATION_REQUIRED = "confirmation_required"`（既有 6 成员逐位未动） | IFC-IB-301 |
+| `src/ib/core/types.py` | 新增 `CitationItem` / `CompletionPayload` / `ConfirmationPrompt` / `ConfirmationDecision` / `ConfirmationGateState` / `SessionTurn` + 两个类型别名与两个常量；`SessionState` **追加** R8 字段（既有 3 字段逐字保留，新增字段全有默认值）；`GraphConfig` 新增 `max_expert_steps` / `confirmation_gate_enabled` / `expert_handoff_enabled` / `max_history_messages` / `aggregation_forbids_internal_labels` | IFC-IB-298~301、305 |
+| `src/ib/core/__init__.py` | 导出上述新增类型 / 常量（纯追加） | IFC-IB-298~301、305 |
+| `src/ib/config/__init__.py` | `IB_RUNTIME_ENV_KEYS` 追加 3 个 R8 键名；`SessionConfig.persistence_policy`、`GlobalConfig.confirmation_gate_enabled` / `reasoning_stream_enabled`（**键名登记，值取安全默认**）；`validate_required` 的值域表新增两项（`IB_SESSION_BACKEND` 值域扩展 / `IB_SESSION_PERSISTENCE_POLICY`） | IFC-IB-304 |
+| `src/ib/config/definition.py` | `validate()` **追加**第 12 项（同专家内空 / 重复关键词，归一化后比较）；docstring 同步 | BLK-R8-02 |
+| `src/ib/experts/__init__.py` | 三处兜底话术按**实际能力**改写（据实作答 / 可转交同侪 / 转交受步数上限约束）；`delegating_experts()` 文档标注 REV-12-2 落地 | REV-12-2（IFC-IB-171/177 消费侧） |
+| `src/ib/streaming/__init__.py` | `USER_VISIBLE_KINDS` 白名单 + `is_user_visible` / `completion_payload_json` / `completion_event` / `confirmation_required_event`；`MemorySessionStore.load` **逐字段**复制 R8 字段（否则 `gate` 被静默丢弃） | IFC-IB-301~303 |
+| `src/ib/orchestration/__init__.py` | `ResumePayload` / `can_resume`（纯函数）/ `_run_inner(gate=)` / `_maybe_gate` / `_persist_gate` / `_pending_query_of` / `_gate_suspend_events` / `_gate_error_events` / `_expand_plan`（G2）/ `resume()` 同步与异步同源；`build_graph` 新增**可选关键字** `confirmation_prompt_builder` | IFC-IB-301 / 305 / 306 / 302 / REV-12-2 |
+| `src/ibweb/views.py` | `chat_stream_endpoint` 缺会话标识 → 显式 `400`（FND-R11-01）；新增 `chat_resume_endpoint`（IFC-IB-307，准入顺序 + `403`/`404`/`409`/`503` fail-closed） | FND-R11-01、IFC-IB-307 |
+| `src/ibweb/urls.py` | 新增 `path("api/chat/resume", ...)`（纯追加，位于 `api/chat/stream` 之后） | IFC-IB-307 |
+| `src/frontend/src/api/client.ts` | `StreamEventKind` 联合类型追加 `'confirmation_required'`；新增 `ConfirmationPrompt` / `ConfirmationDecision` 类型与 `chatResume()`（**仅 Authorization 头**）；`chatStream` 空会话标识**提前拒绝**（FND-R11-01 前端同源） | IFC-IB-308 |
+| `src/frontend/src/views/ChatPage.vue` | 确认区**独立区域**（`role="alertdialog"`，视觉可辨、不并入正文）+ `decide()` 显式点击回传（**无自动续跑**）+ 「本轮已完成」仅在本轮真正收束时显示；会话标识不再预填 `'default'` | IFC-IB-308、FND-R11-01 |
+| `src/scripts/selfcheck.py` | 新增 **8 个离线自检用例**（见 §18.6）+ 既有 `http_contract_offline` 用例追加「缺 session_id → 400」断言 | 本轮自验 |
+
+**未改**：任何既有 IFC-IB 号与签名文本；`src/tests/`（GROUP_D 资产）；模块 / 端口 / 依赖边计数；既有配置键名与默认值；`requirements*.txt`（**零新增第三方依赖**）；`docs/phase_status.md`（PM 专属）。
+
+### 18.5 架构偏差记录与**设计缺口登记**（R11）
+
+| 编号 | 类别 | 描述 | 处置 |
+|------|------|------|------|
+| — | 架构偏差 | **无**（未偏离任何 ADR；ADR-17 四条约束逐条满足：默认关闭 / 无业务语义 / SSE + 独立端点 / 状态丢失 fail-closed） | — |
+| **GAP-R11-01** | **设计缺口（须 PM 裁决）** | `module_design.md` R8 列出的 `SessionState` 字段集与**既有实现**（被 `orchestration` / `streaming` / GROUP_D 既有用例依赖）不一致：设计为「新字段集」，实现需同时被旧消费方读取 | 按**最小一致**原则 **扩展**（既有 3 字段逐字保留 + R8 字段全默认值），**未改任何调用方**。**未擅改设计文档** |
+| **GAP-R11-02** | 设计缺口 | **挂起时的终态表示**未规定：`confirmation_required` 之后是否需要/如何收束流（不发 `done` 会让前端永远转圈） | 实现为「**恰一条** `confirmation_required` + `completion_event(None)`」，且**不发 content** |
+| **GAP-R11-03** | 设计缺口 | **确认话术构造器接缝**未在 IFC 中命名：骨架**不得生成业务话术**（ADR-09），但未定义「话术由谁提供、以何签名注入」 | 实现为 `build_graph` 的**可选关键字** `confirmation_prompt_builder`（沿用 `related_images_provider` 的「兼容超集」先例）；**未启用即零行为差异** |
+| **GAP-R11-04** | 设计缺口 | **G2 交接的业务触发条件未定义**（哪一轮需要交接、交接目标集合、上限落点） | 实现为**确定性**最小选择：开关控制 + 目标取 `default_expert()`（默认同侪）+ 上限取 `min(config.max_expert_steps, MAX_EXPERT_STEPS)`；**骨架不判定业务规则**（骨架其余部分亦不引入业务语义） |
+| **GAP-R11-05** | 设计缺口 | **resume 续跑所需的「原提问」承载**未规定（`ResumePayload` 只有 `session_key` + `decision`） | 实现为挂起时把原提问写入 `SessionState.turns` 末条 user 轮，续跑经 `_pending_query_of` 取回；缺失即 fail-closed（**不臆造**） |
+| **GAP-R11-06** | 口径提示 | `IFC-IB-307` 的 `403` / `404` / `409` / `503` 语义粒度（哪一前置对应哪一码）在设计中只给出「fail-closed，不新建会话」 | 按「鉴权 401/403 → 归属 403 → 门未启用/未携决策/不一致 409 → 会话不存在 404 → 存储不可用 503」实现，**均为 fail-closed 方向**，不放松任何判据 |
+
+> 上述缺口**均未擅自扩充架构**：全部按**最小一致 + 保守（fail-closed）**方向实现，并在此登记待 PM 裁决；设计侧文档**一字未改**。
+
+### 18.6 R11 自验证据（离线；命令可被第三方重跑）
+
+| # | 命令 | 结果 | 证据文件 |
+|---|------|------|---------|
+| 1 | `python -m py_compile`（11 个改动文件）+ `python -m pytest tests -q` | `py_compile OK`；**184 passed**（= R11 基线，无回归） | `docs/evidence/groupc_r11_compile.log` |
+| 2 | `python scripts/selfcheck.py`（离线自检） | **39/39 PASS，EXIT=0**（R1~R10 的 31 例 + 本轮新增 **8 例**） | `docs/evidence/groupc_r11_selfcheck.log` |
+| 3 | `node --test`（cwd = `src/frontend`） | **tests 6 / pass 6 / fail 0，EXIT=0** | `docs/evidence/groupc_r11_frontend.log` |
+| 4 | `vue-tsc --noEmit` + `vite build` | 各 **EXIT=0**（28 modules；`dist/assets/index-*.js` 254.44 kB / gzip 89.93 kB） | `docs/evidence/groupc_r11_frontend_build.log` |
+
+新增 8 个自检用例（**全部离线：InMemory / Fake 替身 + 纯函数，零外部依赖**）：
+
+| # | 用例 | 覆盖 |
+|---|------|------|
+| 1 | `r8_contracts` | `StreamEventKind` 追加而不改既有 6 成员；`SessionState` 构造兼容；持久化策略 / 状态丢失结局取值域；终态单发（`None` → `data=""`，空引用 → `[]`，无 base64）；可见性白名单（`reasoning` 默认不可见、未登记类别不可见） |
+| 2 | `r8_can_resume` | 三判据 + 加固判据的**正反两向**；残缺载荷**不被补成默认批准**；显式拒绝不被反转 |
+| 3 | `r8_gate_resume` | 门默认关闭**零行为差异** + 关闭时 `resume` 显式失败；开关开但无话术构造器仍不触发；挂起恰一条 `confirmation_required` 且**不发 content**；状态丢失 fail-closed；批准续跑且**不再次触发门**；拒绝**不执行** |
+| 4 | `r8_config_keys` | 三键名登记；安全默认值；`IB_SESSION_BACKEND` 值域扩展后合法值通过、非法值**逐键**报错（只报键名） |
+| 5 | `r8_within_expert_keywords` | 同专家内精确 / 归一化后重复 → `expert_keyword_duplicate`（不误报跨专家 `expert_keyword_collision`）；空 → `expert_keyword_empty`；合法基线不被误杀；`validate_specs` 兜底**未被削弱** |
+| 6 | `r8_expert_handoff` | `is_delegating` 已激活；关闭时计划逐位一致；开启时单跳补入默认同侪且**原专家仍在首位**；上限生效；不自交接 |
+| 7 | `r8_chat_resume_http` | 端点 `401` / `?token=` `400` / 非法 JSON `400` / 缺会话标识 `400` / 归属不符 `403` / 门未启用 `409` |
+| 8 | `r8_frontend_confirmation` | 前端静态纪律：事件类别登记、独立端点、**令牌不进查询串**、**不预填 / 不回退默认会话**、确认区 `role=alertdialog`、**确认分支不写入正文**、**无自动续跑定时器** |
+
+### 18.7 冻结约束复核（R11）
+
+- **契约纪律**：`IFC-IB-221~225` / `231~233` / `247` 的**签名文本一字未改**（`IFC-IB-233` 仅新增其载荷类型 `ResumePayload`；`IFC-IB-221/222` 仅补齐其悬置引用的 `SessionState` 定义）；新增编号仅 `298~308`（11 条，设计已分配）；端口 14 / 模块 26 / 依赖边**零新增**（DAG 不变）。
+- **离线纪律**：全部自检与回归**零外部网络**（InMemory / Fake / 纯函数；Django 测试客户端走**进程内**）；**未触达**真实 Qdrant / DeepSeek / bge-m3 / 任何外部端点；**未引入 Docker**；**未引入运行期 CDN**。
+- **框架无关内核**：`src/ib/core` **零 Django import**（自检 `core_framework_free` 守护）；新增类型全部 frozen dataclass / `slots` / 纯 stdlib；**零新增第三方依赖**（`requirements*.txt` 未改）。
+- **凭据纪律**：键名**只登记不写值**；改动文件与证据日志**不含任何真实凭据**；`?token=` / `?key=` 在**新端点同样被拒**（自检第 7 例直接断言）。
+- **未削弱既有断言**：GROUP_D 基线 **184 passed** 原样通过；`validate_specs` 兜底、`validate()` 既有 11 项校验的语义与顺序**均未改动**（本轮仅在**其后追加**第 12 项）；**未使用 skip / xfail 掩盖任何失败**。
+- **FreeArk 仓库全程只读**；`docs/phase_status.md` **未触碰**（PM 专属）；**未执行 `git add` / `git commit`**（提交属 PM 授权范围）。
+- **受保护行复核（R11）**：本文件四处「24/24 PASS」保护行**逐字未改**。因本轮仅**在 `revision_note` 同一物理行（L37）末尾追写**、并在文件末尾**追加 §18**，头部**未新增任何行** → 四行当前行号仍为 **L483 / L615 / L633 / L744**（与 R10 记录**完全一致**）。取证：`grep -n "24/24 PASS" docs/implementation_plan.md`。
+
+### 18.8 R11 补丁轮（REV-12 patch；invocation INV-GROUP_C-INTELBASE-011）
+
+> 触发：独立只读核验 **INV-GROUP_C-VERIFY-R11** = **CONFIRMED_WITH_CAVEATS**（1 项**必须修 MAJOR** + 3 项 MINOR/口径）。本轮**只做 4 项有界修复**，不扩范围。
+
+#### 18.8.1 修复落点
+
+| 项 | 级别 | 落点（文件:行） | 要点 |
+|----|------|----------------|------|
+| **MAJOR-1** | MAJOR → **FIXED** | `src/ibweb/views.py`（`chat_resume_endpoint` 会话键派生段） | 缺 `session_key` 时改走**唯一入口** `ib.context.session_key(project_id, ctx.authz.actor_id, session_id)`，与流路径 `ctx.session_key` **逐字一致**；视图内**不再**自造 2 段键、**不再**出现独立分隔符拼接；`session_key` 直传分支保留。修复前自造 2 段键 → 真实 HTTP 续跑**恒 404** |
+| **MINOR-2** | MINOR → **FIXED** | `src/ib/orchestration/__init__.py`（新增私有 `_requested_gate_id` + `resume`/`aresume` 调用点）、`src/ibweb/views.py`（`chat_resume_endpoint` 调用点） | `gate_id` 改取**请求指向的中间态**（`payload.decision.gate_id`，或请求体显式 `gate_id`），与 `state.gate.gate_id` **真实对账**，不一致即 fail-closed（→409）。**`IFC-IB-306` 签名文本 `can_resume(state, gate_id, payload)` 一字未改**（仅改调用点传值来源） |
+| **MINOR-1** | MINOR → **FIXED** | `src/ib/orchestration/__init__.py::_expand_plan` | `expert_handoff_enabled=False` 时**直接**按 `decision.experts` 原序、原样展开（**不去重 / 不过滤**，与 G2 前**逐位零差异**）；开启分支**保留**去重 + 上限 |
+| **MAJOR-2** | 文档/口径 | `docs/code_review_report.md` §15.2 / §15.6（新增 **GAP-R11-07** OPEN 行）/ §15.9 / §15.10 与本文件 §18.3 / §18.8 | 「三条护栏齐备」**精确改写**为：护栏①③**已实现**；护栏② = **机制就绪 + 必批无自动批准**，**触发规则按设计由接入方提供（骨架不判定）**，**组合根未接线 → 不可经配置触发**（**OPEN：GAP-R11-07**）。**未新增**「敏感动作清单」或任何默认策略代码 |
+
+#### 18.8.2 补丁轮自验证据（离线；命令可被第三方重跑）
+
+| # | 命令 | 结果 | EXIT | 证据文件 |
+|---|------|------|------|---------|
+| 1 | `python -m py_compile`（3 改动文件） | `py_compile OK` | **0** | `docs/evidence/groupc_r11_patch_compile.log` |
+| 2 | `python -m pytest tests -q` | **184 passed**（= R11 基线，无回归） | **0** | `docs/evidence/groupc_r11_patch_pytest.log` |
+| 3 | `python scripts/selfcheck.py`（离线） | **40/40 PASS**（新增 1 例 `r8_chat_resume_http_success`） | **0** | `docs/evidence/groupc_r11_patch_selfcheck.log` |
+| 4 | `node --test`（cwd = `src/frontend`） | **tests 6 / pass 6 / fail 0** | **0** | `docs/evidence/groupc_r11_patch_frontend.log` |
+| 5 | 负向对照（临时还原 2 段键） | `r8_chat_resume_http_success` **FAIL(404)**；`r8_chat_resume_http` **PASS** | **1** | `docs/evidence/groupc_r11_patch_negative_control.log` |
+| 6 | MAJOR-1 成功续跑探针 | 键 byte-identical；`200` + `StreamingHttpResponse` + `text/event-stream`；事件 `reasoning, content, done` | **0** | `docs/evidence/groupc_r11_patch_major1_probe.log` |
+
+> 新增用例 `r8_chat_resume_http_success`（MAJOR-1 正向）：以**流路径真实键**（`make_request_context("p_alpha","service-account","resume-ok").session_key`）预置带 `gate` 的 `SessionState` → `POST /api/chat/resume`（体 `{"session_id":"resume-ok","decision":{"gate_id":"gate-http-1","approved":true}}`）→ 断言 `200` / `StreamingHttpResponse` / `text/event-stream` / 流含 `event: done` 且**不含** `event: confirmation_required`；另断言 `gate_id` 不符 → `409`。全程**进程内** Django 测试客户端，**零外部网络**。
+
+#### 18.8.3 补丁轮守约复核
+
+- **契约纪律**：`IFC-IB-221~225` / `231~233` / `247` / `306` 签名文本**一字未改**；只新增 `298~308`；端口 14 / 模块 26 / 依赖边**零新增**。
+- **未削弱既有断言**：GROUP_D 基线 **184 passed** 原样通过；selfcheck 既有 **39 例全部保留**（含 401/400/403/409 反向断言）；**未使用 skip / xfail**。
+- **只读约束**：未改 `tests/**`（GROUP_D）、`docs/phase_status.md`（PM）、设计真源四文档；未执行 `git add` / `git commit`。
+- **受保护行复核（补丁轮）**：本轮对 L37 `revision_note`、L997 §18.3 REV-12-2 行均为**同一物理行原地改写**（行数不变），并在文件末尾**追加 §18.8** → §18.7 四处「24/24 PASS」保护行当前行号**仍为 L483 / L615 / L633 / L744**（未位移）。取证：`grep -n "24/24 PASS" docs/implementation_plan.md`。

@@ -109,6 +109,16 @@ IB_RUNTIME_ENV_KEYS: tuple[str, ...] = (
     #   IB_VISUAL_CONFIG_ENABLED —— 可视化配置页开关（前端据此决定是否渲染配置视图）
     "IB_DEFINITION_DOC_PATH",
     "IB_VISUAL_CONFIG_ENABLED",
+    # R8（IFC-IB-304）：会话 / 确认中间态 / 思考分区的键名登记。**只登记键名**（值不入仓库、
+    # 不入响应体）。三个键**全部有安全默认**，未声明不报错（与 IB_SESSION_PERSISTENCE_POLICY
+    # 的「须显式声明」区别见下：后者的显式性由 §5 部署模板（IFC-IB-262）承担，见 MOD-IB-23）。
+    #   IB_CONFIRMATION_GATE_ENABLED —— 确认中间态开关，**默认 false**（ADR-17 约束 1：默认关闭
+    #                                 即零行为差异；OQ-IB-07 保持开放）。
+    #   IB_SESSION_PERSISTENCE_POLICY —— 会话持久化策略，取值 `in_process`（默认）或 `external`。
+    #   IB_REASONING_STREAM_ENABLED —— 思考分区流式开关，**默认 false**（AC-IB-19-03）。
+    "IB_CONFIRMATION_GATE_ENABLED",
+    "IB_SESSION_PERSISTENCE_POLICY",
+    "IB_REASONING_STREAM_ENABLED",
 )
 
 #: v1 支持的 4 种格式（**OQ-IB-02 默认值**：其余格式按扩展点预留，不实现）。
@@ -260,6 +270,11 @@ class SessionConfig:
     """会话配置（OQ-IB-08：会话内隔离、不跨会话注入、长度上限可配）。"""
 
     backend: str = "memory"  # IB_SESSION_BACKEND
+    #: R8（IFC-IB-304 / IFC-IB-299）：会话持久化策略，取值 `in_process`（默认）或 `external`。
+    #: 该键**须显式声明**（AC-IB-20-02），声明载体是 `ib-web` 单元的 EnvironmentFile 模板
+    #: （IFC-IB-262）；未声明时取安全默认 `in_process`（进程内，重启即失忆 —— 这本身是
+    #: 安全失败方向，与 `SessionStateLossOutcome` 的唯一取值一致）。
+    persistence_policy: str = "in_process"  # IB_SESSION_PERSISTENCE_POLICY
     max_history_messages: int = 20
     sticky_turns: int = 1
 
@@ -288,6 +303,12 @@ class GlobalConfig:
     allowed_exts: tuple[str, ...] = SUPPORTED_EXTS
     ocr_enabled: bool = True  # IB_OCR_ENABLED
     render_enabled: bool = True  # IB_RENDER_ENABLED
+    #: R8（IFC-IB-304）：确认中间态开关。**默认 False** —— 默认关闭即零行为差异
+    #: （ADR-17 约束 1）。为 True 时若组合根未注入确认话术构造器，仍不触发确认门
+    #: （骨架不生成业务话术，见 MOD-IB-22 / IFC-IB-301）。
+    confirmation_gate_enabled: bool = False  # IB_CONFIRMATION_GATE_ENABLED
+    #: R8（IFC-IB-304）：思考分区流式开关。**默认 False**（AC-IB-19-03：默认不渲染）。
+    reasoning_stream_enabled: bool = False  # IB_REASONING_STREAM_ENABLED
     collection_schema_version: int = 1
     payload_schema_version: int = 1
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
@@ -572,6 +593,12 @@ def resolve_global_config(raw: RawConfig) -> GlobalConfig:
     )
     session_cfg = SessionConfig(
         backend=str(session.get("backend", values.get("session_backend", SessionConfig.backend))),
+        persistence_policy=str(
+            session.get(
+                "persistence_policy",
+                values.get("session_persistence_policy", SessionConfig.persistence_policy),
+            )
+        ),
         max_history_messages=_as_int(
             session.get("max_history_messages"),
             default=SessionConfig.max_history_messages,
@@ -614,6 +641,16 @@ def resolve_global_config(raw: RawConfig) -> GlobalConfig:
         allowed_exts=allowed_exts,
         ocr_enabled=_as_bool(values.get("ocr_enabled"), default=True, key="IB_OCR_ENABLED"),
         render_enabled=_as_bool(values.get("render_enabled"), default=True, key="IB_RENDER_ENABLED"),
+        confirmation_gate_enabled=_as_bool(
+            values.get("confirmation_gate_enabled"),
+            default=GlobalConfig.confirmation_gate_enabled,
+            key="IB_CONFIRMATION_GATE_ENABLED",
+        ),
+        reasoning_stream_enabled=_as_bool(
+            values.get("reasoning_stream_enabled"),
+            default=GlobalConfig.reasoning_stream_enabled,
+            key="IB_REASONING_STREAM_ENABLED",
+        ),
         collection_schema_version=_as_int(
             values.get("collection_schema_version"),
             default=GlobalConfig.collection_schema_version,
@@ -700,7 +737,14 @@ def validate_required(
         "IB_EMBED_BACKEND": (cfg.embedding.backend, {"http", "inproc", "fake"}),
         "IB_LLM_BACKEND": (cfg.llm.backend, {"openai_compatible", "fake"}),
         "IB_LEDGER_BACKEND": (cfg.ledger_backend, {"sqlite", "memory"}),
-        "IB_SESSION_BACKEND": (cfg.session.backend, {"memory"}),
+        # R8（IFC-IB-304）：`IB_SESSION_BACKEND` 的**值域扩展**为 {memory, external}；
+        # 键名与默认值（`memory`）**不变**（沿用 R2 对 `IB_EMBED_BACKEND` 的「仅扩展值域」先例）。
+        "IB_SESSION_BACKEND": (cfg.session.backend, {"memory", "external"}),
+        # R8（IFC-IB-304 / IFC-IB-299）：会话持久化策略值域（in_process 默认 / external）。
+        "IB_SESSION_PERSISTENCE_POLICY": (
+            cfg.session.persistence_policy,
+            {"in_process", "external"},
+        ),
         "IB_CONFIG_SOURCE": (cfg.config_source, {"file", "dict"}),
     }
     for key, (value, allowed) in choices.items():

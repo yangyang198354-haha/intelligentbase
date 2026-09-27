@@ -80,9 +80,14 @@ class RouteTier(WireStrEnum):
 
 
 class StreamEventKind(WireStrEnum):
-    """SSE 流事件类型（IFC-IB-224 / §7.3）。
+    """SSE 流事件类型（IFC-IB-224 / §7.3；R8 追加 `CONFIRMATION_REQUIRED`，IFC-IB-301）。
 
     降级必须在流内可见（AC-IB-14-01 的界面落点）= `DEGRADED` 事件。
+
+    **R8 追加纪律（IFC-IB-301）**：既有 6 个成员（`reasoning` / `content` / `degraded` /
+    `related_images` / `error` / `done`）**一字不动**，只在末尾**追加** `confirmation_required`
+    （确认中间态的呈递事件；**仅在 `IB_CONFIRMATION_GATE_ENABLED=true` 时出现**）。
+    追加而非改写，保证既有消费方（前端 switch / 自检 / 测试）的取值集合是**超集**而非变更集。
     """
 
     REASONING = "reasoning"
@@ -91,6 +96,8 @@ class StreamEventKind(WireStrEnum):
     RELATED_IMAGES = "related_images"
     ERROR = "error"
     DONE = "done"
+    # R8（IFC-IB-301）：确认中间态呈递。既有 6 个成员不动，本项为**追加**。
+    CONFIRMATION_REQUIRED = "confirmation_required"
 
 
 class RebuildState(WireStrEnum):

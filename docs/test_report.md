@@ -7,16 +7,16 @@
 | 文档 ID | DOC-IB-TR-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 测试执行报告 |
 | 产出代理 | test-engineer |
-| 调用 ID | INV-GROUP_D-INTELBASE-001；**R3 增量 = INV-GROUP_D-INTELBASE-002**（见 §10）；**R4 增量 = INV-GROUP_D-INTELBASE-003**（见 §11）；**R7 增量 = INV-GROUP_D-INTELBASE-004**（见 §12）；**R8 增量 = INV-GROUP_D-INTELBASE-005**（见 §13）；**R9 增量 = INV-GROUP_D-INTELBASE-006**（见 §14）；**R10 增量 = INV-GROUP_D-INTELBASE-007**（见 §15） |
+| 调用 ID | INV-GROUP_D-INTELBASE-001；**R3 增量 = INV-GROUP_D-INTELBASE-002**（见 §10）；**R4 增量 = INV-GROUP_D-INTELBASE-003**（见 §11）；**R7 增量 = INV-GROUP_D-INTELBASE-004**（见 §12）；**R8 增量 = INV-GROUP_D-INTELBASE-005**（见 §13）；**R9 增量 = INV-GROUP_D-INTELBASE-006**（见 §14）；**R10 增量 = INV-GROUP_D-INTELBASE-007**（见 §15）；**R11 增量 = INV-GROUP_D-INTELBASE-008**（见 §16）；**R12 增量 = INV-GROUP_D-INTELBASE-010**（见 §17） |
 | 项目 | intelligentbase |
-| 阶段 | GROUP_D / PHASE_08（测试执行）+ PHASE_09（测试用例实现）+ **R3 增量（缺陷回归与门控）** + **R4 增量（Blob 删除范围 / 回环契约）** + **R7 增量（US-IB-17 / US-IB-18「UI 可视化配置」纳入测试范围）** + **R8 增量（FND-R7-01 修复回归：装配期唯一性校验）** + **R9 增量（FLAKE-IB-01 测试侧稳定性治理：连接级有界重试）** + **R10 增量（前端冒烟测试层正式化 + 复跑证据）** |
-| 版本 | 1.6.1（R10 增量 + 修复：Python 层 **171/171 PASSED**（EXIT=0）；**前端冒烟层 6/6 PASSED**（独立一层，**不并入 171 算术**）；CI 阶段9 现含 `npm ci && npm run build && npm test`；**R10 修复（REV-10-2 续）**：TC-INT-086 原「`@vue-flow/core` 未安装」磁盘边界断言与 R10 `npm ci` 冲突 → 已改为**分发纪律（git 跟踪状态）**环境自适应判定，**未装 / 已装两种磁盘态均通过**（见 §15.5））<br>R9 = 1.5.0（**171/171**；三层门控全 PASSED；selfcheck **31/31**；**FLAKE-IB-01 → MITIGATED**）<br>**版本线**：1.0.0(R1) → 1.1.0(R3) → 1.2.0(R4) → 1.3.0(R7) → 1.4.0(R8) → 1.5.0(R9) → 1.6.0(R10) → **1.6.1(R10 修复)** |
-| status | §1~§9 APPROVED（GROUP_D 门控 GR-D-001 = PASS_WITH_CONDITIONS，2026-09-26）；§10 ~ §14 为追加节；**§15（R10 增量）待 PM 门控** |
+| 阶段 | GROUP_D / PHASE_08（测试执行）+ PHASE_09（测试用例实现）+ **R3 增量（缺陷回归与门控）** + **R4 增量（Blob 删除范围 / 回环契约）** + **R7 增量（US-IB-17 / US-IB-18「UI 可视化配置」纳入测试范围）** + **R8 增量（FND-R7-01 修复回归：装配期唯一性校验）** + **R9 增量（FLAKE-IB-01 测试侧稳定性治理：连接级有界重试）** + **R10 增量（前端冒烟测试层正式化 + 复跑证据）** + **R11 增量（REQ-FUNC-IB-20 测试补全：US-IB-19 / US-IB-20 纳入测试范围，含 5 条重挂 + 13 条新增）** + **R12 增量（R8 实现到位后的补测轮 REV-12-5：闭合 AC-IB-19-02 / AC-IB-20-04 并补全其余，含 16 条新增）** |
+| 版本 | 1.8.1（**R12 文档校验补丁（INV-GROUP_D-INTELBASE-011，2026-09-28）**：**纯文档**修订 —— 依独立只读核验 INV-GROUP_D-VERIFY-R12 修 **MINOR-1**（§17.6 门控「未改实现代码」证据改为如实归属）与 **MINOR-2**（§17.1 可测 AC 口径注：**机制层**）；**未改** `tests/**`、`src/**`、`docs/phase_status.md`、设计真源四文档、`docs/test_plan.md`，**未新增/删除用例、未改既有断言与编号**；三门复跑 200/200 不变）<br>1.8.0（**R12 增量（REV-12-5，补测轮）**：R8 实现已落地，Python 层 **200/200 PASSED**（EXIT=0；unit 76 / integration 105 / e2e 19），三层门控 100%/100%/关键路径 16/16；**前端冒烟层 6/6 PASSED**（独立一层，**不并入 200 算术**）；闭合 **AC-IB-19-02 / AC-IB-20-04**（此前「未覆盖」）并补全 19-03 / 20-02 / 20-03 / 20-05；回补 **FND-R11-01**（CLOSED_VERIFIED）与 **BLK-R8-02**（CLOSED_VERIFIED）；**可测 AC 覆盖 90/90 = 100%**（残余 3 项见 §17.5）；强约束：**未改 `src/**`**）<br>1.7.0（R11 增量：**184/184**；前端冒烟层 6/6 独立；可测 AC 覆盖 88/90 = 97.8%）<br>R10 = 1.6.1（**171/171**；前端冒烟层 6/6 独立）<br>R9 = 1.5.0（**171/171**；**FLAKE-IB-01 → MITIGATED**）<br>**版本线**：1.0.0(R1) → 1.1.0(R3) → 1.2.0(R4) → 1.3.0(R7) → 1.4.0(R8) → 1.5.0(R9) → 1.6.0(R10) → 1.6.1(R10 修复) → 1.7.0(R11) → 1.8.0(R12) → **1.8.1(R12 文档校验补丁)** |
+| status | §1~§9 APPROVED（GROUP_D 门控 GR-D-001 = PASS_WITH_CONDITIONS，2026-09-26）；§10 ~ §16 为追加节（R11 = PARTIAL_SUCCESS）；**§17（R12 增量）待 PM 门控；判定 SUCCESS（三层全绿 200/200，可测 AC 覆盖 100%，残余 3 项仅登记不阻塞，见 §17.1/§17.5）** |
 | 创建日期 | 2026-09-26 |
-| 更新日期 | 2026-09-27（R10 增量） |
-| 上游输入 | `docs/test_plan.md`（**1.5.0** / R10）、`docs/user_stories.md`（**1.2.0 / 18 US / APPROVED**）、`docs/implementation_plan.md`（**2.4.0 / R8**）、`docs/architecture_design.md` / `module_design.md` / `tech_stack.md`（**1.3.0 / R7**）、`docs/cicd_pipeline.md`（**1.1.1 / R10**，阶段9）、`src/**`（只读） |
-| 证据留档 | `docs/evidence/groupd_{unit,integration,e2e,all,coverage,credscan,fnd01_repro,fnd02_repro,defect_repros}.log`；**R3 增量 = `groupd_r3_{unit,integration,e2e,all,collect,credscan,blob_probe,targeted}.log`**；**R7 增量 = `groupd_r7_{probe,probe2,probe3,unit,integration,e2e,all,collect,credscan}.log`**；**R8 增量 = `groupd_r8_{unit,integration,e2e,all,collect,credscan,selfcheck}.log` + `groupd_r8_flake_ib01_TC_INT_026.log`（FLAKE-IB-01 现场证据）**；**R9 增量 = `groupd_r9_{unit,integration,e2e,all,collect,selfcheck,credscan,src_guard,wire_repeat,integration_repeat,retry_probe}.log` + `groupd_r9_retry_probe.py`（重试边界守约探针）**；**R10 增量 = `groupd_r10_{unit,integration,e2e,all,all_clean,collect,npm_test,ci_stage9,src_guard}.log`** |
-| 测试套件 | `tests/unit/**`（**7 文件 / 67**）、`tests/integration/**`（**10 文件 / 88**）、`tests/e2e/**`（1 文件 / **16**）、`tests/conftest.py`；**前端层（R10 新增，独立）**：`src/frontend/tests/frontend.smoke.test.js`（**1 文件 / 6 例**，`node --test`） |
+| 更新日期 | 2026-09-28（R12 增量（REV-12-5）） |
+| 上游输入 | `docs/test_plan.md`（**1.7.0 / R12**）、`docs/user_stories.md`（**1.3.0 / 20 US / 101 AC / APPROVED**）、`docs/requirements_spec.md`（**1.3.0 / APPROVED**）、`docs/implementation_plan.md`（**2.6.0 / R11–R12**）、`docs/architecture_design.md` / `module_design.md`（**1.4.0 / R8**）、`docs/tech_stack.md`（**1.3.0 / R7**）、`docs/cicd_pipeline.md`（**1.1.1 / R10**，阶段9）、`src/**`（只读） |
+| 证据留档 | `docs/evidence/groupd_{unit,integration,e2e,all,coverage,credscan,fnd01_repro,fnd02_repro,defect_repros}.log`；**R3 增量 = `groupd_r3_{unit,integration,e2e,all,collect,credscan,blob_probe,targeted}.log`**；**R7 增量 = `groupd_r7_{*}.log`**；**R8 增量 = `groupd_r8_{*}.log`**；**R9 增量 = `groupd_r9_{*}.log` + `groupd_r9_retry_probe.py`**；**R10 增量 = `groupd_r10_{*}.log`**；**R11 增量 = `groupd_r11_{unit,integration,e2e,all,collect,coverage}_*.log`**；**R12 增量 = `groupd_r12_{unit,integration,e2e,all,collect,coverage,frontend}.log`**（`.log` 不入 git，见 `.gitignore`） |
+| 测试套件 | `tests/unit/**`（**10 文件 / 76**）、`tests/integration/**`（**12 文件 / 105**）、`tests/e2e/**`（1 文件 / **19**）、`tests/conftest.py`；**前端层（R10 新增，独立）**：`src/frontend/tests/frontend.smoke.test.js`（**1 文件 / 6 例**，`node --test`） |
 ---
 
 # intelligentbase 测试执行报告（GROUP_D / PHASE_08+09）
@@ -1516,3 +1516,345 @@ FAILED tests/integration/test_definition_config_r7.py::test_TC_INT_086_view_side
 | 2 | GROUP_D R10 增量门控复核（交付态 Python **171/171** + 前端 **6/6**；§15.7 唯一未达标项 = 工作树复跑） | PM | 本轮 |
 | 3 | 前端层计数口径确认（**171 与 6 分列**，不混算） | PM | 信息项 |
 | 4 | `AC-IB-17-06` 覆盖判定更新（源码级 → 「源码级 + 构建产物级」；「禁 Docker 裸装」仍冻结）——见 `test_plan.md` §14.3 | PM | 信息项 |
+
+---
+
+## §16 R11 增量（REQ-FUNC-IB-20 测试补全：US-IB-19 / US-IB-20 纳入测试范围）
+
+> 触发：**REV-11-3**（协调者裁决「需求追踪审计后按 2→1→3 顺序开三轮修复」之第 3 项）。
+> 本轮 `INV-GROUP_D-INTELBASE-008`：为 REQ-FUNC-IB-20 的新 **US-IB-19**（流式交付最终答复，AC-IB-19-01~05）与 **US-IB-20**（会话生命周期，AC-IB-20-01~06）补全测试 —— **重挂 5 条既有用例** + **新增 13 条用例**，复跑三层并落原始证据。
+> **未改 `src/**`（含任何既有实现行为）**；**未改任何既有 171 条用例编号 / 断言语义**（见 §16.7）。
+
+### §16.1 结论摘要（R11 增量）
+
+| 级别 | Total | Pass | Fail | Skip | Blocked | 通过率 | 门控阈值 | 门控结论 |
+|------|-------|------|------|------|---------|--------|---------|---------|
+| 单元（UNIT） | 70 | 70 | 0 | 0 | 0 | **100.0%** | ≥ 80% | **PASSED** |
+| 集成（INT） | 96 | 96 | 0 | 0 | 0 | **100.0%** | ≥ 90% | **PASSED** |
+| E2E | 18 | 18 | 0 | 0 | 0 | **100.0%** | 关键路径 100% | **PASSED** |
+| **合计（Python）** | **184** | **184** | **0** | **0** | **0** | **100.0%** | — | **全部 PASSED** |
+| **前端冒烟（FE，独立层）** | **6** | **6** | **0** | **0** | **0** | **100.0%** | 全通过 | **PASSED** |
+
+- **关键路径覆盖率**：**16 / 16 Must Have US = 100%**（原 14 + R11 新增 US-IB-19 / US-IB-20）。
+- **无 CRITICAL 测试阻塞**；**本轮发现 1 项既有实现缺陷（FND-R11-01，MAJOR）**，**只登记不擅修**（§16.5）。
+- **状态判定：PARTIAL_SUCCESS** —— 三层全绿、算术一致，但 `src/` 尚未实现架构 1.4.0/R8 的 **IFC-IB-298~308**，致 **2 项 AC 未覆盖**（AC-IB-19-02 / AC-IB-20-04）+ **4 项部分覆盖**（AC-IB-19-03 / 20-02 / 20-03 / 20-05）（§16.5）。
+
+### §16.2 用例变更（重挂 5 + 新增 13；既有 171 条编号不变）
+
+**（A）重挂（仅改 `docs/test_plan.md` 的 US/AC 归属列；测试代码零改动）**
+
+| 用例 | 原归属 | **R11 归属** |
+|------|--------|-------------|
+| TC-UNIT-016 | US-IB-08 / AC-IB-08-01 | **US-IB-19 / AC-IB-19-01** |
+| TC-UNIT-017 | US-IB-08 / AC-IB-08-01 | **US-IB-19 / AC-IB-19-01** |
+| TC-INT-039 | US-IB-08 / AC-IB-08-01 | **US-IB-19 / AC-IB-19-01** |
+| TC-UNIT-018 | US-IB-11 / AC-IB-11-02 | **US-IB-20 / AC-IB-20-01** |
+| TC-UNIT-022 | US-IB-11 / AC-IB-11-02 | **US-IB-20 / AC-IB-20-06** |
+
+> **未强制重挂**：TC-INT-042 保持 **US-IB-09 / AC-IB-09-03**（其断言语义属「聚合不暴露内部分工」）；同行为已由新增 TC-INT-088/090 从 US-IB-19 侧覆盖，**不为凑指标重挂**。
+
+**（B）新增 13 条（落 `tests/**`；编号只增不改）**
+
+| TC-ID | 层 | 关联 US | 关联 AC | 结果 |
+|-------|----|--------|--------|------|
+| TC-UNIT-067 | 单元 | US-IB-19 | AC-IB-19-04 | **PASS** |
+| TC-UNIT-068 | 单元 | US-IB-19 | AC-IB-19-03 | **PASS** |
+| TC-UNIT-069 | 单元 | US-IB-20 | AC-IB-20-05 | **PASS** |
+| TC-INT-088 | 集成 | US-IB-19 | AC-IB-19-01 | **PASS** |
+| TC-INT-089 | 集成 | US-IB-19 | AC-IB-19-04 | **PASS** |
+| TC-INT-090 | 集成 | US-IB-19 | AC-IB-19-03 | **PASS** |
+| TC-INT-091 | 集成 | US-IB-19 | AC-IB-19-05 | **PASS** |
+| TC-INT-092 | 集成 | US-IB-20 | AC-IB-20-01 | **PASS** |
+| TC-INT-093 | 集成 | US-IB-20 | AC-IB-20-02/20-05 | **PASS** |
+| TC-INT-094 | 集成 | US-IB-20 | AC-IB-20-03 | **PASS** |
+| TC-INT-095 | 集成 | US-IB-20 | AC-IB-20-06 | **PASS** |
+| TC-E2E-017 | E2E | US-IB-19 | AC-IB-19-01/19-05 | **PASS** |
+| TC-E2E-018 | E2E | US-IB-20 | AC-IB-20-01 | **PASS** |
+
+新增文件：`tests/unit/test_stream_session_lifecycle_unit_r11.py`（3）、`tests/integration/test_stream_session_lifecycle_int_r11.py`（8）；修订文件：`tests/e2e/test_user_journeys.py`（**追加** TC-E2E-017/018，既有 16 例逐字未动）。
+
+### §16.3 执行命令与原始证据（可逐条复核）
+
+```
+# 仓库根：离线装配（conftest 导入期设定 IB_OFFLINE_MODE=1 等）
+$ PYTHONUTF8=1 IB_OFFLINE_MODE=1 python -m pytest tests/unit -q
+70 passed in 0.20s                    EXIT=0   → 70/70 = 100.0% >= 80%  PASSED
+留档：docs/evidence/groupd_r11_unit_20260928T000201.log
+$ PYTHONUTF8=1 IB_OFFLINE_MODE=1 python -m pytest tests/integration -q
+96 passed in 13.64s                   EXIT=0   → 96/96 = 100.0% >= 90%  PASSED
+留档：docs/evidence/groupd_r11_integration_20260928T000201.log
+$ PYTHONUTF8=1 IB_OFFLINE_MODE=1 python -m pytest tests/e2e -q
+18 passed in 0.65s                    EXIT=0   → critical path 16/16 Must Have US = 100%  PASSED
+留档：docs/evidence/groupd_r11_e2e_20260928T000201.log
+$ PYTHONUTF8=1 IB_OFFLINE_MODE=1 python -m pytest tests -q
+184 passed in 13.96s                  EXIT=0
+留档：docs/evidence/groupd_r11_all_20260928T000201.log
+$ PYTHONUTF8=1 IB_OFFLINE_MODE=1 python -m pytest tests --collect-only -q
+184 tests collected                   （unit 70 + integration 96 + e2e 18 = 184，一致）
+留档：docs/evidence/groupd_r11_collect_20260928T000339.log
+$ PYTHONUTF8=1 IB_OFFLINE_MODE=1 python -m pytest tests -q --cov=ib --cov=ibweb --cov=ib_embed
+184 passed；TOTAL 覆盖率 71%          EXIT=0
+留档：docs/evidence/groupd_r11_coverage_20260928T000339.log
+$ cd src/frontend && npm test
+tests 6 / pass 6 / fail 0             EXIT=0   （前端层，独立计数）
+```
+
+**度量自洽校验**：
+```
+单元：70  = 70  + 0 + 0 + 0 ✓     集成：96  = 96  + 0 + 0 + 0 ✓     E2E：18 = 18 + 0 + 0 + 0 ✓
+合计：184 = 184 + 0 + 0 + 0 ✓     通过率 = pass/(pass+fail) = 100.0%
+前端层：6 = 6 + 0 + 0 + 0 ✓（独立层，不计入 184）
+```
+**0 skip / 0 xfail**（`python -m pytest tests -q -rsx` 无 skip/xfail 行）。
+
+### §16.4 突变敏感性自证（新增守卫为**载荷性**，非空转）
+
+以**进程内 monkeypatch** 制造突变（**未改动任何 `src/` 文件**），逐条观察新用例是否失效：
+
+| # | 突变 | 目标用例 | 实测 |
+|---|------|---------|------|
+| M1 | 清空 `ib.orchestration.AGGREGATION_FORBIDDEN_LABELS` | TC-UNIT-067 | **FAIL**（内部标识未被清洗） |
+| M2 | `Orchestrator._aggregate` 返回逐专家拼接 | TC-INT-089 | **FAIL**（未融合为单一答复，内部产物外流） |
+| M5 | `Orchestrator.resume` 静默产出 content+done | TC-INT-093 | **FAIL**（未携带状态却静默续跑） |
+| M6 | `ib.core.GraphConfig` 默认 `confirmation_gate_enabled=True` | TC-INT-094 | **FAIL**（确认门默认须关闭） |
+| M7 | `MemorySessionStore.load` 忽略隔离（任何键返回状态） | TC-INT-092 | **FAIL**（跨会话注入） |
+| M8 | `Orchestrator.run` 产出两个 `done` | TC-INT-088 | **FAIL**（终止事件须恰一次） |
+
+（对照：无突变时对应用例**全 PASS**；推翻对应守卫即变红 → 证明其覆盖为**真实载荷**。）
+
+### §16.5 覆盖缺口登记（IFC-IB-298~308 本轮未实现）+ 既有缺陷 FND-R11-01
+
+**（A）未覆盖 / 部分覆盖的 AC（依赖未实现接口，不写红测）**
+
+| AC | 缺口内容 | 依赖接口（设计 1.4.0/R8） | 本轮状态 |
+|----|---------|--------------------------|---------|
+| AC-IB-19-02 | 完成事件附结构化产物（>= 引用列表），一次性、不臆造 | `CompletionPayload` / `CitationItem` / `completion_event`（IFC-IB-300/302） | **未覆盖** |
+| AC-IB-19-03 | 默认不出思考片段；启用后可辨（`IB_REASONING_STREAM_ENABLED`） | IFC-IB-302 | **部分覆盖** |
+| AC-IB-20-02 | 持久化策略须在配置 + 部署文档显式声明 | `SessionPersistencePolicy`（IFC-IB-304/305） | **部分覆盖** |
+| AC-IB-20-03 | 「机制保留、默认不启用」的启用后行为 | IFC-IB-301 | **部分覆盖** |
+| AC-IB-20-04 | 确认中间态呈递与决策回传 | `confirmation_required` 事件 + `POST /api/chat/resume`（IFC-IB-301/307/308） | **未覆盖** |
+| AC-IB-20-05 | 携带决策自中间态**续跑** | `ResumePayload` / `can_resume`（IFC-IB-306/308） | **部分覆盖** |
+
+**可测 AC 覆盖：88/90 = 97.8%**（101 总 AC - 11 NOT_TESTABLE = 90 可测；2 项未覆盖）。
+
+**（B）FND-R11-01（MAJOR，既有实现缺陷；只登记不擅修）**
+
+| 项 | 内容 |
+|----|------|
+| **现象** | `src/ibweb/views.py::chat_stream_endpoint` 对缺失 `session_id` 以字面量 `"default"` 静默兜底（`request.GET.get("session_id") or "default"`）→ **所有未携带 `session_id` 的调用方共享同一默认会话**，历史互相注入 |
+| **AC 依据** | **AC-IB-20-01**：「会话标识被正确识别（沿用其既有历史）**或显式拒绝**（**不静默新建 / 使用默认会话**）」 |
+| **处置** | **只登记、不擅修**（`src/` 属软件代理职责）；**本轮不写红测**（避免红套件）；**未使任何既有断言失败** |
+| **本轮测试边界** | TC-INT-092 / TC-E2E-018 仅使用**显式** `session_id`，不依赖该兜底行为 |
+| **建议路由** | PM → software-developer：将缺失 `session_id` 改为**显式 4xx 拒绝**（或与 IFC-IB-301/307 的会话生命周期一并实现） |
+
+### §16.6 门控逐条判定（R11 增量）
+
+| 门控项 | 阈值 | 实测 | 判定 | 证据 |
+|--------|------|------|------|------|
+| 单元通过率 | >= 80% | 100.0%（70/70） | **达标** | `groupd_r11_unit_*.log` |
+| 集成通过率 | >= 90% | 100.0%（96/96） | **达标** | `groupd_r11_integration_*.log` |
+| E2E 关键路径覆盖 | 100% | 16/16 Must Have US = 100% | **达标** | `groupd_r11_e2e_*.log` |
+| 全部 US 有测试 | 20/20 | 20/20 | **达标** | `test_plan.md` §4 |
+| 可测 AC 覆盖 | 100% | **88/90 = 97.8%** | **未达标**（2 项，§16.5） | `test_plan.md` §4 / §15.5 |
+| 编号只增不改 | 必须 | 既有 171 条编号 + 断言均未改 | **达标** | §16.7 |
+| metrics 算术一致 | 精确等式 | 184 = 184 + 0 + 0 + 0 | **达标** | §16.3 |
+| 0 skip / 0 xfail | 必须 | 0 / 0 | **达标** | 全量日志 |
+| 未改实现代码 | 必须 | `git status --porcelain src` 为空 | **达标** | §16.7 |
+| 前端冒烟层 | 全通过 | 6/6 = 100% | **达标** | `npm test` |
+
+**门控结论**：三层门控 **全部 PASSED**（100%/100%/100%，EXIT=0）；**唯一未达标项 = 可测 AC 覆盖 97.8%**（因 IFC-IB-298~308 未实现）→ 本代理自评 **PARTIAL_SUCCESS / 建议 PASS_WITH_CONDITIONS**，条件为 §16.5（2 项未覆盖 + 4 项部分覆盖）+ FND-R11-01 路由。
+
+### §16.7 守约复核与交付物
+
+- **未改实现**：`git status --porcelain src` **为空**（`src/**` 全程只读；无 `src/` 写操作记录）。
+- **编号只增不改**：既有 171 条用例 ID **未改**；5 条重挂仅改 `docs/test_plan.md` 的 US/AC 归属列，**测试代码零改动**；TC-INT-042 未强制重挂。
+- **未削弱断言 / 无 skip·xfail**：新增 13 条为纯增；E2E 既有 16 例逐字未动；全量 0 skip / 0 xfail。
+- **AC 真实存在**：全部引用来自 `user_stories.md` 1.3.0 的 US-IB-19 / US-IB-20（AC-IB-19-01~05 / AC-IB-20-01~06）。
+- **离线纪律**：全程 InMemory / Fake / 临时文件系统与本地 npm；**未连**任何外部网络 / 真实 Qdrant / DeepSeek / bge-m3；**无 Docker**。
+- **凭据纪律**：新增测试代码/夹具**无任何真实 token/key/密码**（沿用 `IB_OFFLINE_TOKEN` 环境变量占位符）。
+- **未 commit / 未 push**（PM 统一原子提交）。
+- **本轮改动面**：
+  - `docs/test_plan.md`（**1.5.1/R10 → 1.6.0/R11**；文件头 + §1.1 + §3.1/§3.2/§3.3 + §4 + §5 合计 + **新增 §15**）；
+  - `docs/test_report.md`（**1.6.1/R10 → 1.7.0/R11**；文件头 + **新增 §16**）；
+  - `tests/unit/test_stream_session_lifecycle_unit_r11.py`（新增，3 例）；
+  - `tests/integration/test_stream_session_lifecycle_int_r11.py`（新增，8 例）；
+  - `tests/e2e/test_user_journeys.py`（追加 TC-E2E-017/018）；
+  - `docs/evidence/groupd_r11_{unit,integration,e2e,all,collect,coverage}_*.log`（`.log` 不入 git，见 `.gitignore`）。
+
+### §16.8 需 PM 路由的动作（R11 增量）
+
+| # | 动作 | 对象 | 优先级 |
+|---|------|------|--------|
+| 1 | **IFC-IB-298~308 实现轮**（补 AC-IB-19-02 / 19-03 / 20-02 / 20-03 / 20-04 / 20-05 缺口） | PM → software-developer | **阻塞闭合**（本项覆盖条件） |
+| 2 | **FND-R11-01**：`chat_stream_endpoint` 缺失 `session_id` 静默用默认会话（违反 AC-IB-20-01）→ 改为显式拒绝 | PM → software-developer | MAJOR |
+| 3 | GROUP_D R11 增量门控复核（三层 **184/184**；§16.6 唯一未达标项 = 可测 AC 97.8%） | PM | 本轮 |
+| 4 | 计数基线更新确认（**171 → 184**：unit 70 / int 96 / e2e 18；前端 6 独立） | PM | 信息项 |
+| 5 | `AC-IB-08-01` 覆盖判定更新（TC-INT-039 已重挂至 AC-IB-19-01） | PM | 信息项 |
+
+---
+
+## §17 R12 增量（R8 实现到位后的补测轮 REV-12-5：闭合 AC-IB-19-02 / AC-IB-20-04 并补全其余）
+
+> 触发：**REV-12-5**（R8 设计 IFC-IB-298~308 **已落地于 `src/`**，R11 §16 登记的「未覆盖 / 部分覆盖」AC 现可验收）。
+> 本轮 `INV-GROUP_D-INTELBASE-010`：**新增 16 条用例**（unit +6 / integration +9 / e2e +1），复跑三层并落原始证据。
+> **未改 `src/**`（实现已收口）**；**未改任何既有 184 条用例编号 / 断言语义**；**未改** `docs/phase_status.md` 与设计真源四文档；**未新增 skip/xfail**。
+
+### §17.1 结论摘要（R12 增量）
+
+| 级别 | Total | Pass | Fail | Skip | Blocked | 通过率 | 门控阈值 | 门控结论 |
+|------|-------|------|------|------|---------|--------|---------|---------|
+| 单元（UNIT） | 76 | 76 | 0 | 0 | 0 | **100.0%** | ≥ 80% | **PASSED** |
+| 集成（INT） | 105 | 105 | 0 | 0 | 0 | **100.0%** | ≥ 90% | **PASSED** |
+| E2E | 19 | 19 | 0 | 0 | 0 | **100.0%** | 关键路径 100% | **PASSED** |
+| **合计（Python）** | **200** | **200** | **0** | **0** | **0** | **100.0%** | — | **全部 PASSED** |
+| **前端冒烟（FE，独立层）** | **6** | **6** | **0** | **0** | **0** | **100.0%** | 全通过 | **PASSED** |
+
+- **关键路径覆盖率**：**16 / 16 Must Have US = 100%**（US-IB-20 旅程由 TC-E2E-018/019 双覆盖）。
+- **可测 AC 覆盖率**：**90 / 90 = 100%**（R11 的 2 项未覆盖 AC 已闭合；残余 3 项仅登记、不阻塞，见 §17.5）。
+  > **口径注（机制层）**：该 90/90 为**机制层**口径；AC-IB-19-02 / AC-IB-19-03 / AC-IB-20-02 各有 1 项**已登记未断言子句**（端到端 citations 装配 / 前端运行期可见呈递 / 部署文档显式声明），属端到端 / 部署面**残余**（详见 §17.5 / §16.5）。
+- **无 CRITICAL 阻塞**；**FND-R11-01 / BLK-R8-02 均 → CLOSED_VERIFIED**（§17.5）。
+- **状态判定：SUCCESS** —— 三层门控全 PASSED、算术一致、编号只增不改、16 条新增全绿、可测 AC 覆盖 100%。
+
+### §17.2 新增用例（16 条；既有 184 条编号不变）
+
+| TC-ID | 层 | 关联 US | 关联 AC | 结果 | 文件 |
+|-------|----|--------|--------|------|------|
+| TC-UNIT-070 | 单元 | US-IB-19 | AC-IB-19-02 | **PASS** | `tests/unit/test_stream_session_lifecycle_unit_r12.py` |
+| TC-UNIT-071 | 单元 | US-IB-19 | AC-IB-19-03 | **PASS** | 同上 |
+| TC-UNIT-072 | 单元 | US-IB-20 | AC-IB-20-02/20-05 | **PASS** | 同上 |
+| TC-UNIT-073 | 单元 | US-IB-20 | AC-IB-20-04/20-05 | **PASS** | 同上 |
+| TC-UNIT-074 | 单元 | US-IB-18 | AC-IB-18-02（BLK-R8-02） | **PASS** | `tests/unit/test_definition_keyword_intra_r12.py` |
+| TC-UNIT-075 | 单元 | US-IB-18 | AC-IB-18-02（BLK-R8-02） | **PASS** | 同上 |
+| TC-INT-096 | 集成 | US-IB-20 | AC-IB-20-04 | **PASS** | `tests/integration/test_stream_session_lifecycle_int_r12.py` |
+| TC-INT-097 | 集成 | US-IB-20 | AC-IB-20-04 | **PASS** | 同上 |
+| TC-INT-098 | 集成 | US-IB-20 | AC-IB-20-04/20-05 | **PASS** | 同上 |
+| TC-INT-099 | 集成 | US-IB-20 | AC-IB-20-04（MAJOR-1） | **PASS** | 同上 |
+| TC-INT-100 | 集成 | US-IB-20 | AC-IB-20-01/20-04/20-05（MAJOR-1 守卫） | **PASS** | 同上 |
+| TC-INT-101 | 集成 | US-IB-20 | AC-IB-20-01（FND-R11-01） | **PASS** | 同上 |
+| TC-INT-102 | 集成 | US-IB-20 | AC-IB-20-03 | **PASS** | 同上 |
+| TC-INT-103 | 集成 | US-IB-19 | AC-IB-19-02/19-05 | **PASS** | 同上 |
+| TC-INT-104 | 集成 | US-IB-20 | AC-IB-20-03 | **PASS** | 同上 |
+| TC-E2E-019 | E2E | US-IB-20 | AC-IB-20-04/20-05 | **PASS** | `tests/e2e/test_user_journeys.py`（追加） |
+
+新增文件：`tests/unit/test_stream_session_lifecycle_unit_r12.py`（4）、`tests/unit/test_definition_keyword_intra_r12.py`（2）、`tests/integration/test_stream_session_lifecycle_int_r12.py`（9）；修订文件：`tests/e2e/test_user_journeys.py`（**追加** TC-E2E-019 + 局部夹具 `gate_http_app`，既有 18 例逐字未动）。
+
+### §17.3 执行命令与原始证据（可逐条复核）
+
+```
+# 仓库根：离线装配（conftest 导入期设定 IB_OFFLINE_MODE=1 等）
+$ python -m pytest tests/unit -q
+76 passed in 0.22s                    EXIT=0   → 76/76 = 100.0% >= 80%  PASSED
+留档：docs/evidence/groupd_r12_unit.log
+$ python -m pytest tests/integration -q
+105 passed in 13.71s                  EXIT=0   → 105/105 = 100.0% >= 90%  PASSED
+留档：docs/evidence/groupd_r12_integration.log
+$ python -m pytest tests/e2e -q
+19 passed in 0.65s                    EXIT=0   → critical path 16/16 Must Have US = 100%  PASSED
+留档：docs/evidence/groupd_r12_e2e.log
+$ python -m pytest tests -q
+200 passed in 14.10s                  EXIT=0
+留档：docs/evidence/groupd_r12_all.log
+$ python -m pytest tests --collect-only -q
+200 tests collected                   （unit 76 + integration 105 + e2e 19 = 200，一致）
+留档：docs/evidence/groupd_r12_collect.log
+$ python -m pytest tests -q --cov=ib --cov=ibweb --cov=ib_embed
+200 passed；TOTAL 覆盖率 71%          EXIT=0
+留档：docs/evidence/groupd_r12_coverage.log
+$ cd src/frontend && node --test
+tests 6 / pass 6 / fail 0 / skipped 0   EXIT=0   （前端层，独立计数）
+留档：docs/evidence/groupd_r12_frontend.log
+```
+
+**度量自洽校验**：
+```
+单元：76  = 76  + 0 + 0 + 0 ✓     集成：105 = 105 + 0 + 0 + 0 ✓     E2E：19 = 19 + 0 + 0 + 0 ✓
+合计：200 = 200 + 0 + 0 + 0 ✓     通过率 = pass/(pass+fail) = 100.0%
+前端层：6 = 6 + 0 + 0 + 0 ✓（独立层，不计入 200）
+```
+**0 skip / 0 xfail**（`python -m pytest tests -q -rsxX` 无 skip / xfail 行；前端 `node --test` 报 `skipped 0 / todo 0`）。
+
+### §17.4 突变敏感性自证（新增守卫为**载荷性**，非空转）
+
+以**进程内 monkeypatch** 制造突变（**未改动任何 `src/` 文件**），逐条观察新用例是否失效：
+
+| # | 突变 | 目标用例 | 实测 |
+|---|------|---------|------|
+| M-R12-1 | `completion_event(None)` 改为输出 `{"citations": []}` | TC-UNIT-070 / TC-INT-103 | **FAIL**（未产出产物须为空串） |
+| M-R12-2 | `completion_payload_json` 对空元组输出 `None` | TC-UNIT-070 | **FAIL**（空元组须编码为 `[]`） |
+| M-R12-3 | `USER_VISIBLE_KINDS` 加入 `"reasoning"` | TC-UNIT-071 | **FAIL**（默认不得可见） |
+| M-R12-4 | `can_resume` 缺 `payload.decision` 时返回 `True` | TC-UNIT-073 / TC-INT-098 | **FAIL**（未携决策须 fail-closed） |
+| M-R12-5 | `chat_stream_endpoint` 缺 `session_id` 回退 `"default"` | TC-INT-101 | **FAIL**（须 400，不得静默回退） |
+| M-R12-6 | `chat_resume_endpoint` 自造 2 段键 | TC-INT-099 / TC-INT-100 | **FAIL**（真实 3 段会话恒 404） |
+| M-R12-7 | 专家内部校验跳过空词 | TC-UNIT-074 | **FAIL**（空词须被定位） |
+| M-R12-8 | 专家内部重复改用跨专家码 | TC-UNIT-075 | **FAIL**（内部项须报 `expert_keyword_duplicate`） |
+
+（对照：无突变时对应用例**全 PASS**；推翻对应守卫即变红 → 证明其覆盖为**真实载荷**。）
+
+### §17.5 AC 闭合 / 残余登记 + 缺陷闭环
+
+**（A）R11 登记的缺口 → R12 处置**
+
+| AC | R11 状态（§16.5） | R12 状态 | 依据 TC | 残余 |
+|----|------------------|---------|---------|------|
+| AC-IB-19-02 | 未覆盖 | **Tested（机制层完整）** | TC-UNIT-070, TC-INT-103 | **端到端**「命中→`CompletionPayload` 装配来源」未接线（编排恒传 `payload=None`），登记残余 |
+| AC-IB-19-03 | 部分 | **Tested（默认口径）** | TC-UNIT-068/071, TC-INT-090 | 「启用后可见」端上呈递属前端运行期，离线不可验 |
+| AC-IB-20-01 | 部分（FND-R11-01） | **Tested（完整）** | TC-UNIT-018, TC-INT-092/101, TC-E2E-018 | 无 |
+| AC-IB-20-02 | 部分 | **Tested（配置层）** | TC-UNIT-072, TC-INT-093 | 「**部署文档**显式声明」属部署面（GROUP_E），本轮冻结 |
+| AC-IB-20-03 | 部分 | **Tested（完整）** | TC-INT-094/102/104 | 无 |
+| AC-IB-20-04 | 未覆盖 | **Tested（完整）** | TC-UNIT-073, TC-INT-096/097/099, TC-E2E-019 | 无 |
+| AC-IB-20-05 | 部分 | **Tested（完整）** | TC-UNIT-069/072/073, TC-INT-093/098, TC-E2E-019 | 无 |
+
+**可测 AC 覆盖：90/90 = 100%**（101 总 AC - 11 NOT_TESTABLE = 90 可测；0 项未覆盖）。**残余 3 项**（AC-IB-19-02 端到端装配来源 / AC-IB-19-03 前端呈递 / AC-IB-20-02 部署文档声明）—— **不阻塞通过率**，仅登记待后续轮。
+
+**（B）缺陷闭环**
+
+| 缺陷 | 现象 | R12 处置 | 判定 |
+|------|------|---------|------|
+| **FND-R11-01**（MAJOR） | `chat_stream_endpoint` 缺 `session_id` 曾以 `"default"` 静默兜底（违反 AC-IB-20-01） | software-developer 已修复为**显式 400**；本Agent 以 **TC-INT-101** 守住「缺 `session_id` → 400 且不开流、显式合法 → 200」 | **CLOSED_VERIFIED** |
+| **BLK-R8-02** | 定义文档层未校验**专家内部**关键词空/重复（只留 `validate_specs` 兜底，丢失可定位回执） | `validate` 第 12 项已实现 `expert_keyword_empty` / `expert_keyword_duplicate`；本Agent 以 **TC-UNIT-074/075** 覆盖，并加对照（跨专家仍报旧码 `expert_keyword_collision`、不误报新码；TC-UNIT-062/065 未削弱） | **CLOSED_VERIFIED** |
+
+### §17.6 门控逐条判定（R12 增量）
+
+| 门控项 | 阈值 | 实测 | 判定 | 证据 |
+|--------|------|------|------|------|
+| 单元通过率 | >= 80% | 100.0%（76/76） | **达标** | `groupd_r12_unit.log` |
+| 集成通过率 | >= 90% | 100.0%（105/105） | **达标** | `groupd_r12_integration.log` |
+| E2E 关键路径覆盖 | 100% | 16/16 Must Have US = 100% | **达标** | `groupd_r12_e2e.log` |
+| 全部 US 有测试 | 20/20 | 20/20 | **达标** | `test_plan.md` §4 |
+| 可测 AC 覆盖 | 100% | **90/90 = 100%** | **达标**（残余 3 项见 §17.5） | `test_plan.md` §4 / §16 |
+| 编号只增不改 | 必须 | 既有 184 条编号 + 断言均未改 | **达标** | §17.7 |
+| metrics 算术一致 | 精确等式 | 200 = 200 + 0 + 0 + 0 | **达标** | §17.3 |
+| 0 skip / 0 xfail | 必须 | 0 / 0 | **达标** | 全量日志 |
+| 未改实现代码 | 必须 | 本轮未改 `src/**`（mtime 早于本轮测试/文档写入时间；`M src/**` 均为本轮之前 GROUP_C R11 引入，详见 §17.7 归属说明） | **达标** | §17.7 |
+| 前端冒烟层 | 全通过 | 6/6 = 100% | **达标** | `groupd_r12_frontend.log` |
+
+**门控结论**：三层门控 **全部 PASSED**（100%/100%/关键路径 100%，EXIT=0）；可测 AC 覆盖 **100%** → 本代理自评 **SUCCESS**。
+
+### §17.7 守约复核与交付物
+
+- **未改实现**：本轮**未对 `src/**` 执行任何写操作**（`src/**` 全程只读；本代理工具调用记录中无 `src/` 写操作）。
+  > 说明：`git status --porcelain src` 现显示若干 `M src/**`（如 `ibweb/views.py` / `ib/streaming/__init__.py` / `ib/orchestration/__init__.py` / `ib/config/definition.py` 等）—— 这些是**本轮之前**由 GROUP_C R11（设计侧编号 R8/ADR-17；见 `implementation_plan.md` §18 命名口径声明）实现引入的改动（mtime 均 **早于**本轮测试文件写入时间；本轮起始 git 快照即已为 `M`），**与本轮 R12 测试无关**。R11 §16.7 的「`src` 为空」为该轮当时快照，R8 实现落地后已不再成立，此处如实澄清。
+- **编号只增不改**：既有 184 条用例 ID **未改**；16 条新增编号为 TC-UNIT-070~075 / TC-INT-096~104 / TC-E2E-019（紧接既有最高编号）。
+- **未削弱断言 / 无 skip·xfail**：16 条为纯增；E2E 既有 18 例逐字未动；全量 0 skip / 0 xfail。
+- **AC 真实存在且 G/W/T 对齐**：全部引用来自 `user_stories.md` 1.3.0 的 US-IB-18 / US-IB-19 / US-IB-20（AC-IB-18-02 / AC-IB-19-02/03/05 / AC-IB-20-01~05）。
+- **离线纪律**：全程 InMemory / Fake / 进程内 Django test client / 临时文件系统与本地 `node --test`；**未连**任何外部网络 / 真实 Qdrant / DeepSeek / bge-m3；**无 Docker**。
+- **凭据纪律**：新增测试代码/夹具**无任何真实 token/key/密码**（沿用 `IB_OFFLINE_TOKEN` 环境变量占位符）；`?token=` 仍被拒（TC-INT-100 加断言）。
+- **未 commit / 未 push**（PM 统一原子提交）。
+- **R12 文档校验补丁（INV-GROUP_D-INTELBASE-011）**：本轮为**纯文档**修订 —— 仅修 §17.6 门控「未改实现代码」证据表述（MINOR-1，如实归属）与 §17.1 可测 AC 口径注（MINOR-2，机制层）；版本 1.8.0 → **1.8.1**；**未改** `tests/**`、`src/**`、`docs/phase_status.md`、设计真源四文档与 `docs/test_plan.md`；**未新增/删除用例、未改既有断言与编号**；三门复跑数不变（200/200）。
+- **本轮改动面**：
+  - `docs/test_plan.md`（**1.6.1/R11 → 1.7.0/R12**；文件头 + §1.1 + §3 概览 + §3.1/§3.2/§3.3 + §4 + §5 合计 + **新增 §16**）；
+  - `docs/test_report.md`（**1.7.0/R11 → 1.8.0/R12**；文件头 + **新增 §17**）；
+  - `tests/unit/test_stream_session_lifecycle_unit_r12.py`（新增，4 例）；
+  - `tests/unit/test_definition_keyword_intra_r12.py`（新增，2 例）；
+  - `tests/integration/test_stream_session_lifecycle_int_r12.py`（新增，9 例）；
+  - `tests/e2e/test_user_journeys.py`（追加 TC-E2E-019 + 局部夹具）；
+  - `docs/evidence/groupd_r12_{unit,integration,e2e,all,collect,coverage,frontend}.log`（`.log` 不入 git，见 `.gitignore`）。
+
+### §17.8 需 PM 路由的动作（R12 增量）
+
+| # | 动作 | 对象 | 优先级 |
+|---|------|------|--------|
+| 1 | GROUP_D R12 增量门控复核（三层 **200/200**；可测 AC 覆盖 100%；§17.6 全达标） | PM | 本轮 |
+| 2 | 计数基线更新确认（**184 → 200**：unit 76 / integration 105 / e2e 19；前端 6 独立） | PM | 信息项 |
+| 3 | **残余 3 项**后续轮处置（AC-IB-19-02 端到端装配来源 → developer 接线；AC-IB-19-03 前端呈递 / AC-IB-20-02 部署文档声明 → 前端轮 / GROUP_E） | PM | 信息项（不阻塞） |
+| 4 | FND-R11-01 / BLK-R8-02 状态在缺陷台账中标记 **CLOSED_VERIFIED** | PM | 信息项 |

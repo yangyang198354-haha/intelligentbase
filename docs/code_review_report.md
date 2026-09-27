@@ -7,13 +7,13 @@
 | 文档 ID | DOC-IB-CR-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 开发者自我代码评审报告 |
 | 产出代理 | software-developer |
-| 调用 ID | INV-GROUP_C-INTELBASE-001（R1）／ INV-GROUP_C-INTELBASE-002（R2 增量）／ INV-GROUP_C-INTELBASE-003（R3 缺陷修复增量）／ INV-GROUP_C-INTELBASE-004（R4 缺陷修复 + 依赖补齐增量）／ INV-GROUP_C-INTELBASE-005（R7 定义外置 + 可视化配置增量）／ INV-GROUP_C-INTELBASE-007（R8 FND-R7-01 校验项补齐）／ INV-GROUP_C-INTELBASE-008（R10 前端构建阻断修复） |
+| 调用 ID | INV-GROUP_C-INTELBASE-001（R1）／ INV-GROUP_C-INTELBASE-002（R2 增量）／ INV-GROUP_C-INTELBASE-003（R3 缺陷修复增量）／ INV-GROUP_C-INTELBASE-004（R4 缺陷修复 + 依赖补齐增量）／ INV-GROUP_C-INTELBASE-005（R7 定义外置 + 可视化配置增量）／ INV-GROUP_C-INTELBASE-007（R8 FND-R7-01 校验项补齐）／ INV-GROUP_C-INTELBASE-008（R10 前端构建阻断修复）／ **INV-GROUP_C-INTELBASE-010（R11 IB-20 流式 / 会话增量，协调者轮次口径 REV-12）** |
 | 项目 | intelligentbase |
 | 阶段 | PHASE_06b（自我代码评审） |
-| 版本 | **R10**（R1 主体 §1~§8 未改写；R2 增量见 **§9**；R3 增量见 **§10**；R4 增量见 **§11**；R7 增量见 **§12**；R8 增量见 **§13**；R10 增量见 **§14**） |
+| 版本 | **R11**（R1 主体 §1~§8 未改写；R2 增量见 **§9**；R3 增量见 **§10**；R4 增量见 **§11**；R7 增量见 **§12**；R8 增量见 **§13**；R10 增量见 **§14**；R11 增量见 **§15**） |
 | status | DRAFT（待 GROUP_D / PM 复核） |
-| 上游输入 | `docs/architecture_design.md`（**1.3.0 / R7**，GR-B-004 PASS）、`docs/module_design.md`（**1.3.0 / R7**）、`docs/tech_stack.md`（**1.3.0 / R7**）、`docs/ib_embed_service_contract.md`（R2，权威契约）、`docs/test_report.md`（**1.3.0 / R7**，FND-R7-01 登记处 §12.6）；**R10 触发输入** = PM 只读取证（`.github/workflows/ci.yml` 阶段9 `npm ci` 因锁不同步 EUSAGE）与 `src/frontend/package.json` / `package-lock.json` / `ConfigPage.vue` 现场（tech_stack 已随 R10 升至 1.3.1，见 §14） |
-| 覆盖范围 | MOD-IB-01 ~ MOD-IB-26（**R2 追加 MOD-IB-26**；R1 覆盖 01~25）。**R3 重评 MOD-IB-13 与 MOD-IB-23**；**R4 只重评被触及的部分**：MOD-IB-12 与 MOD-IB-13，外加依赖面新增文件 `src/requirements-embed.txt`（B-05，非模块）；**R7 只重评被触及的部分**：MOD-IB-01（端口 13 → 14 + 结构）、MOD-IB-02（定义文档数据层）、MOD-IB-16（派生注入）、MOD-IB-23（装配期闸门 + 端点）、MOD-IB-24（可视化配置页）；**R8 只重评被触及的部分**：MOD-IB-02（`ib/config/definition.py::validate` 校验项补齐）；**R10 只重评被触及的部分**：MOD-IB-24（前端构建管线：锁同步 / 源文件跟踪 / 类型错误 / 冒烟入口） |
+| 上游输入 | `docs/architecture_design.md`（**1.4.0 / R8**，GR-B-005 PASS_WITH_CONDITIONS）、`docs/module_design.md`（**1.4.0 / R8**）、`docs/tech_stack.md`（**1.3.1 / R10**，R8 设计轮次判 NO_CHANGE）、`docs/ib_embed_service_contract.md`（R2，权威契约）、`docs/test_report.md`（**1.7.0 / R11**，FND-R11-01 与「2 项未覆盖 + 4 项部分覆盖 AC」登记处）、`docs/user_stories.md`（**1.3.0 / R7**，US-IB-19 / US-IB-20）；**R10 触发输入** = PM 只读取证（`.github/workflows/ci.yml` 阶段9 `npm ci` 因锁不同步 EUSAGE）与 `src/frontend/package.json` / `package-lock.json` / `ConfigPage.vue` 现场（tech_stack 已随 R10 升至 1.3.1，见 §14） |
+| 覆盖范围 | MOD-IB-01 ~ MOD-IB-26（**R2 追加 MOD-IB-26**；R1 覆盖 01~25）。**R3 重评 MOD-IB-13 与 MOD-IB-23**；**R4 只重评被触及的部分**：MOD-IB-12 与 MOD-IB-13，外加依赖面新增文件 `src/requirements-embed.txt`（B-05，非模块）；**R7 只重评被触及的部分**：MOD-IB-01（端口 13 → 14 + 结构）、MOD-IB-02（定义文档数据层）、MOD-IB-16（派生注入）、MOD-IB-23（装配期闸门 + 端点）、MOD-IB-24（可视化配置页）；**R8 只重评被触及的部分**：MOD-IB-02（`ib/config/definition.py::validate` 校验项补齐）；**R10 只重评被触及的部分**：MOD-IB-24（前端构建管线：锁同步 / 源文件跟踪 / 类型错误 / 冒烟入口）；**R11 只重评被触及的部分**：MOD-IB-01（R8 类型 / 枚举 / 常量）、MOD-IB-02（键名登记与值域 + `validate` 第 3 子项）、MOD-IB-16（`is_delegating` 消费侧话术）、MOD-IB-21（终态单发 / 可见性 / 确认事件 / 会话存储逐字段复制）、MOD-IB-22（确认门装配 / `resume` fail-closed / G2 单跳交接）、MOD-IB-23（`chat_stream` 显式 4xx + `POST /api/chat/resume`）、MOD-IB-24（确认区呈递 / 决策回传 / 会话标识纪律） |
 | 评审方式 | 5 维评分 + 逐条 finding（含文件:行号）+ 离线实跑证据 |
 ---
 
@@ -1671,3 +1671,226 @@ EXIT=2
 4. **首例解锁后暴露的后续阻断（FND-R10-03）在同轮内修复并验证**，未遗留 UNRESOLVED-CRITICAL。
 5. **无 MAJOR 遗留**；2 条 MINOR 登记不阻塞（M-R10-01 / M-R10-02）。
 6. 未改后端行为、未改 CI 定义、未削弱任何既有断言、未触网引入运行期依赖、未写入任何凭据。
+
+---
+
+# §15 R11 增量自我评审（IB-20 流式交付 / 会话生命周期：IFC-IB-298~308 + G2 交接 + FND-R11-01 + BLK-R8-02）
+
+> 触发：协调者裁决（REV-12；invocation **INV-GROUP_C-INTELBASE-010**）。输入 = `docs/module_design.md` **1.4.0/R8** §2.1 / §2.2.3 / §3、`docs/architecture_design.md` **1.4.0/R8** ADR-17、`docs/test_report.md` **1.7.0/R11**（2 项未覆盖 + 4 项部分覆盖 AC 的归属缺口、**FND-R11-01**）、**BLK-R8-02**。
+> **命名口径**：设计侧记 **R8**、协调者轮次记 **REV-12**、本报告自身版本线记 **R11/§15** —— 三者指向同一批改动（同 `implementation_plan.md` §18 声明）。
+> **性质**：**只追加、不改写**。§1~§14 为 R1~R10 历史记录，**逐字未改**。
+
+## 15.1 R11 规模与改动面
+
+| 文件 | 变更 | 行数变化（`git diff --numstat`，新增 / 删除） |
+|------|------|------|
+| `src/ib/core/enums.py` | `StreamEventKind` 追加 `confirmation_required` | +8 / −1 |
+| `src/ib/core/types.py` | R8 类型 / 别名 / 常量 + `SessionState` 扩展 + `GraphConfig` 新字段 | +123 / −5 |
+| `src/ib/core/__init__.py` | 导出补充 | +21 / −0 |
+| `src/ib/config/__init__.py` | 3 键名登记 + `IB_SESSION_BACKEND` 值域扩展 + `persistence_policy` | +45 / −1 |
+| `src/ib/config/definition.py` | `validate()` 第 12 项（同专家内空 / 重复关键词） | +42 / −2 |
+| `src/ib/experts/__init__.py` | 兜底话术按实际能力改写 + `delegating_experts()` 文档 | +17 / −4 |
+| `src/ib/streaming/__init__.py` | 终态单发 / 可见性白名单 / 确认事件 / 存储逐字段复制 | +141 / −2 |
+| `src/ib/orchestration/__init__.py` | 确认门 / `resume` / `ResumePayload` / `can_resume` / G2 `_expand_plan` | +385 / −37 |
+| `src/ibweb/views.py` | `chat_stream` 显式 4xx（FND-R11-01）+ `chat_resume_endpoint` | +105 / −1 |
+| `src/ibweb/urls.py` | `api/chat/resume` 路由 | +4 / −0 |
+| `src/frontend/src/api/client.ts` | `confirmation_required` + `chatResume` + 空会话标识提前拒绝 | +69 / −3 |
+| `src/frontend/src/views/ChatPage.vue` | 确认区独立 + `decide()` + 会话标识不预填 | +141 / −2 |
+| `src/scripts/selfcheck.py` | 新增 8 个离线自检用例 + 1 条既有断言强化 | +495 / −1 |
+| **合计** | **13 文件** | **+1596 / −59** |
+
+**未改**：任何既有 IFC-IB 号与签名文本；`tests/`（GROUP_D 资产，本轮零改动，184 基线原样通过）；模块 / 端口 / 依赖边计数；既有配置键名与默认值；`requirements*.txt`（**零新增第三方依赖**）；`docs/phase_status.md`。
+
+## 15.2 R11 5 维评分（仅被触及的部分）
+
+| 维度 | 分数 | 说明 |
+|------|------|------|
+| Correctness | **9/10** | 四件事均有**离线实跑**证据：REV-12-1 的 11 条 IFC 逐条落地（自检第 1~4、7 例）；REV-12-2 交接护栏（自检第 6 例，含「关闭时逐位一致」与「上限生效」反面；护栏①/③ **已实现**、护栏② 为**机制就绪但组合根未接线**，见 §15.6 GAP-R11-07）；REV-12-3 缺会话标识 → `400`（自检 `http_contract_offline` 强化 + 第 7 例）；REV-12-4 同专家内空 / 重复 → 逐码拒绝（自检第 5 例）。扣 1 分：`arun` / `aresume`（异步孪生）与同步路径**同源**，但**确认门呈递只在 `run` 侧实现**（异步宿主若需确认门应经 `_maybe_gate` 同源扩展）—— 该差异已在 docstring 明示，属**已知边界**而非缺陷 |
+| Security | **9/10** | 确认门**默认关闭**（ADR-17 约束 1，默认零行为差异）；`can_resume` **纯函数 + fail-closed**，残缺载荷**绝不补成「默认批准」**（自检第 2 例对三类残缺载荷逐一断言）；恢复端点**仅 Authorization 头**且 `?token=` 显式 `400`（自检第 7 例）；可见性**白名单**使内部子任务产物**默认不外流**；凭据仅登记键名、值取环境变量。扣 1 分：确认门话术构造器异常时的 fail-closed 分支（`confirmation_prompt_failed`）已实现并记录日志，但**离线自检未构造该异常分支**（仅代码路径审阅），属覆盖缺口已登记（M-R11-02） |
+| Performance | **9/10** | 无新增阻塞 / 无 N+1；`MemorySessionStore.load` 的**逐字段复制**是**正确性必需**（否则确认中间态被静默丢弃），代价是浅拷贝而非零拷贝 —— 会话状态为小对象且 TTL / 上限已护栏，可接受；`_expand_plan` 为 O(命中专家数) 且默认关闭时不进入展开分支。扣 1 分：未做并发压测（属 GROUP_D / 目标机范畴） |
+| Maintainability | **9/10** | 「兼容超集」先例复用一致（`confirmation_prompt_builder` 对齐 `related_images_provider`）；骨架**不生成业务话术、不判定业务规则**（ADR-09 语义纪律贯穿）；新增类型全部 frozen + `slots`；每处决策都在 docstring 写明「为什么」与「未决项」。扣 1 分：`SessionState` 采用「旧字段 + 新字段全默认」的**兼容扩展**（见 GAP-R11-01），字段集与设计文档不同口径，需 PM 裁决后收口 |
+| Test Coverage（可测试性） | **9/10** | 本轮**新增 8 个离线自检用例**（39/39 PASS），覆盖：类型兼容、三判据正反两向、门的三态（关 / 开无话术 / 开有话术）、HTTP 六种状态码、前端静态纪律（含「确认分支不写入正文」「无自动续跑」「不预回退默认会话」）。GROUP_D 既有 **184 passed** 无回归。扣 1 分：自检属开发者自验（非正式套件），AC-IB-19/20 的**正式**覆盖仍归 GROUP_D；且上述话术构造器异常分支未构造 |
+
+**5 维均分为 9.0/10**；无维度低于 8 —— 不构成「须回炉」信号。
+
+## 15.3 R11 Finding 统计（诚实口径）
+
+| 严重级别 | 计数 | 状态 |
+|---------|------|------|
+| **CRITICAL** | **1** | **FIXED**（同轮内修复并实跑验证） |
+| MAJOR | 0 | — |
+| MINOR | 3 | 登记不阻塞（见 15.5） |
+
+| Finding ID | 严重级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|---------|------------|------|------|
+| **FND-R11-01** | **CRITICAL** | `src/ibweb/views.py`（`chat_stream_endpoint`，R11 前 `session_id = (request.GET.get("session_id") or "default").strip() or "default"`）；旁证 `src/frontend/src/api/client.ts`（`query$.set('session_id', sessionId \|\| 'default')`）、`src/frontend/src/views/ChatPage.vue:90`（`ref('default')`） | **静默回退字面量默认会话**：缺会话标识时按 `"default"` 建会话，导致（a）多标签页 / 多用户静默共用同一会话（违背会话内隔离意图），（b）「未填」与「显式用 default」**不可区分**，AC-IB-20-01 的显式性要求被抹平 | **FIXED**：服务端缺失即 `ValidationError` → **`400`**（不回退）；前端 `chatStream/chatResume` 对空标识**提前拒绝**并给可读回执、输入框**不预填** `'default'`。实证：自检 `http_contract_offline` 断言 `/api/chat/stream?q=…`（无 `session_id`）→ **400**；`?q=…&session_id=selfcheck` → **200** |
+
+> **CRITICAL = 0（修复后）**。该缺陷属**会话隔离与显式性**层面的契约破坏，不得降级为 MINOR 登记 —— 故按 CRITICAL 定级并同轮修复。
+
+## 15.4 逐模块 R11 评审详情
+
+---
+**MOD-IB-01（core：R8 类型 / 枚举 / 常量）**
+- Correctness: 9/10 · Security: 10/10 · Performance: 10/10 · Maintainability: 9/10 · Test Coverage: 9/10
+
+| Finding ID | 严重级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|---------|------------|------|------|
+| M-R11-01 | MINOR | `src/ib/core/types.py`（`SessionState` 字段区） | `SessionState` 采用「既有 3 字段逐字保留 + R8 字段全默认值」的兼容扩展，与 `module_design` R8 列出的「新字段集」口径**并存**；字段集未收敛为单一表述 | DOCUMENTED（GAP-R11-01，待 PM 裁决） |
+
+---
+**MOD-IB-02（config：键名登记 / 值域 / `validate` 第 12 项）**
+- Correctness: 10/10 · Security: 10/10 · Performance: 10/10 · Maintainability: 9/10 · Test Coverage: 9/10
+
+| Finding ID | 严重级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|---------|------------|------|------|
+| — | — | — | 无 finding。三个键名**只登记不写值**；`IB_SESSION_BACKEND` 仅扩展值域（键名 / 默认值不变，对齐 R2 对 `IB_EMBED_BACKEND` 的先例）；`validate()` 第 12 项**在既有 11 项之后追加**，既有语义与顺序未动 | — |
+
+---
+**MOD-IB-16（experts：`is_delegating` 消费侧）**
+- Correctness: 9/10 · Security: 10/10 · Performance: 10/10 · Maintainability: 9/10 · Test Coverage: 8/10
+
+| Finding ID | 严重级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|---------|------------|------|------|
+| M-R11-02 | MINOR | `src/ib/orchestration/__init__.py`（`_maybe_gate` 的 `except` 分支 → `confirmation_prompt_failed`） | 「已启用确认门而话术构造抛异常 → fail-closed」分支已实现且记录日志，但**离线自检未构造该异常分支** | DOCUMENTED（不阻塞） |
+
+---
+**MOD-IB-21（streaming：终态单发 / 可见性 / 确认事件 / 会话存储）**
+- Correctness: 9/10 · Security: 10/10 · Performance: 9/10 · Maintainability: 9/10 · Test Coverage: 9/10
+
+| Finding ID | 严重级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|---------|------------|------|------|
+| M-R11-03 | MINOR | `src/ib/streaming/__init__.py`（`MemorySessionStore.load`） | 为不丢 `gate` 而**逐字段**复制会话状态（新增字段需同步维护该复制点），存在「将来加字段忘改此处 → 静默丢状态」的维护风险 | DOCUMENTED（已在代码注释写明 R8 纪律；建议后续以 `dataclasses.replace` 收敛） |
+
+---
+**MOD-IB-22（orchestration：确认门 / `resume` / G2 交接）**
+- Correctness: 9/10 · Security: 10/10 · Performance: 9/10 · Maintainability: 8/10 · Test Coverage: 9/10
+
+| Finding ID | 严重级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|---------|------------|------|------|
+| — | — | — | 无 CRITICAL / MAJOR。fail-closed 语义在 `run` / `resume` 与同步 / 异步两条路径上**同源**；挂起路径**不发 content**；续跑**不再次触发**确认门（防自死锁）。扣分点在**设计缺口**（GAP-R11-02~05）而非实现缺陷 | — |
+
+---
+**MOD-IB-23（ibweb：`chat_stream` 4xx + `chat_resume_endpoint`）**
+- Correctness: 9/10 · Security: 10/10 · Performance: 10/10 · Maintainability: 9/10 · Test Coverage: 9/10
+
+| Finding ID | 严重级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|---------|------------|------|------|
+| FND-R11-01 | **CRITICAL** | `src/ibweb/views.py`（`chat_stream_endpoint` 会话标识解析行） | 见 15.3 | **FIXED** |
+
+---
+**MOD-IB-24（frontend：确认区呈递 / 决策回传 / 会话标识纪律）**
+- Correctness: 9/10 · Security: 10/10 · Performance: 10/10 · Maintainability: 9/10 · Test Coverage: 8/10
+
+| Finding ID | 严重级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|---------|------------|------|------|
+| — | — | — | 无 finding。确认区**独立区域**（`role="alertdialog"`、视觉可辨），**不并入正文**，未决前**不显示「本轮已完成」**，**无自动续跑**；决策经**独立端点**、**仅 Authorization 头**回传。可测试性扣 1 分：前端断言为**源码级静态检查**（无 SFC 语义级测试基建，与 R10 同口径刻意回避） | — |
+---
+
+## 15.5 R11 MINOR finding（登记不阻塞）
+
+| ID | 位置 | 描述 | 处置 |
+|----|------|------|------|
+| M-R11-01 | `src/ib/core/types.py` | `SessionState` 兼容扩展 vs 设计文档字段集口径并存 | 登记为 **GAP-R11-01**，**待 PM 裁决**；本轮按最小一致原则实现，**未擅改设计文档** |
+| M-R11-02 | `src/ib/orchestration/__init__.py` | 确认话术构造器异常 → fail-closed 分支未被离线自检构造 | 登记不阻塞；建议 GROUP_D 补一条「构造器抛异常」用例 |
+| M-R11-03 | `src/ib/streaming/__init__.py` | `MemorySessionStore.load` 逐字段复制需随字段集同步维护 | 登记不阻塞；已加注释，建议后续以 `dataclasses.replace` 收敛 |
+
+## 15.6 R11 设计缺口登记（须 PM 裁决；**未擅自扩充架构**）
+
+| 缺口 ID | 设计未规定处 | 本轮实现（最小一致 + fail-closed 方向） |
+|---------|------------|------------------------------------|
+| **GAP-R11-01** | `SessionState` 字段集（设计 R8 版 vs 既有实现消费方） | 兼容扩展：旧 3 字段逐字保留 + R8 字段全默认值 |
+| **GAP-R11-02** | 挂起时的**终态表示**（`confirmation_required` 之后如何收束） | 恰一条 `confirmation_required` + `completion_event(None)`；**不发 content** |
+| **GAP-R11-03** | **确认话术构造器接缝**未命名（骨架不得生成业务话术） | `build_graph` 可选关键字 `confirmation_prompt_builder`（兼容超集先例）；未注入即零行为差异 |
+| **GAP-R11-04** | **G2 交接的业务触发条件 / 目标集合 / 上限落点**未定义 | 开关控制 + 目标取 `default_expert()` + 上限 `min(config.max_expert_steps, MAX_EXPERT_STEPS)`；骨架**不判定业务规则** |
+| **GAP-R11-05** | `resume` 续跑所需「原提问」的承载未规定 | 挂起时写入 `SessionState.turns`，续跑经 `_pending_query_of` 取回；缺失即 fail-closed |
+| **GAP-R11-06** | `IFC-IB-307` 各前置与 `403`/`404`/`409`/`503` 的对应粒度 | 鉴权 → 403；归属 → 403；门未启用 / 未携决策 / 不一致 → 409；会话不存在 → 404；存储不可用 → 503（**全部 fail-closed**） |
+| **GAP-R11-07（OPEN）** | handoff **护栏②（敏感写操作强制人工确认）的触发规则 / 生产接线**未定义：`module_design.md:566` 明文「骨架**不判定「哪些动作需要确认」**（ADR-09 / ADR-17 约束 2）」、「`prompt.summary` **由接入方提供的业务构造器产出**」；全库**无**识别「敏感写操作」的代码；组合根**未注入** `confirmation_prompt_builder`；`IB_CONFIRMATION_GATE_ENABLED` **默认关闭** | **按设计维持**：护栏② = **机制就绪 + 必批无自动批准**（确认中间态 + `confirmation_required` 呈递 + `POST /api/chat/resume` 显式决策回传，**无任何自动批准 / 自动续跑**），**触发规则按设计由接入方提供（骨架不判定）**；因组合根未接线 → **当前不可经配置触发**。**未新增**「敏感动作清单」或任何默认策略代码（不发明业务规则）。**登记为 OPEN，待 PM 裁决**（是否/如何提供生产入口） |
+
+## 15.7 R11 实跑证据（命令 + 原始输出 + EXIT）
+
+| # | 命令 | 原始输出摘要 | EXIT | 日志 |
+|---|------|-------------|------|------|
+| 1 | `python -m py_compile`（11 个改动文件） | `py_compile OK` | **0** | `docs/evidence/groupc_r11_compile.log` |
+| 2 | `python -m pytest tests -q` | `184 passed in 13.97s`（= R11 基线，**无回归**） | **0** | `docs/evidence/groupc_r11_compile.log` |
+| 3 | `python scripts/selfcheck.py`（离线） | 自检 **39/39 通过**（含本轮新增 8 例） | **0** | `docs/evidence/groupc_r11_selfcheck.log` |
+| 4 | `node --test`（cwd = `src/frontend`） | `tests 6 / pass 6 / fail 0` | **0** | `docs/evidence/groupc_r11_frontend.log` |
+| 5 | `vue-tsc --noEmit` + `vite build`（cwd = `src/frontend`） | `TSC_EXIT=0`；`28 modules transformed`；`index-*.js 254.44 kB │ gzip 89.93 kB`；`built in 752ms` | **0** | `docs/evidence/groupc_r11_frontend_build.log` |
+
+> 全部命令**离线执行**：InMemory / Fake 替身 + 纯函数 + Django 测试客户端（进程内）；**零外部网络**、**无 Docker**、**无运行期 CDN**。
+
+## 15.8 R11 契约与冻结约束的守约复核
+
+- **契约纪律**：`IFC-IB-221~225` / `231~233` / `247` 的**签名文本一字未改**（`IFC-IB-233` 仅**新增**其载荷类型 `ResumePayload`，签名 `payload: dict` 文本不动；`IFC-IB-221/222` 仅**补齐**其悬置引用的 `SessionState` 定义）；新增编号仅 **298~308**；端口 **14** / 模块 **26** / 依赖边**零新增**（DAG 不变）。
+- **框架无关内核**：`src/ib/core` **零 Django import**（自检 `core_framework_free` 守护）；新增类型全为 frozen dataclass / `slots` / 纯 stdlib；**零新增第三方依赖**。
+- **离线纪律**：未触达真实 Qdrant / DeepSeek / bge-m3 / 任何外部端点；未引入 Docker；未引入运行期 CDN。
+- **凭据纪律**：键名**只登记不写值**；改动文件与证据日志**不含任何真实凭据**；新端点**同样拒绝** `?token=`（自检第 7 例直接断言）。
+- **未削弱既有断言**：GROUP_D 基线 **184 passed** 原样通过；`validate()` 既有 11 项语义与顺序未动（仅在**其后追加**第 12 项）；`ib.experts.validate_specs` 安装期兜底保留（自检第 5 例以行为断言守护）；**未使用 skip / xfail 掩盖任何失败**。
+- **FreeArk 仓库全程只读**；`docs/phase_status.md` **未触碰**（PM 专属）；**未执行 `git add` / `git commit`**（提交属 PM 授权范围）。
+
+## 15.9 §15 结论
+
+**R11 自评状态：SUCCESS（CRITICAL = 1，FIXED；修复后 CRITICAL = 0）。**
+
+1. **REV-12-1**：`IFC-IB-298~308`（11 条）逐条落地，含默认关闭的确认门、纯函数 fail-closed 恢复判据、专用恢复端点（对齐准入顺序）与前端呈递 / 决策回传约束。
+2. **REV-12-2**：`is_delegating` / `delegating_experts()` **不再是死字段**；G2 单跳交接与既有图结构一致，且**默认关闭时严格逐位零差异**（关闭分支直接按 `decision.experts` 原序展开、**不去重**，见 §15.10）。三护栏的**精确口径**为：**护栏①（往返上限）已实现**；**护栏③（非 handoff 出路）已实现**；**护栏② = 机制就绪 + 必批无自动批准**，**触发规则按设计由接入方提供（骨架不判定「哪些动作需要确认」，`module_design.md:566` / ADR-09 / ADR-17 约束 2）**，**当前组合根未接线 → 不可经配置触发**（登记为 **OPEN**：GAP-R11-07）。
+3. **REV-12-3**：**FND-R11-01 已修复** —— 缺会话标识**不再静默回退**字面量默认会话，服务端显式 `400`，前端同源收紧。
+4. **REV-12-4**：**BLK-R8-02 已落地** —— `validate()` 追加同专家内空 / 重复关键词校验（**先归一化再比较**），既有派生 / 安装期兜底**未削弱**。
+5. **MAJOR 遗留 = 0**；3 条 MINOR 登记不阻塞；**6 项设计缺口**按最小一致 + fail-closed 方向实现并**如实登记待 PM 裁决**（未擅自扩充架构，设计文档一字未改）。
+6. 未改既有 IFC 签名、未改模块边界与依赖边、未改既有配置键名与默认值、未新增第三方依赖、未触网、未写入任何凭据、未做任何 git 提交动作。
+
+---
+
+# §15.10 R11 补丁轮（REV-12 patch；invocation INV-GROUP_C-INTELBASE-011）
+
+> 触发：独立只读核验 **INV-GROUP_C-VERIFY-R11** 结论 = **CONFIRMED_WITH_CAVEATS**（1 项**必须修 MAJOR** + 3 项 MINOR/澄清）。本轮**只做这 4 项有界修复**，不扩范围。**性质：只追加**（§15.1~§15.9 除「三护栏」口径按 MAJOR-2 要求**精确改写**外，其余逐字未改）。
+
+## 15.10.1 修复项与落点
+
+| 项 | 级别 | 病灶（修复前） | 修复（文件:行） |
+|----|------|---------------|----------------|
+| **MAJOR-1** | **MAJOR → FIXED** | `chat_resume_endpoint` 缺 `session_key` 时自造 **2 段**键 `f"{project_id}:{session_id}"`，与流路径写入的 **3 段**键 `ctx.session_key` 永不相等 → 真实 HTTP 续跑**恒 404** | `src/ibweb/views.py`（`chat_resume_endpoint`，会话键派生段）：改为**唯一入口** `ib.context.session_key(project_id, ctx.authz.actor_id, session_id)`，与 `chat_stream_endpoint`（`ctx.session_key`）**逐字一致**；视图内**不再**自造键、**不再**出现独立分隔符拼接；保留 `session_key` 直传分支 |
+| **MINOR-2** | MINOR → FIXED | `resume` / `aresume`（`src/ib/orchestration/__init__.py`）与 `chat_resume_endpoint`（`views.py`）均以 `state.gate` 派生 `gate_id` 再传入 `can_resume`，使 `can_resume` 内 `gate.gate_id != gate_id` **恒为假**（请求指向的中间态 vs 状态里的中间态对账**空转**，IFC-IB-306） | `src/ib/orchestration/__init__.py`（新增私有 `_requested_gate_id` + `resume`/`aresume` 调用点）、`src/ibweb/views.py`（`chat_resume_endpoint` 调用点）：`gate_id` 改取**请求指向的中间态**（`payload.decision.gate_id`，或请求体显式 `gate_id`），与 `state.gate.gate_id` **真实对账**，不一致即 fail-closed（→409）。**`IFC-IB-306` 签名文本 `can_resume(state, gate_id, payload)` 一字未改** |
+| **MINOR-1** | MINOR → FIXED | `_expand_plan` 默认关闭分支仍先经 `seen` 去重再返回，使「默认关闭**逐位零差异**」不严格（重复命中会被静默改写） | `src/ib/orchestration/__init__.py`（`_expand_plan`）：`expert_handoff_enabled=False` 时**直接**按 `decision.experts` 原序、原样展开（**不去重 / 不过滤**）；开启分支**保留**去重 + 上限 |
+| **MAJOR-2** | 文档/口径 | 「三护栏齐备」表述与事实不符（`module_design.md:566`：骨架**不判定**「哪些动作需要确认」；组合根**未注入** `confirmation_prompt_builder`；全库**无**识别「敏感写操作」的代码；`IB_CONFIRMATION_GATE_ENABLED` 默认关闭） | 本文件 §15.2 / §15.6（新增 **GAP-R11-07（OPEN）**）/ §15.9 与 `docs/implementation_plan.md` §18.3 / §18.8 精确改写为：护栏①③ **已实现**；护栏② = **机制就绪 + 必批无自动批准**，**触发规则按设计由接入方提供**，**组合根未接线 → 不可经配置触发**（OPEN）。**未新增**「敏感动作清单」或任何默认策略代码 |
+
+## 15.10.2 补丁轮 Finding 统计
+
+| 严重级别 | 计数 | 状态 |
+|---------|------|------|
+| **CRITICAL** | 0 | — |
+| **MAJOR** | **1** | **FIXED**（MAJOR-1，负向对照实证） |
+| MINOR | 3 | 2 项 FIXED（MINOR-1 / MINOR-2）+ 1 项口径（MAJOR-2，已改写为 GAP-R11-07 OPEN） |
+
+> 兼容口径：上表「MAJOR-1」= §15 核验员指认项（非 §15.3 R11 原始统计）。R11 原始 §15.3「MAJOR = 0」为**该轮自评**结论，本轮据独立核验**追加**该项并修复。
+
+## 15.10.3 MAJOR-1 取证（离线成功续跑；请求 / 响应摘要 + 键文本）
+
+- 键文本（**逐字一致**）：流路径 `make_request_context(project_id="p_alpha", actor_id="service-account", session_id="resume-ok").session_key` = `p_alpha:service-account:resume-ok`；resume 视图经唯一入口 `ib.context.session_key("p_alpha", "service-account", "resume-ok")` = `p_alpha:service-account:resume-ok`（**byte-identical = True**）。
+- 请求：`POST /api/chat/resume`，体 `{"session_id": "resume-ok", "decision": {"gate_id": "gate-http-1", "approved": true}}`（会话预置：以**流路径真实键**写入带 `gate` 的 `SessionState`）。
+- 响应：**`200`**、类型 **`StreamingHttpResponse`**、`Content-Type: text/event-stream`；流事件序列 = `reasoning, content, done`（达终态 `done`，**未**再触发 `confirmation_required`）。
+- **负向对照**（回归闸）：把会话键派生**临时还原**为 2 段 `f"{project_id}:{session_id}"` → 同一用例**按预期失败**（`404 not_found`），而既有 401/400/403/409 反向断言用例 `r8_chat_resume_http` **仍 PASS** → 证明新用例非空转、且直击病灶。
+- 实证文件：`docs/evidence/groupc_r11_patch_major1_probe.log`（正向）、`docs/evidence/groupc_r11_patch_negative_control.log`（负向对照）。
+
+## 15.10.4 补丁轮实跑证据（命令 + 原始输出 + EXIT）
+
+| # | 命令 | 原始输出摘要 | EXIT | 日志 |
+|---|------|-------------|------|------|
+| 1 | `python -m py_compile`（3 个改动文件） | `py_compile OK` | **0** | `docs/evidence/groupc_r11_patch_compile.log` |
+| 2 | `python -m pytest tests -q` | `184 passed in 14.00s`（**无回归**） | **0** | `docs/evidence/groupc_r11_patch_pytest.log` |
+| 3 | `python scripts/selfcheck.py`（离线） | 自检 **40/40 通过**（新增 1 例 `r8_chat_resume_http_success`） | **0** | `docs/evidence/groupc_r11_patch_selfcheck.log` |
+| 4 | `npm test`（cwd = `src/frontend`） | `tests 6 / pass 6 / fail 0` | **0** | `docs/evidence/groupc_r11_patch_frontend.log` |
+| 5 | 负向对照（临时还原 2 段键） | `r8_chat_resume_http_success` **FAIL(404)**；`r8_chat_resume_http` **PASS** | **1** | `docs/evidence/groupc_r11_patch_negative_control.log` |
+
+> 全部命令**离线执行**：InMemory / Fake 替身 + 纯函数 + Django 进程内测试客户端；**零外部网络**、**无 Docker**、**无运行期 CDN**。
+
+## 15.10.5 补丁轮守约复核
+
+- **契约纪律**：`IFC-IB-221~225 / 231~233 / 247` 签名文本**一字未改**；`IFC-IB-306` 的 `can_resume(state, gate_id, payload)` **签名文本一字未改**（仅改**调用点**传值来源）；只新增 `298~308`；端口 **14** / 模块 **26** / 依赖边**零新增**。
+- **视图薄层纪律**：`views.py` 内**不再**出现独立的会话键分隔符拼接（键构造唯一入口为 `ib.context.session_key`）；`project_id` / `actor_id` 恒取自 `ctx.authz`。
+- **未削弱既有断言**：GROUP_D 基线 **184 passed** 原样通过；selfcheck 既有 39 例**全部保留**（含 401/400/403/409 反向断言）；**未使用 skip / xfail**。
+- **未发明业务规则**：护栏②**未**新增「敏感动作清单」或默认策略代码；仅按 MAJOR-2 精确改写**口径**并登记 **GAP-R11-07（OPEN）**。
+- **只读约束**：未改 `tests/**`（GROUP_D）、`docs/phase_status.md`（PM）、`docs/architecture_design.md` / `docs/module_design.md` / `docs/requirements_spec.md` / `docs/user_stories.md`（设计真源）；未执行 `git add` / `git commit`。
+
+## 15.10.6 补丁轮结论
+
+**补丁自评状态：SUCCESS。** MAJOR-1（真实 HTTP 续跑恒 404）**已修复并负向对照实证**；MINOR-1 / MINOR-2 **已修复**；MAJOR-2 **口径已精确改写**并登记 **GAP-R11-07（OPEN）**。**CRITICAL = 0 / MAJOR 遗留 = 0**。**待 PM 裁决项**：是否/如何为护栏② 提供生产入口（组合根注入话术构造器 + 触发规则），否则**不可经配置触发**（见 `<blockers>`）。

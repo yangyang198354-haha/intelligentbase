@@ -3,6 +3,8 @@
 @implements IFC-IB-221 SessionStore.load / 222 save / 223 delete
             IFC-IB-224 StreamEvent / 225 to_sse
             IFC-IB-282（R2）`related_images` 事件的**载荷类型化**（RelatedImagesPayload）
+            IFC-IB-302（R8）`completion_event` 终态单发构造
+            IFC-IB-303（R8）`is_user_visible` 可见性判据（白名单）
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-04
 @author software-developer
 
@@ -53,7 +55,14 @@ import threading
 import time
 from typing import Any, Sequence
 
-from ib.core import RelatedImageItem, RelatedImagesPayload, SessionState, StreamEventKind
+from ib.core import (
+    CompletionPayload,
+    ConfirmationGateState,
+    RelatedImageItem,
+    RelatedImagesPayload,
+    SessionState,
+    StreamEventKind,
+)
 from ib.core import StreamEvent as _CoreStreamEvent
 
 __all__ = [
@@ -71,6 +80,12 @@ __all__ = [
     "SSE_CONTENT_TYPE",
     "SSE_HEADERS",
     "SessionState",
+    # R8（IFC-IB-302 / 303）
+    "completion_event",
+    "completion_payload_json",
+    "confirmation_required_event",
+    "is_user_visible",
+    "USER_VISIBLE_KINDS",
 ]
 
 #: 图片字节端点的**站内相对路径模板**（IFC-IB-283）。
@@ -218,11 +233,20 @@ class MemorySessionStore:
                 return None
             state, _ = item
             self._items[session_key] = (state, time.time())
-            # 返回**浅拷贝**的消息列表：调用方对返回列表的 append 不应写回存储
+            # 返回**浅拷贝**：调用方对返回对象的改动（消息列表 append）不应写回存储。
+            # R8 纪律：**逐字段复制**，不得只复制既有三字段 —— 否则确认中间态（`gate`）
+            # 在读取时被静默丢弃，表现为「刚写入的待确认状态立刻读不到」（can_resume 恒 False），
+            # 且不报任何错。
             return SessionState(
                 messages=list(state.messages),
                 last_expert=state.last_expert,
                 sticky_turns_left=state.sticky_turns_left,
+                session_key=state.session_key,
+                project_id=state.project_id,
+                actor_id=state.actor_id,
+                turns=tuple(state.turns),
+                gate=state.gate,
+                updated_at=state.updated_at,
             )
 
     def save(self, session_key: str, state: SessionState) -> None:
@@ -274,4 +298,119 @@ def degraded_event(reason: Any, *, hint: str = "") -> StreamEvent:
     return StreamEvent(
         StreamEventKind.DEGRADED,
         json.dumps({"reason": str(reason), "hint": hint or ""}, ensure_ascii=False),
+    )
+
+
+# --------------------------------------------------------------------------- #
+# R8：完成事件与可见性（IFC-IB-302 / 303）
+# --------------------------------------------------------------------------- #
+
+#: **面向用户可见**的事件类别（IFC-IB-303）。
+#:
+#: * `content` / `degraded` / `related_images` / `error` / `done` → 可见（契约明列）；
+#: * `confirmation_required` → 可见（**呈递给用户**并要求决策，AC-IB-20-04；
+#:   它虽为 R8 追加成员，但语义上必须到达用户，故归入可见集）；
+#: * `reasoning` → **默认不可见**（AC-IB-19-03：思考分区可选且默认不启用，受
+#:   `IB_REASONING_STREAM_ENABLED` 门控）。
+#:
+#: 这是一个**白名单**：任何未列出的类别（含未来的内部子任务产物）一律判为**不可见** ——
+#: 使「内部产物永不外流」（AC-IB-19-04）成为**默认安全**的结构事实，而非依赖调用方记得过滤。
+USER_VISIBLE_KINDS: frozenset[str] = frozenset(
+    {
+        "content",
+        "degraded",
+        "related_images",
+        "error",
+        "done",
+        "confirmation_required",
+    }
+)
+
+
+def is_user_visible(kind: StreamEventKind | str) -> bool:
+    """[IFC-IB-303] 该事件类别是否**面向用户可见**（**纯函数**，无 IO）。
+
+    ## 为什么是「白名单 + 默认不可见」
+
+    AC-IB-19-04 要求「内部子任务产物绝不作为面向用户的内容片段出现」。若把判据写成
+    「黑名单」（只排除 reasoning），任何**新增**的内部类别默认就是可见的 —— 一次疏忽即
+    外流。白名单使默认方向相反：新增类别若忘记登记，**倾向于不外流**（可发现的
+    「该显示却没显示」），而不是**倾向于外流**（不可发现的泄漏）。
+
+    ## `reasoning` 的默认口径
+
+    函数签名只收 `kind`（契约如此），故它给出的是**默认**判定：`reasoning → False`。
+    「启用后可见」由配置 `IB_REASONING_STREAM_ENABLED` 与前端呈递共同决定，
+    不改变本纯函数的默认口径（AC-IB-19-03：默认不启用）。
+    """
+    return str(kind) in USER_VISIBLE_KINDS
+
+
+def completion_payload_json(payload: CompletionPayload) -> str:
+    """把 `CompletionPayload` 编码为 JSON 文本（**只含定位信息，不含正文/字节**）。
+
+    `citations` 为空元组时仍如实编码为空数组（`[]`）—— 「无引用」是一个**可区分的事实**
+    （AC-IB-19-05），不应与「未产出结构化产物」混淆。
+    """
+    import json
+
+    return json.dumps(
+        {
+            "citations": [
+                {
+                    "doc_id": item.doc_id,
+                    "doc_name": item.doc_name,
+                    "page_or_section": item.page_or_section,
+                    "locator": item.locator,
+                    "score": item.score,
+                }
+                for item in payload.citations
+            ],
+            "had_content": bool(payload.had_content),
+        },
+        ensure_ascii=False,
+    )
+
+
+def completion_event(payload: CompletionPayload | None = None) -> StreamEvent:
+    """[IFC-IB-302] 构造**唯一**的终态事件（`kind=done`；**纯函数**）。
+
+    ## 三条纪律（对应 AC-IB-19-01 / 19-05）
+
+    1. **恰一次单发**：本函数是终态构造的**唯一入口**；调用方对一次交互只应调用一次，
+       其后**不得**再产出任何 `content` 片段（调用顺序由 `Orchestrator.run` 保证）。
+    2. **`payload` 缺省时不臆造引用**：`None` → `data=""`（**不**输出任何引用清单）。
+       这在结构上使「没有结构化产物」与「空引用清单」可区分：前者 `data` 为空，
+       后者是 `{"citations": [], ...}` 的 JSON。
+    3. **不发空的 `content` 帧**：本函数只产 `done` 事件，**从不**产 `content` ——
+       空内容场景下自然满足「不推送空内容片段」。
+
+    返回的 `data` 是**已序列化好的字符串**（本模块不做 JSON 之外的包装，见模块文档纪律 3）。
+    """
+    if payload is None:
+        return StreamEvent(StreamEventKind.DONE, "")
+    return StreamEvent(StreamEventKind.DONE, completion_payload_json(payload))
+
+
+def confirmation_required_event(state: ConfirmationGateState) -> StreamEvent:
+    """构造**一个** `confirmation_required` 事件（IFC-IB-301 / ADR-17 约束 3；纯函数）。
+
+    载荷只含**呈递所需的最小字段**（`gate_id` / `expert_name` / `summary`）：
+    `summary` 由**接入方**构造（骨架不生成业务话术），`gate_id` 供决策回传时对账
+    （`can_resume` 以它做归属断言）。**不发空事件**：`ConfirmationGateState` 强制携带
+    `prompt`，故本函数不存在「空载荷」分支。
+    """
+    import json
+
+    prompt = state.prompt
+    return StreamEvent(
+        StreamEventKind.CONFIRMATION_REQUIRED,
+        json.dumps(
+            {
+                "gate_id": state.gate_id,
+                "expert_name": prompt.expert_name,
+                "summary": prompt.summary,
+            },
+            ensure_ascii=False,
+        ),
     )
