@@ -20,6 +20,7 @@
     R7 增量（REV-07，2026-09-27）：GROUP_B 由 **GR-B-004 判 PASS**（三份文档 1.2.0/R2 → 1.3.0/R7）；**GROUP_C 由 GR-C-005 判 PASS**（software-developer INV-GROUP_C-INTELBASE-005 交付 R7 实现 + INV-GROUP_C-INTELBASE-006 门控订正；PHASE_05/06/06b 版本 2.2.0/R4 → **2.3.0/R7**；implementation_plan.md v2.3.0 + code_review_report.md §12 R7 增量节；离线自检 30/30 PASS EXIT=0 经独立 verifier 复现；REQ-FUNC-IB-25/26/27 已贯通实现层 §15.2 / §6 交叉核对 27/27）。REV-07-3 闭合；**GROUP_D 由 GR-D-004 判 PASS_WITH_CONDITIONS**（test-engineer INV-GROUP_D-INTELBASE-004；US-IB-17/18 纳入测试范围，test_plan.md 1.1.0/R3 → 1.2.0/R7、test_report.md 1.2.0/R4 → 1.3.0/R7，tests/ 149 → 165（unit 62 / integration 87 / e2e 16），**165/165 EXIT=0** 经独立 verifier 复现）。REV-07-4 闭合、REV-07-5 完成。遗留 **FND-R7-01（MAJOR，validate 缺『路由关键词撞车』与 cn_label 唯一性校验）** 待协调者裁决是否开 GROUP_C 增量修复轮。**协调者裁决 A（REV-08）→ GROUP_C R8 修复轮**：GR-C-006 判 PASS_WITH_CONDITIONS（FND-R7-01 实现面已修复，PHASE_05/06/06b 2.3.0/R7 → **2.4.0/R8**；遗留 D-R8-01 四个陈旧 GROUP_D 夹具转 GROUP_D 闭合）；**GR-D-005 判 PASS_WITH_CONDITIONS**（GROUP_D INV-GROUP_D-INTELBASE-005：夹具修复 + 补测，**171/171**（unit 67 / integration 88 / e2e 16）+ selfcheck 31/31，经独立 verifier 复现；FND-R7-01 → CLOSED_VERIFIED；D-R8-01 闭合；test_plan 1.2.0/R7 → 1.3.0/R8、test_report 1.3.0/R7 → 1.4.0/R8）。**REV-08 全链收口**（GROUP_C R8 → GROUP_D R8）；PHASE_11 仍冻结。**协调者裁决 A（REV-09）→ FLAKE-IB-01 测试侧稳定性治理轮**：**GR-D-006 判 PASS_WITH_CONDITIONS**（test-engineer INV-GROUP_D-INTELBASE-006：test_ib_embed_wire.py 有限有界重试；**171/171** 经独立 verifier 复现 + 靶点 10 绿；「不吞断言」边界经结构+行为双证据证明；test_report 1.4.0/R8 → **1.5.0/R9**、test_plan 1.3.0/R8 → **1.4.0/R9**；FLAKE-IB-01 → MITIGATED 非 CLOSED）。REV-09 收口。
     R10 增量（REV-10，2026-09-27，需求追踪审计后协调者裁决「按 2→1→3 顺序开三轮修复」之第 2 项）：**前端构建阻断修复轮**。背景：需求追踪审计（三路只读取证）发现 src/frontend/package.json 声明 @vue-flow/core（^1.41.0，ConfigPage.vue:31/34/35 导入）但 package-lock.json 无该条目且 node_modules 未安装 → CI 阶段9 `npm ci &amp;&amp; npm run build`（.github/workflows/ci.yml:122-125）因锁不同步必失败。REV-10-1 software-developer 同步 package-lock.json 纳入 @vue-flow/core 及传递依赖并使构建通过；REV-10-2 test-engineer 补前端冒烟测试（构建/类型检查通过 + ConfigPage 最小可验证断言）。GROUP_C 置 IN_PROGRESS（R10），重试计数 0；PHASE_10/11 维持冻结。
     R10 结果（2026-09-27）：software-developer INV-GROUP_C-INTELBASE-008 交付 REV-10-1——三处前端构建阻断修复：**FND-R10-01** package-lock.json 同步纳入 @vue-flow/core（^1.41.0 → 锁定 1.48.2/MIT）及 14 个传递依赖（全 MIT/ISC/BSD-3，零 copyleft）；**FND-R10-02** ConfigPage.vue 首次纳入版本控制（此前未跟踪，而 App.vue:23 已 import 之）；**FND-R10-03** 去除 ConfigPage.vue 未用导入（TS6133）。独立只读 verifier 亲自复现：rm -rf node_modules + npm ci（EXIT=0）+ npm run build（EXIT=0，28 modules，JS 252.35kB/gzip 89.20kB）+ npm test（6/6，锁同步回归断言经负向对照证非空转）；锁幂等（md5 复跑不变）；tech_stack.md §2.1 登记 14 包与锁逐项一致。**GR-C-007 = PASS_WITH_CONDITIONS**（代码实质 PASS）。**verifier 报交付态 CRITICAL**：ConfigPage.vue 仅 staged 未 commit（不在 HEAD）、且索引不自洽（5 个互依产物仅 2 个 staged）→ 现在裸 commit 会复现 stage9 失败；**且 reframing：HEAD 自洽（不含 vue-flow / 不含 ConfigPage import）→ 对 HEAD 的全新 checkout 反而 stage9 通过**，故「CI 必失败」为**工作树态**、非 HEAD 态。原子提交属用户/协调者授权范围，**PM 暂停上报裁决**。PHASE_05/06/06b 2.4.0/R8 → **2.5.0/R10**。
+    R10 收口（2026-09-27，协调者裁决「授权提交 + push + Node20 复核」）：GROUP_C 段提交条件闭合——software-developer INV-GROUP_C-INTELBASE-009 在仓库根 .gitignore 追加 `docs/evidence/*.log`（保留 .py 探针），暂存全树并**原子提交** `d76239e`（48 文件，10094 insertions/179 deletions，末尾带 Co-Authored-By: Claude Code 署名；node_modules / dist / .log / 凭据零入库），`git push origin main` EXIT=0（1f3e244..d76239e）。**全新 checkout + Node 20.19.0 复核**（远端 clone origin，独立只读 verifier）：npm ci EXIT=0（65 包）、npm run build EXIT=0（28 modules，JS 252.35kB/gzip 89.20kB）、npm test 6/6 EXIT=0；clone 内 Python unit 67 / integration 88 全绿；三方 HEAD 一致（clone HEAD = origin/main = 主仓 d76239e）。**GR-D-007**（GROUP_D R10）：REV-10-2 前端冒烟层 6 例 TC-FE-001~006 正式化进 test_plan 1.5.1 / test_report 1.6.1 + TC-INT-086 断言由「node_modules 不存在」重定向为「前端依赖不入库（git 跟踪判定）」；Python 基线 171 不变，判 PASS_WITH_CONDITIONS。**GR-E-003**（GROUP_E PHASE_10 R10 增量）：ci.yml 阶段9 追加 npm test + cicd_pipeline.md 1.1.1，判 PASS_WITH_CONDITIONS（仅流水线层；PHASE_11 仍冻结）。GROUP_D 1.5.0/R9 → PHASE_07 1.5.1 / PHASE_08+09 1.6.1（R10）。
   -->
 
   <group id="GROUP_A" status="APPROVED" gate_decision="PASS（GR-A-001）；R5_PASS_WITH_CONDITIONS（GR-A-002，需求补充调研）；R6_PASS_WITH_CONDITIONS（GR-A-003，诉求③ UI 可视化配置纳入 v1）">
@@ -274,6 +275,10 @@
       <item id="REV-10-2">[前端冒烟测试] test-engineer：补前端冒烟测试（至少：构建/类型检查通过 + ConfigPage 的最小可验证断言，覆盖只读编排图 / 白名单表单 / 乐观并发 / 服务端校验唯一裁决等结构事实）。</item>
       <item id="REV-10-3">[复跑 + 重开门控] 重开 GR-C-007（GROUP_C）/ GR-D-007（GROUP_D）；逐段回报门控状态与版本号变化。</item>
       <item id="REV-10-4">[范围边界] 仅动 src/frontend/（含 package.json / package-lock.json / 构建配置 / 新增前端测试）；不改后端 src/ib、src/ibweb、src/ib_embed 既有行为；不削弱既有断言、不用 skip/xfail 掩盖；不引入运行期 CDN（AC-IB-17-06 / REQ-NFR-IB-08）；保持离线纪律；不改受保护行。</item>
+      <closure item="REV-10-1" status="DONE_CLOSED_VERIFIED" note="2026-09-27：software-developer（INV-GROUP_C-INTELBASE-008 修复 + INV-GROUP_C-INTELBASE-009 提交）——① package-lock.json 同步纳入 @vue-flow/core 1.48.2 + 14 传递依赖；② ConfigPage.vue 纳入版本控制并去未用导入（FND-R10-02/03）；③ 仓库根 .gitignore 追加 docs/evidence/*.log，全树原子提交 d76239e 并 push origin/main（EXIT=0）；④ 全新 checkout + Node 20 复跑 stage9：npm ci / npm run build / npm test 全 EXIT=0（6/6）。"/>
+      <closure item="REV-10-2" status="DONE_CLOSED_VERIFIED" note="2026-09-27：test-engineer（INV-GROUP_D-INTELBASE-007）——前端冒烟 6 例 TC-FE-001~006 正式化入 test_plan.md §14（1.4.0/R9 → 1.5.1/R10）/ test_report.md §15（1.5.0/R9 → 1.6.1/R10），逐例带 AC/NFR 追溯；TC-INT-086 原『node_modules/@vue-flow/core 不存在』改为等价更强『前端依赖不入库（git 跟踪判定）』，经负向对照证非空转。GR-D-007 判 PASS_WITH_CONDITIONS。"/>
+      <closure item="REV-10-3" status="DONE" note="2026-09-27：GR-C-007（GROUP_C，PASS_WITH_CONDITIONS）与 GR-D-007（GROUP_D，PASS_WITH_CONDITIONS）均已签发；GR-E-003（PHASE_10 R10 增量，PASS_WITH_CONDITIONS）同轮签发（npm test 接入 stage9）。"/>
+      <closure item="REV-10-4" status="DONE_CLOSED_VERIFIED" note="2026-09-27：本轮足迹零 src/（src/ib、src/ibweb、src/ib_embed 既有行为未改；src/frontend 仅按授权修复前端构建）；无断言被削弱为通过、无 skip/xfail 掩盖；无运行期 CDN 引入；凭据零命中；docs/evidence/*.log 未入库。"/>
     </revision_request>
 
     <implementation_constraints frozen_for="GROUP_C">
@@ -286,7 +291,7 @@
     REV-03：GROUP_C R3 缺陷修复（FND-GROUP-D-02/01）已闭合（GR-C-003 / GR-D-002）；REV-04：GROUP_C R4 修复 FND-GROUP-D-03 + 补 B-05 依赖，已闭合（GR-C-004 = PASS / GR-D-003 = PASS_WITH_CONDITIONS）。
     GROUP_E：PHASE_10（部署计划）已授权（仅计划、不执行）；PHASE_11 生产部署仍**冻结**，解冻须用户明确下达 PRODUCTION_DEPLOY_CONFIRM=true（且仅当次有效）。
   -->
-  <group id="GROUP_C" status="APPROVED" gate_decision="R4_PASS（GR-C-004；GR-C-001/002/003 继续有效）；R7_PASS（GR-C-005，基于 PHASE_05/06/06b v2.3.0/R7：REV-07-3 贯通 REQ-FUNC-IB-25/26/27 落地 + 全链计数订正）；R8_PASS_WITH_CONDITIONS（GR-C-006，基于 PHASE_05/06/06b v2.4.0/R8：REV-08 修复 FND-R7-01——validate 纯追加跨专家关键词撞车 + cn_label 唯一性校验）；R10_PASS_WITH_CONDITIONS（GR-C-007，基于 PHASE_05/06/06b v2.5.0/R10：REV-10-1 前端构建阻断修复——package-lock 同步纳入 @vue-flow/core + ConfigPage.vue 纳入版本控制 + 去未用导入；遗留 CRITICAL 交付条件：原子提交待协调者授权）">
+  <group id="GROUP_C" status="APPROVED" gate_decision="R4_PASS（GR-C-004；GR-C-001/002/003 继续有效）；R7_PASS（GR-C-005，基于 PHASE_05/06/06b v2.3.0/R7：REV-07-3 贯通 REQ-FUNC-IB-25/26/27 落地 + 全链计数订正）；R8_PASS_WITH_CONDITIONS（GR-C-006，基于 PHASE_05/06/06b v2.4.0/R8：REV-08 修复 FND-R7-01——validate 纯追加跨专家关键词撞车 + cn_label 唯一性校验）；R10_PASS_WITH_CONDITIONS（GR-C-007，基于 PHASE_05/06/06b v2.5.0/R10：REV-10-1 前端构建阻断修复——package-lock 同步纳入 @vue-flow/core + ConfigPage.vue 纳入版本控制 + 去未用导入；CRITICAL 交付条件已闭合——协调者授权后原子提交 d76239e 并 push，全新 checkout Node20 复核 stage9 全绿；npm test 无 CI 强制力之 MINOR 由 GR-E-003 接入 stage9 闭合）">
     <comment>R4 为缺陷修复轮：改动面 = ib/blob/__init__.py（新增 kb_segment 单一真源）、ib/lifecycle/__init__.py（_blob_scope_of + 删除第 2 步改用台账派生 scope）、src/requirements-embed.txt（新增）、.gitignore（权重忽略规则）。未增删模块，src/ 仍 76 文件。</comment>
     <phase id="PHASE_05" name="实现计划" status="APPROVED"
       output_file="docs/implementation_plan.md"
@@ -418,7 +423,7 @@
       finding_4="前端冒烟测试非空转 — SATISFIED：npm test EXIT=0，pass 6 / fail 0；独立 verifier 于 OS 临时目录做**负向对照**（复制 frontend、从副本锁删 @vue-flow/core）→ 锁同步用例如期 FAIL（exit 1），证明该断言为载荷性门"
       finding_5="传递依赖许可登记逐项一致 — SATISFIED：tech_stack.md §2.1 登记的 14 包版本与许可证与锁逐项吻合（MIT×5 / ISC×8 / BSD-3-Clause×1，零 copyleft/AGPL）；[待核实] 标记收敛为已核实（R10）；REQ-NFR-IB-12 合规"
       finding_6="改动范围 / 凭据 / 离线 / 受保护行 — SATISFIED：后端 src/ib、src/ibweb、src/ib_embed 本轮未触（mtime 旁证）；ci.yml 未改（stage9 命令逐字保留）；4 条『24/24 PASS』受保护行逐字节未改（git diff 零命中）；凭据扫描 0 命中；src/frontend/src 下无运行期 CDN（仅 vite.config.ts 的 localhost 代理与测试黑名单字符串）"
-      condition_1="[CRITICAL 交付条件，须协调者授权闭合并转 GROUP_D] FND-R10-02 的**交付态**未闭合：ConfigPage.vue 仅 staged（git status 显示 A）未 commit（git cat-file 确认不在 HEAD）；且索引不自洽——5 个互依产物（package.json / package-lock.json / App.vue / src/views/ConfigPage.vue / tests/frontend.smoke.test.js）仅 2 个 staged → 独立 verifier 用 git checkout-index 快照证明：现在裸 commit 会令 stage9 因 vue-tsc TS2307（Cannot find module @vue-flow/core）失败，即**复现本轮要消除的失败**。原子提交属用户/协调者授权范围，PM 暂停上报。"
+      condition_1="[CRITICAL 交付条件，须协调者授权闭合并转 GROUP_D] FND-R10-02 的**交付态**未闭合：ConfigPage.vue 仅 staged（git status 显示 A）未 commit（git cat-file 确认不在 HEAD）；且索引不自洽——5 个互依产物（package.json / package-lock.json / App.vue / src/views/ConfigPage.vue / tests/frontend.smoke.test.js）仅 2 个 staged → 独立 verifier 用 git checkout-index 快照证明：现在裸 commit 会令 stage9 因 vue-tsc TS2307（Cannot find module @vue-flow/core）失败，即**复现本轮要消除的失败**。原子提交属用户/协调者授权范围，PM 暂停上报。【2026-09-27 闭合：协调者裁决授权原子提交——d76239e 已提交并 push origin/main；全新 checkout（Node 20.19.0）npm ci / npm run build / npm test 全 EXIT=0（6/6）；npm test 接入 CI 由 GR-E-003 闭合。】"
       condition_2="[MINOR] npm test **未接入 CI** stage9（ci.yml 未改）→ 新冒烟测试目前无流水线强制力，FND-R10-01 的『常驻回归守卫』仅存在于开发机。建议随 GROUP_E/PHASE_10 计划或授权下接入 stage9。"
       open_item_1="[verifier 异议登记] 独立 verifier 建议 **FAIL GR-C-007**（理由为交付态，非代码）；PM 判 PASS_WITH_CONDITIONS（代码实质经独立复现全部 PASS），并将交付态 CRITICAL 原样登记为 condition_1 上报协调者——不掩盖、不降级"
       open_item_2="[reframing 登记] HEAD 自洽（HEAD:package.json 仅声明 vue；HEAD:App.vue 不 import ConfigPage；HEAD:lock 无 @vue-flow/core）→ 对 HEAD 的全新 CI checkout **stage9 通过**（只是不含 R7 配置页）。故本轮『CI 必失败』实为**工作树 / 部分提交态**属性，非 HEAD 态；『消除 CI 必失败』的充分动作是**原子提交一致的工作树**。"
@@ -429,22 +434,22 @@
 
   </group>
 
-  <group id="GROUP_D" status="APPROVED" gate_decision="PASS_WITH_CONDITIONS（GR-D-001 + GR-D-002 + GR-D-003 R4 回归增量；GR-D-002 的 blob 覆盖缺口条件已闭合）；R7_PASS_WITH_CONDITIONS（GR-D-004，基于 PHASE_07/08/09 v1.3.0/R7：US-IB-17/18 纳入测试范围，165/165）；R8_PASS_WITH_CONDITIONS（GR-D-005，基于 PHASE_07/08/09 v1.4.0/R8：FND-R7-01 新校验补测 + D-R8-01 四夹具修复 + FLAKE-IB-01 登记补全，171/171）；R9_PASS_WITH_CONDITIONS（GR-D-006，基于 PHASE_07/08/09 v1.5.0/R9：FLAKE-IB-01 测试侧稳定性治理，171/171）">
+  <group id="GROUP_D" status="APPROVED" gate_decision="PASS_WITH_CONDITIONS（GR-D-001 + GR-D-002 + GR-D-003 R4 回归增量；GR-D-002 的 blob 覆盖缺口条件已闭合）；R7_PASS_WITH_CONDITIONS（GR-D-004，基于 PHASE_07/08/09 v1.3.0/R7：US-IB-17/18 纳入测试范围，165/165）；R8_PASS_WITH_CONDITIONS（GR-D-005，基于 PHASE_07/08/09 v1.4.0/R8：FND-R7-01 新校验补测 + D-R8-01 四夹具修复 + FLAKE-IB-01 登记补全，171/171）；R9_PASS_WITH_CONDITIONS（GR-D-006，基于 PHASE_07/08/09 v1.5.0/R9：FLAKE-IB-01 测试侧稳定性治理，171/171）；R10_PASS_WITH_CONDITIONS（GR-D-007，基于 PHASE_07/08/09 v1.5.1/v1.6.1/R10：REV-10-2 前端冒烟层 6 例 TC-FE-001~006 正式化 + TC-INT-086 断言重定向为『前端依赖不入库』；Python 基线 171 不变）">
     <phase id="PHASE_07" name="测试计划" status="APPROVED"
       output_file="docs/test_plan.md"
       assigned_agent="test-engineer"
-      version="1.4.0（R9 增量：§13 R9 增量；§7 FLAKE-IB-01 → MITIGATED；用例数不变 171）"
-      invocation_id="INV-GROUP_D-INTELBASE-001" r3_invocation_id="INV-GROUP_D-INTELBASE-002" r4_invocation_id="INV-GROUP_D-INTELBASE-003" r7_invocation_id="INV-GROUP_D-INTELBASE-004" r8_invocation_id="INV-GROUP_D-INTELBASE-005" r9_invocation_id="INV-GROUP_D-INTELBASE-006"/>
+      version="1.5.1（R10 增量：§14 R10 前端冒烟层 6 例 TC-FE-001~006 正式化；Python 用例数不变 171）"
+      invocation_id="INV-GROUP_D-INTELBASE-001" r3_invocation_id="INV-GROUP_D-INTELBASE-002" r4_invocation_id="INV-GROUP_D-INTELBASE-003" r7_invocation_id="INV-GROUP_D-INTELBASE-004" r8_invocation_id="INV-GROUP_D-INTELBASE-005" r9_invocation_id="INV-GROUP_D-INTELBASE-006" r10_invocation_id="INV-GROUP_D-INTELBASE-007"/>
     <phase id="PHASE_08" name="测试执行+报告" status="APPROVED"
       output_file="docs/test_report.md"
       assigned_agent="test-engineer"
-      version="1.5.0（R9 增量：§14 R9 增量节 171/171；FLAKE-IB-01 → MITIGATED（有界重试）+ 探针守约论证）"
-      invocation_id="INV-GROUP_D-INTELBASE-001" r3_invocation_id="INV-GROUP_D-INTELBASE-002" r4_invocation_id="INV-GROUP_D-INTELBASE-003" r7_invocation_id="INV-GROUP_D-INTELBASE-004" r8_invocation_id="INV-GROUP_D-INTELBASE-005" r9_invocation_id="INV-GROUP_D-INTELBASE-006"/>
+      version="1.6.1（R10 增量：§15 R10 前端冒烟 6/6 + Python 171/171 不变；TC-INT-086 断言重定向）"
+      invocation_id="INV-GROUP_D-INTELBASE-001" r3_invocation_id="INV-GROUP_D-INTELBASE-002" r4_invocation_id="INV-GROUP_D-INTELBASE-003" r7_invocation_id="INV-GROUP_D-INTELBASE-004" r8_invocation_id="INV-GROUP_D-INTELBASE-005" r9_invocation_id="INV-GROUP_D-INTELBASE-006" r10_invocation_id="INV-GROUP_D-INTELBASE-007"/>
     <phase id="PHASE_09" name="测试用例实现" status="APPROVED"
-      output_file="tests/（R9 增量：test_ib_embed_wire.py 请求助手新增有限有界重试 _request_bounded；用例数不变 171：unit 67 / integration 88 / e2e 16）"
+      output_file="tests/（R10 增量：新增 src/frontend/tests/frontend.smoke.test.js 6 例；test_definition_config_r7.py TC-INT-086 断言改为 git 跟踪判定；Python 用例数不变 171：unit 67 / integration 88 / e2e 16）"
       assigned_agent="test-engineer"
-      version="1.5.0（R9：用例数不变 171；FLAKE-IB-01 治理）"
-      invocation_id="INV-GROUP_D-INTELBASE-001" r3_invocation_id="INV-GROUP_D-INTELBASE-002" r4_invocation_id="INV-GROUP_D-INTELBASE-003" r7_invocation_id="INV-GROUP_D-INTELBASE-004" r8_invocation_id="INV-GROUP_D-INTELBASE-005" r9_invocation_id="INV-GROUP_D-INTELBASE-006"/>
+      version="1.6.1（R10：新增 src/frontend/tests/frontend.smoke.test.js 6 例；test_definition_config_r7.py TC-INT-086 改为 git 跟踪判定；Python 用例数不变 171：unit 67 / integration 88 / e2e 16）"
+      invocation_id="INV-GROUP_D-INTELBASE-001" r3_invocation_id="INV-GROUP_D-INTELBASE-002" r4_invocation_id="INV-GROUP_D-INTELBASE-003" r7_invocation_id="INV-GROUP_D-INTELBASE-004" r8_invocation_id="INV-GROUP_D-INTELBASE-005" r9_invocation_id="INV-GROUP_D-INTELBASE-006" r10_invocation_id="INV-GROUP_D-INTELBASE-007"/>
 
     <gate_review id="GR-D-001" decision="PASS_WITH_CONDITIONS" reviewer="pm-orchestrator"
       time="2026-09-26T00:00:00Z" retry_count="0" scope="GROUP_D（PHASE_07 测试计划 + PHASE_08 执行报告 + PHASE_09 用例实现）"
@@ -560,14 +565,27 @@
     />
     <followup_note id="GR-D-006">GROUP_D R9 增量稳定性治理门控 GR-D-006：四项 PASS 标准**全部 SATISFIED**，且全部由**独立 verifier 亲自复跑**证实：67/67、88/88、18/18 US、171=171+0+0+0，`pytest tests -q` **171 passed EXIT=0**、selfcheck 31/31、靶点文件 10 次重复 **10 绿**。**『不吞断言』边界经结构（except 仅连接级 + HTTPError；MRO 证明 AssertionError 不可捕获）与行为（探针 D attempts=1 raised=AssertionError）双证据证明** —— REV-09-2 硬边界守住。判 **PASS_WITH_CONDITIONS**（不判 FAIL：门控阈值无一被违反；不判纯 PASS：FLAKE-IB-01 保持 MITIGATED 非 CLOSED 的诚实残余 + 承前文档 MINOR + 3 open_item）。GR-D-001~005 继续有效。**这标志着 REV-09（FLAKE-IB-01 测试侧治理）收口。** PHASE_11 生产部署维持**冻结**：须待用户明确下达 PRODUCTION_DEPLOY_CONFIRM。依据协调者裁决 A（REV-09 第 3 项），本门控通过后停下回报协调者。</followup_note>
 
+    <gate_review id="GR-D-007" decision="PASS_WITH_CONDITIONS" reviewer="pm-orchestrator"
+      time="2026-09-27T00:00:00Z" retry_count="0" scope="GROUP_D R10 增量（PHASE_07/08/09，INV-GROUP_D-INTELBASE-007；REV-10-2/10-3：前端冒烟层正式化 + TC-INT-086 重定向）"
+      finding_1="四项 PASS 标准 — SATISFIED（未因 R10 降低）：单元 67/67 = 100%（≥80%）；集成 88/88 = 100%（≥90%）；18/18 US 有测试；metrics 算术一致 171 = 171+0+0+0（unit 67 / integration 88 / e2e 16，Python 层不变）。经独立 verifier 在**全新 checkout** 亲跑 67 unit + 88 integration 全绿（EXIT=0）"
+      finding_2="前端冒烟层正式化 — SATISFIED：REV-10-2 将 6 例（TC-FE-001~006）写入 test_plan.md §14（1.4.0/R9 → 1.5.1/R10）与 test_report.md §15（1.5.0/R9 → 1.6.1/R10），逐例附 AC/NFR 追溯（锁同步回归闸 / ConfigPage 只读编排图 / 白名单表单 / 乐观并发 / 服务端唯一裁决 / 无运行期 CDN）；独立 verifier 于全新 checkout 复跑 npm test 6/6 EXIT=0"
+      finding_3="前端层与 Python 层计数分离 — SATISFIED：前端 6 例作为**独立层**登记，未并入 Python 基线 171（171 = 67 unit + 88 integration + 16 e2e）；test_plan §14.4 / test_report §15.5 明示两层口径，避免总数虚增"
+      finding_4="TC-INT-086 断言重定向非削弱 — SATISFIED：原断言『node_modules/@vue-flow/core 不存在』在 R10 装上依赖后必然失败（R10 引入的测试冲突）；test-engineer 改为**等价更强**不变式『前端依赖不随仓库分发（node_modules 不得被 git 跟踪）』，以 git ls-files 判定。负向对照：伪造 GIT_INDEX_FILE 使依赖看似被跟踪 → 用例如期 FAIL（EXIT=1），证明非空转；断言语义未削弱为通过"
+      finding_5="范围与凭据 — SATISFIED：本轮（含提交 d76239e）足迹零 src/（src/ 仅被纳入版本控制的既有后端文件与按授权修复的 src/frontend）；无 skip/xfail 掩盖；凭据零命中；docs/evidence/*.log 未入库"
+      condition_1="[MINOR 文档一致性，承前挂账] test_report.md L17 file_header 仍引 test_plan.md 1.5.0，而 test_plan 已至 1.5.1（既存偏差，须随下轮触碰修正）"
+      open_item_1="[诚实性限制] 前端运行期渲染（浏览器实跑）无法在无头/离线本机证明，NV-R8-04 仍如实登记为不可验证；本轮仅证结构事实（构建/类型/锁同步/只读图不变量）"
+      open_item_2="[承前挂账] NV-R8-01（FLAKE-IB-01 根治）/ NV-R8-02（生产目标机行为）仍 OPEN/MITIGATED，属 PHASE_11 前置"
+    />
+    <followup_note id="GR-D-007">GROUP_D R10 增量门控 GR-D-007：四项 PASS 标准**全部 SATISFIED**（67/67、88/88、18/18 US、171 算术一致），由**独立 verifier 在全新 checkout 亲跑**证实（未采信自述）。REV-10-2 前端冒烟层 6 例正式化入 test_plan 1.5.1 / test_report 1.6.1（逐例带追溯）；TC-INT-086 断言由『依赖不存在』重定向为**等价更强**的『前端依赖不入库』，负向对照证其非空转。判 **PASS_WITH_CONDITIONS**（不判 FAIL：门控阈值无一被违反；不判纯 PASS：test_report L17 断链 MINOR + 前端运行期渲染不可验证 + 2 open_item）。GR-D-001~006 继续有效。**REV-10（第 2 项）GROUP_C+GROUP_D 段收口。** PHASE_11 生产部署维持**冻结**：须待用户明确下达 PRODUCTION_DEPLOY_CONFIRM。</followup_note>
+
   </group>
 
-  <group id="GROUP_E" status="IN_PROGRESS" gate_decision="PHASE_10_APPROVED（GR-E-001 对 v1.0.0 + GR-E-002 对 v1.1.0/R4，均 PASS_WITH_CONDITIONS，仅计划层）；PHASE_11 仍 PENDING，待用户 PRODUCTION_DEPLOY_CONFIRM">
+  <group id="GROUP_E" status="IN_PROGRESS" gate_decision="PHASE_10_APPROVED（GR-E-001 对 v1.0.0 + GR-E-002 对 v1.1.0/R4，均 PASS_WITH_CONDITIONS，仅计划层）；PHASE_10_R10_增量已批准（GR-E-003 对 v1.1.1/R10：stage9 接入 npm test + cicd_pipeline.md 1.1.1，仅流水线层，PASS_WITH_CONDITIONS）；PHASE_11 仍 PENDING，待用户 PRODUCTION_DEPLOY_CONFIRM">
     <phase id="PHASE_10" name="CI/CD 与部署计划" status="APPROVED"
       output_file="docs/deployment_plan.md（+ docs/cicd_pipeline.md）"
       assigned_agent="devops-engineer"
-      revision="R4（REV-04-3：C-02 nginx 纳入组件清单 / C-03 补 ib-worker.env.example / C-04 Qdrant 二进制路径统一 / C-05 ib_embed 包落点明确 / C-06 无 AVX2 wheel fallback；并反映 B-05 已补 requirements-embed.txt）"
-      invocation_id="INV-GROUP_E-INTELBASE-001" r4_invocation_id="INV-GROUP_E-INTELBASE-002"
+      revision="R4（REV-04-3：C-02 nginx 纳入组件清单 / C-03 补 ib-worker.env.example / C-04 Qdrant 二进制路径统一 / C-05 ib_embed 包落点明确 / C-06 无 AVX2 wheel fallback；并反映 B-05 已补 requirements-embed.txt）；R10（REV-10：cicd_pipeline.md 1.1.1 —— stage9 由 `npm ci &amp;&amp; npm run build` 扩为 `npm ci &amp;&amp; npm run build &amp;&amp; npm test`，前端冒烟 6 例纳入流水线强制力）"
+      invocation_id="INV-GROUP_E-INTELBASE-001" r4_invocation_id="INV-GROUP_E-INTELBASE-002" r10_invocation_id="INV-GROUP_E-INTELBASE-003"
       constraint="仅产出计划；**禁止任何对目标机 192.168.31.133 的写操作/安装/服务启动/SSH 写**；凭据仅环境变量注入、禁止写入任何 git 跟踪文件"/>
     <phase id="PHASE_11" name="生产部署" status="PENDING"
       blocker="须用户明确下达 PRODUCTION_DEPLOY_CONFIRM；且 FND-GROUP-D-03（MAJOR）建议先闭合"/>
@@ -600,6 +618,17 @@
       open_item_2="[诚实性限制] verifier F-5：intelligentbase 无 git 仓库且无 v1.0.0 基线副本，无法 diff 复核『18 处定点修订』，仅与修订记录枚举量级对量 → 不可完全判定；同轮『未触目标机』亦无审计钩子，仅间接证据"
     />
     <followup_note id="GR-E-002">GROUP_E PHASE_10 R4 修订增量门控 GR-E-002：本轮为**计划层修订**，适用标准与 GR-E-001 同类（产出完整 / 仅计划未执行 / 冻结决策遵循 / 凭据洁净 / 回滚与验证覆盖）。C-02~C-06 **五项 P1 全部处置**、B-05 反映正确，且额外揪出并修正一处真实端口冲突；越界与纪律经**独立只读 verifier 证实**（src/ 改动收敛、未抢发门控、FreeArk 只读、无凭据）。故判 **PASS_WITH_CONDITIONS**（不判 FAIL：无 PASS 标准被违反；不判纯 PASS：存在 1 项 MEDIUM 开放项 F-1（checklists.txt B12 与 C-02 冲突且未登记，须 PM 裁决）+ 2 项文档 MINOR + 未触目标机的不可完全判定）。PHASE_10 置 **APPROVED（计划层，v1.1.0/R4）**；GR-E-001 对 v1.0.0 仍有效。GROUP_E 整体仍 IN_PROGRESS，**PHASE_11 保持 PENDING 未门控**（须用户 PRODUCTION_DEPLOY_CONFIRM，且 P0 前置 B-01/B-02/B-03/B-05/B-06 与 F-1 待闭合）。依据用户指令（REV-04），本门控通过后**停下回报**。</followup_note>
+
+    <gate_review id="GR-E-003" decision="PASS_WITH_CONDITIONS" reviewer="pm-orchestrator"
+      time="2026-09-27T00:00:00Z" retry_count="0" scope="GROUP_E PHASE_10 R10 增量（INV-GROUP_E-INTELBASE-003；REV-10：CI 阶段9 接入 npm test + cicd_pipeline.md 1.1.1）；PHASE_11 仍不在门控范围"
+      finding_1="增量范围最小且正当 — SATISFIED：仅改 .github/workflows/ci.yml 的 stage9（单 hunk，步骤名『Frontend build (阶段9)』的 run 由 npm ci 加 npm run build 扩为三行 + npm test；workflow 其余 13 步与 node 20 钉版未动）与 docs/cicd_pipeline.md（1.1.0 → 1.1.1，stage9 行同步）。仍只计划/流水线层，**未执行任何部署**"
+      finding_2="npm test 纳入流水线强制力 — SATISFIED：REV-10 condition_2（GR-C-007 提出的 MINOR：冒烟测试仅存于开发机、无 CI 强制力）在本轮闭合；接入后前端锁同步回归闸具备常驻强制力（对应 FND-R10-01 的防复发）"
+      finding_3="仅计划未执行 / PHASE_11 冻结 — SATISFIED：无任何目标机写操作/连接痕迹；confirm_status 仍 PENDING；PHASE_11 维持冻结"
+      finding_4="凭据与冻结决策 — SATISFIED：ci.yml / cicd_pipeline.md 凭据扫描零命中；禁 Docker / 禁 PyMuPDF / pin 三条硬版本门未改动"
+      condition_1="[承前挂账] PHASE_10 层既有条件继续有效（GR-E-001 condition_1 六项 P0 外部前置含 F-1；GR-E-002 condition_1~3 文档 MINOR 等），均属 PHASE_11 前置，本轮未闭合亦未加重"
+      open_item_1="[流程门控] 本轮为流水线层增量，不改变 GROUP_E 整体 IN_PROGRESS / PHASE_11 PENDING 的冻结态"
+    />
+    <followup_note id="GR-E-003">GROUP_E PHASE_10 R10 增量门控 GR-E-003：适用标准同 PHASE_10 计划层（产出完整 / 仅计划未执行 / 冻结决策遵循 / 凭据洁净），本轮为 **CI 流水线层增量**且范围最小（仅 stage9 单 hunk + cicd_pipeline.md 1.1.1）。REV-10 condition_2（npm test 无 CI 强制力）**已闭合**。判 **PASS_WITH_CONDITIONS**（不判纯 PASS：承前 PHASE_11 外部前置与文档 MINOR 未变）。GR-E-001/002 继续有效。**PHASE_11 保持 PENDING 未门控**（须用户 PRODUCTION_DEPLOY_CONFIRM）。</followup_note>
   </group>
 
   <retry_counters>
@@ -847,6 +876,15 @@
     <log time="2026-09-27T00:00:00Z" state="PM_GATE_REVIEW" action="增量门控 GR-C-007：两项 PASS 标准（26/26 模块 / code_review 无 CRITICAL）均 SATISFIED；六项 finding 全 SATISFIED（锁同步幂等、CI 序列 EXIT=0、冒烟测试负向对照非空转、许可登记逐项一致、边界/受保护行/凭据/CDN 全守）。独立 verifier **建议 FAIL**（交付态非代码）；PM 判 PASS_WITH_CONDITIONS，将交付态 CRITICAL（ConfigPage.vue 仅 staged 未 commit + 索引不自洽 + 裸 commit 复现 stage9 失败）与 reframing（HEAD 自洽，『CI 必失败』为工作树态）原样登记为 condition/open_item" result="PASS_WITH_CONDITIONS" invocation_id="INV-GROUP_C-INTELBASE-008" trace_id="intelligentbase"/>
     <log time="2026-09-27T00:00:00Z" state="PM_GATE_PASS" action="GROUP_C 三门控阶段（PHASE_05/06/06b）status=APPROVED，版本 2.4.0/R8 → 2.5.0/R10，gate_decision=R10_PASS_WITH_CONDITIONS（GR-C-007）；retry_counters GROUP_C=0（本轮首过）" result="GROUP_C APPROVED（带 CRITICAL 交付条件）" invocation_id="INV-GROUP_C-INTELBASE-008" trace_id="intelligentbase"/>
     <log time="2026-09-27T00:00:00Z" state="PM_AWAIT_USER_CONFIRM" action="第 2 项（前端构建阻断）GROUP_C 段收口并**暂停**：代码实质已修复并独立复现，但交付态需协调者裁决——① 是否授权原子提交 5 个互依前端产物（或全树 R7~R10）；② 索引不自洽须先消解；③ 是否将 npm test 接入 CI stage9；④ GROUP_D（前端冒烟测试正式化）是否照常开。PHASE_11 维持冻结" result="WAITING" trace_id="intelligentbase"/>
+    <log time="2026-09-27T00:00:00Z" state="PM_PARSE_PROJECT" action="收到协调者裁决（第 2 项收口指令）：① 提交范围=整个一致工作树（R7~R10），排除 docs/evidence/*.log（加 .gitignore，保留 .py）；② push origin/main；③ commit message 末尾带 Co-Authored-By: Claude Code &lt;noreply@anthropic.com&gt;；④ 同意 npm test 接入 CI stage9 + 照常开 GROUP_D；提交后从全新 checkout 用 Node 20 复跑 stage9 收口" result="PARSED_AND_AUTHORIZED" trace_id="intelligentbase"/>
+    <log time="2026-09-27T00:00:00Z" state="PM_INVOKE_AGENT" action="sub_agent_invoke software-developer (INV-GROUP_C-INTELBASE-009)：仓库根 .gitignore 追加 docs/evidence/*.log（保留 .py）→ git add -A 暂存全树（含此前未跟踪的 src/ib/config/definition.py + tests/* + 前端 5 产物）→ 单个原子提交（末尾 Co-Authored-By: Claude Code 署名）→ push origin main" result="DISPATCHED" invocation_id="INV-GROUP_C-INTELBASE-009" trace_id="intelligentbase"/>
+    <log time="2026-09-27T00:00:00Z" state="PM_READ_OUTPUTS" action="提交结果：commit d76239e（48 文件，10094 insertions/179 deletions；.gitignore:41 docs/evidence/*.log；forbidden 路径命中 0；凭据扫描 0）；git push origin main EXIT=0（1f3e244..d76239e，远端分支保护 bypass 放行）；提交后 git status 干净、HEAD=origin/main=d76239e" result="COMMITTED_AND_PUSHED" invocation_id="INV-GROUP_C-INTELBASE-009" trace_id="intelligentbase"/>
+    <log time="2026-09-27T00:00:00Z" state="PM_READ_OUTPUTS" action="全新 checkout + Node 20 收口验证（独立只读 verifier，远端 clone origin）：clone HEAD=d76239e（三方一致）；clone 干净、必需文件在位、node_modules/dist 未入库；手工取得 node v20.19.0；npm ci EXIT=0（65 包）/ npm run build EXIT=0（28 modules）/ npm test 6/6 EXIT=0；clone 内 Python unit 67 / integration 88 全绿；ci.yml 钉 node 20 且 stage9 为三行" result="PASS" trace_id="intelligentbase"/>
+    <log time="2026-09-27T00:00:00Z" state="PM_GATE_REVIEW" action="签发 GR-D-007（GROUP_D R10）：四项 PASS 标准全 SATISFIED（67/67、88/88、18/18 US、171 算术一致）；REV-10-2 前端冒烟 6 例正式化入 test_plan 1.5.1 / test_report 1.6.1；TC-INT-086 断言重定向（依赖不存在→依赖不入库，负向对照证非空转）；判 PASS_WITH_CONDITIONS" result="PASS_WITH_CONDITIONS" invocation_id="INV-GROUP_D-INTELBASE-007" trace_id="intelligentbase"/>
+    <log time="2026-09-27T00:00:00Z" state="PM_GATE_PASS" action="GROUP_D 三门控阶段（PHASE_07/08/09）status=APPROVED，版本 1.5.0/R9 → PHASE_07 1.5.1 / PHASE_08 1.6.1 / PHASE_09 1.6.1（R10）；gate_decision=R10_PASS_WITH_CONDITIONS（GR-D-007）" result="GROUP_D APPROVED" invocation_id="INV-GROUP_D-INTELBASE-007" trace_id="intelligentbase"/>
+    <log time="2026-09-27T00:00:00Z" state="PM_GATE_REVIEW" action="签发 GR-E-003（GROUP_E PHASE_10 R10 增量）：ci.yml stage9 单 hunk 接入 npm test（+ cicd_pipeline.md 1.1.1），闭合 REV-10 condition_2；仅流水线层、未执行部署、PHASE_11 冻结未变；判 PASS_WITH_CONDITIONS" result="PASS_WITH_CONDITIONS" invocation_id="INV-GROUP_E-INTELBASE-003" trace_id="intelligentbase"/>
+    <log time="2026-09-27T00:00:00Z" state="PM_GATE_PASS" action="GROUP_E PHASE_10 增量 status=APPROVED（v1.1.1/R10）；GROUP_E 整体仍 IN_PROGRESS，PHASE_11 维持 PENDING/冻结" result="PHASE_10 APPROVED（R10 增量）" invocation_id="INV-GROUP_E-INTELBASE-003" trace_id="intelligentbase"/>
+    <log time="2026-09-27T00:00:00Z" state="PM_AWAIT_USER_CONFIRM" action="第 2 项（前端构建阻断）**完整收口**并回报协调者：提交 d76239e + push EXIT=0、全新 checkout Node20 stage9 全绿、GR-C-007/GR-D-007/GR-E-003 三签发、前端冒烟覆盖 6 例。按顺序「每轮完成后回报」→ 停下，等待进入第 1 项（REQ-FUNC-IB-20 回 GROUP_A 补需求）。PHASE_11 维持冻结" result="WAITING" trace_id="intelligentbase"/>
   </audit_log>
 
 </phase_status>
