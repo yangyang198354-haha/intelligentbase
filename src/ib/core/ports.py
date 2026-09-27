@@ -1,7 +1,8 @@
 """
 @module MOD-IB-01
-@implements 13 个端口 Protocol（IFC-IB-021~022 / 032~033 / 051~053 / 061~063 / 071 /
-            081~082 / 090~096 / 098 / 100~110 / 120~131 / 131~134 / 211~215 / 221~223）
+@implements 14 个端口 Protocol（IFC-IB-021~022 / 032~033 / 051~053 / 061~063 / 071 /
+            081~082 / 090~096 / 098 / 100~110 / 120~131 / 131~134 / 211~215 / 221~223 /
+            287~292（R7 第 14 个端口 DefinitionDocumentStore））
 @depends (none)
 @author software-developer
 
@@ -30,6 +31,8 @@ from .types import (
     ChunkingSpec,
     CollectionInfo,
     CollectionSpec,
+    DefinitionDocument,
+    DerivedView,
     DocumentRecord,
     EmbedderDescriptor,
     EgressDescriptor,
@@ -42,10 +45,12 @@ from .types import (
     PointFilter,
     RawConfig,
     RetrievalResult,
+    SaveResult,
     Scope,
     ScoredPoint,
     SessionState,
     UpsertResult,
+    ValidationReport,
     Vector,
     VectorPoint,
 )
@@ -64,6 +69,7 @@ __all__ = [
     "BlobStore",
     "LlmProvider",
     "SessionStore",
+    "DefinitionDocumentStore",
 ]
 
 
@@ -549,4 +555,57 @@ class SessionStore(Protocol):
 
     def delete(self, session_key: str) -> None:
         """删除会话状态。"""
+        ...
+
+
+# =========================================================================== #
+# MOD-IB-02 定义文档（R7 增量，第 14 个端口）
+# =========================================================================== #
+
+
+@runtime_checkable
+class DefinitionDocumentStore(Protocol):
+    """定义文档存储端口（IFC-IB-287~292，module_design.md §2.2 R7 增记 / §3 MOD-IB-02）。
+
+    **单一真源的可替换边界**（ADR-15 第三层）：定义文档的「装载 / 校验 / 派生 / 写回」
+    全经由本端口，生产实现为 `FileDefinitionDocumentStore`（本地文件 + 原子替换 + 语义哈希
+    乐观并发），测试替身为 `InMemoryDefinitionDocumentStore`。
+
+    纪律：
+      * `validate` / `derive` 必须是**纯函数**（同输入同输出、无副作用、离线可测）。
+      * `load` 遇缺失 / 不可解析文件时**不得**静默回退为空文档 —— 抛 `ConfigError`（可读错误）。
+      * `save` 先写临时文件再**原子替换**；`expected_content_hash` 不匹配时**拒绝覆盖**。
+    """
+
+    def load(self, project_id: str) -> DefinitionDocument:
+        """装载定义文档（IFC-IB-288）。
+
+        缺失 / 不可解析 → 抛 `ConfigError`（只报可读原因，**不静默回退空文档**）。
+        """
+        ...
+
+    def save(
+        self,
+        project_id: str,
+        doc: DefinitionDocument,
+        *,
+        expected_content_hash: str | None,
+    ) -> SaveResult:
+        """原子写回定义文档（IFC-IB-289）。
+
+        临写 + 原子替换；`expected_content_hash` 与当前不一致 → `SaveResult(conflict=True)`
+        且**不覆盖**（乐观并发）。
+        """
+        ...
+
+    def validate(self, doc: DefinitionDocument) -> ValidationReport:
+        """完备性校验（IFC-IB-290）。**纯函数**，≥7 类校验项，framework-free。"""
+        ...
+
+    def derive(self, doc: DefinitionDocument) -> DerivedView:
+        """派生只读视图（IFC-IB-291）。**纯函数**；结果**不落盘、不可反写**。"""
+        ...
+
+    def editable_field_whitelist(self) -> frozenset[str]:
+        """可编辑字段白名单（IFC-IB-292）。白名单外字段界面**不得写入**。"""
         ...

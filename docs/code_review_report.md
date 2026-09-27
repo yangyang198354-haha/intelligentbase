@@ -7,13 +7,13 @@
 | 文档 ID | DOC-IB-CR-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 开发者自我代码评审报告 |
 | 产出代理 | software-developer |
-| 调用 ID | INV-GROUP_C-INTELBASE-001（R1）／ INV-GROUP_C-INTELBASE-002（R2 增量）／ INV-GROUP_C-INTELBASE-003（R3 缺陷修复增量）／ INV-GROUP_C-INTELBASE-004（R4 缺陷修复 + 依赖补齐增量） |
+| 调用 ID | INV-GROUP_C-INTELBASE-001（R1）／ INV-GROUP_C-INTELBASE-002（R2 增量）／ INV-GROUP_C-INTELBASE-003（R3 缺陷修复增量）／ INV-GROUP_C-INTELBASE-004（R4 缺陷修复 + 依赖补齐增量）／ INV-GROUP_C-INTELBASE-005（R7 定义外置 + 可视化配置增量）／ INV-GROUP_C-INTELBASE-007（R8 FND-R7-01 校验项补齐）／ INV-GROUP_C-INTELBASE-008（R10 前端构建阻断修复） |
 | 项目 | intelligentbase |
 | 阶段 | PHASE_06b（自我代码评审） |
-| 版本 | **R4**（R1 主体 §1~§8 未改写；R2 增量见 **§9**；R3 增量见 **§10**；R4 增量见 **§11**） |
+| 版本 | **R10**（R1 主体 §1~§8 未改写；R2 增量见 **§9**；R3 增量见 **§10**；R4 增量见 **§11**；R7 增量见 **§12**；R8 增量见 **§13**；R10 增量见 **§14**） |
 | status | DRAFT（待 GROUP_D / PM 复核） |
-| 上游输入 | `docs/architecture_design.md`（**1.2.0 / R2**，GR-B-003 PASS）、`docs/module_design.md`（**1.2.0 / R2**）、`docs/tech_stack.md`（**1.2.0 / R2**）、`docs/ib_embed_service_contract.md`（R2，新建权威契约） |
-| 覆盖范围 | MOD-IB-01 ~ MOD-IB-26（**R2 追加 MOD-IB-26**；R1 覆盖 01~25）。**R3 重评 MOD-IB-13 与 MOD-IB-23**；**R4 只重评被触及的部分**：MOD-IB-12（`ib/blob`，kb 段推导单一真源）与 MOD-IB-13（`ib/lifecycle`，删除路径 scope 来源），外加依赖面新增文件 `src/requirements-embed.txt`（B-05，非模块） |
+| 上游输入 | `docs/architecture_design.md`（**1.3.0 / R7**，GR-B-004 PASS）、`docs/module_design.md`（**1.3.0 / R7**）、`docs/tech_stack.md`（**1.3.0 / R7**）、`docs/ib_embed_service_contract.md`（R2，权威契约）、`docs/test_report.md`（**1.3.0 / R7**，FND-R7-01 登记处 §12.6）；**R10 触发输入** = PM 只读取证（`.github/workflows/ci.yml` 阶段9 `npm ci` 因锁不同步 EUSAGE）与 `src/frontend/package.json` / `package-lock.json` / `ConfigPage.vue` 现场（tech_stack 已随 R10 升至 1.3.1，见 §14） |
+| 覆盖范围 | MOD-IB-01 ~ MOD-IB-26（**R2 追加 MOD-IB-26**；R1 覆盖 01~25）。**R3 重评 MOD-IB-13 与 MOD-IB-23**；**R4 只重评被触及的部分**：MOD-IB-12 与 MOD-IB-13，外加依赖面新增文件 `src/requirements-embed.txt`（B-05，非模块）；**R7 只重评被触及的部分**：MOD-IB-01（端口 13 → 14 + 结构）、MOD-IB-02（定义文档数据层）、MOD-IB-16（派生注入）、MOD-IB-23（装配期闸门 + 端点）、MOD-IB-24（可视化配置页）；**R8 只重评被触及的部分**：MOD-IB-02（`ib/config/definition.py::validate` 校验项补齐）；**R10 只重评被触及的部分**：MOD-IB-24（前端构建管线：锁同步 / 源文件跟踪 / 类型错误 / 冒烟入口） |
 | 评审方式 | 5 维评分 + 逐条 finding（含文件:行号）+ 离线实跑证据 |
 ---
 
@@ -33,8 +33,8 @@
 | 交付文件总数（`src/` 下，不含 `__pycache__`） | **69** |
 | 交付代码总行数（`src/` 下，含部署交付物） | **16,396** |
 | 模块数 | 25（MOD-IB-01 ~ 25）|
-| 端口数 | 13（`ib/core/ports.py`）|
-| 接口契约数 | 58（IFC-IB-001 ~ 265）|
+| 端口数 | 13（`ib/core/ports.py`；**R7 追加第 14 个端口 `DefinitionDocumentStore`，见 §12**）|
+| 接口契约数 | 58（IFC-IB-001 ~ 265；**R7 追加 IFC-IB-287~297 共 11 条，见 §12**）|
 | 后端 Python 文件 | 55 |
 | 前端 TS/Vue 文件 | 11 |
 | 部署交付物 | 9（4 systemd unit + env.example + config.example.json + 迁移 .sql + 检查清单 + 2 requirements）|
@@ -650,7 +650,7 @@ langgraph 的类型与生命周期泄漏到 HTTP 层。
 
 ---
 
-## §6 REQ-FUNC-IB 24 条落地交叉核对
+## §6 REQ-FUNC-IB 27 条落地交叉核对
 
 | 需求 | 落点（模组 / 文件） | 落地状态 |
 |------|-------------------|---------|
@@ -678,8 +678,11 @@ langgraph 的类型与生命周期泄漏到 HTTP 层。
 | REQ-FUNC-IB-22 服务定义与环境变量集中管理 | MOD-IB-25（4 unit + env.example + 启动校验） | 已落地（禁 Docker，物理机直部署；`ExecStartPre` 校验） |
 | REQ-FUNC-IB-23 多项目/多知识库隔离 | MOD-IB-10 collection-per-project + MOD-IB-03 `Scope` + MOD-IB-11 归属断言 | 已落地（用例 `isolation_scope_required` 断言降级时 filter 仍含 `project_id`） |
 | REQ-FUNC-IB-24 索引重建机制 | MOD-IB-14 + MOD-IB-23 `POST /api/rebuild` + MOD-IB-24 RebuildPage | 已落地（单文档失败不切换版本；旧版本可回滚） |
+| REQ-FUNC-IB-25 可视化配置界面（定义文档的图形视图，双向同源） | MOD-IB-24 `frontend/src/views/ConfigPage.vue` + MOD-IB-23 `GET /api/config/definition` | 已落地（Vue Flow 只读图渲染 + 白名单表单；视图侧零持久化，回写单一真源；本地打包无 CDN） |
+| REQ-FUNC-IB-26 可视化可编辑对象边界（节点参数与专家集合，不含运行期改图） | MOD-IB-02 `editable_field_whitelist()`（IFC-IB-292）+ MOD-IB-23 `PUT /api/config/definition` | 已落地（白名单外字段拒绝写入；拓扑/条件边不在可编辑对象；界面不产出无法判定可达性的定义） |
+| REQ-FUNC-IB-27 完备性校验与装配期 fail-fast 准入闸门 | MOD-IB-02 `validate()`（IFC-IB-290）+ MOD-IB-23 `admit()` 装配闸门（IFC-IB-293） | 已落地（`ValidationReport` 无 force/ignore/warn_only；校验失败拒绝装配、服务不启动；离线用例覆盖） |
 
-**24/24 均有落点。** 其中 2 条的完成度依赖目标机或上游决策（IB-11 的真实 OCR 识别、
+**27/27 均有落点。** 其中 2 条的完成度依赖目标机或上游决策（IB-11 的真实 OCR 识别、
 IB-14/15 的图片引用与 `ib-embed` 服务端归属），已在 §5 标注。
 
 ---
@@ -730,7 +733,7 @@ IB-14/15 的图片引用与 `ib-embed` 服务端归属），已在 §5 标注。
    不是可通过改代码消除的设计缺陷；均有明确的验收动作（清单 B4/B5/L-02/L-03）。满足「MAJOR 超过 3 条须说明」的门槛（恰好 3 条，且已说明）。
 3. **实跑证据充分**：后端离线自检 15/15、Django 系统检查 0 issue、前端 SSE 自检 9/9、
    依赖纪律审计（无 fitz/FastAPI/uvicorn/channels/redis）、钉版断言实证生效。全部命令与原始输出见 §2。
-4. **24 条 REQ-FUNC 全部有落点**（§6）。
+4. **27 条 REQ-FUNC 全部有落点**（§6）。
 5. **12 条冻结架构约束逐条守约**：
    - 无 FastAPI/Uvicorn（SSE 由 Django 同步视图 + `StreamingHttpResponse` 承载）；无 Channels/Redis（审计无匹配）；
    - `?token=` 显式 400（用例覆盖）；SSE 只认 `Authorization` 头；
@@ -1353,3 +1356,318 @@ print(r.stdout.strip() or r.stderr.strip())
 4. 全量回归 **142 passed**、离线自检 **24/24**、`compileall` EXIT=0、凭据扫描零命中。
 5. 未修改 `tests/`，未触碰其他代理产出，未触碰 FreeArk 仓库与任何远程主机。
 6. 存疑项**如实登记**于 §11.6（依赖确切版本与传递依赖清单离线不可确证 —— 未粉饰）。
+
+---
+
+# §12 R7 增量评审（定义外置为单一真源 + REQ-FUNC-IB-25/26/27 落地）
+
+> 评审对象：R7 触及的 MOD-IB-01（`ib/core` 端口与结构）、MOD-IB-02（`ib/config/definition.py` + 配置键登记）、
+> MOD-IB-16（`ib/experts` 派生注入）、MOD-IB-23（`ibweb` 闸门与端点）、MOD-IB-24（前端配置页）。
+> 纪律不变：**无实跑证据不下结论**；命令与原始输出见 §12.5。
+
+## 12.1 R7 规模与改动面
+
+| 文件 | 行数级改动 | 性质 |
+|------|-----------|------|
+| `src/ib/core/types.py` | +约 150 行（10 个 frozen `slots=True` 数据结构 + `__all__`） | 契约数据结构 |
+| `src/ib/core/ports.py` | +约 30 行（第 14 个端口 `DefinitionDocumentStore`；头注释 13 → 14） | 端口（纯追加） |
+| `src/ib/core/__init__.py` | +约 20 行（导出） | 导出面 |
+| `src/ib/config/definition.py` | **新增**（约 430 行：纯函数数据层 + 两适配器） | 定义文档数据层 |
+| `src/ib/config/__init__.py` | +约 20 行（2 个键名登记 + 导出） | 配置面 |
+| `src/ib/experts/__init__.py` | +约 15 行（`install_derived`） | 派生注入 |
+| `src/ibweb/composition.py` | +约 120 行（`admit` 闸门 + 装配 4c 步 + 3 个 Deps 字段 + 派生工具函数） | 装配期闸门 |
+| `src/ibweb/serializers.py` | +约 90 行（定义文档读写序列化器） | 序列化面 |
+| `src/ibweb/views.py` | +约 130 行（`definition_config_endpoint` + 5 个私有辅助） | 端点 |
+| `src/ibweb/urls.py` | +1 行 | 路由 |
+| `src/frontend/**`（4 文件） | +约 430 行（`ConfigPage.vue` 新增 + 其余追加） | 可视化配置页 |
+| `src/scripts/selfcheck.py` | +约 250 行（6 个 R7 用例 + 端口一致性 2 对） | 自验 |
+
+**未新增模块（仍 26，MOD-IB-01~26）**；端口 **13 → 14**（module_design R7 §3 明示的纯追加）；未改既有 IFC 签名；未改既有配置键名/默认值；未改依赖边。
+
+## 12.2 R7 5 维评分（仅被触及的部分）
+
+| 维度 | MOD-IB-01/02（数据层 + 端口） | MOD-IB-23（闸门 + 端点） | MOD-IB-24（前端配置页） | 说明 |
+|------|------------------------------|------------------------|-----------------------|------|
+| Correctness（正确性） | 9/10 | 9/10 | 8/10 | `validate`/`derive` 纯函数同输入同输出、语义哈希与 `updated_at` 解耦、缺文档不静默回退 —— 均由 `definition_pure_functions` / `definition_store_roundtrip` 实测；前端 `@vue-flow/core` 未安装 → 类型/构建**离线不可验证**（如实扣分，见 §12.6） |
+| Security（安全性） | 9/10 | 9/10 | 9/10 | **无强制继续开关**（`ValidationReport` 字段集不含 force/ignore/warn_only，为类型层事实）；端点走 `_require_manage`（403）与既有 401 纪律；响应体**只出键名不出键值**（`config_key_names`）；`v-html` 禁用；`ValidationErrorItem` 不回显凭据值 |
+| Performance（性能） | 9/10 | 9/10 | 9/10 | `validate`/`derive` 为 O(n) 纯内存；原子写回为单次 `os.replace`（无大文件拷贝以外开销）；装配期一次性派生并常驻，运行期零额外 IO；前端本地打包（无 CDN 往返） |
+| Maintainability（可维护性） | 9/10 | 9/10 | 8/10 | 单一真源（文档 → 装配期派生 → 构造注入），杜绝各模块各自解析；白名单与校验项**成对维护**并注释；`install_derived` 幂等（支持重复装配测试） |
+| Test Coverage（可测试性） | 9/10 | 9/10 | 7/10 | 纯函数 + `InMemoryDefinitionDocumentStore` 使装配期全链路**离线可测**（6 例新用例）；前端仅**源码级**纪律断言（无离线类型检查）—— 如实扣分 |
+
+## 12.3 R7 Finding 统计（诚实口径）
+
+| 级别 | 新引入（本轮） | 本轮修复/关闭 | 遗留（未闭合） |
+|------|--------------|--------------|-------------|
+| CRITICAL | **0** | 0 | **0** |
+| MAJOR | **0** | 0 | **0** |
+| MINOR / 说明 | 2（见 §12.4） | — | 0（均 DOCUMENTED） |
+
+**未解决的 CRITICAL 问题：无。遗留 MAJOR：无。**（满足本代理「无 CRITICAL 方可提交 SUCCESS」的判据。）
+
+### 12.4 R7 finding（均 MINOR，登记不阻塞）
+
+| Finding ID | 严重级别 | 文件:关键位置 | 描述 | 处置 |
+|-----------|---------|-------------|------|------|
+| FND-R7-01 | MINOR | `src/frontend/src/views/ConfigPage.vue` 全文件 | `@vue-flow/core` **未在本机安装**（无网络），前端 `vue-tsc`/`vite build` 与运行期渲染**无法离线验证** | **DOCUMENTED**：Python 侧 `frontend_config_discipline` 做源码级纪律断言（依赖声明/import/无 CDN/零持久化/拓扑只读入口不存在）；与既有 L-02 同类残留，部署机 `npm install` 后须补验 |
+| FND-R7-02 | MINOR | `src/ibweb/views.py::_put_definition_config` | 写回成功仅刷新 `definitions`/`derived_views`，**不**热更运行中的注册表与已编译图（拓扑本就不可运行期改） | **DOCUMENTED**：与 ADR-16「图编译一次常驻、拓扑变更唯一路径 = 改文档 → 装配期校验 → 重启重编译」一致，属**刻意设计**而非缺陷；专家**参数**（非拓扑）的生效范围已在响应与注释中说明 |
+
+## 12.5 R7 实跑证据（命令 + 原始输出 + EXIT）
+
+| # | 命令（cwd=`src/`） | 结果 | 说明 |
+|---|------------------|------|------|
+| 1 | `PYTHONUTF8=1 python -X utf8 scripts/selfcheck.py` | **30/30 PASS，EXIT=0** | R1~R4 的 24 例全绿 + R7 新增 6 例全绿；逐例输出见下 |
+| 2 | `python -m compileall -q src` | **EXIT=0** | 全量语法编译（含 R7 新增/改动文件） |
+
+R7 新增 6 例的逐例结论（同一次 selfcheck 运行输出）：
+
+```
+PASS  definition_pure_functions：validate / derive / 白名单 / 非编辑字段（IFC-IB-290~292；纯函数）
+PASS  definition_store：原子写回 + 乐观并发 + 缺失不静默回退（IFC-IB-288/289）
+PASS  definition_gate：装配期 fail-fast 准入闸门，聚合全部校验项（IFC-IB-293）
+PASS  definition_config 端点：GET/PUT 200/400/401/403/405/409（IFC-IB-294/295）
+PASS  definition_assembly：装载→校验→派生→注入（IFC-IB-288/291/293）
+PASS  frontend_config_discipline：无 CDN / 视图侧零持久化 / 拓扑只读 / 只有键名（IFC-IB-296）
+------------------------------------------------------------------------
+自检结果：30/30 通过
+EXIT=0
+```
+
+> 注：上示块内 `EXIT=0` 系 **shell 退出码**（命令退出状态，即 `echo $?` 所得），**并非脚本自身打印的输出** ——
+> `scripts/selfcheck.py` 只打印到「自检结果：30/30 通过」为止；上表 `compileall` 行的 `EXIT=0` 同理（shell 退出状态）。
+
+> 关于既有回归：R7 的默认定义文档由**既有默认值精确派生**（`EXPERT_SPECS` / `DEFAULT_TAU` /
+> `DEFAULT_MARGIN` / `max_expert_steps=8` / `search_knowledge`），故派生的专家注册表 **== 现有默认注册表**，
+> 装配期注入**不改变任何既有行为** —— 既有 24 例自检**全绿即行为不变的机器证据**。全量
+> `tests/` 回归属 GROUP_D 职责，本轮**未改** `tests/` 下任何文件（其断言一字未动）。
+
+## 12.6 R7 本地不可验证项（如实登记，不得据此声称「已通过」）
+
+| 项 | 原因 | 处置 |
+|----|------|------|
+| 前端类型检查 / 构建（`vue-tsc` / `vite build`） | `@vue-flow/core` 未安装，离线环境无法 `npm install` | 部署机联网后补验；已在 FND-R7-01 登记 |
+| 配置页运行期真实渲染与 round-trip 写回 | 同上（无浏览器 + 无依赖） | 部署机 `npm install` 后按 AC-IB-17-06 补验；API 侧 round-trip 已由 `definition_store_roundtrip` 离线覆盖 |
+| 生产 `FileDefinitionDocumentStore` 在真实磁盘的并发写 | 离线用临时目录单进程验证（原子替换 + 无残留临时文件） | 多进程并发竞争未实测；已由乐观并发（内容哈希）在协议层防护，如实登记 |
+
+## 12.7 契约与冻结约束的守约复核（R7）
+
+- **未改**：`IFC-IB-001~286` 的号/名/签名（R7 新增 `IFC-IB-287~297` 共 11 条，**纯追加**）；
+  既有配置键名与默认值（R7 仅**登记** `IB_DEFINITION_DOC_PATH` / `IB_VISUAL_CONFIG_ENABLED` 两个**键名**，
+  **任何文件与响应体均不含键值**）；依赖边（新端口适配器由既有边 `23 → 01/02` 构造，**零新增边**）；
+  模块数（仍 26）。
+- **未触碰**：Django + DRF + 原生 `StreamingHttpResponse` SSE / 禁 Channels / 禁 Redis；
+  Qdrant 窄端口 + `scope` 必填；collection-per-project 硬隔离；台账即队列；**无 PyMuPDF**；
+  `langchain-openai` pin `<0.3`；**无 Docker / 无容器化**；**无 AGPL/copyleft**（`@vue-flow/core` = MIT）。
+- **未触碰**：`tests/` 下任何文件（GROUP_D 职责，断言未改）；`docs/` 下**其他代理**的产出
+  （`requirements_spec.md` / `user_stories.md` / `architecture_design.md` / `module_design.md` /
+  `tech_stack.md` / `ib_embed_service_contract.md` 均**未改**）；FreeArk 仓库**全程只读**。
+- **未触网**：本轮自测**离线**（InMemory 替身 + 临时目录），**未**真连 Qdrant / DeepSeek / ib-embed。
+- **凭据纪律**：R7 新增/修改文件**不含任何真实凭据**；配置键**只登记键名**（`IB_DEFINITION_DOC_PATH`
+  为路径、`IB_VISUAL_CONFIG_ENABLED` 为开关，二者值均经环境变量注入，**不入任何 git 跟踪文件**）。
+
+## 12.8 §12 结论
+
+**R7 自评状态：SUCCESS（CRITICAL = 0，MAJOR = 0）。**
+
+1. **施工前置已闭合**：先完成「专家/路由/编排/工具授权外置为数据 + 单一真源」（`DefinitionDocumentStore`
+   + `definition.py` 数据层），再回填 UI 真实内容（配置页），符合 REV-07-6 裁定 (a)。
+2. **REQ-FUNC-IB-25/26/27 均有落点**（§6 交叉核对 27/27）：只读图 + 白名单表单；拓扑不可运行期编辑 +
+   零持久化 + 本地打包禁 CDN；装配期 fail-fast 闸门（无强制继续开关，为类型层事实）。
+3. **离线自检 30/30 PASS（EXIT=0）**，其中 6 例专测 R7 纯函数与离线可测路径；`compileall` EXIT=0。
+4. **无 CRITICAL 遗留**，两条 MINOR 均 DOCUMENTED（前端离线不可验、写回不热更运行期图 —— 后者为 ADR-16 刻意设计）。
+5. 未改 `tests/`，未触碰其他代理产出，未触碰 FreeArk 仓库与任何远程主机。
+
+---
+
+# §13 R8 增量评审（FND-R7-01 修复：`validate` 补齐两项装配期校验）
+
+> 评审对象：R8 触及的 MOD-IB-02（`src/ib/config/definition.py::validate`）与自验面
+> `src/scripts/selfcheck.py`。缺陷登记处：`docs/test_report.md` §12.6 / §12.10（**FND-R7-01，MAJOR**）。
+> 纪律不变：**无实跑证据不下结论**；命令与原始输出见 §13.5。
+
+> **同号不同源提示（诚实登记）**：GROUP_D `test_report.md` §12.6 的 **FND-R7-01（MAJOR，校验项缺失）** 与本报告
+> §12.4 的 **FND-R7-01（MINOR，前端 `@vue-flow/core` 离线不可验）** **同号不同源**（由不同代理各自登记）。
+> 本节修复的是**前者**；§12.4 的 MINOR 登记保持原样、未改动、未关闭（属前端离线残留）。
+
+## 13.1 R8 规模与改动面
+
+| 文件 | 行数级改动 | 性质 |
+|------|-----------|------|
+| `src/ib/config/definition.py` | +约 52 行（`validate()` 末尾追加第 10 / 11 项校验 + docstring 登记） | 校验项补齐（纯追加） |
+| `src/scripts/selfcheck.py` | 2 夹具微调 + 1 新用例（+约 70 行） | 自验 |
+| `tests/unit/test_definition_uniqueness_r8.py` | **新增**（TC-UNIT-062 / 063 / 064） | GROUP_D 套件新增 |
+| `docs/implementation_plan.md` | 头部版本 2.3.0 → 2.4.0 / §16 | Task 3 |
+| `docs/code_review_report.md` | 头部版本行 + 本节 | Task 4 |
+
+**未新增模块 / 端口 / IFC 编号**；`validate` 签名与 `ValidationReport` 结构**未改**；`EXPERT_SPECS` 默认数据**未改**；既有 9 项校验的语义与顺序**未改**（仅末尾追加）。
+
+## 13.2 R8 5 维评分（仅被触及的部分）
+
+| 维度 | MOD-IB-02（`validate` 校验项补齐） | 自验面（selfcheck） | 说明 |
+|------|-----------------------------------|---------------------|------|
+| Correctness（正确性） | 9/10 | 9/10 | 两分支（通过 / 拒绝）均实测；归一化口径对齐**路由消费方**（`keyword.lower()`），撞车判定与运行期实际行为一致；默认装配（三专家）修后仍通过 |
+| Security（安全性） | 9/10 | 9/10 | 错误信息只回显**关键词 / 标签**（业务数据），**不含任何凭据值**；仍无「强制继续」通道（类型层事实未变）；`ValidationErrorItem` 字段集未扩 |
+| Performance（性能） | 10/10 | 10/10 | 追加为 O(总关键词数) 单遍字典归并，装配期一次性纯内存，无 I/O |
+| Maintainability（可维护性） | 9/10 | 9/10 | 口径理由以注释就地写明（为何 `lower` / 为何 `strip` / 为何跳过空值）；docstring 逐类登记；未触碰既有 9 项 |
+| Test Coverage（可测试性） | 9/10 | 8/10 | 新增 3 个纯函数单元用例（通过 + 3 类拒绝）；selfcheck +1 例。**扣分**：见 §13.6 —— 修复使 4 个**既有 GROUP_D 夹具**失效（夹具数据本身撞车），本轮**不得改动 tests/**，已登记交 GROUP_D |
+
+## 13.3 R8 Finding 统计（诚实口径）
+
+| 级别 | 新引入（本轮） | 本轮修复/关闭 | 遗留（未闭合） |
+|------|--------------|--------------|-------------|
+| CRITICAL | **0** | 0 | **0** |
+| MAJOR | **0** | **1**（FND-R7-01，本报告按「已实现补齐」计） | **0** |
+| MINOR / 说明 | 1（见 §13.4） | — | 0 |
+
+**未解决的 CRITICAL 问题：无。遗留 MAJOR（本代理实现面）：无。**
+
+### 13.4 R8 finding（登记不阻塞）
+
+| Finding ID | 严重级别 | 文件:关键位置 | 描述 | 处置 |
+|-----------|---------|-------------|------|------|
+| D-R8-01 | MINOR（登记） | `tests/unit/test_definition_data_layer_r7.py`、`tests/integration/test_definition_config_r7.py` 的 `_expert` 夹具 | 夹具两专家共用关键词 `k` / 标签 `"标签"`，在**旧（不完整）校验**下「合法」；修后为**应拒**，导致 TC-UNIT-056/057/061、TC-INT-082 失败 | **DOCUMENTED + 交 GROUP_D**：本轮**不得改动 tests/ 既有用例**（硬约束）；处置建议见 §13.6。属 `test_report.md` §12.10 第 4 项预期的修复后测试侧工作 |
+
+## 13.5 R8 实跑证据（命令 + 原始输出 + EXIT）
+
+| # | 命令（**cwd = 仓库根目录**） | 结果 | 说明 |
+|---|-----------------------------|------|------|
+| 1 | `PYTHONUTF8=1 python -X utf8 src/scripts/selfcheck.py` | **31/31 PASS，EXIT=0** | R1~R7 的 30 例全绿 + R8 新增 `definition_uniqueness` 全绿 |
+| 2 | `IB_OFFLINE_MODE=1 PYTHONUTF8=1 python -m pytest tests/unit/test_definition_uniqueness_r8.py -q` | **3 passed，EXIT=0** | 新增单元用例（TC-UNIT-062 / 063 / 064） |
+| 3 | `IB_OFFLINE_MODE=1 PYTHONUTF8=1 python -m pytest tests/unit tests/integration -q` | **148 passed / 4 failed**（152 计） | 4 个失败**恰为** §13.6 所列既有夹具；无其他回归、无 ERROR |
+| 4 | `python -m compileall -q src` | **EXIT=0** | 全量语法编译（含改动文件） |
+
+R8 新增 selfcheck 用例的逐例结论：
+
+```
+PASS  definition_uniqueness：跨专家关键词撞车 / cn_label 重复 → fail-fast（ADR-16；R8）
+------------------------------------------------------------------------
+自检结果：31/31 通过
+```
+
+## 13.6 下游影响与处置建议（诚实登记，需 GROUP_D）
+
+新增校验使两专家共用 `keywords=("k",)` / `cn_label="标签"` 的**既有测试夹具**由「旧校验下合法」变为「修后应拒」。经实跑（§13.5 第 3 行），**恰好 4 个既有用例**因此失败：
+
+| 用例 | 文件 | 根因 | 建议处置（GROUP_D） |
+|------|------|------|--------------------|
+| TC-UNIT-056 / 057 / 061 | `tests/unit/test_definition_data_layer_r7.py` | `_expert` 默认 `keywords=("k",)` / `cn_label="标签"` | 将 `_expert` 夹具改为每专家关键词互异、标签互异（如 `keywords=(f"k{name}",)`、`cn_label=f"标签{name}"`） |
+| TC-INT-082 | `tests/integration/test_definition_config_r7.py` | 同上 | 同上 |
+
+> 本轮**未改动 `tests/` 任何既有用例**（遵守硬约束「只可新增」）；此为**夹具数据陈旧**问题（其数据在修前仅因缺陷而「合法」），非实现缺陷。与 `test_report.md` §12.10 第 4 项 / NV-R7-05 的预期一致。
+
+## 13.7 契约与冻结约束的守约复核（R8）
+
+- **未改**：`IFC-IB-001~297`（无新增编号、无签名/返回类型变更）；`validate(doc, *, known_tools=None) -> ValidationReport` 签名与 `ValidationReport` / `ValidationErrorItem` 字段集一字未改；端口数 14；模块数 26；`EXPERT_SPECS` 默认数据；配置键名与默认值；依赖边。
+- **未触碰**：Django + 原生 SSE / 禁 Channels·Redis；Qdrant；bge-m3 dim=1024 CPU-only；**禁 PyMuPDF**；`langchain-openai` pin `<0.3`；**禁 Docker / 无容器化**；**无 AGPL/copyleft**。
+- **未触碰**：`tests/` 下任何**既有用例**（只新增 1 文件）；`docs/` 下**其他代理**的产出（`requirements_spec.md` / `user_stories.md` / `architecture_design.md` / `module_design.md` / `tech_stack.md` / `ib_embed_service_contract.md` / `test_plan.md` / `test_report.md` / `phase_status.md` 均**未改**）；FreeArk 仓库**全程只读**。
+- **未触网 / 未引新依赖**：本轮自测**离线**（纯函数 + 临时目录），**未**真连 Qdrant / DeepSeek / ib-embed，**未**安装任何新依赖。
+- **凭据纪律**：改动代码 / 文档 / 用例**不含任何真实凭据**；错误信息只回显**关键词 / 标签值**（业务数据），不回显任何环境变量值。
+
+## 13.8 §13 结论
+
+**R8 自评状态：PARTIAL_SUCCESS（CRITICAL = 0；FND-R7-01 实现面已补齐并实跑验证；仅余 GROUP_D 侧夹具更新）。**
+
+1. **FND-R7-01 实现面已补齐**：跨专家关键词撞车 + `cn_label` 唯一性两项装配期校验落地，违反即产出可定位的 `ValidationErrorItem`，由既有 `admit` 聚合闸门 fail-fast 拒绝。
+2. **纯追加边界守住**：既有 9 项校验语义与顺序、全部 IFC / 签名、`EXPERT_SPECS` 默认数据、模块/端口/依赖边**均未改**。
+3. **离线自检 31/31 PASS（EXIT=0）**；新增单元用例 **3 passed**；`compileall` EXIT=0；**默认装配修后仍通过**。
+4. **无 CRITICAL 遗留**；出现 1 条 MINOR 登记（D-R8-01：既有测试夹具陈旧，须 GROUP_D 更新）—— 故状态判 **PARTIAL_SUCCESS** 而非 SUCCESS，以强制关注下游夹具更新。
+5. 未改 `tests/` 既有用例，未触碰其他代理产出，未触碰 FreeArk 仓库与任何远程主机。
+
+---
+
+# §14 R10 增量评审（前端构建阻断修复 + 冒烟入口 + 许可登记）
+
+> **性质**：对 §1~§13 的**追加**，不覆盖。R10 为**交付管线缺陷修复轮**（invocation `INV-GROUP_C-INTELBASE-008`），只重评被触及的 **MOD-IB-24**（前端）。§1~§13 逐字未改。
+
+## 14.1 R10 规模与改动面
+
+| 文件 | 变更 | 行数变化 |
+|------|------|---------|
+| `src/frontend/package-lock.json` | 重新生成（纳入 `@vue-flow/core` + 14 传递包） | **+216** |
+| `src/frontend/package.json` | 新增 `test` 脚本 + `_comment` 两条（R10 说明、传递依赖已核实） | +2 有效行 |
+| `src/frontend/src/views/ConfigPage.vue` | 删 1 行未使用导入；**并入 git 跟踪** | **-1** |
+| `src/frontend/tests/frontend.smoke.test.js` | **新增**（6 用例，零新增依赖） | +153（新文件） |
+| `docs/tech_stack.md` | §2.1 新增 + §1/§2/§5.3 三处收敛 + 头部 1.3.1 | +~35 |
+| `docs/implementation_plan.md` | §17 + 头部 2.5.0 | +~60 |
+
+**未改**：后端 `src/ib` / `src/ibweb` / `src/ib_embed`；`tests/` 任何既有用例；`.github/workflows/ci.yml`；`vite.config.ts` / `tsconfig.json`。
+
+## 14.2 R10 5 维评分（仅 MOD-IB-24 被触及的部分）
+
+| 维度 | 分数 | 说明 |
+|------|------|------|
+| Correctness | **9/10** | 三处阻断缺陷全部闭合，CI 顺序实跑 `npm ci` + `npm run build` 双双 **EXIT=0**（§14.4）。扣 1 分：FND-R10-02 说明「交付物完整性校验」在 R7 交付时**缺失**（文件未跟踪竟未被任何自检发现），本轮仅补救该一例，未新增通用的「已跟踪性」自检 |
+| Security | **10/10** | 无凭据写入；新依赖许可全宽松（无 AGPL/copyleft，REQ-NFR-IB-12）；无运行期 CDN（AC-IB-17-06）；冒烟用例对 CDN 主机做主动扫描 |
+| Performance | **9/10** | 未引入 UI 组件库；产物 JS 252.35 kB（gzip 89.20 kB）/ CSS 12.62 kB，对 4GB 目标机可接受。扣 1 分：`@vue-flow/core` 1.48.2 相对 `^1.41.0` 抬升引入的**增量**未与旧产物逐字节比对（旧 `dist` 为 R7 前产物，无可比基线） |
+| Maintainability | **9/10** | 修复最小化（删 1 行、重生成锁）；`package.json` `_comment` 与 `tech_stack` §2.1 同步更新，消除 `[待核实]` 陈述漂移；冒烟入口零依赖、可被 REV-10-2 直接扩写。扣 1 分：冒烟用例为**文本级结构断言**，非 SFC 语义编译断言（`@vue/compiler-sfc` 为传递依赖，直接 import 会引入隐式依赖，故刻意回避） |
+| Test Coverage（可测试性） | **9/10** | 新增 6 用例含**根因回归闸**（锁 ↔ package.json 同步）并附**负向对照**证明其有效（§14.4 行 5）。扣 1 分：`tests/` 未纳入 `tsconfig.include`，故测试脚本本身不经 `vue-tsc` 类型检查（有意为之：Node 内建测试脚本用纯 JS 免构建） |
+
+## 14.3 R10 Finding 统计（诚实口径）
+
+| 严重级别 | 计数 | 状态 |
+|---------|------|------|
+| **CRITICAL** | **3** | **全部 FIXED 并实跑验证** |
+| MAJOR | 0 | — |
+| MINOR | 2 | 登记不阻塞（见 14.5） |
+
+| Finding ID | 严重级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|---------|------------|------|------|
+| FND-R10-01 | **CRITICAL** | `src/frontend/package-lock.json`（根节点 `packages[""].dependencies`） | 锁与 `package.json` 失同步：lock 内 0 条 `vue-flow`，CI 阶段9 `npm ci` EUSAGE | **FIXED**（重生成锁；`npm ci` EXIT=0 实证） |
+| FND-R10-02 | **CRITICAL** | `src/frontend/src/views/ConfigPage.vue`（整文件未被 git 跟踪）；旁证 `src/frontend/src/App.vue:23` | R7 交付的页面未 `git add`，而 `App.vue` 已 import 之 → CI checkout 后缺文件，`vue-tsc` 必失败 | **FIXED**（`git add`，已 staging；本地 `npm run build` EXIT=0 实证） |
+| FND-R10-03 | **CRITICAL** | `src/frontend/src/views/ConfigPage.vue:41` | `type ExpertSpecInput` 未使用；`noUnusedLocals: true` 下 `TS6133` 致 `vue-tsc` 非零退出 | **FIXED**（删除该导入；`npm run build` EXIT=0 实证） |
+
+> **CRITICAL = 0（修复后）**。三条 CRITICAL 均属**交付管线阻断**（任一存在则 CI 阶段9 失败），故不得以 MINOR/MAJOR 口径降级登记。
+
+## 14.4 R10 实跑证据（命令 + 原始输出 + EXIT）
+
+| # | 命令（cwd = `src/frontend`） | 原始输出摘要 | EXIT | 日志 |
+|---|---------------------------|-------------|------|------|
+| 1 | `npm install --no-fund --no-audit` | `added 16 packages in 5s` | **0** | `docs/evidence/groupc_r10_npm_install.log` |
+| 2 | `rm -rf node_modules && npm ci` | `added 65 packages in 2s` | **0** | `docs/evidence/groupc_r10_npm_ci.log` |
+| 3 | `rm -rf dist && npm run build` | `28 modules transformed` / `index-*.js 252.35 kB │ gzip: 89.20 kB` / `built in 1.23s` | **0** | `docs/evidence/groupc_r10_npm_build.log` |
+| 4 | `npm test` | `tests 6 / pass 6 / fail 0` | **0** | `docs/evidence/groupc_r10_npm_test.log` |
+| 5 | 负向对照：旧锁 + `node --test tests/frontend.smoke.test.js` | `AssertionError: package-lock.json 未解析 @vue-flow/core`（`pass 5 / fail 1`） | **1（预期）** | `docs/evidence/groupc_r10_guard_negative_control.log` |
+| 6 | 逐包读 `node_modules/<pkg>/package.json` | 14 包 → MIT / ISC / BSD-3-Clause | — | `docs/evidence/groupc_r10_license.log` |
+
+**修复前原始报错（FND-R10-03 现场，保留备查）**：
+
+```
+> vue-tsc --noEmit && vite build
+src/views/ConfigPage.vue(41,8): error TS6133: 'ExpertSpecInput' is declared but its value is never read.
+EXIT=2
+```
+
+**修复后**：`vue-tsc --noEmit` 零错误 → `vite build` 成功（同 §14.4 行 3）。
+
+## 14.5 R10 MINOR finding（登记不阻塞）
+
+| ID | 级别 | 描述 | 处置 |
+|----|------|------|------|
+| M-R10-01 | MINOR | **「已跟踪性」无自检**：`ConfigPage.vue` 未被跟踪（FND-R10-02）在 R7 交付后长期未被发现，说明缺少「交付文件是否全部入 git」的机械校验 | 建议后续轮次在 `src/scripts/selfcheck.py`（或 CI 阶段1 后）增加「`src/frontend/src/**` 全部被 `git ls-files` 覆盖」断言。**本轮未加**（selfcheck 属受保护文件，且超出授权范围） |
+| M-R10-02 | MINOR | **冒烟用例为文本断言**：用例 3/4 以正则匹配 `ConfigPage.vue` 文本，而非用 `@vue/compiler-sfc` 真正编译 SFC | 有意为之：`@vue/compiler-sfc` 为**传递**依赖，直接 import 会引入隐式契约。REV-10-2 若需语义断言，应先将其**显式**登记为 devDependency 并同步锁。**本轮不加**（避免二次锁漂移与体积抬升） |
+
+## 14.6 R10 本地不可验证项（如实登记）
+
+- **CI 真机（GitHub Actions ubuntu-24.04 / Node 20）未跑**：本轮在**本地 Windows + Node 24.18.0 + npm 11.16.0** 复现 CI 的**命令序列**（`npm ci` → `npm run build`），非同一 runner。Node 主版本差异（20 vs 24）对 `node --test` 的用例发现规则**可能有别** —— 故 `test` 脚本选用**无参数** `node --test`（默认递归扫描、排除 `node_modules`），该行为在 Node 18/20/24 一致；`npm ci` / `vite build` 的 Node 20 兼容性由 CI 自身验证。
+- **`dist` 未入库**（`.gitignore` 刻意排除）：故用例 6 以「`dist/` 存在」为前置条件；未 `npm run build` 时该用例给出 diagnostic 而非失败。
+- **`@vue-flow/core` 1.48.2 的运行时渲染**未做浏览器端实测（无 headless 浏览器依赖）；本轮只证明**构建期**通过（`vue-tsc` + `vite build`）与产物**零外发**。
+
+## 14.7 契约与冻结约束的守约复核（R10）
+
+- **未改**：`IFC-IB-001~297`（无新增编号、无签名/返回类型变更）；端口数 14；模块数 26；配置键名与默认值；依赖边；**后端 `src/ib` / `src/ibweb` / `src/ib_embed` 任何行为**；`.github/workflows/ci.yml` 阶段定义。
+- **未触碰**：Django + 原生 SSE / 禁 Channels·Redis；Qdrant；bge-m3 dim=1024 CPU-only；**禁 PyMuPDF**；`langchain-openai` pin `<0.3`；**禁 Docker / 无容器化**。
+- **许可（NFR-12）**：新纳入 14 传递包全部宽松（MIT / ISC / BSD-3-Clause），**无 AGPL / copyleft**；登记于 `tech_stack.md` §2.1。
+- **离线纪律**：**未引入运行期 CDN**（AC-IB-17-06 / REQ-NFR-IB-08）；依赖本地打包；`npm test` 零新增依赖。
+- **未触碰**：`tests/` 下任何既有用例；`docs/phase_status.md`（PM 专属）；其他代理产出中的既有已批准内容（`tech_stack.md` 仅**追加/收敛登记**，选型未变）。
+- **凭据纪律**：改动代码 / 文档 / 证据日志**不含任何真实凭据**（证据仅为 npm 输出、包元数据与构建尺寸）。
+- **FreeArk 仓库全程只读**。
+
+## 14.8 §14 结论
+
+**R10 自评状态：SUCCESS（CRITICAL = 3，全部 FIXED；修复后 CRITICAL = 0）。**
+
+1. **三处交付管线阻断缺陷全部闭合**：锁同步（FND-R10-01）、源文件纳入跟踪（FND-R10-02）、类型错误（FND-R10-03）。
+2. **CI 顺序实跑双绿**：`npm ci` **EXIT=0** → `npm run build` **EXIT=0**；冒烟 `npm test` **6/6 pass EXIT=0**。
+3. **回归闸有效**：负向对照用旧锁复跑，用例 2 **按预期失败**（证明其非空转断言）。
+4. **首例解锁后暴露的后续阻断（FND-R10-03）在同轮内修复并验证**，未遗留 UNRESOLVED-CRITICAL。
+5. **无 MAJOR 遗留**；2 条 MINOR 登记不阻塞（M-R10-01 / M-R10-02）。
+6. 未改后端行为、未改 CI 定义、未削弱任何既有断言、未触网引入运行期依赖、未写入任何凭据。

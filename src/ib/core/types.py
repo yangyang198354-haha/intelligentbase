@@ -773,6 +773,152 @@ class GraphConfig:
     aggregation_forbids_internal_labels: bool = True
 
 
+# --------------------------------------------------------------------------- #
+# 定义文档（R7 增量，IFC-IB-287~292；module_design.md §2.1 / §3 MOD-IB-01）
+#
+# 这些是「定义文档为单一真源」的**类型层契约**（ADR-15）：定义文档在装配期被
+# 装载 → 校验 → 派生为**只读**视图（DerivedView），运行期不得由任何图外输入改变拓扑。
+# 全部 frozen dataclass / 纯 stdlib（REV-07-5），字段一律用不可变元组，杜绝共享可变状态。
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True, slots=True)
+class ExpertSpecInput:
+    """定义文档中的**专家规格输入**（IFC-IB-287 / 288）。
+
+    与运行期 `ExpertSpec` 的区别：本类额外携带 `exemplars`（供语义路由的样例句），
+    且**不含**运行期注入项。`keywords` / `exemplars` 均为不可变元组。
+    """
+
+    name: str
+    cn_label: str
+    keywords: tuple[str, ...]
+    exemplars: tuple[str, ...]
+    is_data_expert: bool
+    fallback_prompt: str
+    is_delegating: bool
+    is_default: bool
+
+
+@dataclass(frozen=True, slots=True)
+class RouteSpecInput:
+    """定义文档中的**路由参数**（IFC-IB-287）。
+
+    `tau` / `margin` 对应语义路由阈值；`default_expert` 必须**恰好**匹配一个专家 name。
+    """
+
+    tau: float
+    margin: float
+    max_expert_steps: int
+    default_expert: str
+
+
+@dataclass(frozen=True, slots=True)
+class ConditionalEdgeSpec:
+    """条件边规格（IFC-IB-287）。
+
+    `branch_map` 为**有序** `(branch_key, target_node)` 序列。**显式声明**是硬要求：
+    缺失 / 为空即非法（IFC-IB-290 拒绝）—— 否则界面无法判定可达性（REQ-FUNC-IB-26 ④）。
+    """
+
+    from_node: str
+    branch_map: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class OrchestrationSpecInput:
+    """编排图规格输入（IFC-IB-287）。
+
+    `nodes` 为节点名集合；`conditional_edges` 为条件边集合。**图拓扑不在运行期可编辑**
+    （REQ-FUNC-IB-26 ②）：本结构一旦派生为 `DerivedView`，进程内不得再被改写。
+    """
+
+    nodes: tuple[str, ...]
+    conditional_edges: tuple[ConditionalEdgeSpec, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ToolGrantSpec:
+    """工具授权规格（IFC-IB-287）。
+
+    `expert_name` → 该专家**可绑定**的工具名集合。工具名须在已知工具注册表内，
+    否则 IFC-IB-290 报错（不静默放行未定义工具）。
+    """
+
+    expert_name: str
+    tool_names: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class DefinitionDocument:
+    """**定义文档**（单一真源；IFC-IB-287~288，module_design.md §2.1）。
+
+    承载「专家 / 路由 / 编排 / 工具授权」的完整定义。`content_hash` 为语义哈希，
+    用于写回的**乐观并发**判据（IFC-IB-289）；`schema_version` 供未来迁移。
+    """
+
+    schema_version: int
+    project_id: str
+    content_hash: str
+    experts: tuple[ExpertSpecInput, ...]
+    route: RouteSpecInput
+    orchestration: OrchestrationSpecInput
+    tool_grants: tuple[ToolGrantSpec, ...]
+    updated_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class DerivedView:
+    """**只读派生视图**（IFC-IB-291，ADR-15 第二层）。
+
+    由 `derive(doc)` **纯函数**产出：**不落盘、不可反写文档**。装配期据此注入运行期
+    注册表 / 图配置。`capability_digest` 为工具授权的能力摘要。
+    """
+
+    experts: tuple[ExpertSpecInput, ...]
+    capability_digest: str
+    graph_config: OrchestrationSpecInput
+
+
+@dataclass(frozen=True, slots=True)
+class ValidationErrorItem:
+    """单条校验错误（IFC-IB-290）。
+
+    **只出** `path` / `code` / `message`：`message` 不得回显任何凭据值（AC-IB-18-04）。
+    """
+
+    path: str
+    code: str
+    message: str
+
+
+@dataclass(frozen=True, slots=True)
+class ValidationReport:
+    """校验报告（IFC-IB-290 / 293，ADR-16）。
+
+    **字段集是刻意的**：除 `ok` / `errors` 外**不存在** `force` / `ignore` / `warn_only`
+    —— 使「不提供强制继续 / 忽略错误开关」成为**类型层事实**而非纪律约定
+    （REQ-FUNC-IB-27）。任何「带病继续」都无法由本结构表达。
+    """
+
+    ok: bool
+    errors: tuple[ValidationErrorItem, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class SaveResult:
+    """写回结果（IFC-IB-289，module_design.md §2.1）。
+
+    `conflict=True` 表示乐观并发哈希不匹配 —— **拒绝覆盖**并回执可读冲突收据；
+    此时 `ok=False` 且 `errors` 至少含一条 `code="content_hash_conflict"`。
+    """
+
+    ok: bool
+    content_hash: str
+    conflict: bool
+    errors: tuple[ValidationErrorItem, ...] = ()
+
+
 __all__ = [
     "Vector",
     "DistanceLiteral",
@@ -829,4 +975,15 @@ __all__ = [
     "StreamEvent",
     "ExpertResult",
     "GraphConfig",
+    # R7 定义文档（IFC-IB-287~292）
+    "ExpertSpecInput",
+    "RouteSpecInput",
+    "ConditionalEdgeSpec",
+    "OrchestrationSpecInput",
+    "ToolGrantSpec",
+    "DefinitionDocument",
+    "DerivedView",
+    "ValidationErrorItem",
+    "ValidationReport",
+    "SaveResult",
 ]

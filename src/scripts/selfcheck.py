@@ -228,6 +228,7 @@ def port_conformance() -> None:
     import inspect
 
     from ib.blob import InMemoryBlobStore
+    from ib.config import FileDefinitionDocumentStore, InMemoryDefinitionDocumentStore
     from ib.core import ports as P
     from ib.embedding import FakeEmbedder, InProcessBgeM3Embedder, LocalHttpEmbedder
     from ib.ledger import InMemoryLedgerRepository
@@ -235,6 +236,7 @@ def port_conformance() -> None:
 
     # R2：Embedder 的**三形态**都必须过同一端口检查（契约 §8「形态可逆」）。
     # 进程内形态与 HTTP 形态是两份独立实现（有意不共享代码），任一方漂移都要在此暴露。
+    # R7：第 14 个端口 `DefinitionDocumentStore` 的**生产/替身两形态**同样纳入检查。
     pairs = [
         (P.VectorStore, InMemoryVectorStore),
         (P.LedgerRepository, InMemoryLedgerRepository),
@@ -242,6 +244,8 @@ def port_conformance() -> None:
         (P.Embedder, FakeEmbedder),
         (P.Embedder, LocalHttpEmbedder),
         (P.Embedder, InProcessBgeM3Embedder),
+        (P.DefinitionDocumentStore, InMemoryDefinitionDocumentStore),
+        (P.DefinitionDocumentStore, FileDefinitionDocumentStore),
     ]
     problems: list[str] = []
     for port, impl in pairs:
@@ -1749,6 +1753,419 @@ def deploy_templates_have_no_secrets() -> None:
         raise AssertionError("模板中出现疑似真实凭据：" + "; ".join(offenders))
 
 
+# --------------------------------------------------------------------------- #
+# R7 增量（定义文档单一真源 / 可视化配置；IFC-IB-287~297）
+# --------------------------------------------------------------------------- #
+
+
+@_case("definition_pure_functions：validate / derive / 白名单 / 非编辑字段（IFC-IB-290~292；纯函数）")
+def definition_pure_functions() -> None:
+    """证明定义文档数据层的 `validate` / `derive` 为**纯函数**且语义正确（离线，无 I/O）。"""
+    from ib.config import (
+        build_definition_document,
+        derive,
+        editable_field_whitelist,
+        non_editable_changes,
+        semantic_hash,
+        validate,
+    )
+    from ib.core import (
+        ConditionalEdgeSpec,
+        ExpertSpecInput,
+        OrchestrationSpecInput,
+        RouteSpecInput,
+        ToolGrantSpec,
+        ValidationReport,
+    )
+
+    # `ValidationReport` 字段集是**刻意的**：不含 force / ignore / warn_only（ADR-16），
+    # 「带病继续」在类型层无法表达。
+    fields = set(ValidationReport.__dataclass_fields__)
+    assert fields == {"ok", "errors"}, fields
+    assert not (fields & {"force", "ignore", "warn_only"}), fields
+
+    def _doc(**over: Any) -> Any:
+        base: dict[str, Any] = {
+            "project_id": "p1",
+            "experts": (
+                ExpertSpecInput("a", "A", ("k",), ("e",), True, "p", False, True),
+                ExpertSpecInput("b", "B", ("j",), (), False, "p", False, False),
+            ),
+            "route": RouteSpecInput(0.65, 0.05, 8, "a"),
+            "orchestration": OrchestrationSpecInput(
+                ("route", "a", "b"), (ConditionalEdgeSpec("route", (("a", "a"),)),)
+            ),
+            "tool_grants": (ToolGrantSpec("a", ("search_knowledge",)),),
+        }
+        base.update(over)
+        return build_definition_document(**base)
+
+    good = _doc()
+    known = {"search_knowledge"}
+    assert validate(good, known_tools=known).ok
+    # 纯函数：同输入同输出（无副作用 / 无隐藏状态）
+    assert validate(good, known_tools=known) == validate(good, known_tools=known)
+    assert semantic_hash(good) == semantic_hash(good)
+    assert derive(good) == derive(good)
+    # semantic_hash 与 updated_at 无关（updated_at 非语义内容）
+    assert semantic_hash(good) == semantic_hash(_doc(updated_at="2026-09-27T00:00:00Z"))
+
+    view = derive(good)
+    assert [e.name for e in view.experts] == ["a", "b"]
+    assert view.capability_digest and "search_knowledge" in view.capability_digest
+    assert view.graph_config.nodes == ("route", "a", "b")
+
+    wl = editable_field_whitelist()
+    assert "route.tau" in wl and "experts[].cn_label" in wl
+    for forbidden in ("orchestration", "orchestration.nodes", "project_id", "schema_version"):
+        assert forbidden not in wl, f"{forbidden} 不应在可编辑白名单内"
+
+    # 违规：默认专家两个 / 未知工具
+    bad = _doc(
+        experts=(
+            ExpertSpecInput("a", "A", ("k",), (), True, "p", False, True),
+            ExpertSpecInput("b", "B", ("k",), (), False, "p", False, True),
+        ),
+        tool_grants=(ToolGrantSpec("a", ("ghost-tool",)),),
+    )
+    codes = {e.code for e in validate(bad, known_tools=known).errors}
+    assert "expert_default_count" in codes and "tool_grant_tool_unknown" in codes, codes
+
+    # 条件边必须显式声明 branch_map（否则界面无法判定可达性，REQ-FUNC-IB-26 ④）
+    empty_branch = _doc(
+        orchestration=OrchestrationSpecInput(("route",), (ConditionalEdgeSpec("route", ()),))
+    )
+    assert "conditional_edge_branch_map_empty" in {e.code for e in validate(empty_branch).errors}
+
+    # 非编辑字段变更检出（拓扑不可编辑）
+    changed = _doc(
+        orchestration=OrchestrationSpecInput(
+            ("route", "a", "b", "evil"), (ConditionalEdgeSpec("route", (("a", "a"),)),)
+        )
+    )
+    assert any(i.code == "field_not_editable" for i in non_editable_changes(good, changed))
+    # 白名单内变更（route.tau）不算违规
+    assert non_editable_changes(good, _doc(route=RouteSpecInput(0.7, 0.05, 8, "a"))) == ()
+
+
+@_case("definition_store：原子写回 + 乐观并发 + 缺失不静默回退（IFC-IB-288/289）")
+def definition_store_roundtrip() -> None:
+    """`FileDefinitionDocumentStore` 真落盘（临时目录）：原子替换、乐观并发、无残留临时文件。"""
+    import pathlib
+    import tempfile
+
+    from ib.config import (
+        FileDefinitionDocumentStore,
+        InMemoryDefinitionDocumentStore,
+        build_definition_document,
+        semantic_hash,
+    )
+    from ib.core import (
+        ConditionalEdgeSpec,
+        ConfigError,
+        ExpertSpecInput,
+        OrchestrationSpecInput,
+        RouteSpecInput,
+    )
+
+    def _doc(tau: float = 0.65) -> Any:
+        return build_definition_document(
+            project_id="p1",
+            experts=(ExpertSpecInput("a", "A", ("k",), (), True, "p", False, True),),
+            route=RouteSpecInput(tau, 0.05, 8, "a"),
+            orchestration=OrchestrationSpecInput(
+                ("route", "a"), (ConditionalEdgeSpec("route", (("a", "a"),)),)
+            ),
+        )
+
+    with tempfile.TemporaryDirectory() as d:
+        path = str(pathlib.Path(d) / "definition.json")
+        store = FileDefinitionDocumentStore(path, known_tools={"search_knowledge"})
+        # 缺失 → ConfigError（**不静默回退空文档**）
+        try:
+            store.load("p1")
+            raise AssertionError("缺失定义文档未被拒绝（静默回退违规，IFC-IB-288）")
+        except ConfigError:
+            pass
+        res = store.save("p1", _doc(), expected_content_hash=None)
+        assert res.ok and not res.conflict, res
+        assert pathlib.Path(path).is_file()
+        loaded = store.load("p1")
+        assert loaded.project_id == "p1" and loaded.content_hash == semantic_hash(loaded)
+        # 乐观并发：陈旧哈希 → conflict，且**不覆盖**
+        stale = store.save("p1", _doc(tau=0.9), expected_content_hash="sha256:deadbeef")
+        assert stale.conflict and not stale.ok and stale.errors, stale
+        assert store.load("p1").route.tau == 0.65, "冲突时不得覆盖（IFC-IB-289）"
+        # 正确哈希 → 写回生效
+        ok = store.save("p1", _doc(tau=0.9), expected_content_hash=loaded.content_hash)
+        assert ok.ok and store.load("p1").route.tau == 0.9
+        # 原子替换：目录内不得残留任何临时文件
+        leftovers = [p.name for p in pathlib.Path(d).iterdir() if p.name != "definition.json"]
+        assert not leftovers, f"原子写回残留临时文件：{leftovers}"
+
+    # 测试替身同端口语义
+    mem = InMemoryDefinitionDocumentStore(_doc(), known_tools={"search_knowledge"})
+    assert mem.validate(mem.load("p1")).ok
+    assert mem.save("p1", _doc(tau=0.5), expected_content_hash="sha256:x").conflict
+    assert mem.editable_field_whitelist() == __import__("ib.config", fromlist=["editable_field_whitelist"]).editable_field_whitelist()
+
+
+@_case("definition_gate：装配期 fail-fast 准入闸门，聚合全部校验项（IFC-IB-293）")
+def definition_gate_refuses_invalid() -> None:
+    """校验不通过 → 拒绝装配（无强制继续开关）；聚合**全部**校验项。"""
+    from ib.config import InMemoryDefinitionDocumentStore, build_definition_document
+    from ib.core import (
+        ConditionalEdgeSpec,
+        ConfigError,
+        ExpertSpecInput,
+        OrchestrationSpecInput,
+        RouteSpecInput,
+    )
+    from ibweb.composition import admit
+
+    def _doc(defaults: int) -> Any:
+        experts = tuple(
+            ExpertSpecInput(f"e{i}", f"E{i}", (f"k{i}",), (), i == 0, "p", False, i < defaults)
+            for i in range(3)
+        )
+        return build_definition_document(
+            project_id="p1",
+            experts=experts,
+            route=RouteSpecInput(0.65, 0.05, 8, "e0"),
+            orchestration=OrchestrationSpecInput(
+                ("route", "e0", "e1", "e2"), (ConditionalEdgeSpec("route", (("e0", "e0"),)),)
+            ),
+        )
+
+    good = _doc(1)
+    store = InMemoryDefinitionDocumentStore(good, known_tools={"search_knowledge"})
+    view = admit(good, store=store)
+    assert [e.name for e in view.experts] == ["e0", "e1", "e2"]
+
+    bad = _doc(2)  # 两个默认专家 → 非法
+    try:
+        admit(bad, store=store)
+        raise AssertionError("非法定义文档未被拒绝装配（IFC-IB-293 被破坏）")
+    except ConfigError as exc:
+        items = getattr(exc, "validation_items", ())
+        assert any(i.code == "expert_default_count" for i in items), items
+        assert "拒绝装配" in str(exc)
+
+
+@_case("definition_uniqueness：跨专家关键词撞车 / cn_label 重复 → fail-fast（ADR-16；R8）")
+def definition_uniqueness_rejects_collisions() -> None:
+    """R8（FND-R7-01 修复）：`validate` 补齐 ADR-16 / AC-IB-18-02 的两类装配期校验。
+
+    * **通过**：跨专家关键词归一化后互不相同、`cn_label` 去空白后互不相同 → `ok`；
+    * **拒绝**：跨专家关键词撞车（大小写不敏感）、`cn_label` 重复 → 逐类拒绝且可定位。
+    """
+    from ib.config import build_definition_document, validate
+    from ib.core import (
+        ConditionalEdgeSpec,
+        ExpertSpecInput,
+        OrchestrationSpecInput,
+        RouteSpecInput,
+    )
+
+    def _doc(
+        a_kws: tuple[str, ...],
+        b_kws: tuple[str, ...],
+        a_label: str = "甲",
+        b_label: str = "乙",
+    ) -> Any:
+        return build_definition_document(
+            project_id="p1",
+            experts=(
+                ExpertSpecInput("a", a_label, a_kws, (), True, "p", False, True),
+                ExpertSpecInput("b", b_label, b_kws, (), False, "p", False, False),
+            ),
+            route=RouteSpecInput(0.65, 0.05, 8, "a"),
+            orchestration=OrchestrationSpecInput(
+                ("route", "a", "b"), (ConditionalEdgeSpec("route", (("a", "a"),)),)
+            ),
+        )
+
+    known = {"search_knowledge"}
+
+    # 通过分支：关键词互不相交（大小写不同者亦不相交）、标签互异
+    assert validate(_doc(("用电", "KWH"), ("故障",)), known_tools=known).ok, "合法的唯一性定义被误拒"
+
+    # 拒绝 1：跨专家关键词撞车（`KWH` 与 `kwh` 归一化后相同）→ expert_keyword_collision
+    rep = validate(_doc(("用电", "KWH"), ("kwh", "故障")), known_tools=known)
+    hits = [i for i in rep.errors if i.code == "expert_keyword_collision"]
+    assert not rep.ok and hits, rep.errors
+    assert "kwh" in hits[0].message.lower() and "'a'" in hits[0].message and "'b'" in hits[0].message, hits
+    assert hits[0].path and hits[0].message
+
+    # 拒绝 2：cn_label 重复（`甲` 与 ` 甲 ` 去空白后相同）→ expert_cn_label_duplicate
+    rep2 = validate(_doc(("用电",), ("故障",), "甲", " 甲 "), known_tools=known)
+    assert any(i.code == "expert_cn_label_duplicate" for i in rep2.errors), rep2.errors
+
+
+@_case("definition_config 端点：GET/PUT 200/400/401/403/405/409（IFC-IB-294/295）")
+def definition_config_endpoints() -> None:
+    """定义文档读写端点的状态码契约 + 只登记键名（响应体不含键值）。"""
+    import copy
+    import json
+
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ibweb.settings")
+    os.environ["IB_CONFIG_SOURCE"] = "dict"
+    from ibweb.composition import build_application, build_deps
+
+    deps = build_deps(OFFLINE_RAW)
+    import django
+
+    django.setup()
+    build_application(deps)
+
+    from django.test import Client
+
+    client = Client()
+    auth = {"HTTP_AUTHORIZATION": f"Bearer {os.environ['IB_OFFLINE_TOKEN']}"}
+
+    r = client.get("/api/config/definition", **auth)
+    assert r.status_code == 200, r.content
+    payload = r.json()
+    assert set(payload) == {"document", "derived", "editable_fields", "config_key_names"}, payload
+    # 只登记**键名**：两个新键名出现，但响应体中不得出现任何环境变量**值**
+    assert payload["config_key_names"] == ["IB_DEFINITION_DOC_PATH", "IB_VISUAL_CONFIG_ENABLED"]
+    assert "orchestration" not in payload["editable_fields"], "拓扑不得进入可编辑白名单"
+    assert payload["derived"]["nodes"] and payload["derived"]["expert_names"]
+
+    # 鉴权纪律对新端点同样生效
+    assert client.get("/api/config/definition").status_code == 401
+    assert client.get("/api/config/definition?token=x").status_code == 400
+    assert client.post("/api/config/definition", **auth).status_code == 405
+
+    # 合法编辑（route.tau ∈ 白名单）→ 200 SaveResult
+    doc = copy.deepcopy(payload["document"])
+    doc["route"]["tau"] = 0.72
+    r2 = client.put(
+        "/api/config/definition",
+        data=json.dumps({"expected_content_hash": payload["document"]["content_hash"], "document": doc}),
+        content_type="application/json",
+        **auth,
+    )
+    assert r2.status_code == 200, r2.content
+    assert set(r2.json()) == {"ok", "content_hash", "conflict", "errors"} and r2.json()["ok"]
+
+    # 非法（两个默认专家）→ 400，逐条 path/code/message
+    doc2 = copy.deepcopy(payload["document"])
+    doc2["experts"][1]["is_default"] = True
+    r3 = client.put(
+        "/api/config/definition",
+        data=json.dumps({"document": doc2}),
+        content_type="application/json",
+        **auth,
+    )
+    assert r3.status_code == 400, r3.content
+    item = r3.json()["error"]["items"][0]
+    assert {"path", "code", "message"} <= set(item), item
+    assert any(i["code"] == "expert_default_count" for i in r3.json()["error"]["items"])
+
+    # 拓扑变更 → 400（field_not_editable：界面编辑与直接改文档一视同仁）
+    doc3 = copy.deepcopy(payload["document"])
+    doc3["orchestration"]["nodes"].append("evil")
+    r4 = client.put(
+        "/api/config/definition",
+        data=json.dumps({"document": doc3}),
+        content_type="application/json",
+        **auth,
+    )
+    assert r4.status_code == 400, r4.content
+    assert any(i["code"] == "field_not_editable" for i in r4.json()["error"]["items"]), r4.content
+
+    # 乐观并发冲突 → 409（含可读回执，不静默覆盖）
+    doc4 = copy.deepcopy(payload["document"])
+    doc4["route"]["tau"] = 0.8
+    r5 = client.put(
+        "/api/config/definition",
+        data=json.dumps({"expected_content_hash": "sha256:deadbeef", "document": doc4}),
+        content_type="application/json",
+        **auth,
+    )
+    assert r5.status_code == 409, r5.content
+    assert r5.json()["error"]["receipt"]["conflict"] is True
+
+
+@_case("definition_assembly：装载→校验→派生→注入（IFC-IB-288/291/293）")
+def definition_assembly_injects_derived() -> None:
+    """装配期按序执行且派生的专家表注入 MOD-IB-16（默认文档 → 与既有默认注册表一致）。"""
+    import ib.experts as experts
+    from ibweb.composition import build_deps
+
+    deps = build_deps(OFFLINE_RAW)
+    assert set(deps.definitions) == {"p_alpha", "p_beta"}
+    # 每项目一份文档（不共享对象）
+    assert deps.definitions["p_alpha"] is not deps.definitions["p_beta"]
+    # 派生的只读视图存在
+    view = deps.derived_views["p_alpha"]
+    assert [e.name for e in view.experts] == ["data-expert", "inspection-expert", "knowledge-expert"]
+    # 注入 MOD-IB-16：派生注册表 == 文档专家集
+    assert experts.names() == tuple(e.name for e in view.experts)
+    assert experts.default_expert() == deps.definitions["p_alpha"].route.default_expert
+    # 图配置取自文档（max_expert_steps 默认 8）
+    from ibweb.composition import _graph_config
+
+    assert _graph_config(deps.cfg, deps.definitions["p_alpha"].route).max_expert_steps == 8
+    # 存储端口可替换（离线 → 内存替身）
+    from ib.config import InMemoryDefinitionDocumentStore
+
+    assert isinstance(deps.definition_store, InMemoryDefinitionDocumentStore)
+
+
+@_case("frontend_config_discipline：无 CDN / 视图侧零持久化 / 拓扑只读 / 只有键名（IFC-IB-296）")
+def frontend_config_discipline() -> None:
+    """IFC-IB-296 的静态纪律检查（前端为 TS/Vue，Python 侧只能做源码级断言，注释先剥）。"""
+    import pathlib
+    import re
+
+    def _strip_comments(text: str) -> str:
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+        text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+        text = re.sub(r"^[ \t]*//.*$", "", text, flags=re.MULTILINE)
+        return text
+
+    frontend = pathlib.Path(_SRC) / "frontend"
+    src_root = frontend / "src"
+    cfg_src = (src_root / "views" / "ConfigPage.vue").read_text(encoding="utf-8")
+    cfg = _strip_comments(cfg_src)
+    pkg = (frontend / "package.json").read_text(encoding="utf-8")
+
+    # 图可视化库随构建产物**本地打包**（依赖声明 + 源码 import；无 CDN）
+    assert "@vue-flow/core" in pkg, "package.json 未声明本地打包的图可视化库 @vue-flow/core"
+    assert "@vue-flow/core" in cfg, "ConfigPage 未使用本地打包的图可视化库"
+
+    all_sources = list(src_root.rglob("*.vue")) + list(src_root.rglob("*.ts"))
+    index_html = frontend / "index.html"
+    if index_html.is_file():
+        all_sources.append(index_html)
+    for path in all_sources:
+        text = _strip_comments(path.read_text(encoding="utf-8")).lower()
+        for bad in ("cdn.", "unpkg.com", "jsdelivr", "cdnjs", "//cdn", "https://unpkg"):
+            assert bad not in text, f"{path.name} 含 CDN 引用：{bad}（AC-IB-17-06）"
+
+    # 视图侧零持久化（ADR-14）：配置页不得用 localStorage / IndexedDB 作为真源
+    # （client.ts 用 sessionStorage 存**令牌**，是 IC-IB-01 的要求，非配置真源）
+    for path in all_sources:
+        if path.name == "client.ts":
+            continue
+        text = _strip_comments(path.read_text(encoding="utf-8"))
+        assert "localStorage" not in text, f"{path.name} 使用 localStorage（视图侧零持久化）"
+        assert "indexedDB" not in text and "IndexedDB" not in text, f"{path.name} 使用 IndexedDB"
+
+    # 拓扑只读：只读渲染标志 + 无图拓扑编辑入口（增删图节点 / 增删边）
+    assert "nodes-draggable" in cfg and "connectable" in cfg, "编排图未设为只读渲染"
+    assert not re.search(r"\b(addNode|removeNode|deleteNode|addEdge|removeEdge|deleteEdge)\b", cfg), (
+        "出现图拓扑编辑入口（拓扑不可运行期编辑，REQ-FUNC-IB-26 ②）"
+    )
+    assert "v-html" not in cfg, "配置页使用了 v-html（XSS 通道）"
+    # 只有键名（凭据 / 路径值不回显）
+    assert "config_key_names" in cfg
+    # 未提交草稿须显式标注「可丢弃」（ADR-14）
+    assert "未提交" in cfg_src, "未提交草稿未显式标注（ADR-14）"
+
+
 def main() -> int:
     print("=" * 72)
     print("intelligentbase 离线自检（GROUP_C 自我验证；正式测试套件属 GROUP_D）")
@@ -1780,6 +2197,14 @@ def main() -> int:
         related_images_events,
         file_image_endpoint,
         frontend_image_discipline,
+        # R7 增量（定义文档单一真源 / 可视化配置；IFC-IB-287~297）
+        definition_pure_functions,
+        definition_store_roundtrip,
+        definition_gate_refuses_invalid,
+        definition_uniqueness_rejects_collisions,
+        definition_config_endpoints,
+        definition_assembly_injects_derived,
+        frontend_config_discipline,
     ]
     for case in cases:
         case()

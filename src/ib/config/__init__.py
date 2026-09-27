@@ -46,6 +46,21 @@ __all__ = [
     "ConfigurationResolver",
     "read_secret",
     "validate_required",
+    # R7 定义文档数据层（IFC-IB-288~292）
+    "SUPPORTED_SCHEMA_VERSION",
+    "DEFAULT_MAX_EXPERT_STEPS",
+    "semantic_hash",
+    "editable_field_whitelist",
+    "non_editable_changes",
+    "validate",
+    "derive",
+    "build_definition_document",
+    "document_to_json",
+    "document_from_json",
+    "content_hash_conflict_item",
+    "FileDefinitionDocumentStore",
+    "InMemoryDefinitionDocumentStore",
+    "NON_EDITABLE_FIELDS",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -89,6 +104,11 @@ IB_RUNTIME_ENV_KEYS: tuple[str, ...] = (
     "IB_CHUNK_OVERLAP",
     "IB_RETRIEVAL_TOP_K",
     "IB_RETRIEVAL_SCORE_THRESHOLD",
+    # R7（IFC-IB-297）：定义文档路径与可视化开关。**只登记键名**（值不入仓库、不入响应体）。
+    #   IB_DEFINITION_DOC_PATH —— 定义文档本地文件路径（[ARCH-ASSUMPTION-A6]：一项目一文件）
+    #   IB_VISUAL_CONFIG_ENABLED —— 可视化配置页开关（前端据此决定是否渲染配置视图）
+    "IB_DEFINITION_DOC_PATH",
+    "IB_VISUAL_CONFIG_ENABLED",
 )
 
 #: v1 支持的 4 种格式（**OQ-IB-02 默认值**：其余格式按扩展点预留，不实现）。
@@ -726,3 +746,25 @@ class ConfigurationResolver:
 
     def validate(self, *, env: Mapping[str, str] | None = None) -> list[ConfigError]:
         return validate_required(self.global_config(), env=env)
+
+
+# --------------------------------------------------------------------------- #
+# R7 定义文档数据层（IFC-IB-288~292）—— 在文件末尾导入，确保子模块可依赖已就绪的
+# `ib.core` 契约，且不产生包初始化期的循环导入。
+# --------------------------------------------------------------------------- #
+from .definition import (  # noqa: E402  (循环导入防护：置于模块末尾)
+    DEFAULT_MAX_EXPERT_STEPS,
+    NON_EDITABLE_FIELDS,
+    SUPPORTED_SCHEMA_VERSION,
+    FileDefinitionDocumentStore,
+    InMemoryDefinitionDocumentStore,
+    build_definition_document,
+    content_hash_conflict_item,
+    derive,
+    document_from_json,
+    document_to_json,
+    editable_field_whitelist,
+    non_editable_changes,
+    semantic_hash,
+    validate,
+)

@@ -39,6 +39,12 @@ __all__ = [
     "EgressDescriptorSerializer",
     "FileListEnvelopeSerializer",
     "RebuildProgressEnvelopeSerializer",
+    # R7 定义文档（IFC-IB-294/295）
+    "DefinitionDocumentSerializer",
+    "DefinitionConfigInputSerializer",
+    "SaveResultSerializer",
+    "ValidationErrorItemSerializer",
+    "definition_derived_summary",
 ]
 
 
@@ -131,3 +137,119 @@ class FileListEnvelopeSerializer(serializers.Serializer):
 
     items = DocumentRecordSerializer(many=True)
     total = serializers.IntegerField()
+
+
+# --------------------------------------------------------------------------- #
+# R7 定义文档（IFC-IB-294 / 295；module_design §3 MOD-IB-23/24）
+#
+# 字段**逐个写出**（同本模块总纪律）：新增领域字段不得静默进/出响应。
+# 反序列化只接受 `document` 整体 + 乐观并发 `expected_content_hash`；
+# **不接受** `project_id`（归属恒取自服务端鉴权结论，不信请求体）。
+# --------------------------------------------------------------------------- #
+
+
+class _ExpertSpecInputSerializer(_DataclassSerializer):
+    _fields = {
+        "name": None,
+        "cn_label": None,
+        "keywords": None,
+        "exemplars": None,
+        "is_data_expert": None,
+        "fallback_prompt": None,
+        "is_delegating": None,
+        "is_default": None,
+    }
+
+
+class _ConditionalEdgeSpecSerializer(serializers.Serializer):
+    def to_representation(self, instance: Any) -> dict[str, Any]:
+        # `branch_map` 输出为 `[[branch_key, target_node], ...]`（**保序**，供界面判定可达性）。
+        return {
+            "from_node": instance.from_node,
+            "branch_map": [[str(k), str(t)] for k, t in instance.branch_map],
+        }
+
+
+class _RouteSpecInputSerializer(_DataclassSerializer):
+    _fields = {"tau": None, "margin": None, "max_expert_steps": None, "default_expert": None}
+
+
+class _OrchestrationSpecInputSerializer(serializers.Serializer):
+    def to_representation(self, instance: Any) -> dict[str, Any]:
+        return {
+            "nodes": list(instance.nodes),
+            "conditional_edges": [
+                _ConditionalEdgeSpecSerializer().to_representation(ce) for ce in instance.conditional_edges
+            ],
+        }
+
+
+class _ToolGrantSpecSerializer(_DataclassSerializer):
+    _fields = {"expert_name": None, "tool_names": None}
+
+
+class DefinitionDocumentSerializer(serializers.Serializer):
+    """`DefinitionDocument` 的对外投影（IFC-IB-294）。
+
+    只输出定义文档的**内容字段**：不含任何凭据（定义文档本就不应含凭据；
+    `ValidationErrorItem` 只出 `path`/`code`/`message`）。
+    """
+
+    def to_representation(self, instance: Any) -> dict[str, Any]:
+        return {
+            "schema_version": instance.schema_version,
+            "project_id": instance.project_id,
+            "content_hash": instance.content_hash,
+            "experts": [_ExpertSpecInputSerializer().to_representation(e) for e in instance.experts],
+            "route": _RouteSpecInputSerializer().to_representation(instance.route),
+            "orchestration": _OrchestrationSpecInputSerializer().to_representation(instance.orchestration),
+            "tool_grants": [_ToolGrantSpecSerializer().to_representation(g) for g in instance.tool_grants],
+            "updated_at": instance.updated_at,
+        }
+
+
+class ValidationErrorItemSerializer(_DataclassSerializer):
+    """单条校验项（**只出** `path`/`code`/`message`；不回显任何凭据值）。"""
+
+    _fields = {"path": None, "code": None, "message": None}
+
+
+class SaveResultSerializer(serializers.Serializer):
+    """`SaveResult` 的对外投影（IFC-IB-295）。`conflict=True` 时含可读冲突回执。"""
+
+    def to_representation(self, instance: Any) -> dict[str, Any]:
+        return {
+            "ok": instance.ok,
+            "content_hash": instance.content_hash,
+            "conflict": instance.conflict,
+            "errors": [ValidationErrorItemSerializer().to_representation(e) for e in instance.errors],
+        }
+
+
+class DefinitionConfigInputSerializer(serializers.Serializer):
+    """`PUT /api/config/definition` 入参（IFC-IB-295）。
+
+    * `document`：完整定义文档（JSON 对象）；
+    * `expected_content_hash`：乐观并发基（可选；缺省表示「不校验并发」）。
+
+    **刻意不接受** `project_id`：归属恒取自服务端鉴权结论（见模块文档）。
+    """
+
+    expected_content_hash = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    document = serializers.JSONField()
+
+
+def definition_derived_summary(view: Any) -> dict[str, Any]:
+    """派生视图摘要（IFC-IB-294 的「+ 派生视图摘要」）。
+
+    只暴露**只读派生结果**（专家名 / 能力摘要 / 图节点与条件边）—— 供界面只读渲染，
+    **不含**任何真源写入口（视图侧零持久化，ADR-14）。凭据一律不出现。
+    """
+    return {
+        "capability_digest": view.capability_digest,
+        "expert_names": [e.name for e in view.experts],
+        "nodes": list(view.graph_config.nodes),
+        "conditional_edges": [
+            _ConditionalEdgeSpecSerializer().to_representation(ce) for ce in view.graph_config.conditional_edges
+        ],
+    }

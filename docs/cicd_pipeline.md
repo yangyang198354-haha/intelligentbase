@@ -6,22 +6,22 @@
 | 文档 ID | DOC-IB-CICD-001 |
 | 标题 | intelligentbase 智能知识库基座 —— CI/CD 流水线定义 |
 | 产出代理 | devops-engineer (author_agent) |
-| 调用 ID | INV-GROUP_E-INTELBASE-002 |
+| 调用 ID | INV-GROUP_E-INTELBASE-003 |
 | 项目 | intelligentbase |
 | 阶段 | GROUP_E / PHASE_10（部署计划配套；**仅定义，不执行**） |
-| 版本 | 1.1.0（R4 修订；补部署前硬门 D-1/D-2，其余不动） |
-| status | **REVISED_PENDING_REVIEW**（R4 修订；GR-E-001 对 R4 前版本有效，待 PM 重新门控 GR-E-002） |
+| 版本 | 1.1.1（R10 修订；阶段9 接入前端 `npm test`，其余不动） |
+| status | **REVISED_PENDING_REVIEW**（R10 修订；GR-E-001 对 R4 前版本有效、GR-E-002 对 1.1.0 有效，本次待 PM 重新门控） |
 | 创建日期 | 2026-09-26 |
 | 凭据纪律 | 本文件不含任何真实凭据；CI 凭据一律经 CI secret / 环境变量注入，不入仓库 |
 | 前置 | **git 仓库与 remote 尚未建立**（见 `deployment_plan.md` §1.1 B-01）——本流水线在其闭合前**无法被触发** |
 
-> 本文件是 `docs/deployment_plan.md` 的配套。**工具链均取自 `src/` 既有交付物**，未虚构工具：pytest（`tests/`）、`scripts/selfcheck.py`（离线自检）、`manage.py check`、`src/frontend` 的 `npm run build`、`src/requirements*.txt`、`src/deploy/checklists.txt`。
+> 本文件是 `docs/deployment_plan.md` 的配套。**工具链均取自 `src/` 既有交付物**，未虚构工具：pytest（`tests/`）、`scripts/selfcheck.py`（离线自检）、`manage.py check`、`src/frontend` 的 `npm run build` 与 `npm test`（Node 20 内置 `node:test`）、`src/requirements*.txt`、`src/deploy/checklists.txt`。
 > **本基座禁 Docker**（DR-03）——CI 使用**裸 runner / 虚拟环境**，不使用容器镜像作为交付物（见 §5）。
 
 ## 1. 流水线概览
 
 ```
-[Source] → [Lint/Config] → [Unit] → [Integration] → [E2E] → [Version-Gate] → [Frontend Build] → [Package Artifact]
+[Source] → [Lint/Config] → [Unit] → [Integration] → [E2E] → [Version-Gate] → [Frontend Build+Test] → [Package Artifact]
                  │                                                                              │
                  └────────────────── 任一失败 → Abort & Notify（不进入后续阶段）────────────┘
 ```
@@ -43,8 +43,10 @@
 | 6 | **Full Suite + Coverage** | 前阶段成功 | `python -m pytest tests --cov=ib --cov=ibweb --cov=ib_embed -q` | **142/142 通过、0 skip/xfail**（R3 基线）；覆盖率 **仅记录不设门**（当前 67%） | abort & notify |
 | 7 | **Offline Selfcheck** | 前阶段成功 | `python src/scripts/selfcheck.py` | 全 `PASS`，exit 0（任一 `FAIL` 非零退出） | abort & notify |
 | 8 | **Version Gate** | 前阶段成功 | 见 §3 | 全部断言通过 | abort & notify |
-| 9 | **Frontend Build** | 前阶段成功 | `cd src/frontend && npm ci && npm run build` | `vue-tsc --noEmit` 零错 + `vite build` 成功 | abort & notify |
+| 9 | **Frontend Build + Test** | 前阶段成功 | `cd src/frontend && npm ci && npm run build && npm test` | `vue-tsc --noEmit` 零错 + `vite build` 成功 + **前端冒烟测试（`node:test`）全通过** | abort & notify |
 | 10 | **Package Artifact** | 前阶段成功 | 归档 `src/frontend/dist/` + 记录 `git rev-parse HEAD` | 产物归档、commit 可追溯 | abort & notify |
+
+> **阶段9 说明（R10 增量）**：阶段9 在 `npm run build` **之后**追加 `npm test`——前端冒烟测试（`src/frontend/tests/frontend.smoke.test.js`，Node 20 内置 `node:test`，**零新增依赖**）。其**必须在 build 之后**运行：用例 6 断言 `dist/` 构建产物内容，属「先建后测」的前置条件顺序。该测试含「`package-lock.json` 与 `package.json` 同步」回归闸——正是 R10 中 `npm ci` 因锁失同步而 `EUSAGE` 失败的根因守卫；接入流水线后该回归守卫方具备**强制力**（此前仅本地可跑）。
 
 > **测试纪律（来源 `CLAUDE.md` / tech_stack §1）**：所有测试必须**离线**跑（`IB_OFFLINE_MODE=1`；外部依赖一律替身）；**严禁连接任何生产 / 外部数据库**；测试使用 SQLite 内存库。CI runner 无须网络访问外部服务（仅需 PyPI / npm registry）。
 
@@ -116,5 +118,6 @@
 |------|------|------|---------|----------|----------|
 | 1.0.0 | PHASE_10 首版 | 2026-09-26 | INV-GROUP_E-INTELBASE-001 | 首版（GR-E-001 = PASS_WITH_CONDITIONS，**对该 R4 前版本有效**） | 既有交付物（pytest / selfcheck / Requirements / frontend build / checklists） |
 | 1.1.0 | GROUP_E / R4（REV-04-3） | 2026-09-26 | INV-GROUP_E-INTELBASE-002 | **最小修订**：新增 §3.1「部署前硬门」D-1（ib-embed 依赖 `pip freeze` 回填锁定）/ D-2（`nginx -t` 语法门）/ D-3（SSE `proxy_buffering off` 复验）；§5 矩阵「Prod 运行形态」补系统 nginx；其余不动 | `src/requirements-embed.txt`「区间非锁定值」；`deployment_plan.md` §7.5（C-02）/ §4.2 |
+| 1.1.1 | GROUP_E / R10（REV-10-2） | 2026-09-27 | INV-GROUP_E-INTELBASE-003 | **最小修订**：阶段9 定义更新为「`vue-tsc` 零错 + `vite build` + 前端冒烟测试（`node:test`）」——命令追加 `npm test`（与 `.github/workflows/ci.yml` 阶段9 逐字同步）；§1 概览补「Build+Test」；新增阶段9 说明（先建后测顺序理由 + 锁同步回归闸的强制力）；其余不动 | GR-C-007 / R10：`src/frontend/package.json` 新增 `"test": "node --test"`、`src/frontend/tests/frontend.smoke.test.js`（6 例）；协调者裁决「阶段9 接入 `npm test`」 |
 
 > 本文件为**定义**，**未执行**；不含任何真实凭据。

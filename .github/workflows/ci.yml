@@ -109,8 +109,11 @@ jobs:
           python -V
           python -c "import sys; assert (3,11) <= sys.version_info[:2] < (3,14), 'python out of range'; print('PASS')"
 
-      # ---- 阶段 9：Frontend build（vue-tsc 零错 + vite build）----
+      # ---- 阶段 9：Frontend build（vue-tsc 零错 + vite build + 前端冒烟测试）----
       # 已提交 package-lock.json，用 npm ci 精确复现（版本锁定，杜绝 ^ 区间漂移）。
+      # R10：阶段9 现含前端单测 `npm test`（Node 20 内置 node:test，零新增依赖；
+      #      含「package-lock.json 与 package.json 同步」回归闸，守住 R10 的 EUSAGE 根因）。
+      # 顺序为先 build 后 test —— 冒烟用例 6 断言 dist/ 产物，须待 vite build 产出后再运行。
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -123,6 +126,7 @@ jobs:
         run: |
           npm ci
           npm run build
+          npm test
 
       # ---- 阶段 10：Package artifact（dist + HEAD 可追溯）----
       - name: Record HEAD (阶段10)

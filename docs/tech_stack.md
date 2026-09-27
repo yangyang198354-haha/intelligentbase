@@ -3,18 +3,19 @@
   <artifact>tech_stack</artifact>
   <path>docs/tech_stack.md</path>
   <doc_id>TECH-INTELBASE-001</doc_id>
-  <version>1.2.0</version>
-  <revision>R2</revision>
+  <version>1.3.1</version>
+  <revision>R7（+ R10 传递依赖许可登记）</revision>
   <status>DRAFT_FOR_GATE_REVIEW</status>
   <phase>GROUP_B / PHASE_04b 技术选型</phase>
   <author>system-architect</author>
   <invocation_id>INV-GROUP_B-INTELBASE-002</invocation_id>
   <created_at>2026-09-25</created_at>
-  <updated_at>2026-09-26</updated_at>
+  <updated_at>2026-09-27</updated_at>
   <inputs>
-    <input path="docs/requirements_spec.md" version="1.1.0" status="APPROVED"/>
-    <input path="docs/architecture_design.md" version="1.2.0" revision="R2" status="DRAFT_FOR_GATE_REVIEW"/>
-    <input path="docs/module_design.md" version="1.2.0" revision="R2" status="DRAFT_FOR_GATE_REVIEW"/>
+    <input path="docs/requirements_spec.md" version="1.2.0" status="APPROVED"/>
+    <input path="docs/user_stories.md" version="1.2.0" status="APPROVED" note="R7 新增登记：可视化配置的 AC 落点（AC-IB-17-01~06 / AC-IB-18-01~06）为 §4.5 新增项与 §1.3 凭据纪律的直接依据"/>
+    <input path="docs/architecture_design.md" version="1.3.0" revision="R7" status="DRAFT_FOR_GATE_REVIEW"/>
+    <input path="docs/module_design.md" version="1.3.0" revision="R7" status="DRAFT_FOR_GATE_REVIEW"/>
     <input path="docs/ib_embed_service_contract.md" version="1.0.0" revision="R2" status="DRAFT_FOR_GATE_REVIEW" note="MOD-IB-26 契约唯一落点；本文件 §1.2 的键名清单以其 §9 为准"/>
     <readonly_reference path="FreeArk 仓库" note="只读参考；未修改任何文件"/>
   </inputs>
@@ -22,14 +23,16 @@
   <credential_policy>本文档不记录任何密钥、令牌、口令或证书。目标机凭据**一律经环境变量注入**（REQ-NFR-IB-07 / C-IB-02）。所有条目仅登记「配置键名」，不登记值。</credential_policy>
   <revision_history>
     <rev version="1.0.0" date="2026-09-25" note="初稿（GROUP_B 首次提交，PM 门控前）"/>
-    <rev version="1.1.0" revision="R1" date="2026-09-25" note="按 PM 架构复核反馈 REV-01 修订：① Web 框架 FastAPI→Django（用户明确指定，非建议），前端 Vue 3 + Vite 不变；② Uvicorn 作为 ASGI 应用服务器的条目改写为 Waitress/Gunicorn（WSGI），Pydantic 退出 Web/校验层选型（仅作可选独立校验库）；③ §2 许可台账补登 Django（BSD-3-Clause）/ DRF（BSD-3-Clause）/ Waitress（ZPL-2.1）/ Gunicorn（MIT），经外部核实后登记；④ 新增 §4.5 Web 层（Django）与服务承载验证清单、§5.2 SSE 并发风险项、[TBD-T15]；⑤ 编号稳定优先：类别与条目名尽量沿用 1.0.0，被替换者移入 §1.1 留痕；所有改动带 -R1 标记。需求侧文档未改动。"</rev>
+    <rev version="1.1.0" revision="R1" date="2026-09-25" note="按 PM 架构复核反馈 REV-01 修订：① Web 框架 FastAPI→Django（用户明确指定，非建议），前端 Vue 3 + Vite 不变；② Uvicorn 作为 ASGI 应用服务器的条目改写为 Waitress/Gunicorn（WSGI），Pydantic 退出 Web/校验层选型（仅作可选独立校验库）；③ §2 许可台账补登 Django（BSD-3-Clause）/ DRF（BSD-3-Clause）/ Waitress（ZPL-2.1）/ Gunicorn（MIT），经外部核实后登记；④ 新增 §4.5 Web 层（Django）与服务承载验证清单、§5.2 SSE 并发风险项、[TBD-T15]；⑤ 编号稳定优先：类别与条目名尽量沿用 1.0.0，被替换者移入 §1.1 留痕；所有改动带 -R1 标记。需求侧文档未改动。"/>
     <rev version="1.2.0" revision="R2" date="2026-09-26" invocation_id="INV-GROUP_B-INTELBASE-004" note="R2 补交（L-03）：① 「Embedding 推理运行时」行改写为三候选（FlagEmbedding / sentence-transformers / 直接 onnxruntime 载 bge-m3 的 ONNX 导出），补记许可、CPU-only 可用性、传递依赖与指令集基线风险；② §2 许可台账补登传递依赖 torch（BSD-3-Clause）与 transformers（Apache-2.0），均标条件性采纳；③ 新增 §1.2「服务端配置键登记」（只登记键名与语义，不含任何值，覆盖 IFC-IB-286 的第二份 EnvironmentFile）；④ §5.2 新增一行中风险：目标机 CPU 缺 AVX2 致预编译 wheel 触发 SIGILL（同时命中既有 OCR 链路与 R2 的 embedding 推理运行时），缓解与判定指向 [TBD-T18]；⑤ 编号稳定：既有条目类别/行序尽量沿用，被改写者标「（R2 改写）」；未引入 PyMuPDF、未引入 Docker（DR-03）。需求侧文档与 FreeArk 仓库未改动。"/>
+    <rev version="1.3.0" revision="R7" date="2026-09-27" invocation_id="INV-GROUP_B-INTELBASE-005" note="R7 增量贯通（GROUP_A REV-06 裁决：诉求③「UI 可视化配置」纳入 v1，新增 REQ-FUNC-IB-25/26/27）：① 新增「前端图可视化库」行 = Vue Flow（@vue-flow/core，MIT，R7 经外部核实：包内 LICENSE 为标准 MIT 文本，© webkid GmbH 2019–2024 / Burak Cakmakoglu 2021–2024），要求随构建产物本地打包、禁止运行期 CDN；② §1.1 留痕 5 项已评估未采纳（AntV X6 / LogicFlow / React Flow / 自绘 SVG-D3 / 运行期 CDN 加载）；③ 新增 §1.3 客户端配置键登记（只登记键名 IB_DEFINITION_DOC_PATH / IB_VISUAL_CONFIG_ENABLED，不含任何值）；④ §2 台账登记 Vue Flow（MIT，采纳）与传递依赖（条件性采纳 + [待核实]，须锁定版本后逐包复核）；⑤ §4.5 新增第 10~12 项（前端产物零外发依赖、装配期 fail-fast 实测、定义文档凭据明文扫描）；⑥ §5.3 新增两行低风险（定义文档被写入凭据明文 / 图库传递依赖的许可与体积，以 [TBD-T20] 实测为准）；⑦ 硬约束未松动：未引入 Docker / Redis / PyMuPDF，端口契约仍 framework-free。需求侧文档与 FreeArk 仓库未改动；未写入任何凭据或配置值（只登记键名）。"/>
+    <rev version="1.3.1" revision="R10" date="2026-09-27" invocation_id="INV-GROUP_C-INTELBASE-008" author="software-developer" note="R10 传递依赖许可登记（GROUP_C 前端构建阻断修复轮）：① 新增 §2.1「前端依赖许可登记」—— 在 src/frontend 执行 npm install 后逐包实测，登记 @vue-flow/core 1.48.2 与 14 个传递包（@vueuse/core·shared·metadata 10.11.1 / vue-demi 0.14.10 / @types/web-bluetooth 0.0.20 / d3-color·dispatch·drag·interpolate·selection·timer·transition·zoom + d3-ease）的精确版本与许可，全部 MIT / ISC / BSD-3-Clause，**无 copyleft / AGPL 面** → 不触发 §1 重选型（REQ-NFR-IB-12 合规）；② §2 台账「Vue Flow 的传递依赖」行由 [待核实] 改为**已核实（R10）**；③ §1「前端图可视化库」行与 §5.3 风险行同步收敛；④ 补记 R10 实测产物体积（JS 252.35 kB / gzip 89.20 kB）供 [TBD-T20] 引用。**仅登记事实，未改任何选型决策 / 未改键名 / 未写入任何凭据值**；证据 = docs/evidence/groupc_r10_license.log。**性质：登记型修订，选型未变**（GROUP_B 可复核）。"/>
   </revision_history>
 </file_header>
 
 # 技术选型 — intelligentbase
 
-**版本**: 1.2.0（R2 补交） | **状态**: DRAFT_FOR_GATE_REVIEW | **日期**: 2026-09-26
+**版本**: 1.3.1（R7 增量 + R10 前端传递依赖许可登记） | **状态**: DRAFT_FOR_GATE_REVIEW | **日期**: 2026-09-27
 
 **R2 修订摘要（L-03：`ib-embed` 服务端无模块归属与契约）**：
 
@@ -40,6 +43,18 @@
 | 3 | 新增 **§1.2 服务端配置键登记**（**只登记键名与语义，不含任何值**） | §1.2（新增） |
 | 4 | 新增一行中风险：**目标机缺 AVX2 → 预编译 wheel 触发 SIGILL**（同时命中既有 OCR 链路与 R2 的 embedding 运行时） | §5.2 |
 | 5 | **编号与许可稳定**：既有条目的类别、行序、条目名尽量沿用；被改写者标「（R2 改写）」；未引入任何 AGPL / copyleft 新面，**未引入 PyMuPDF、未引入 Docker** | 全文 |
+
+**R7 修订摘要（GROUP_A REV-06 下游贯通：诉求③「UI 可视化配置」纳入 v1）**：
+
+| 序 | 改动 | 落点 |
+|----|------|------|
+| 1 | 新增「**前端图可视化库**」行 = **Vue Flow（`@vue-flow/core`，MIT）**（选型理由 / 许可 / 离线本地打包 / 传递依赖待核实） | §1（新行，标「R7 新增」） |
+| 2 | §1.1 留痕 **5 项已评估未采纳**：AntV X6 / LogicFlow / React Flow / 自绘 SVG-D3 / **运行期 CDN 加载** | §1.1 |
+| 3 | 新增 **§1.3 客户端配置键登记**（只登记键名与语义，**不含任何值**） | §1.3（新增） |
+| 4 | §2 台账登记 **Vue Flow（MIT，采纳）** 与**传递依赖（条件性采纳 + `[待核实]`）** | §2 |
+| 5 | §4.5 新增第 **10~12** 项：前端产物**零外发依赖**、**装配期 fail-fast 实测**、**定义文档凭据明文扫描** | §4.5 |
+| 6 | §5.3 新增两行低风险：定义文档被写入凭据明文 / 图库传递依赖的许可与体积（[TBD-T20]） | §5.3 |
+| 7 | **禁项与硬约束未松动**：未引入 Docker / Redis / PyMuPDF；图库**禁 CDN**；端口契约仍 framework-free | 全文 |
 
 **版本策略说明**：本表给出**版本约束/主版本策略**，并在 `精确版本` 列统一标注「部署时锁定」。原因是目标机硬件与系统版本未实测（[TBD-T13] / [TBD-T14]），且基座定位为可复用资产——**具体小版本须在部署阶段经实测后写入 `requirements` 锁文件**，此处不预先编造精确版本号。凡本文未能确证的版本事实，一律标 `[待核实]`。
 
@@ -66,6 +81,7 @@
 | **ASGI 服务器（R1 新增；仅并发升级路径）** | Gunicorn + `uvicorn.workers.UvicornWorker`（承载 **Django 异步视图**） | 部署时锁定 | **仅当 [TBD-T15] 显示同步 worker 池容量不足时启用**：异步视图下 SSE 长连接不占用 worker 槽位、并发由事件循环承载，而**仍不引入 Channels/Redis**，保留「SSE 而非 WebSocket」的防泄漏初衷 | REQ-FUNC-IB-21 | 中 | **默认不启用、不安装**（Uvicorn 不再作为独立 ASGI 应用服务器选型）；启用前提：全链路同步调用（Django DB 读、`ib-embed` HTTP、Qdrant 同步客户端、langgraph 同步流）须经 `sync_to_async` 正确桥接——**任一未桥接的阻塞调用会拖慢全部并发连接**，该失效模式比「占用一个 worker」更危险，故列为升级路径而非默认（ADR-11-R1） |
 | **数据校验（R1 改写；1.0.0 此行为 Pydantic）** | **DRF Serializer**（HTTP 边界校验/序列化）+ **frozen dataclass**（端口契约，定义于 MOD-IB-01） | 随 Django / DRF 主版本 | 契约分层：**内部端口契约**用零依赖 frozen dataclass 承载类型化（满足「接口须类型化」门控标准，且不使 MOD-IB-01 依赖任何第三方）；**HTTP 边界**由 DRF Serializer 承担请求校验、响应序列化与错误聚合 | REQ-NFR-IB-01 | 低 | **Pydantic 取舍（显式说明）**：Pydantic **不再是 Web 层或校验层的选型**（FastAPI 已整体移除）；若后续需要**独立于 Web 框架**的配置/契约校验（如配置文件 schema 校验），可作为**可选依赖**引入，但**不得**成为任何端口契约的载体，也不得进入 MOD-IB-01 的依赖集（ADR-13-R1） |
 | 前端框架 | Vue 3 + Vite | Vue 3.4+ / Vite 5+；部署时锁定 | 与既有前端栈同源，降低维护成本；构建产物静态托管 | REQ-FUNC-IB-09/17 | 低 | ADR-11；前端**仅通过 HTTP/SSE 契约**与后端交互；**（R1）前端不受后端框架切换影响：Vue 3 + Vite 不变** |
+| **前端图可视化库（R7 新增；R10 传递依赖已核实）** | **Vue Flow**（`@vue-flow/core`） | 主版本随实现锁定（建议 `^1`）；部署时锁定 | 可视化配置页需渲染编排图（节点 / 条件边 / 分支可达性），Vue 3 生态内成熟首选：组件化节点与边、视口与缩放、**只读模式**（节点不可拖拽、不可连线）开箱可用；**MIT 许可**；可**随构建产物本地打包**（满足离线 + 数据不出本地，AC-IB-17-06） | REQ-FUNC-IB-25、IB-26；AC-IB-17-02、AC-IB-17-06；REQ-NFR-IB-08 | 中 | **MIT（R7 经外部核实：包内 `LICENSE` 为标准 MIT 文本，© webkid GmbH 2019–2024 / Burak Cakmakoglu 2021–2024）**；**传递依赖**（D3 系 / `@vueuse/core` 等）须在锁定版本后**逐包核实并登记**（**R10 已逐包核实并登记于 §2.1**：14 个传递包全部为 **MIT / ISC / BSD-3-Clause**，**无 copyleft / AGPL 面**），见 §2 / §2.1 与 [TBD-T20]；**禁止运行期 CDN 加载**；**只读渲染优先**（拓扑不可编辑，ADR-14 / ADR-15） |
 | 编排框架 | LangGraph | 主版本随实现锁定 | 图编排 + 条件边并行扇出 + checkpointer，是 REQ-FUNC-IB-18/19 的直接支撑；FreeArk 已验证可行 | REQ-FUNC-IB-18/19/20 | 中 | **仅 L4 层使用**，且被端口隔离（REQ-NFR-IB-11）；版本升级须跑骨架回归；**（R1）为同步流式 API，与 ADR-11-R1 选定的同步 WSGI + SSE 在并发模型上同构**（不需 async 桥接） |
 | LLM 客户端 | LangChain + `langchain-openai` | **`langchain-openai` pin `<0.3`** | 沿 FreeArk 既有集成路径 | REQ-FUNC-IB-18；DR-04 | **高** | **生产事故史**：0.3.x 移除 `_convert_chunk_to_generation_chunk` 致生产漂移，且会丢弃 `DeepSeek` 的 `reasoning_content`。ADR-08 已把该风险收敛到 MOD-IB-20 适配器内部（[TBD-T10]） |
 | LLM 服务 | 云端 DeepSeek（OpenAI 兼容接口） | 端点经配置；不锁死 | DR-04 用户拍板；端点可配以便未来切自建兼容端点 | REQ-FUNC-IB-18；REQ-NFR-IB-08 | 中 | **须显式声明「提问文本 + 检索片段外发云端」**（AC-IB-12-05）；`describe_egress()` 输出至启动日志与 `/healthz/deps` |
@@ -110,6 +126,11 @@
 | langchain `VectorStore` 抽象（`langchain-qdrant`） | 抽象面过宽、版本耦合风险、`Document.metadata: dict` 非类型化（违反门控标准 4） | ADR-01 |
 | 对象存储（MinIO / S3） | 新增组件与凭据面；本量级收益为负 | ADR-05 |
 | 本地 LLM（v1） | 与 DR-04 冲突；显著加重目标机 CPU/内存压力。**保留 v2 经同一端口接入** | ADR-08 |
+| **AntV X6（R7 新增）** | 图编辑能力更强（拖拽连线、布局算法齐备），但**框架无关的独立图引擎**在本项目「只读渲染 + 白名单表单」的前提下属**能力过剩**；引入自成一体的图形栈与主题体系，与既有 Vue 3 组件体系叠两套心智模型。**已评估未采纳** | REQ-FUNC-IB-26；ADR-14 |
+| **LogicFlow（R7 新增）** | 国产流程编排图库，流程图语义贴合；但生态与社区规模小于 Vue Flow，且其**编辑导向**（锚点 / 连线）与「**拓扑不可编辑**」硬约束需要额外裁剪。**已评估未采纳** | REQ-FUNC-IB-26；ADR-14 |
+| **React Flow（R7 新增）** | 与 Vue Flow 同源、成熟度最高；但**要求 React 运行时**，与既有前端栈（Vue 3 + Vite）冲突，为单一页面引入第二前端框架不可接受。**已评估未采纳** | REQ-FUNC-IB-25；ADR-11 |
+| **自绘 SVG / 直接使用 D3（R7 新增）** | 零新依赖、产物体积最小；但需自实现节点布局、边路由、缩放平移与命中测试，**维护与回归成本显著高于引入成熟库**（D3 许可仍需登记）。**已评估未采纳**；**保留为回退路径**：若将来要求「零新增前端依赖」，可回退至此并在 §2 补登 D3 许可 | REQ-FUNC-IB-25；REQ-NFR-IB-11 |
+| **运行期 CDN 加载图库（R7 新增）** | 免打包、可远程热更；但**违反「数据不出本地 / 离线可用」**（AC-IB-17-06），并引入外部可用性与供应链风险。**已评估未采纳（并明令禁止）** | REQ-NFR-IB-08；AC-IB-17-06 |
 
 ---
 
@@ -133,6 +154,17 @@
 | `IB_EMBED_MEMORY_LIMIT_MB` | 服务端内存上限（**须与单元文件 `MemoryMax` 一致**） | IFC-IB-274 |
 
 **未列出的键**：`IB_EMBED_BACKEND` 属**客户端**（`ib-web`）配置，**不在本表**；`IB_EMBED_TIMEOUT_*` / `IB_EMBED_RETRY_*` 亦属**客户端**冷/热双路径实例（IFC-IB-273：**服务端不区分冷热**）。**此处不得为服务端补一套超时/重试键**——那会把冷热纪律从客户端**双落点**化，破坏 ADR-02-R2 附注的单一落点。
+
+### 1.3 客户端配置键登记（**R7 新增**；只登记键名与语义，**不含任何值**）
+
+> **用途**：REV-07（可视化配置）为 `ib-web` 侧新增两个配置键（IFC-IB-297）。与 §1.2 的分工：**§1.2 = `ib-embed` 服务端键**（不得在此补服务端超时 / 重试键），**本节 = `ib-web` 客户端键**。语义与校验规则以 `module_design.md` §3 MOD-IB-02 / MOD-IB-23 为准；键名的唯一权威落点为 `module_design.md` §2.2.2（IFC-IB-297）。
+
+| 键名 | 语义（一句话） | 关联 IFC |
+|------|---------------|----------|
+| `IB_DEFINITION_DOC_PATH` | 定义文档的本地文件路径（**一项目一文档**；[ARCH-ASSUMPTION-A6]）；装配期由准入闸门读取 | IFC-IB-288 / IFC-IB-293 / IFC-IB-297 |
+| `IB_VISUAL_CONFIG_ENABLED` | 可视化配置页与定义文档端点（`GET` / `PUT`）的开关；关闭时端点不注册、界面不提供入口 | IFC-IB-294 / IFC-IB-295 / IFC-IB-297 |
+
+**凭据纪律（强制）**：上述键**只登记键名**。定义文档内**只允许出现键名**（如凭据型配置项**的名称**），**不得出现任何值**；界面与校验错误信息**不回显**凭据值（AC-IB-17-05 / AC-IB-18-04）；`?token=` / `?key=` 类凭据型查询串纪律（§3）**扩展至全部新端点**（含定义文档的 `GET` / `PUT`）。若 `IB_DEFINITION_DOC_PATH` 的路径本身含敏感信息，须经**环境变量**注入且**不得**写入文档、日志或响应。
 
 ---
 
@@ -162,6 +194,8 @@
 | **Gunicorn（R1 新增）** | **MIT** | 宽松 | **采纳**（多 worker/多线程备选 WSGI 服务器） |
 | **Uvicorn（R1 新增；仅并发升级路径）** | **BSD-3-Clause** | 宽松 | **采纳（条件性）**：仅当 ADR-11-R1 的 Option B（Django 异步视图 + ASGI）被 [TBD-T15] 触发时引入；默认不安装 |
 | Vue 3 / Vite | MIT | 宽松 | 采纳 |
+| **Vue Flow（`@vue-flow/core`）（R7 新增）** | **MIT** | 宽松 | **采纳**（可视化配置页的编排图渲染）。**R7 经外部核实**：包内 `LICENSE` 为标准 MIT 文本（© webkid GmbH 2019–2024 / Burak Cakmakoglu 2021–2024） |
+| **Vue Flow 的传递依赖（R7 新增；R10 已逐包核实）** | **已核实（R10）**：`@vueuse/core` 10.11.1（MIT）、`@vueuse/shared` 10.11.1（MIT）、`@vueuse/metadata` 10.11.1（MIT）、`vue-demi` 0.14.10（MIT）、`@types/web-bluetooth` 0.0.20（MIT）、`d3-color` 3.1.0（ISC）、`d3-dispatch` 3.0.1（ISC）、`d3-drag` 3.0.0（ISC）、`d3-ease` 3.0.1（BSD-3-Clause）、`d3-interpolate` 3.0.1（ISC）、`d3-selection` 3.0.0（ISC）、`d3-timer` 3.0.1（ISC）、`d3-transition` 3.0.1（ISC）、`d3-zoom` 3.0.0（ISC）（版本随 `src/frontend/package-lock.json` 锁定） | **全部宽松（MIT / ISC / BSD-3-Clause）** | **采纳**（**R10 实地核实**：逐包读 `node_modules/<pkg>/package.json` 的 `version` / `license` 字段并确认包内 `LICENSE` 文件存在；**零 copyleft / AGPL 面**，满足 REQ-NFR-IB-12）。复核证据：`docs/evidence/groupc_r10_license.log`。**任一传递依赖出现 copyleft / AGPL 面即须回 §1 重新选型**（**不得**沿用「内部平台合规」豁免）；传递依赖的许可留痕规则见本节末段与 §2.1 |
 | LangGraph / LangChain / `langchain-openai` | MIT | 宽松 | 采纳（**版本 pin 见风险表**） |
 | **PyMuPDF** | **AGPL-3.0** | **传染性，不兼容** | **不采纳** |
 | Poppler CLI | GPL-2.0 | 传染性 | **不采纳** |
@@ -171,6 +205,34 @@
 **AGPL 三条合规前置条件（逐条判定，用于留痕）**：① 购买 Artifex 商业授权 —— 成本不可接受；② 整个基座以 AGPL 开源 —— 与「内部多项目复用」目标冲突；③ 严格内部使用且不与外部网络交互 —— 与 REQ-FUNC-IB-23（多项目、多使用方）冲突。**三条均不成立，故不采纳 PyMuPDF。**
 
 **遗留合规动作（部署阶段）**：`pypdf` / `pdfminer.six` / `pdfplumber` / `pypdfium2` 的实际许可文本须在锁定版本后**从发行包内 `LICENSE` 文件复核**（发行方可能随版本调整），复核结果记入部署记录。**（R1 追加）** 同规则适用于 **Django / DRF / Waitress / Gunicorn**（及条件性引入的 Uvicorn）。**（R2 追加）** 同规则适用于**实际选中的 Embedding 推理运行时**及其**传递依赖**（若选 ① / ② 则含 `torch` / `transformers`；若选 ③ 则含 `onnxruntime` 与 bge-m3 的 ONNX 权重再分发条款）—— **传递依赖的许可亦须逐条留痕**，不得只登记直接依赖。
+
+### 2.1 前端依赖许可登记（**R10 新增**；NFR-12 可核验落点）
+
+> **落点与依据**：R7 引入 `@vue-flow/core` 时，其**传递依赖**的许可与版本标为 `[待核实]`（见上表与 §1「前端图可视化库」行）。GROUP_C R10（前端构建阻断修复轮，invocation `INV-GROUP_C-INTELBASE-008`）在 `src/frontend` 执行 `npm install` 后，**逐包实测**解析结果并据实登记于下；`src/frontend/package-lock.json` 已重新生成，锁定以下精确版本。
+
+**核实方法**：对每个包读取 `src/frontend/node_modules/<pkg>/package.json` 的 `version` / `license` 字段，并确认包内 `LICENSE` 文件存在。原始输出：`docs/evidence/groupc_r10_license.log`。
+
+| 包 | 版本（锁定） | 许可 | 性质 |
+|----|-------------|------|------|
+| `@vue-flow/core`（直接依赖，R7） | **1.48.2** | MIT | 宽松 |
+| `@vueuse/core` | 10.11.1 | MIT | 宽松 |
+| `@vueuse/shared` | 10.11.1 | MIT | 宽松 |
+| `@vueuse/metadata` | 10.11.1 | MIT | 宽松 |
+| `vue-demi`（嵌套于 `@vueuse/{core,shared}`） | 0.14.10 | MIT | 宽松 |
+| `@types/web-bluetooth` | 0.0.20 | MIT | 宽松 |
+| `d3-color` | 3.1.0 | ISC | 宽松 |
+| `d3-dispatch` | 3.0.1 | ISC | 宽松 |
+| `d3-drag` | 3.0.0 | ISC | 宽松 |
+| `d3-ease` | 3.0.1 | **BSD-3-Clause** | 宽松 |
+| `d3-interpolate` | 3.0.1 | ISC | 宽松 |
+| `d3-selection` | 3.0.0 | ISC | 宽松 |
+| `d3-timer` | 3.0.1 | ISC | 宽松 |
+| `d3-transition` | 3.0.1 | ISC | 宽松 |
+| `d3-zoom` | 3.0.0 | ISC | 宽松 |
+
+**结论（R10）**：14 个传递包（15 个 `node_modules` 条目，`vue-demi` 因嵌套去重计两处）**全部为宽松许可（MIT / ISC / BSD-3-Clause）**，**无 copyleft / AGPL 面** → **不触发 §1 重选型**，REQ-NFR-IB-12 合规。`@vue-flow/core` 由 `^1.41.0` 区间解析并锁定为 **1.48.2**；该版本仍处 `^1` 主版本内，与 §1「主版本随实现锁定（建议 `^1`）」一致。**仍禁止运行期 CDN 加载**（AC-IB-17-06 / REQ-NFR-IB-08）：上述依赖全部经构建本地打包。
+
+**体积实测（R10，`npm run build` 产物）**：`dist/assets/index-*.js` **252.35 kB（gzip 89.20 kB）**、`index-*.css` **12.62 kB（gzip 2.74 kB）** —— 供 [TBD-T20] 引用；目标机（4GB 内存）首屏体积敏感，故仍**不引入** UI 组件库。
 
 ---
 
@@ -269,6 +331,9 @@
 | 7 | **SSE 并发上限与 worker 池耗尽行为已实测** | 记录 [TBD-T15]：达到上限时新连接**快速失败（503 + 可读文案）**，不出现无限排队或全站挂死 |
 | 8 | 反向代理（若前置 nginx）不缓冲 SSE | 实测流式未被缓冲；`proxy_buffering off` 类配置生效 |
 | 9 | 前端（Vue 3 + Vite）构建产物可托管并完成一次端到端问答 | REQ-FUNC-IB-09/17；**前端不受后端框架切换影响（R1）** |
+| **10** | **（R7）前端产物零外发依赖**：图可视化库及全部前端依赖**随构建产物本地打包**；产物体内**不得**出现指向公网 CDN / 字体 / 图床的引用 | 断网状态下可视化配置页可正常加载与渲染；构建产物内公网 URL 扫描**零命中**（AC-IB-17-06；REQ-NFR-IB-08） |
+| **11** | **（R7）装配期 fail-fast 实测**：故意提交一份非法定义文档（如条件边缺分支映射 / 默认专家为 0 个或 2 个 / 工具授权引用不存在的工具），观察装配行为 | **拒绝装配、服务不启动**；错误**逐条定位**到 `path` / `code` / `message` 且**不回显凭据值**；**不存在**「启动成功、首次提问才失败」的路径（AC-IB-18-01 / 02 / 03 / 04 / 06） |
+| **12** | **（R7）定义文档凭据明文扫描**：定义文档、`.env.example` 与全部响应体扫描 | **零命中**任何凭据型**值**（只允许出现**键名**）；`GET /api/config/definition` 的响应体内**无**任何凭据值或掩码残留（AC-IB-17-05 / AC-IB-18-04；§1.3 纪律） |
 
 ---
 
@@ -305,6 +370,8 @@
 | 前端 Markdown 渲染兼容性 | 若引入 Markdown 渲染，须**真机验证**（FreeArk 有 `marked` 正则致安卓白屏的前科） |
 | venv 依赖隔离依赖纪律 | 每进程一 venv；锁文件入库；部署前 `pip install -r` 校验 |
 | 反向代理缓冲破坏 SSE | 部署检查项：禁用响应缓冲（`X-Accel-Buffering: no`） |
+| **（R7 新增）定义文档被写入凭据明文** | 缓解：定义文档**只允许出现键名**（§1.3）；界面与校验错误**不回显**凭据值（AC-IB-17-05 / AC-IB-18-04）；§4.5 第 12 项加入「定义文档凭据明文扫描」；仓库内**不得**出现除 `.env.example` 之外的任何真实值 |
+| **（R7 新增；R10 已收敛）图可视化库传递依赖的许可与体积** | 缓解：主体 `@vue-flow/core` 的 **MIT 已外部核实**；传递依赖（D3 系 / `@vueuse/core`）**已于 R10 锁定版本后逐包复核并登记**于 **§2.1**（14 包全部 MIT / ISC / BSD-3-Clause，**无 copyleft 面**，故**不**回 §1 重选）；体积与渲染规模上界以 **[TBD-T20]** 实测为准（R10 已测产物 JS 252.35 kB / gzip 89.20 kB）；**禁止 CDN**（AC-IB-17-06） |
 
 ---
 
@@ -321,4 +388,8 @@
 - **（R2）L-03 补交已完成**：新增 **§1.2 服务端配置键登记**（`ib-embed` / MOD-IB-26 的配置**键名**清单，**只登记键名与语义、不含任何值**，对应 IFC-IB-286 的第二份 `EnvironmentFile`）；「Embedding 推理运行时」行改写为**三候选**并显式化**选择依据 / 许可 / CPU-only 可用性 / 传递依赖 / 指令集基线风险**；§2 台账补登传递依赖 `torch`（BSD-3-Clause）与 `transformers`（Apache-2.0）（**条件性采纳**）；§5.2 新增**目标机缺 AVX2 → SIGILL** 风险行（该风险**同时命中既有 OCR 链路**，须合并评估）。
 - **（R2）技术面硬约束未松动**：**未引入 PyMuPDF**（仍为 AGPL-3.0，不采纳）、**未引入 Docker/容器化**（DR-03）、**未引入 Redis/RabbitMQ**；新候选 ③（`onnxruntime` 直载）与既有 OCR 运行时**同组件**，**未净增组件面**。
 - **（R2）凭据纪律**：§1.2 **只登记键名**；`ib-embed` **不需要任何令牌**，其 `EnvironmentFile` **不得**写入任何凭据；全文**不含任何键值**。
+- **（R7）可视化配置增量的技术面结论**：① 新增**前端图可视化库 = Vue Flow（`@vue-flow/core`，MIT，R7 经外部核实）**（§1 新行）；§1.1 留痕 **5 项**已评估未采纳（AntV X6 / LogicFlow / React Flow / 自绘 SVG-D3 / **运行期 CDN 加载**）；② §2 台账登记 Vue Flow（**MIT，采纳**）与**传递依赖（条件性采纳 + `[待核实]`）**；③ 新增 **§1.3 客户端配置键登记**（只登记键名 `IB_DEFINITION_DOC_PATH` / `IB_VISUAL_CONFIG_ENABLED`，**不含任何值**）；④ §4.5 新增第 **10~12** 项（前端产物**零外发依赖**、**装配期 fail-fast 实测**、**定义文档凭据明文扫描**）；⑤ §5.3 新增两行低风险（定义文档被写入凭据明文 / 图库传递依赖的许可与体积，后者以 [TBD-T20] 实测为准）。
+- **（R7）禁项与硬约束未松动**：**未引入 Docker / 容器化**（DR-03）、**未引入 Redis / RabbitMQ**（C-IB-08）、**未引入 PyMuPDF 或任何 AGPL / copyleft 组件**（REQ-NFR-IB-12）；图库**随构建产物本地打包、禁止运行期 CDN**（数据不出本地，AC-IB-17-06）；**端口契约仍 framework-free**（新增契约落在 MOD-IB-01，纯 stdlib / frozen dataclass，零第三方依赖）。
+- **（R7）凭据纪律**：§1.3 **只登记键名**；定义文档内**只允许出现键名**；全文**不含任何键值**；`?token=` / `?key=` 纪律由 §3 **扩展至全部新端点**（含定义文档的 `GET` / `PUT`）。
+- **（R7）未改动他处**：`FreeArk` 仓库**任何文件未作修改**；需求侧文档（`requirements_spec.md` / `user_stories.md`）**未作修改**；`architecture_design.md` / `module_design.md` 的 R1 / R2 结论**未改写**（R7 只追加）；`implementation_plan.md`（GROUP_C）**未改动**（其 L471 / L603 / L621 / L732 的「24/24 PASS」为**离线自检用例数**，与本表的 REQ 计数口径无关，**不得混淆**）。
 - **（R2）未改动他处**：`FreeArk` 仓库**任何文件未作修改**；需求侧文档（`requirements_spec.md` / `user_stories.md`）**未作修改**；`architecture_design.md` / `module_design.md` 的 R1 结论**未改写**（R2 只追加）。

@@ -456,3 +456,157 @@ def test_TC_E2E_013_image_seam_end_to_end(http_app):
     got = Client().get(url_path, **AUTH)
     assert got.status_code == 200 and got.content == png
     assert got["Content-Type"].startswith("image/png")
+
+
+# --------------------------------------------------------------------------- #
+# US-IB-17 + US-IB-18：可视化配置（定义文档单一真源）与装配期 fail-fast 闸门（关键路径）
+# --------------------------------------------------------------------------- #
+
+
+def test_TC_E2E_015_visual_config_roundtrip_is_single_source(http_app):
+    """US-IB-17 通过可视化界面配置项目定义（关键路径）。
+
+    旅程：打开配置页（GET 定义文档）→ 编辑白名单内字段并保存（PUT）→ 重新载入以**文档为准**
+    刷新且与刚保存一致（无漂移）→ 试图改图拓扑被拒（界面不提供拓扑编辑）→ 由他处改动后
+    重载以文档为准、陈旧视图回写被 409 拒绝（不用陈旧副本反向覆盖）。
+
+    覆盖：AC-IB-17-01（写回唯一真源 / 重载一致 / 无第二副本）、AC-IB-17-02（往返无漂移）、
+    AC-IB-17-03（以文档为准，不静默分歧）。
+    """
+    from ib.config import document_from_json
+
+    deps, Client = http_app
+    client = Client()
+    path = "/api/config/definition"
+    store = deps.definition_store
+
+    # 1) 打开配置页：唯一真源 = 定义文档；界面只拿到只读派生视图 + 白名单 + 键名
+    first = client.get(path, **AUTH)
+    assert first.status_code == 200, first.content
+    envelope = json.loads(first.content)
+    document = envelope["document"]
+    assert document["project_id"] == "p_alpha"
+    assert "orchestration" not in envelope["editable_fields"]
+    assert envelope["derived"]["nodes"] and envelope["derived"]["expert_names"]
+
+    # 2) 编辑白名单内字段（路由阈值 + 专家中文标签）并保存 → 写回定义文档
+    edited = json.loads(json.dumps(document))
+    edited["route"]["tau"] = 0.70
+    edited["experts"][0]["cn_label"] = "数据专家（改名）"
+    saved = client.put(
+        path,
+        data=json.dumps({"expected_content_hash": document["content_hash"], "document": edited}),
+        content_type="application/json",
+        **AUTH,
+    )
+    assert saved.status_code == 200 and json.loads(saved.content)["ok"] is True
+    # 存储层（唯一真源）已更新——不存在第二份副本
+    assert store.load("p_alpha").route.tau == 0.70
+    assert deps.definitions["p_alpha"].content_hash == store.load("p_alpha").content_hash
+
+    # 3) 重新载入：界面内容与刚保存的编辑结果一致（无漂移）
+    reloaded = json.loads(client.get(path, **AUTH).content)
+    assert reloaded["document"]["route"]["tau"] == 0.70
+    assert reloaded["document"]["experts"][0]["cn_label"] == "数据专家（改名）"
+    assert reloaded["document"]["content_hash"] == store.load("p_alpha").content_hash
+
+    # 4) 界面不提供拓扑编辑：改图节点 → 400，不静默生效
+    topo = json.loads(json.dumps(reloaded["document"]))
+    topo["orchestration"]["nodes"].append("evil")
+    rejected = client.put(path, data=json.dumps({"document": topo}), content_type="application/json", **AUTH)
+    assert rejected.status_code == 400
+    assert any(i["code"] == "field_not_editable" for i in json.loads(rejected.content)["error"]["items"])
+
+    # 5) 定义文档在界面之外被改动 → 重载以**文档**为准；陈旧视图回写被拒（不反向覆盖）
+    external = json.loads(json.dumps(reloaded["document"]))
+    external["route"]["tau"] = 0.55
+    assert store.save(
+        "p_alpha", document_from_json("p_alpha", json.dumps(external)), expected_content_hash=None
+    ).ok is True
+    assert json.loads(client.get(path, **AUTH).content)["document"]["route"]["tau"] == 0.55
+    stale_body = json.loads(json.dumps(reloaded["document"]))  # 仍是 tau=0.70 的陈旧视图
+    stale_body["route"]["tau"] = 0.99
+    conflict = client.put(
+        path,
+        data=json.dumps({"expected_content_hash": reloaded["document"]["content_hash"], "document": stale_body}),
+        content_type="application/json",
+        **AUTH,
+    )
+    assert conflict.status_code == 409, conflict.content
+    assert store.load("p_alpha").route.tau == 0.55, "陈旧副本反向覆盖了文档"
+
+
+def test_TC_E2E_016_invalid_config_refused_at_assembly(http_app):
+    """US-IB-18 非法配置在装配期被拒绝（fail-fast）（关键路径）。
+
+    旅程：合法定义装配成功且编排图编译一次常驻 → 提交非法配置（默认专家不唯一 / 拓扑变更）
+    被 400 拒绝并定位条目、不得静默生效 → 非法定义直接走装配期准入闸门被拒绝并**聚合全部**
+    校验项、无「强制继续」通道 → 文档缺失即显式报错（不静默回退空配置）→ 错误体不含凭据值。
+
+    覆盖：AC-IB-18-01（合法即装配 / 图编译一次常驻）、AC-IB-18-02（各类非法被拒 + 可读定位 +
+    不静默生效 + 无强制继续）、AC-IB-18-04（不回显凭据值）、AC-IB-18-06（装配期即报出）。
+    """
+    from ib.config import InMemoryDefinitionDocumentStore, document_from_json, validate as _validate
+    from ib.core import ConfigError
+    from ibweb.composition import admit
+
+    deps, Client = http_app
+    client = Client()
+    path = "/api/config/definition"
+
+    # 1) 合法定义 → 装配完成（装载→准入→派生→注入），编排图编译一次常驻
+    assert set(deps.definitions) == {"p_alpha", "p_beta"}
+    assert deps.orchestrator_for("p_alpha") is deps.orchestrator_for("p_alpha")
+    envelope = json.loads(client.get(path, **AUTH).content)
+    baseline_tau = envelope["document"]["route"]["tau"]
+
+    # 2) 非法配置（默认专家不唯一）→ 400 且定位到条目；不得静默生效
+    dup = json.loads(json.dumps(envelope["document"]))
+    dup["experts"][1]["is_default"] = True
+    bad = client.put(path, data=json.dumps({"document": dup}), content_type="application/json", **AUTH)
+    assert bad.status_code == 400
+    items = json.loads(bad.content)["error"]["items"]
+    assert any(i["code"] == "expert_default_count" for i in items)
+    assert all(i["path"] and i["code"] and i["message"] for i in items)
+    assert json.loads(client.get(path, **AUTH).content)["document"]["route"]["tau"] == baseline_tau
+
+    # 3) 装配期准入闸门：非法定义被拒绝，且**聚合全部**校验项（无强制继续开关）
+    illegal = document_from_json(
+        "p_alpha",
+        json.dumps(
+            {
+                "schema_version": 1,
+                "project_id": "p_alpha",
+                "experts": [
+                    {"name": "a", "cn_label": "A", "keywords": ["k"], "is_default": True, "fallback_prompt": "p"},
+                    {"name": "a", "cn_label": "A2", "keywords": ["k"], "is_default": True, "fallback_prompt": "p"},
+                ],
+                "route": {"tau": 1.5, "margin": 0.05, "max_expert_steps": 0, "default_expert": "ghost"},
+                "orchestration": {"nodes": ["route"], "conditional_edges": []},
+                "tool_grants": [{"expert_name": "a", "tool_names": ["ghost-tool"]}],
+            }
+        ),
+    )
+    expected = _validate(illegal, known_tools=frozenset({"search_knowledge"}))
+    assert expected.ok is False and len(expected.errors) >= 4
+    try:
+        admit(illegal, store=deps.definition_store)
+        raise AssertionError("非法定义竟通过装配期准入闸门")
+    except ConfigError as exc:
+        assert "拒绝装配" in str(exc) and f"{len(expected.errors)} 项" in str(exc)
+        assert len(getattr(exc, "validation_items", ())) == len(expected.errors)
+        # 错误体不含凭据值（此处令牌为环境变量占位符）
+        assert TOKEN not in str(exc)
+
+    # 4) 文档缺失 → 显式报错（不静默回退为空文档）：装配期不会「装作成功」
+    assert isinstance(deps.definition_store, InMemoryDefinitionDocumentStore)
+    try:
+        InMemoryDefinitionDocumentStore(missing=True).load("p_alpha")
+        raise AssertionError("缺失定义文档竟静默回退")
+    except ConfigError:
+        pass
+
+    # 5) 合法定义仍可通过闸门（闸门不是一刀切拒绝），且派生视图与装配期一致
+    view = admit(deps.definitions["p_alpha"], store=deps.definition_store)
+    runtime_names = [e.name for e in deps.derived_views["p_alpha"].experts]
+    assert [e.name for e in view.experts] == runtime_names

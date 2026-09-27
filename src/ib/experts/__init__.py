@@ -52,6 +52,7 @@ __all__ = [
     "default_expert",
     "get",
     "install",
+    "install_derived",
     "validate_specs",
 ]
 
@@ -197,6 +198,26 @@ def install(specs: Sequence[ExpertSpec]) -> None:
     _BY_NAME.clear()
     _BY_NAME.update({spec.name: spec for spec in EXPERT_SPECS})
     _installed = True
+
+
+def install_derived(specs: Sequence[ExpertSpec]) -> None:
+    """**装配期派生注入**（R7，ADR-15）：由定义文档派生的专家表注入注册表。
+
+    与 `install()` 的区别（**这是刻意的**）：
+      * **幂等可重复**：组合根在每次装配（含测试的 `build_deps(force=True)` 重复装配）都应能
+        注入最新派生结果，故**不**受 `_installed` 一次性护栏约束 —— 该护栏只约束接入方对
+        `install()` 的显式替换，不约束「由单一真源派生」这一机械化路径。
+      * **不改写真源**：本函数只替换**派生**注册表（`EXPERT_SPECS` / `_BY_NAME`），
+        不触碰定义文档（定义文档是唯一真源，由 MOD-IB-02 / MOD-IB-23 持有）。
+
+    结构性约束沿用 `validate_specs`（空表 / 重名 / 默认专家不唯一 → `ValueError` 快速失败）。
+    **IFC-IB-171~179 的号 / 名 / 签名不变**（R7 只改数据来源，不改模块边界）。
+    """
+    validate_specs(specs)
+    global EXPERT_SPECS
+    EXPERT_SPECS = list(specs)
+    _BY_NAME.clear()
+    _BY_NAME.update({spec.name: spec for spec in EXPERT_SPECS})
 
 
 # --------------------------------------------------------------------------- #

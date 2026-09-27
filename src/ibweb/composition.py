@@ -2,6 +2,8 @@
 @module MOD-IB-23
 @implements IFC-IB-241 build_application / build_deps（组合根，module_design §5）
             R2：`related_images` 提供者（命中 → 页面图）在 `orchestrator_for` 内闭包注入
+            R7：装配期 fail-fast 准入闸门 admit（IFC-IB-293）；定义文档读写端点
+                （IFC-IB-294/295，落在 `ibweb/views.py`）
 @depends MOD-IB-01 ~ MOD-IB-22
 @author software-developer
 
@@ -36,10 +38,11 @@ from __future__ import annotations
 
 import os
 import threading
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any, Sequence
 
 from ib.core import (
+    ConfigError,
     KbRecord,
     ProjectRecord,
     Scope,
@@ -65,6 +68,7 @@ __all__ = [
     "build_application",
     "resolve_scope",
     "register_builtin_tools",
+    "admit",
     "SEARCH_TOOL_SPEC",
 ]
 
@@ -107,6 +111,10 @@ class Deps:
     projects: dict[str, ProjectRecord]
     egress: Any
     capability_digest: str
+    # R7 定义文档（单一真源）：存储端口 + 每项目已装载文档 / 已派生只读视图。
+    definition_store: Any = None
+    definitions: dict[str, Any] = field(default_factory=dict)
+    derived_views: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self._lock = threading.Lock()
@@ -131,15 +139,19 @@ class Deps:
         from ib.orchestration import build_graph
         from ib.routing import IntentRouter
 
+        # R7：图配置 / 路由阈值一律取自**已准入的定义文档**（单一真源，ADR-15）；
+        #     未装配定义文档时回退既有常量（与 R1~R6 行为逐位一致）。
+        route = getattr(self.definitions.get(project_id), "route", None)
+
         # L1 语义路由的向量化走 embedding 热路径；失败时 SemanticRouter 自己吞掉（fail-open）
-        semantic = _build_semantic_router(self.embedder, project_id)
+        semantic = _build_semantic_router(self.embedder, project_id, route)
         router = IntentRouter(llm_provider=self.llm, semantic=semantic)
         graph = build_graph(
             llm=self.llm,
             experts=EXPERT_SPECS,
             tools=bound_tools,
             sessions=self.sessions,
-            config=_graph_config(self.cfg),
+            config=_graph_config(self.cfg, route),
             router=router,
             scope=scope,
             tools_by_expert={name: bound_tools for name in _expert_names()},
@@ -463,6 +475,20 @@ def _assemble() -> Deps:
     #     有没有在这里登记**。登记源与 `bind_tools` 是同一个函数 → 摘要与实绑工具不漂移。
     register_builtin_tools(default_tool_registry)
 
+    # 4c) R7 定义文档准入闸门（ADR-16）：装载 → 校验 → 派生 → 注入（任一步失败即启动失败）。
+    #     闸门位于装配序列**第一步**精神：在构造并注入运行期注册表 / 图配置之前完成。
+    #     序列：IFC-IB-288 装载 → IFC-IB-293 准入（内含 IFC-IB-290）→ IFC-IB-291 派生
+    #           → 注入 MOD-IB-16/17/19/22 → 图编译一次常驻（首个请求时在 orchestrator_for）。
+    definition_store = build_definition_store(cfg, projects)
+    definitions: dict[str, Any] = {}
+    derived_views: dict[str, Any] = {}
+    for project_id in projects:
+        doc = definition_store.load(project_id)  # IFC-IB-288
+        view = admit(doc, store=definition_store)  # IFC-IB-293（内含 IFC-IB-290 / 291）
+        definitions[project_id] = doc
+        derived_views[project_id] = view
+    _inject_derived_experts(next(iter(projects), ""), definitions, derived_views)
+
     deps = Deps(
         cfg=cfg,
         config_resolver=resolver,
@@ -486,6 +512,9 @@ def _assemble() -> Deps:
         egress=llm.describe_egress(),
         # 由**刚登记过自带工具的**注册表派生（与 bind_tools 同一清单）
         capability_digest=build_capability_digest(),
+        definition_store=definition_store,
+        definitions=definitions,
+        derived_views=derived_views,
     )
     log_event(
         "startup",
@@ -592,11 +621,18 @@ def _fingerprint_factors(cfg: Any) -> dict[str, Any]:
 #: 不递增就会让「换了 PDF 解析路径但没重建」的库处于新旧混排状态）。
 _PARSER_VERSION = "pypdf-1"
 
-def _graph_config(cfg: Any) -> Any:
+def _graph_config(cfg: Any, route: Any = None) -> Any:
+    """编排图配置（IFC-IB-231）。R7：`max_expert_steps` 优先取自定义文档的路由参数。
+
+    用 `getattr(route, ...)` 而非点取，使「未装配定义文档」的历史路径仍回退到既有常量
+    （module_design §7.1：`MAX_EXPERT_STEPS=8`），R1~R6 行为逐位不变。
+    """
     from ib.core import GraphConfig
 
+    steps = getattr(route, "max_expert_steps", None)
+    max_steps = int(steps) if isinstance(steps, int) and steps >= 1 else 8
     return GraphConfig(
-        max_expert_steps=8,  # module_design §7.1 明文常量
+        max_expert_steps=max_steps,
         confirmation_gate_enabled=bool(getattr(cfg, "confirmation_gate_enabled", False)),
         max_history_messages=cfg.session.max_history_messages,
         aggregation_forbids_internal_labels=True,
@@ -609,13 +645,185 @@ def _expert_names() -> tuple[str, ...]:
     return names()
 
 
-def _build_semantic_router(embedder: Any, project_id: str) -> Any:
-    """构造语义路由（L1）。**没有示例句就返回 `None`** → L1 自动跳过（fail-open，不停机）。"""
-    from ib.routing import SemanticRouter
+# --------------------------------------------------------------------------- #
+# R7 定义文档（单一真源）：装配期准入闸门与派生注入（IFC-IB-288/290/291/293）
+# --------------------------------------------------------------------------- #
+
+
+def admit(doc: Any, *, store: Any | None = None) -> Any:
+    """**[IFC-IB-293] 装配期准入闸门**（ADR-16）。
+
+    语义：`validate(doc)`（IFC-IB-290）不通过 → **拒绝装配**，抛出**聚合全部**
+    `ValidationErrorItem` 的 `ConfigError`；通过 → `derive(doc)`（IFC-IB-291）返回只读视图。
+
+    **不提供**「强制继续 / 忽略错误」参数，且 `ValidationReport` 在类型层就**无法**表达
+    带病继续（ADR-16）—— 因此本闸门不存在绕过路径。
+
+    `store` 省略时取当前已装配 `Deps.definition_store`（供端点复用同一校验器）。
+    """
+    if store is None:
+        deps = get_deps(required=False)
+        store = getattr(deps, "definition_store", None)
+    if store is None:
+        raise StartupError("准入闸门缺少定义文档存储：装配未完成或未注入 definition_store")
+    report = store.validate(doc)
+    if not report.ok:
+        details = "；".join(f"[{item.code}] {item.path}: {item.message}" for item in report.errors)
+        err = ConfigError(
+            f"定义文档校验不通过（{len(report.errors)} 项），拒绝装配：{details}",
+            key="IB_DEFINITION_DOC_PATH",
+        )
+        # 结构化附带全部校验项，供端点逐条回执（不回显任何凭据值）。
+        try:
+            err.validation_items = report.errors  # type: ignore[attr-defined]
+        except Exception:  # noqa: BLE001 - 附带失败不影响拒绝装配这一主语义
+            pass
+        raise err
+    return store.derive(doc)
+
+
+def _known_tool_names() -> frozenset[str]:
+    """已知工具名集合（由**唯一登记点**派生，供校验器判工具授权合法性）。"""
+    from ib.tools import ToolRegistry
+
+    return frozenset(register_builtin_tools(ToolRegistry()).names())
+
+
+def _default_definition_document(project_id: str, cfg: Any) -> Any:
+    """由**既有默认值**构造一份内置默认定义文档（离线 / 未配置路径时的种子）。
+
+    专家取自 `ib.experts.EXPERT_SPECS`（其本身在装配期由定义文档派生 —— 首次装配时即
+    内置默认），路由阈值取自 `ib.routing.DEFAULT_TAU/MARGIN`，`max_expert_steps=8`，
+    工具授权对全部专家授予 `search_knowledge` —— 与 `Deps.bind_tools` 的实际绑定逐位一致，
+    故派生结果 == 既有默认注册表，**不引入行为变化**。
+    """
+    from ib.config import build_definition_document
+    from ib.core import (
+        ConditionalEdgeSpec,
+        ExpertSpecInput,
+        OrchestrationSpecInput,
+        RouteSpecInput,
+        ToolGrantSpec,
+    )
+    from ib.experts import EXPERT_SPECS, default_expert
+    from ib.routing import DEFAULT_MARGIN, DEFAULT_TAU
+
+    exemplars_map = _load_exemplars(project_id)
+    experts = tuple(
+        ExpertSpecInput(
+            name=spec.name,
+            cn_label=spec.cn_label,
+            keywords=tuple(spec.keywords),
+            exemplars=tuple(exemplars_map.get(spec.name, ())),
+            is_data_expert=spec.is_data_expert,
+            fallback_prompt=spec.fallback_prompt,
+            is_delegating=spec.is_delegating,
+            is_default=spec.is_default,
+        )
+        for spec in EXPERT_SPECS
+    )
+    route = RouteSpecInput(
+        tau=DEFAULT_TAU,
+        margin=DEFAULT_MARGIN,
+        max_expert_steps=8,
+        default_expert=default_expert(),
+    )
+    orchestration = OrchestrationSpecInput(
+        nodes=("route", "expert", "general", "gate", "aggregate"),
+        conditional_edges=(
+            ConditionalEdgeSpec(
+                from_node="route",
+                branch_map=(("expert", "expert"), ("general", "general")),
+            ),
+        ),
+    )
+    grants = tuple(
+        ToolGrantSpec(expert_name=spec.name, tool_names=("search_knowledge",)) for spec in EXPERT_SPECS
+    )
+    return build_definition_document(
+        project_id=project_id,
+        experts=experts,
+        route=route,
+        orchestration=orchestration,
+        tool_grants=grants,
+    )
+
+
+def build_definition_store(cfg: Any, projects: dict[str, ProjectRecord]) -> Any:
+    """按配置选择定义文档存储（IFC-IB-288/289 的实现选择）。
+
+    * 离线模式 → `InMemoryDefinitionDocumentStore`（内置默认文档种子）；
+    * 非离线且 `IB_DEFINITION_DOC_PATH` 已配置 → `FileDefinitionDocumentStore`（原子写回）；
+    * 非离线但**未配置** `IB_DEFINITION_DOC_PATH` → 内存默认文档 + WARN
+      （显式记录，**不静默当作空文档** —— 对齐 IFC-IB-288 的「不静默回退」纪律）。
+    """
+    from ib.config import FileDefinitionDocumentStore, InMemoryDefinitionDocumentStore
+    from ib.observability import log_event
+
+    first = next(iter(projects), "")
+    known = _known_tool_names()
+    path = os.environ.get("IB_DEFINITION_DOC_PATH", "").strip()
+    if not cfg.offline_mode and path:
+        return FileDefinitionDocumentStore(path, known_tools=known)
+    if not cfg.offline_mode and not path:
+        log_event(
+            "definition_doc",
+            "path_not_configured_using_in_memory_default",
+            project_id=first,
+        )
+    # 每项目一份内置默认文档（一个项目一份定义文档，[ARCH-ASSUMPTION-A6]）。
+    seeds = {pid: _default_definition_document(pid, cfg) for pid in projects}
+    return InMemoryDefinitionDocumentStore(documents=seeds, known_tools=known)
+
+
+def _inject_derived_experts(
+    project_id: str,
+    definitions: dict[str, Any],
+    derived_views: dict[str, Any],
+) -> None:
+    """把定义文档派生的专家表注入 MOD-IB-16（R7 装配期派生注入）。
+
+    v1 专家注册表为**进程级单例**，故取**首个项目**的派生结果（多项目定义分歧需独立实例，
+    同 `ib.experts.install()` 文档既有口径）。`install_derived` 幂等，重复装配不抛。
+    """
+    from ib.core import ExpertSpec
+    from ib.experts import install_derived
+
+    view = derived_views.get(project_id)
+    if view is None:
+        return
+    specs = [
+        ExpertSpec(
+            name=e.name,
+            cn_label=e.cn_label,
+            keywords=tuple(e.keywords),
+            is_data_expert=e.is_data_expert,
+            fallback_prompt=e.fallback_prompt,
+            is_delegating=e.is_delegating,
+            is_default=e.is_default,
+        )
+        for e in view.experts
+    ]
+    if specs:
+        install_derived(specs)
+
+
+def _build_semantic_router(embedder: Any, project_id: str, route: Any = None) -> Any:
+    """构造语义路由（L1）。**没有示例句就返回 `None`** → L1 自动跳过（fail-open，不停机）。
+
+    R7：`tau` / `margin` 优先取自定义文档的路由参数；缺省时用 `ib.routing` 的既有默认常量
+    （`DEFAULT_TAU` / `DEFAULT_MARGIN`），故未装配定义文档时行为不变。
+    """
+    from ib.routing import DEFAULT_MARGIN, DEFAULT_TAU, SemanticRouter
 
     exemplars = _load_exemplars(project_id)
     if not exemplars:
         return None
+
+    tau = getattr(route, "tau", None)
+    margin = getattr(route, "margin", None)
+    tau = float(tau) if isinstance(tau, (int, float)) else DEFAULT_TAU
+    margin = float(margin) if isinstance(margin, (int, float)) else DEFAULT_MARGIN
 
     def _embed_texts(texts: list[str]) -> list[list[float]]:
         # 范例与查询必须落在**同一向量空间**，故用同一个 embedder。
@@ -627,6 +835,8 @@ def _build_semantic_router(embedder: Any, project_id: str) -> Any:
     return SemanticRouter(
         embed_texts=_embed_texts,
         exemplars_provider=lambda pid: exemplars if pid == project_id else {},
+        tau=tau,
+        margin=margin,
     )
 
 

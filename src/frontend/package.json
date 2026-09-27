@@ -1,7 +1,7 @@
 {
   "name": "intelligentbase-frontend",
   "@module": "MOD-IB-24",
-  "@implements": "IFC-IB-256 / 257 / 258 / 259（上传·列表·重建页 + 问答页 + 类型化 API 客户端）",
+  "@implements": "IFC-IB-256 / 257 / 258 / 259（上传·列表·重建页 + 问答页 + 类型化 API 客户端）+ IFC-IB-296（R7 可视化配置页：Vue Flow 只读图渲染）",
   "@author": "software-developer",
   "private": true,
   "version": "1.0.0",
@@ -10,9 +10,11 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit",
+    "test": "node --test"
   },
   "dependencies": {
+    "@vue-flow/core": "^1.41.0",
     "vue": "^3.4.0"
   },
   "devDependencies": {
@@ -23,9 +25,13 @@
     "vue-tsc": "^2.0.0"
   },
   "_comment": [
-    "刻意不加 UI 组件库（Element Plus 等）：本前端只有 3 个页面，一次性引入组件库会带来",
+    "刻意不加 UI 组件库（Element Plus 等）：本前端只有少量页面，一次性引入组件库会带来",
     "几十 MB 的构建产物与一套需要跟随升级的依赖。目标机是 4GB 内存的树莓派，静态资源体积",
-    "直接影响首屏；用原生 CSS 足以覆盖这 3 个页面的需求。",
-    "无 axios：HTTP 一律经 src/api/client.ts 的 fetch 封装（见该文件的 IC-IB-01 说明）。"
+    "直接影响首屏；用原生 CSS 足以覆盖这些页面的需求。",
+    "无 axios：HTTP 一律经 src/api/client.ts 的 fetch 封装（见该文件的 IC-IB-01 说明）。",
+    "R7：@vue-flow/core（MIT）用于配置页的**只读**编排图渲染（IFC-IB-296）。",
+    "该库及其传递依赖随构建产物**本地打包**，运行期**禁止 CDN**（AC-IB-17-06 / REQ-NFR-IB-08）。",
+    "传递依赖（@vueuse/core / d3-* 等）的许可证与版本**已于 R10 核实并登记**（见 tech_stack §2.1：14 包全部 MIT / ISC / BSD-3-Clause）。",
+    "R10：锁文件曾与 dependencies 失同步（package-lock.json 无 @vue-flow/core）致 CI 阶段9 的 `npm ci` EUSAGE 失败；已重新生成锁并新增 `npm test`（Node 20 内置 node:test，零新增依赖，见 tests/frontend.smoke.test.js），其中含『锁与 package.json 同步』回归断言。"
   ]
 }

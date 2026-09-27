@@ -2,6 +2,7 @@
 @module MOD-IB-23
 @implements IFC-IB-242 ~ IFC-IB-249 路由表
             IFC-IB-283（R2）`/api/files/{doc_id}/images/{image_id}` 路由
+            IFC-IB-294/295（R7）`/api/config/definition` 路由
 @depends MOD-IB-23（views）
 @author software-developer
 
@@ -48,4 +49,6 @@ urlpatterns = [
     path("api/rebuild/rollback", views.rebuild_rollback_endpoint, name="ib-rebuild-rollback"),
     path("api/rebuild/<str:job_id>", views.rebuild_progress_endpoint, name="ib-rebuild-progress"),
     path("api/chat/stream", views.chat_stream_endpoint, name="ib-chat-stream"),
+    # R7（IFC-IB-294/295）：定义文档读写。**单一真源**端点（GET 读 / PUT 原子写回）。
+    path("api/config/definition", views.definition_config_endpoint, name="ib-config-definition"),
 ]

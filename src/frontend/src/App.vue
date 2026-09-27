@@ -1,32 +1,39 @@
 <script setup lang="ts">
 /**
  * @module MOD-IB-24
- * @implements IFC-IB-256 / 257 / 258 页面宿主与导航
+ * @implements IFC-IB-256 / 257 / 258 / 296（R7 可视化配置页宿主）页面宿主与导航
  * @author software-developer
  *
- * 应用外壳：令牌输入 + 三个页面的切换。
+ * 应用外壳：令牌输入 + 页面的切换。
  *
  * ## 为什么用 `ref` 切页而不是 vue-router
  *
- * 只有 3 个页面、且都以「查询参数 + 刷新」为代价换不来任何东西；引入 router 会多一层
+ * 只有少量页面、且都以「查询参数 + 刷新」为代价换不来任何东西；引入 router 会多一层
  * 依赖（影响树莓派上的静态资源体积）并带来 history 模式的 nginx `try_files` 配置要求。
  * 当页面数量或深链接需求增长时再引入 —— 迁移成本主要在 `currentView` 一处。
+ *
+ * ## R7 配置页的启用开关是**服务端**行为
+ *
+ * `IB_VISUAL_CONFIG_ENABLED` 的**值不出现在任何响应体**（IFC-IB-297），故前端**不**据其值
+ * 决定是否显示配置页；改为：配置页恒可见，未启用时服务端返回 404，配置页据此显示「不可用」。
  */
 import { computed, ref } from 'vue';
 
 import ChatPage from './views/ChatPage.vue';
+import ConfigPage from './views/ConfigPage.vue';
 import RebuildPage from './views/RebuildPage.vue';
 import UploadPage from './views/UploadPage.vue';
 import type { ApiClient } from './api/client';
 
 const props = defineProps<{ client: ApiClient }>();
 
-type ViewKey = 'upload' | 'chat' | 'rebuild';
+type ViewKey = 'upload' | 'chat' | 'rebuild' | 'config';
 
 const VIEWS: { key: ViewKey; label: string }[] = [
   { key: 'upload', label: '资料管理' },
   { key: 'chat', label: '知识问答' },
   { key: 'rebuild', label: '索引重建' },
+  { key: 'config', label: '可视化配置' },
 ];
 
 const current = ref<ViewKey>('chat');
@@ -38,6 +45,7 @@ const notice = ref('');
 const activeComponent = computed(() => {
   if (current.value === 'upload') return UploadPage;
   if (current.value === 'rebuild') return RebuildPage;
+  if (current.value === 'config') return ConfigPage;
   return ChatPage;
 });
 

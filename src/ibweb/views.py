@@ -2,6 +2,7 @@
 @module MOD-IB-23
 @implements IFC-IB-242 ~ IFC-IB-249（HTTP 端点）
             IFC-IB-283（R2）`GET /api/files/{doc_id}/images/{image_id}` 页面图字节
+            IFC-IB-294/295（R7）`GET|PUT /api/config/definition` 定义文档读写
 @depends MOD-IB-23（authz/composition/serializers/sse）, MOD-IB-11/12/13/14/15/22（服务）
 @author software-developer
 
@@ -47,12 +48,14 @@ HTTP 端点（MOD-IB-23 的对外面）。本模块**只做三件事**：
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 from rest_framework import serializers, status
 
 from ib.core import (
     BlobRef,
+    ConfigError,
     ConflictError,
     DependencyUnavailableError,
     DocStatus,
@@ -65,12 +68,17 @@ from ib.observability import log_event
 from ibweb import composition
 from ibweb.authz import REQUEST_CTX_ATTR, get_policy
 from ibweb.serializers import (
+    DefinitionConfigInputSerializer,
+    DefinitionDocumentSerializer,
     DeleteReportSerializer,
     DocumentRecordSerializer,
     EgressDescriptorSerializer,
     FileListEnvelopeSerializer,
     HealthStatusSerializer,
     RebuildJobSerializer,
+    SaveResultSerializer,
+    ValidationErrorItemSerializer,
+    definition_derived_summary,
 )
 
 __all__ = [
@@ -87,6 +95,7 @@ __all__ = [
     "chat_stream_endpoint",
     "healthz_endpoint",
     "healthz_deps_endpoint",
+    "definition_config_endpoint",
 ]
 
 #: 分页上限：**服务端硬上限**（不接受客户端指定更大的值）。
@@ -600,3 +609,167 @@ def _egress_of(deps: Any) -> Any:
         return deps.egress or deps.llm.describe_egress()
     except Exception:  # noqa: BLE001 - 外发声明缺失不应让健康端点失败
         return EgressDescriptor(remote=False, endpoint_host="", data_categories=[])
+
+
+# --------------------------------------------------------------------------- #
+# R7（IFC-IB-294 / 295）：定义文档读写端点
+#
+# 纪律（module_design §3 MOD-IB-23 R7）：
+#   * 归属恒取自 `ctx.authz.project_id`（请求体/查询串中的 project_id 一律忽略）；
+#   * 读不到 / 写不进定义文档 → **503（fail-closed）**，**不返回空文档**；
+#   * 校验不通过 → **400**，逐条回执 `path`/`code`/`message`（**不回显凭据值**）；
+#   * 乐观并发冲突 → **409**，含可读冲突回执，**不静默覆盖**；
+#   * 界面编辑与直接改文档**一视同仁**（同一校验器 `IFC-IB-290` 裁决）。
+# --------------------------------------------------------------------------- #
+
+
+def definition_config_endpoint(request: Any) -> Any:
+    """`GET|PUT /api/config/definition`（IFC-IB-294 / 295）。"""
+    if not _visual_config_enabled():
+        # 键值**不出现在响应体**（只看行为）：未启用即视为端点不可用。
+        return _json(
+            {"error": {"code": "not_found", "message": "可视化配置未启用"}},
+            status.HTTP_404_NOT_FOUND,
+        )
+    if request.method == "GET":
+        return _get_definition_config(request)
+    if request.method == "PUT":
+        return _put_definition_config(request)
+    return _json(
+        {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+        status.HTTP_405_METHOD_NOT_ALLOWED,
+    )
+
+
+def _visual_config_enabled() -> bool:
+    """`IB_VISUAL_CONFIG_ENABLED` 开关（默认**开** —— REQ-FUNC-IB-25/26/27 属 v1 范围）。
+
+    **只读键名对应的值用于行为判定，绝不把值写入任何响应体**（IFC-IB-297）。
+    """
+    raw = os.environ.get("IB_VISUAL_CONFIG_ENABLED")
+    if raw is None or str(raw).strip() == "":
+        return True
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _read_failure_response() -> Any:
+    """定义文档不可读 / 不可写 → 503（fail-closed；**不返回空文档**）。"""
+    return _json(
+        {
+            "error": {
+                "code": "dependency_unavailable",
+                "message": "定义文档当前不可读（fail-closed：为满足单一真源纪律，不返回空文档）",
+            }
+        },
+        status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
+
+
+def _validation_failure_response(items: Any, message: str) -> Any:
+    """校验不通过 → 400，逐条回执（IFC-IB-295）。"""
+    return _json(
+        {
+            "error": {
+                "code": "validation_error",
+                "message": message,
+                "items": [ValidationErrorItemSerializer().to_representation(i) for i in items],
+            }
+        },
+        status.HTTP_400_BAD_REQUEST,
+    )
+
+
+def _get_definition_config(request: Any) -> Any:
+    deps = composition.get_deps()
+    try:
+        ctx = _ctx_of(request)
+        project_id = composition.resolve_scope(ctx).project_id
+        doc = deps.definition_store.load(project_id)  # IFC-IB-288
+        view = deps.definition_store.derive(doc)  # IFC-IB-291
+    except ConfigError:
+        return _read_failure_response()
+    except IbError as exc:
+        return error_response(exc)
+    except Exception as exc:  # noqa: BLE001
+        return error_response(exc)
+
+    payload = {
+        "document": DefinitionDocumentSerializer().to_representation(doc),
+        "derived": definition_derived_summary(view),
+        "editable_fields": sorted(deps.definition_store.editable_field_whitelist()),
+        # **只登记键名，不含任何值**（凭据 / 路径值一律不回显；AC-IB-17-05 / IFC-IB-297）。
+        "config_key_names": ["IB_DEFINITION_DOC_PATH", "IB_VISUAL_CONFIG_ENABLED"],
+    }
+    return _json(payload, status.HTTP_200_OK)
+
+
+def _put_definition_config(request: Any) -> Any:
+    from ib.config import document_from_json, non_editable_changes
+
+    deps = composition.get_deps()
+    try:
+        ctx = _require_manage(request)  # 写操作需管理权限（否则 403）
+        project_id = composition.resolve_scope(ctx).project_id
+        raw_body = json.loads(request.body.decode("utf-8") or "{}") if request.body else {}
+        form = DefinitionConfigInputSerializer(data=raw_body)
+        form.is_valid(raise_exception=True)
+        expected = form.validated_data.get("expected_content_hash") or None
+        submitted = document_from_json(
+            project_id,
+            json.dumps(form.validated_data["document"], ensure_ascii=False),
+        )
+        current = deps.definition_store.load(project_id)
+    except ConfigError:
+        return _read_failure_response()
+    except IbError as exc:
+        return error_response(exc)
+    except Exception as exc:  # noqa: BLE001 - 含 JSON/DRF 校验错误：不合法的请求体 → 400
+        return error_response(ValidationError(f"请求体不合法：{type(exc).__name__}"))
+
+    # ① 白名单：非编辑字段（拓扑 / 归属）被改动 → 400
+    illegal = non_editable_changes(current, submitted)
+    if illegal:
+        return _validation_failure_response(illegal, "存在不可编辑字段的变更（REQ-FUNC-IB-26）")
+
+    # ② 完备性校验（服务端为唯一裁决者；界面预校验不作数）→ 400
+    report = deps.definition_store.validate(submitted)
+    if not report.ok:
+        return _validation_failure_response(report.errors, "定义文档校验不通过")
+
+    # ③ 原子写回（乐观并发）
+    try:
+        result = deps.definition_store.save(
+            project_id, submitted, expected_content_hash=expected
+        )
+    except ConfigError:
+        return _read_failure_response()
+    except IbError as exc:
+        return error_response(exc)
+    except Exception as exc:  # noqa: BLE001
+        return error_response(exc)
+
+    if result.conflict:
+        return _json(
+            {
+                "error": {
+                    "code": "conflict",
+                    "message": "定义文档已被他处修改（乐观并发冲突，未覆盖）",
+                    "receipt": SaveResultSerializer().to_representation(result),
+                }
+            },
+            status.HTTP_409_CONFLICT,
+        )
+    if not result.ok:
+        return _validation_failure_response(result.errors, "写回未生效")
+
+    # ④ **以文档为准**刷新只读派生视图（AC-IB-17-03）；拓扑/注册表的生效点为**下次装配**
+    #    （图编译一次常驻，运行期不得由图外输入改变拓扑 —— REQ-FUNC-IB-26 ②）。
+    try:
+        refreshed = deps.definition_store.load(project_id)
+        deps.definitions[project_id] = refreshed
+        deps.derived_views[project_id] = deps.definition_store.derive(refreshed)
+    except IbError:  # noqa: BLE001 - 刷新失败不影响「已成功写回」这一事实
+        pass
+
+    log_event("definition_config", "saved", project_id=project_id)
+    return _json(SaveResultSerializer().to_representation(result), status.HTTP_200_OK)

@@ -9,10 +9,50 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 import urllib.error
 import urllib.request
 
 import pytest
+
+# --------------------------------------------------------------------------- #
+# 连接级瞬态故障的**有限有界重试**（FLAKE-IB-01 治理；仅测试侧）
+# --------------------------------------------------------------------------- #
+#
+# 背景：Windows 回环真 HTTP 偶发 ConnectionAbortedError[WinError 10053] /
+# ConnectionResetError[WinError 10054]，抛自「建立连接 / 读取响应」阶段（见
+# docs/evidence/groupd_r8_flake_ib01_TC_INT_026.log）。属**测试环境瞬时抖动**，非产品缺陷。
+#
+# 硬边界（不可违反，见 REV-09-1/2）：
+#   * **仅**重试下述**特定连接级异常类型**——连接建立/读取阶段的瞬态故障；
+#   * **绝不**捕获 AssertionError 或任何其他异常：断言失败/语义错误一律原样冒泡，
+#     故重试**不可能**吞掉断言失败（本函数根本不 `except Exception`）；
+#   * **不**重写任何状态码或响应体：HTTPError（4xx/5xx）显式排除在重试之外，原样返回；
+#   * 尝试次数**有界**（≤ _MAX_ATTEMPTS），用尽后以裸 `raise` **原样抛出**最后一次异常
+#     （保留原始回溯；失败可观测，绝不静默通过）；
+#   * 不用 skip / xfail / assert True 掩盖 —— 是「捕获特定类型后重发」，不是「捕获后忽略」。
+_CONNECTION_LEVEL_ERRORS = (ConnectionAbortedError, ConnectionResetError)
+_MAX_ATTEMPTS = 3  # ≤ 3 次尝试（即 ≤ 2 次重试）
+_RETRY_BACKOFF_S = 0.05  # 短退避（秒）
+
+
+def _request_bounded(req, *, timeout):
+    """发送请求并返回 `(status, raw_bytes)`；**仅**对连接级瞬态异常做有界重试。
+
+    除 `_CONNECTION_LEVEL_ERRORS` 外的任何异常（含 `AssertionError`、`HTTPError`、
+    其余 `OSError`）**一律不经缓冲突发**：`HTTPError` 原样返回、其余直接冒泡。
+    """
+    for attempt in range(_MAX_ATTEMPTS):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.status, resp.read()
+        except urllib.error.HTTPError as exc:
+            # 4xx/5xx 是**确定性业务响应**，非瞬态连接故障 —— 不重试，状态码原样返回
+            return exc.code, exc.read()
+        except _CONNECTION_LEVEL_ERRORS:
+            if attempt + 1 >= _MAX_ATTEMPTS:
+                raise  # 重试计数用尽 → 原样抛出（保留原始回溯，失败可观测）
+            time.sleep(_RETRY_BACKOFF_S)
 
 
 def _cfg(**overrides):
@@ -46,11 +86,7 @@ class _Server:
 
     def get(self, path):
         req = urllib.request.Request(self._url(path), method="GET")
-        try:
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                return resp.status, json.loads(resp.read().decode("utf-8"))
-        except urllib.error.HTTPError as exc:
-            return exc.code, json.loads(exc.read().decode("utf-8"))
+        return self._exchange(req)
 
     def post(self, path, payload=None, raw=None):
         body = raw if raw is not None else json.dumps(payload).encode("utf-8")
@@ -58,11 +94,13 @@ class _Server:
             self._url(path), data=body, method="POST",
             headers={"Content-Type": "application/json"},
         )
-        try:
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                return resp.status, json.loads(resp.read().decode("utf-8"))
-        except urllib.error.HTTPError as exc:
-            return exc.code, json.loads(exc.read().decode("utf-8"))
+        return self._exchange(req)
+
+    @staticmethod
+    def _exchange(req):
+        """发送并解析响应体；连接级瞬态异常由 `_request_bounded` 有界重试。"""
+        status, raw = _request_bounded(req, timeout=5)
+        return status, json.loads(raw.decode("utf-8"))
 
 
 @pytest.fixture()

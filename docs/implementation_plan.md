@@ -3,14 +3,14 @@
   <artifact>implementation_plan</artifact>
   <path>docs/implementation_plan.md</path>
   <doc_id>IMPL-INTELBASE-001</doc_id>
-  <version>2.2.0</version>
+  <version>2.5.0</version>
   <status>DRAFT</status>
-  <phase>GROUP_C / PHASE_05 实现计划（R4 增量：缺陷修复 FND-GROUP-D-03 + B-05 补齐）</phase>
+  <phase>GROUP_C / PHASE_05 实现计划（R7 定义外置增量 + R8 缺陷修复增量 + R10 前端构建阻断修复增量）</phase>
   <author>software-developer</author>
   <invocation_id>INV-GROUP_C-INTELBASE-002</invocation_id>
-  <latest_invocation_id>INV-GROUP_C-INTELBASE-004</latest_invocation_id>
+  <latest_invocation_id>INV-GROUP_C-INTELBASE-008</latest_invocation_id>
   <created_at>2026-09-25</created_at>
-  <updated_at>2026-09-26</updated_at>
+  <updated_at>2026-09-27</updated_at>
   <revision_note>R1（v1.0.0）为 GROUP_C 首轮交付（69 文件 / 16,396 行 / 25 模块）。
     R2（v2.0.0）为**增量**：只做两件事 ——（L-03）实现 MOD-IB-26 `ib-embed` 服务端 + 进程内第三种 Embedder 形态；
     （M-02）实现页面图关联的生产与读路径（related_images）。**R1 内容一律保留**，本轮只追加与最小改动（见 §12）。
@@ -23,7 +23,18 @@
     —— 将「可选 kb → 存储段」的推导收敛为**单一真源** `ib.blob.kb_segment`，并让 `delete_document` 由**台账记录**派生原文件删除 scope；
     （B）补 B-05 —— 新增 `src/requirements-embed.txt`（ib-embed 推理运行时：FlagEmbedding + torch(CPU) + transformers，含 bge-m3 权重双源说明）。
     **未新增模块 / 未改任何 IFC 签名（含 `delete_document`）/ 未改配置键名与默认值 / 未把重型依赖混入主 `requirements.txt`**，只追加（见 §14）。
-    正文 §1~§13 为 R1~R3 的**历史记录，未改写**。</revision_note>
+    正文 §1~§13 为 R1~R3 的**历史记录，未改写**。
+    R7（v2.3.0，invocation INV-GROUP_C-INTELBASE-005）为 **GROUP_B R7 定义外置增量**（内容与 `module_design.md` R7 / `architecture_design.md` R7 对齐；
+    **本文件沿用自身版本线 v2.3.0**（R2=v2.0.0 → R3=v2.1.0 → R4=v2.2.0 → R7=v2.3.0），**与 GROUP_B 三份文档的 1.3.0 属各自独立版本线，不互相覆盖**）。**只追加、不改写**：落地 REQ-FUNC-IB-25 / IB-26 / IB-27 ——
+    ①**施工前置**（REV-07-6 裁定 (a)）：先把「专家 / 路由 / 编排 / 工具授权」外置为**定义文档数据**并确立**单一真源**（REQ-FUNC-IB-01 / IB-02 的实现落差闭合），再回填界面真实内容；
+    ②**定义文档数据层**（MOD-IB-02，IFC-IB-288~292）：装载 / 完备性校验 / 派生 / 原子写回 / 可编辑白名单，`validate` 与 `derive` 为**纯函数**（离线可测）；
+    ③**定义文档端口**（MOD-IB-01，IFC-IB-287）：第 **14** 个端口 `DefinitionDocumentStore`（Protocol，5 方法）+ 10 个 frozen 数据结构（纯 stdlib、零第三方依赖）；
+    ④**装配期 fail-fast 准入闸门 + 端点**（MOD-IB-23，IFC-IB-293~295）：校验不通过即**拒绝装配、服务不启动**，无强制继续开关；`GET`/`PUT /api/config/definition`，界面编辑与直接改文档**一视同仁**；
+    ⑤**可视化配置页**（MOD-IB-24，IFC-IB-296）：Vue Flow **只读**图渲染 + 白名单表单（拓扑运行期**不可编辑**），**视图侧零持久化**（无第二真源），**本地打包、运行期禁 CDN**（数据不出本机）；
+    ⑥**配置键**（IFC-IB-297）：`IB_DEFINITION_DOC_PATH`、`IB_VISUAL_CONFIG_ENABLED`——**仅登记键名，任何文件与响应体均不含键值**。
+    **未新增模块（仍 26，MOD-IB-01~26）/ 端口 13 → 14（纯追加）/ 未改既有 IFC 签名 / 未改既有配置键名与默认值 / 未改依赖边**，只追加（见 §15）。正文 §1~§14 为 R1~R4 的**历史记录，未改写**（§1 概览表仅追加 R7 计数订正行，见 §15.1）。（R7 门控订正：INV-GROUP_C-INTELBASE-006，PM 门控 GR-C-005 复核修正版本线与计数口径。）
+    R8（v2.4.0，invocation INV-GROUP_C-INTELBASE-007）为**缺陷修复增量**（输入 = GROUP_D `docs/test_report.md` §12.6 / §12.10 登记的 **FND-R7-01（MAJOR）**；协调者裁决 A / REV-08）：在 `src/ib/config/definition.py::validate` **纯追加**两项装配期校验 —— ①**跨专家路由关键词撞车**（归一化 = `strip().lower()`，对齐路由消费方 `ib/routing/intent.py::_keyword_hits`）、②**`cn_label` 唯一性**（去首尾空白后比较）；违反即产出可定位的 `ValidationErrorItem`（`expert_keyword_collision` / `expert_cn_label_duplicate`），由既有 `admit` 聚合闸门在装配期 fail-fast 拒绝。**本文件沿用自身版本线 2.3.0 → 2.4.0**（R2=2.0.0 → R3=2.1.0 → R4=2.2.0 → R7=2.3.0 → R8=2.4.0），**与 GROUP_B 三份文档的 1.3.0/R7 属各自独立版本线，不互相覆盖**。**未新增模块（仍 26）/ 未改端口数（仍 14）/ 未改任何 IFC-IB 号或签名 / 未改模块边界 / 未改 `EXPERT_SPECS` 默认数据 / 未改 validate() 既有 9 项校验的语义与顺序（仅在其后追加）**，只追加（见 §16）。正文 §1~§15 为 R1~R7 的**历史记录，未改写**。
+    R10（v2.5.0，invocation INV-GROUP_C-INTELBASE-008）为**前端构建阻断修复增量**（输入 = PM 只读取证：CI 阶段9 在 `src/frontend` 执行 `npm ci` 因**锁文件与 `package.json` 失同步**而 EUSAGE 失败，`npm run build` 永不抵达）。修三处**交付管线阻断**：①**锁同步** —— `src/frontend/package-lock.json` 内**无** `@vue-flow/core` 任何条目（R7 引入该依赖时未随锁提交），重新 `npm install` 生成，纳入 `@vue-flow/core` **1.48.2** 及其 **14 个传递包**；②**未跟踪源文件** —— `src/frontend/src/views/ConfigPage.vue`（被已跟踪的 `App.vue` 导入）此前**未纳入 git**，CI checkout 后 `vue-tsc` 必因缺文件而失败，本轮 `git add` 纳入版本控制；③**类型错误** —— `ConfigPage.vue` 导入未使用的 `type ExpertSpecInput`，在 `noUnusedLocals: true` 下直接 `TS6133` 致 `vue-tsc --noEmit` 失败，删除该无用导入。另落地**前端冒烟测试最小入口**（`package.json` 新增 `test` = `node --test`，纯 Node 内建、**零新增依赖**；含「锁与 `package.json` 同步」回归闸）并据实登记传递依赖许可于 `tech_stack.md` §2.1。**本文件沿用自身版本线 2.4.0 → 2.5.0**，**与 GROUP_B 文档属各自独立版本线**。**未新增模块（仍 26）/ 未改端口数（仍 14）/ 未改任何 IFC-IB 号或签名 / 未改后端 `src/ib`·`src/ibweb`·`src/ib_embed` 任何行为 / 未改配置键名与默认值**，只追加（见 §17）。正文 §1~§16 为 R1~R8 的**历史记录，未改写**。</revision_note>
   <inputs>
     <input path="docs/architecture_design.md" version="1.2.0" revision="R2" status="APPROVED (GROUP_B gate_decision=PASS / GR-B-003；文件头 status 字段仍为 DRAFT_FOR_GATE_REVIEW，以 phase_status.md 为权威 —— 见 §8 偏差 D-01)"/>
     <input path="docs/module_design.md" version="1.2.0" revision="R2" status="APPROVED（同上；R2 增补 MOD-IB-26 与 IFC-IB-266~286）"/>
@@ -51,7 +62,7 @@
 # 实现计划 — intelligentbase
 
 **版本**: 1.0.0 | **日期**: 2026-09-25 | **阶段**: GROUP_C / PHASE_05
-**范围**: 25 个模块（MOD-IB-01~25）/ 13 个端口 / 58 条端口级 IFC-IB 契约 / 24 条 REQ-FUNC。
+**范围**: 26 个模块（MOD-IB-01~26）/ 14 个端口 / 59 条端口级 IFC-IB 契约（R7 +1，IFC-IB-287；另 R7 新增 IFC-IB-287~297 共 11 条，其中端口级 1 条）/ 27 条 REQ-FUNC。
 **本计划不含测试套件**（GROUP_D 职责）；`src/scripts/selfcheck.py` 仅为**自我验证**用途，非正式测试交付物。
 
 ---
@@ -69,6 +80,7 @@
 | 包结构 | `src/ib/`（基座库，MOD-IB-01~22）+ `src/ibweb/`（Django 项目 = MOD-IB-23）+ `src/frontend/`（MOD-IB-24）+ `src/deploy/`（MOD-IB-25） |
 | 实现批次 | 6 批（严格按 MOD 编号升序 = 拓扑序） |
 | 目标 Python | `>=3.11,<3.14`（部署锁定）；本地自测机为 3.14.6 —— 见 §9 偏差 D-03 |
+| **R7 计数订正** | **端口数 13 → 14**（+`DefinitionDocumentStore`，IFC-IB-287，纯追加）；生产适配器 **10 → 11**（+`FileDefinitionDocumentStore`）；替身适配器 **10 → 11**（+`InMemoryDefinitionDocumentStore`）；**模块总数 25 → 26（R2 起；R7 未再增，MOD-IB-01~26）、实现批次仍 6 批**；REQ-FUNC 覆盖计数 **24 → 27**（R7 同步）。详见 §15 |
 
 **核心不变式（贯穿实现）**：
 1. `ib/core/`（MOD-IB-01）**零第三方依赖** —— 只允许 `dataclasses` / `typing` / `enum` / `abc` / `collections.abc` 等 stdlib。实现后以 `selfcheck.py::test_core_framework_free` 在**干净子进程**中断言 `sys.modules` 无任何非 stdlib 顶层包。
@@ -732,3 +744,204 @@ scope 的 kb 段一致」），并**叠加**了共享 `kb_segment`（防止未�
 | `groupc_r4_after_selfcheck.log` | 离线自检 `24/24 PASS`（EXIT=0） |
 | `groupc_r4_compileall.log` | `python -m compileall -q src` EXIT=0 |
 | `groupc_r4_credscan.log` | 凭据形态扫描 **零命中**（EXIT=1），覆盖 4 个改动文件 |
+
+---
+
+## 15. R7 增量实现（定义外置为单一真源 + REQ-FUNC-IB-25/26/27 落地；追加，不改写 §1~§14）
+
+> 依据：`module_design.md` R7 §2.1 / §3 MOD-IB-01 / MOD-IB-02 / MOD-IB-23 / MOD-IB-24 / §5 / §9；`architecture_design.md` R7 ADR-14 / ADR-15 / ADR-16。
+> **性质**：**只追加、不改写**。未新增模块（仍 26）、未改既有 IFC 签名、未改既有配置键名与默认值、未改依赖边；端口 13 → 14（纯追加）。§1~§14 为 R1~R4 历史记录。
+
+### 15.1 施工前置（REV-07-6 裁定 (a)）与落地顺序
+
+本轮**先闭合「定义外置为数据、单一真源」的实现落差（REQ-FUNC-IB-01 / IB-02 的施工前置），再回填界面真实内容**。落地顺序（= 构造顺序，与 ADR-16 的装配期闸门一致）：
+
+1. **数据层**：`definition.py` 的 `validate`（IFC-IB-290）/ `derive`（IFC-IB-291）**纯函数**先成立（离线可测，无 IO）。
+2. **端口层**：`DefinitionDocumentStore`（IFC-IB-287）Protocol + 10 个 frozen 数据结构先稳定。
+3. **装配层**：`admit`（IFC-IB-293）在装配期**第一步**闸门化，`_assemble` 按「装载 → 准入 → 派生 → 注入」注入 MOD-IB-16/19。
+4. **界面层**：仅在此之后，配置页（IFC-IB-296）以**只读图 + 白名单表单**回填真实内容。
+
+**关键不变式（R7）**：派生注册表 == 现有默认注册表 → **无行为变化**（默认定义文档由既有默认值精确派生：`EXPERT_SPECS` / `DEFAULT_TAU` / `DEFAULT_MARGIN` / `max_expert_steps=8` / `search_knowledge` 授权），故 R1~R4 的既有回归**不受影响**（见 §15.5）。
+
+### 15.2 REQ-FUNC-IB-25 / 26 / 27 → 实现落点映射
+
+| REQ-ID | 需求要点 | MOD | IFC | 实现落点（文件 :: 符号） |
+|--------|---------|-----|-----|------------------------|
+| REQ-FUNC-IB-25 | UI 可视化配置（只读编排图 + 白名单表单） | MOD-IB-24 | IFC-IB-296 | `src/frontend/src/views/ConfigPage.vue`（`VueFlow` 只读渲染 + 白名单表单 + 未提交草稿标注）；`src/frontend/src/App.vue`（`ViewKey='config'` + 导航）；`src/frontend/package.json`（`@vue-flow/core` 本地打包） |
+| REQ-FUNC-IB-26 | 拓扑运行期**不可编辑**、单一真源、本地打包禁 CDN、编辑后 round-trip 写回 | MOD-IB-24 / MOD-IB-02 | IFC-IB-296 / IFC-IB-289 / IFC-IB-292 | `ConfigPage.vue`（`nodes-draggable` / `connectable` 只读；无 add/remove node/edge；零持久化）；`src/ib/config/definition.py::editable_field_whitelist`（拓扑不在白名单）、`::non_editable_changes`（拓扑变更即 400）、`::FileDefinitionDocumentStore.save`（原子写回 + 乐观并发）、`::InMemoryDefinitionDocumentStore` |
+| REQ-FUNC-IB-27 | 装配期 fail-fast 准入闸门；**不提供**强制继续 / 忽略错误开关 | MOD-IB-23 / MOD-IB-02 | IFC-IB-290 / IFC-IB-293 | `src/ibweb/composition.py::admit`（聚合全部 `ValidationErrorItem` 的 `ConfigError`；拒绝装配）；`src/ib/core/types.py::ValidationReport`（字段集**不含** force/ignore/warn_only）；`definition.py::validate`（≥7 类校验项） |
+| 前置（IB-01/IB-02 落差闭合） | 定义外置为数据、单一真源 | MOD-IB-01 / MOD-IB-02 | IFC-IB-287 ~ 292 | `src/ib/core/ports.py::DefinitionDocumentStore`；`src/ib/config/definition.py`；`src/ibweb/composition.py::{build_definition_store, _default_definition_document, _inject_derived_experts}` |
+
+### 15.3 R7 变更文件清单
+
+| 文件 | 变更性质 | 对应 IFC / 项 |
+|------|---------|-------------|
+| `src/ib/core/types.py` | **追加** 10 个 frozen `slots=True` 数据结构：`ExpertSpecInput` / `RouteSpecInput` / `ConditionalEdgeSpec` / `OrchestrationSpecInput` / `ToolGrantSpec` / `DefinitionDocument` / `DerivedView` / `ValidationErrorItem` / `ValidationReport` / `SaveResult`（+`__all__`） | IFC-IB-287 |
+| `src/ib/core/ports.py` | **追加** 第 14 个端口 `DefinitionDocumentStore`（Protocol，5 方法）；头注释 13 → 14 端口；`__all__` | IFC-IB-287 |
+| `src/ib/core/__init__.py` | 追加导出（10 结构 + 端口） | IFC-IB-287 |
+| `src/ib/config/definition.py` | **新增**：`semantic_hash` / `validate` / `derive` / `editable_field_whitelist` / `non_editable_changes` / `build_definition_document` / `document_to_json` / `document_from_json` / `InMemoryDefinitionDocumentStore` / `FileDefinitionDocumentStore`（原子写 + 乐观并发） | IFC-IB-288~292 |
+| `src/ib/config/__init__.py` | `IB_DEFINITION_DOC_PATH` / `IB_VISUAL_CONFIG_ENABLED` 登记入 `IB_RUNTIME_ENV_KEYS`（**仅键名**）+ 导出定义层符号 | IFC-IB-297 |
+| `src/ib/experts/__init__.py` | **追加** `install_derived(specs)`（幂等、可重复装配） | IFC-IB-291 |
+| `src/ibweb/composition.py` | **追加** `admit`（fail-fast 闸门）、`_known_tool_names`、`_default_definition_document`、`build_definition_store`、`_inject_derived_experts`；`_assemble` 新增 4c 步「装载→准入→派生→注入」；`Deps` 增 `definition_store` / `definitions` / `derived_views`；`_graph_config` / `_build_semantic_router` 接受文档派生 `route` | IFC-IB-293 |
+| `src/ibweb/serializers.py` | **追加** 定义文档读写序列化器（`DefinitionConfigInputSerializer` 含 `expected_content_hash`）+ `definition_derived_summary` | IFC-IB-294/295 |
+| `src/ibweb/views.py` | **追加** `definition_config_endpoint`（GET/PUT；405/404/401/403/503/400/409）+ `_visual_config_enabled` / `_read_failure_response` / `_validation_failure_response` / `_get_definition_config` / `_put_definition_config` | IFC-IB-294/295 |
+| `src/ibweb/urls.py` | **追加** `path("api/config/definition", …, name="ib-config-definition")` | IFC-IB-294/295 |
+| `src/frontend/package.json` | **追加** 依赖 `@vue-flow/core`（MIT，本地打包） | IFC-IB-296 |
+| `src/frontend/src/api/client.ts` | **追加** `definitionConfig()` / `saveDefinition()` + 类型；`ApiClientError.details` | IFC-IB-294/295/296 |
+| `src/frontend/src/views/ConfigPage.vue` | **新增**：只读编排图（Vue Flow）+ 白名单表单 + 冲突处理；**零持久化** | IFC-IB-296 |
+| `src/frontend/src/App.vue` | **追加** 配置页导航与宿主 | IFC-IB-296 |
+| `src/scripts/selfcheck.py` | **追加** 6 个 R7 离线用例（见 §15.5） | 自验 |
+| `docs/implementation_plan.md` | 本 §15 + 头部版本 2.3.0/R7 + §1 R7 计数订正 + 范围行 REQ 计数 24 → 27（现 L63） | Task 1 |
+| `docs/code_review_report.md` | §6 / 计数订正 + R7 增量评审小节 | Task 1/3 |
+
+### 15.4 架构偏差记录（R7）
+
+| 偏差ID | 偏差描述 | 原 ADR / 契约 | 偏差原因与处置 |
+|--------|---------|--------------|-------------|
+| — | **无架构偏差** | — | 未新增/删除模块（仍 26）；端口 13 → 14 为 module_design R7 §3 明示的**纯追加**（IFC-IB-287）；未改既有 IFC 签名与配置键名/默认值；未改依赖边（新端口的适配器由既有边 `23 → 01/02` 构造）；ADR-14/15/16 全部遵循 |
+
+**冻结约束复核**：Django + 原生 SSE / 禁 Channels·Redis、Qdrant、bge-m3 dim=1024 CPU-only、**禁 PyMuPDF**、`langchain-openai>=0.2,<0.3`、**禁 Docker**、**禁 AGPL/copyleft**（`@vue-flow/core` = MIT）—— **全部未触碰**。
+
+### 15.5 R7 自验证据
+
+| 证据 | 内容 |
+|---|---|
+| `PYTHONUTF8=1 python -X utf8 scripts/selfcheck.py`（cwd=`src/`） | **30/30 PASS，EXIT=0**（R1~R4 的 24 例全绿 + R7 新增 6 例全绿） |
+| R7 新增用例 | `definition_pure_functions`（validate/derive 纯函数 + 白名单）、`definition_store`（原子写 + 乐观并发 + 缺失不静默回退）、`definition_gate`（fail-fast 聚合）、`definition_config 端点`（GET/PUT 200/400/401/403/405/409）、`definition_assembly`（装载→校验→派生→注入）、`frontend_config_discipline`（无 CDN / 零持久化 / 拓扑只读 / 只有键名） |
+| 未变的保护值 | `src/scripts/selfcheck.py` 例数由 24 → 30；**R2 / R3 / R4 增量小节内记载的「24/24 PASS」为 R1~R4 时点的历史自检记录**，对应本文件受保护的四行（**调用时行号 L471 / L603 / L621 / L732**；因本轮在文件头追加 R7 修订说明而整体下移至 **L481 / L613 / L631 / L742**）为**自检例数口径（≠ REQ 计数）**，本轮**逐字未改** —— 以 `git diff -U0 docs/implementation_plan.md \| grep '24/24 PASS'` 取证：四处**零出现在 diff**（仅新增的 §15.5 本行为本轮新增） |
+| 残留（诚实标注） | `@vue-flow/core` **未在本机安装** → 前端 `vue-tsc` 类型检查与 `vite build` **无法离线验证**；Python 侧 `frontend_config_discipline` 仅做**源码级**纪律断言（依赖声明 / import / 无 CDN / 零持久化 / 拓扑只读入口不存在）。与既有 L-02（前端构建依赖联网）同类残留 |
+
+---
+
+## 16. R8 增量实现（FND-R7-01 修复：`validate` 补齐两项装配期校验；追加，不改写 §1~§15）
+
+> 依据：`architecture_design.md` R7 ADR-16（校验项枚举含「路由关键词撞车」「面向用户标签唯一性」）；`user_stories.md` AC-IB-18-02；`module_design.md` §3 MOD-IB-02（IFC-IB-290）；登记处：`docs/test_report.md` §12.6 / §12.10。
+> **性质**：**只追加、不改写**。未新增模块（仍 26）、未改端口数（仍 14）、未改任何 IFC-IB 号或签名、未改模块边界、未改 `EXPERT_SPECS` 默认数据、未改 `validate()` 既有 9 项校验的语义与顺序（仅在末尾追加第 10 / 11 项）。§1~§15 为 R1~R7 历史记录，**逐字未改**。
+
+### 16.1 修复范围（协调者裁决 A / REV-08）
+
+| 项 | 内容 |
+|----|------|
+| 缺陷 | **FND-R7-01（MAJOR）** —— `validate` 未覆盖 ADR-16 / REQ-FUNC-IB-27 ① 列举的两类装配期校验（`test_report.md` §12.6） |
+| 补齐项 | ① 跨专家「路由关键词撞车」；② `cn_label`（中文标签）唯一性 |
+| 边界 | `EXPERT_SPECS` 默认数据、既有 9 项校验语义与顺序、全部 IFC 号 / 签名、模块边界 —— **均未改** |
+
+> 口径说明（**如实登记，不扩围**）：`test_report.md` §12.6 另举「专家内关键词为空/重复未由 `validate` 覆盖」一项。该子项**不在本轮授权范围**（协调者明确限定为「两项校验」），且已由 `ib/experts.validate_specs` 在**派生安装期**以 `ValueError` 兜底（既有行为，非本轮缺陷面）。本轮**未**改动该项。
+
+### 16.2 校验口径与实现落点
+
+| 新增校验 | 归一化口径 | 错误码 | 落点 | 理由 |
+|---------|-----------|--------|------|------|
+| 跨专家关键词撞车 | `kw.strip().lower()` | `expert_keyword_collision` | `src/ib/config/definition.py::validate` §10（L362~L389） | `lower()` **对齐路由消费方** `ib/routing/intent.py::_keyword_hits`（`keyword.lower() in text.lower()`）—— 大小写不同、小写后相同的两词在运行期**同样**并列命中、结果不可复现；`strip()` 去首尾空白（带空白的关键词几乎必然是录入错误，其去空白形态仍会重叠命中）。**只在跨专家之间**判定（专家内重复由 `validate_specs` 兜底） |
+| `cn_label` 唯一性 | `label.strip()` | `expert_cn_label_duplicate` | `src/ib/config/definition.py::validate` §11（L391~L411） | 标签是**展示串**，空白填充在界面不可见 → 必须视为重复；大小写差异界面可见 → 不归一。空标签由既有第 5 项 `expert_text_missing` 单独报出，本项跳过空值以免重复告警 |
+
+错误信息**定位到具体条目键**并回显冲突值（关键词 / 标签）与涉及的**两个专家名**，无任何凭据值（AC-IB-18-02 / AC-IB-18-04）。
+
+### 16.3 R8 变更文件清单
+
+| 文件 | 变更性质 | 对应 IFC / 项 |
+|------|---------|-------------|
+| `src/ib/config/definition.py` | `validate()` **末尾纯追加**第 10 / 11 项校验（+docstring 登记第 10 / 11 类；既有 9 项一字未改） | IFC-IB-290（签名 / 返回类型不变） |
+| `src/scripts/selfcheck.py` | **修正 2 个既有用例的夹具**（`definition_pure_functions` 的 `b` 关键词 `k → j`；`definition_gate` 的 `e{i}` 关键词 `k → k{i}`）—— 原夹具「两专家共用关键词 `k`」仅在旧（不完整）校验下「合法」，修后即为**应拒**；**并在 `cases` 列表登记 1 个新用例** | 自验 |
+| `src/scripts/selfcheck.py` | **新增** `definition_uniqueness` 用例（通过 + 拒绝两分支；ADR-16 / AC-IB-18-02） | 自验 |
+| `tests/unit/test_definition_uniqueness_r8.py` | **新增**（TC-UNIT-062 / 063 / 064，纯函数离线） | GROUP_D 套件新增 |
+| `docs/implementation_plan.md` | 本 §16 + 头部版本 2.3.0 → **2.4.0** / R8 修订行 / `latest_invocation_id` | Task 3 |
+| `docs/code_review_report.md` | 头部版本行 + 新增 **§13 R8 增量评审** | Task 4 |
+
+**未改**：`src/` 下与本次修复无关的文件；`tests/` 下**任何既有用例**（只新增 1 个文件）。
+
+### 16.4 架构偏差记录（R8）
+
+| 偏差ID | 偏差描述 | 原 ADR / 契约 | 偏差原因与处置 |
+|--------|---------|--------------|-------------|
+| — | **无架构偏差** | — | ADR-16 的校验项枚举**本已含**这两类；本轮是**补齐实现落差**，非新增架构决策。未改模块 / 端口 / IFC / 配置键 / 依赖边 / 默认数据 |
+
+### 16.5 R8 自验证据
+
+| 证据 | 内容 |
+|---|---|
+| `PYTHONUTF8=1 python -X utf8 src/scripts/selfcheck.py`（**cwd = 仓库根目录**） | **31/31 PASS，EXIT=0**（R1~R7 的 30 例全绿 + R8 新增 1 例全绿） |
+| R8 新增用例 | `definition_uniqueness`（跨专家关键词撞车 / `cn_label` 重复 → fail-fast；通过 + 拒绝两分支） |
+| 新增单元测试 | `tests/unit/test_definition_uniqueness_r8.py` → **3 passed**（TC-UNIT-062 / 063 / 064） |
+| 默认装配不回归 | `selfcheck.py::definition_assembly` / `definition_config 端点` **PASS** —— 默认定义文档（由 `EXPERT_SPECS` 精确派生：三专家无跨专家关键词撞车、`cn_label` 唯一）**修后仍通过**（`TC-UNIT-064` 亦独立佐证） |
+| `python -m compileall -q src` | **EXIT=0**（含改动文件） |
+
+### 16.6 下游影响（诚实登记，需 GROUP_D 处置）
+
+新增校验使**部分既有测试夹具**（两专家共用关键词 `k` 或共用 `cn_label` `"标签"`）由「旧校验下合法」变为「修后应拒」。经**实跑**，`tests/unit` + `tests/integration` 中恰好 **4 个既有用例**因此失败：
+
+| 用例 | 文件 | 根因 |
+|------|------|------|
+| TC-UNIT-056 / 057 / 061 | `tests/unit/test_definition_data_layer_r7.py` | 夹具 `_expert` 默认 `keywords=("k",)` / `cn_label="标签"`，两专家撞车 |
+| TC-INT-082 | `tests/integration/test_definition_config_r7.py` | 同上 |
+
+**处置建议（不改 tests/，交 GROUP_D）**：将上述两文件的 `_expert` 夹具改为「每专家关键词互异、标签互异」的合法数据（如 `keywords=(f"k{name}",)`）。此与 `test_report.md` §12.10 第 4 项「FND-R7-01 修复后补验回归用例」及 NV-R7-05 一致 —— 属 GROUP_D 的修复后测试侧工作。**本轮未改 `tests/` 任何既有用例**。
+
+### 16.7 冻结约束复核（R8）
+
+- **未改**：`IFC-IB-001~297`（无新增编号、无签名/返回类型变更）；端口数 14；模块数 26；`EXPERT_SPECS` 默认数据；配置键名与默认值；依赖边。
+- **未触碰**：Django + 原生 SSE / 禁 Channels·Redis；Qdrant；bge-m3 dim=1024 CPU-only；**禁 PyMuPDF**；`langchain-openai` pin `<0.3`；**禁 Docker**；**禁 AGPL/copyleft**。
+- **未触网 / 未引新依赖**：本轮自测离线（纯函数 + 临时目录），未真连 Qdrant / DeepSeek / ib-embed，未安装任何新依赖。
+- **凭据纪律**：改动代码与文档**不含任何真实凭据**；错误信息只回显关键词 / 标签值（业务数据，非凭据），且不回显任何环境变量值。
+
+---
+
+## 17. R10 增量实现（前端构建阻断修复 + 冒烟入口 + 许可登记；追加，不改写 §1~§16）
+
+> 依据：PM 只读取证（`.github/workflows/ci.yml` 阶段9 `npm ci` → `npm run build`；`src/frontend/package.json` L16 声明 `@vue-flow/core@^1.41.0`）；`docs/test_plan.md`（AC-IB-17-06 / REQ-NFR-IB-08 离线与零外发）；`docs/tech_stack.md` §1.3 / §2（传递依赖许可 `[待核实]`）。
+> **性质**：**只追加、不改写**。未新增模块（仍 26）、未改端口数（仍 14）、未改任何 IFC-IB 号或签名、未改后端 `src/ib` / `src/ibweb` / `src/ib_embed` 任何行为、未改配置键名与默认值。§1~§16 为 R1~R8 历史记录，**逐字未改**。
+
+### 17.1 缺陷根因（三处叠加，任一处均令交付管线走不通）
+
+| 编号 | 缺陷 | 证据（R10 前） | 后果 |
+|------|------|---------------|------|
+| **FND-R10-01（CRITICAL）** | **锁文件与 `package.json` 失同步**：`package-lock.json` 内**无任何** `vue-flow` 条目（`grep -c vue-flow package-lock.json` = **0**），其根节点 `packages[""].dependencies` 只含 `vue` | `src/frontend/package-lock.json`（R10 前 1459 行） | CI 阶段9 `npm ci` 比对 package.json ↔ lock 不一致 → **EUSAGE 失败**，`npm run build` **永不抵达** |
+| **FND-R10-02（CRITICAL）** | **源文件未被跟踪**：`src/frontend/src/views/ConfigPage.vue` 未入 git（`git ls-files` 无、`git status` 显示 `??`），而**已跟踪**的 `src/frontend/src/App.vue:23` 已 `import ConfigPage from './views/ConfigPage.vue'` | `git ls-files src/frontend/src/views` 仅 3 个文件 | CI checkout 后**缺该文件** → `vue-tsc --noEmit` 报模块不存在 → 阶段9 仍失败；且 R7 的 IFC-IB-296 页面**不会进产物** |
+| **FND-R10-03（CRITICAL）** | **类型错误**：`ConfigPage.vue` L41 导入 `type ExpertSpecInput` 但全文未使用；`tsconfig.json` 开启 `noUnusedLocals: true` | R10 首跑 `npm run build` 原始输出：`src/views/ConfigPage.vue(41,8): error TS6133: 'ExpertSpecInput' is declared but its value is never read.` `EXIT=2` | 即便锁与跟踪均修好，`vue-tsc --noEmit` 仍非零退出 → 阶段9 失败 |
+
+> 二者（01 / 02）互为**独立**阻断：只修锁不改跟踪，或只改跟踪不修锁，`npm run build` 均不可达 / 不通过。故本轮必须**三处同修**方能使 CI 阶段9 绿。
+
+### 17.2 R10 变更文件清单
+
+| 文件 | 变更性质 | 对应 IFC / 项 |
+|------|---------|-------------|
+| `src/frontend/package-lock.json` | **重新生成**：新增 `@vue-flow/core@1.48.2` 及 14 个传递包（+216 行；`npm ci` 可精确复现） | FND-R10-01 |
+| `src/frontend/package.json` | 新增 `"test": "node --test"` 脚本；`_comment` 追加 R10 说明（**dependencies 未增删**，`@vue-flow/core@^1.41.0` 保持原样） | 前端冒烟入口 |
+| `src/frontend/src/views/ConfigPage.vue` | 删除未使用的 `type ExpertSpecInput` 导入（**-1 行**，其余逐字未改）；**并入 git 跟踪** | FND-R10-02 / 03（IFC-IB-296 不变） |
+| `src/frontend/tests/frontend.smoke.test.js` | **新增**：零新增依赖的冒烟骨架（6 用例，含「锁 ↔ package.json 同步」回归闸） | 前端冒烟入口 |
+| `docs/tech_stack.md` | 新增 **§2.1** 前端依赖许可登记（14 传递包版本 + 许可）；§1 / §2 / §5.3 三处 `[待核实]` 收敛为**已核实（R10）**；头部 1.3.0 → **1.3.1** | NFR-12 许可合规落点 |
+| `docs/implementation_plan.md` | 本 §17 + 头部版本 2.4.0 → **2.5.0** / R10 修订行 / `latest_invocation_id` | Task 3 |
+| `docs/code_review_report.md` | 头部版本行 + 新增 **§14 R10 增量评审** | Task 4 |
+
+**未改**：`src/` 下**后端**任何文件（`ib` / `ibweb` / `ib_embed`）；`tests/` 下任何既有用例；`src/frontend/src/` 下除 `ConfigPage.vue` 一行删除外的任何文件；`vite.config.ts` / `tsconfig.json` / `index.html`。**未改** `.github/workflows/ci.yml`（阶段9 命令保持 `npm ci` + `npm run build` 原样 —— 本轮修的是被它检验的产物，不是检验本身）。
+
+### 17.3 构建证明（严格按 CI 顺序复现；可被第三方重跑）
+
+| # | 命令（cwd = `src/frontend`） | 结果 | 证据文件 |
+|---|---------------------------|------|---------|
+| 1 | `npm install --no-fund --no-audit` | **EXIT=0**；`added 16 packages` | `docs/evidence/groupc_r10_npm_install.log` |
+| 2 | `npm ci`（先 `rm -rf node_modules`，依 lock 重装） | **EXIT=0**；`added 65 packages`；`node_modules/@vue-flow/core` 就位 | `docs/evidence/groupc_r10_npm_ci.log` |
+| 3 | `npm run build`（= `vue-tsc --noEmit && vite build`） | **EXIT=0**；`28 modules transformed`；`dist/assets/index-*.js` **252.35 kB（gzip 89.20 kB）**、`index-*.css` **12.62 kB（gzip 2.74 kB）** | `docs/evidence/groupc_r10_npm_build.log` |
+| 4 | `npm test`（= `node --test`） | **EXIT=0**；`tests 6 / pass 6 / fail 0` | `docs/evidence/groupc_r10_npm_test.log` |
+| 5 | 回归闸负向对照：以 **R10 前的旧锁**（`git show HEAD:src/frontend/package-lock.json`）跑用例 2 | **按预期失败**：`AssertionError: package-lock.json 未解析 @vue-flow/core`（`pass 5 / fail 1`） | `docs/evidence/groupc_r10_guard_negative_control.log` |
+| 6 | 传递依赖许可核实（逐包读 `node_modules/<pkg>/package.json`） | 14 包全部 **MIT / ISC / BSD-3-Clause**，无 copyleft | `docs/evidence/groupc_r10_license.log` |
+
+> 第 2 步 `npm ci` 会**先清空 `node_modules` 再依 lock 重装**，是「锁完整、可离线复现」的最强证明；其 EXIT=0 即证 FND-R10-01 已闭合。第 3 步 EXIT=0 即证 FND-R10-03 已闭合。
+
+### 17.4 架构偏差记录（R10）
+
+| 偏差ID | 偏差描述 | 原 ADR / 契约 | 偏差原因与处置 |
+|--------|---------|--------------|-------------|
+| D-R10-01 | **`git add src/frontend/src/views/ConfigPage.vue`**（将既有未跟踪文件纳入版本控制） | 无对应 ADR；属交付完整性问题 | FND-R10-02：文件由 R7 交付（`implementation_plan.md` §15 已登记 `ConfigPage.vue`），但从未 `git add`。**未改其内容语义**（仅删 1 行无用导入），仅补登记。**已 staging，待 PM 纳入提交** |
+| — | 其余**无架构偏差** | — | 未改 ADR/模块/端口/IFC/配置键/依赖边/后端行为 |
+
+### 17.5 冻结约束复核（R10）
+
+- **未改**：`IFC-IB-001~297`（无新增编号、无签名/返回类型变更）；端口数 14；模块数 26；配置键名与默认值；依赖边；后端 `src/ib` / `src/ibweb` / `src/ib_embed` 任何行为。
+- **未触碰**：Django + 原生 SSE / 禁 Channels·Redis；Qdrant；bge-m3 dim=1024 CPU-only；**禁 PyMuPDF**；`langchain-openai` pin `<0.3`；**禁 Docker**。
+- **许可（NFR-12）**：新纳入的 14 个传递包**全部宽松**（MIT / ISC / BSD-3-Clause），**无 AGPL / copyleft**；已登记于 `tech_stack.md` §2.1。
+- **离线纪律（AC-IB-17-06 / REQ-NFR-IB-08）**：**未引入运行期 CDN**；依赖经构建本地打包；冒烟用例 5 对外发 CDN 主机名做**源码 + `dist/index.html`** 双向扫描；`npm test` **零新增依赖**（仅 Node 20 内建 `node:test`）。
+- **体积纪律**：未引入 UI 组件库；`dist` JS 252.35 kB（gzip 89.20 kB），对 4GB 目标机可接受。
+- **凭据纪律**：改动文件与证据日志**不含任何真实凭据**（证据仅为 npm 输出与包元数据）。
+- **FreeArk 仓库全程只读**；`docs/phase_status.md` **未触碰**（PM 专属）。
+- **受保护行复核（R10）**：本文件四处「24/24 PASS」保护行**逐字未改**。因 R8 / R10 各在文件头 `revision_note` 追加一段（各 +1 行），四行的**当前行号**为 **L483 / L615 / L633 / L744**（R7 时点记录为 L481 / L613 / L631 / L742）。R10 的改动仅落在文件头（L6 / L8 / L11 / L36）与本 §17，**与保护行无交集**。取证：`grep -n "24/24 PASS" docs/implementation_plan.md`。`src/scripts/selfcheck.py` 及其相关行**本轮未触碰**。

@@ -36,3 +36,6 @@ htmlcov/
 .claude/*
 !.claude/agents/
 .claude/agents/knowledge_base/
+
+# Evidence run logs (keep *.py probes tracked)
+docs/evidence/*.log

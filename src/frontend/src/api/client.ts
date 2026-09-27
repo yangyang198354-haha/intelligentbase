@@ -3,6 +3,7 @@
  * @implements IFC-IB-259 类型化 API 客户端（`client.ts`；module_design 中名为 `apiClient.ts`，
  *             同一契约的路径写法差异，见 implementation_plan §8 偏差 D-09）
  *             IFC-IB-283（R2）`fetchFileImage` / `fileImageUrl`：页面图字节取用
+ *             IFC-IB-294 / 295（R7）`definitionConfig` / `saveDefinition`：定义文档读写
  * @depends MOD-IB-23（HTTP / SSE 契约，**仅**契约，不 import 任何后端模块）
  * @author software-developer
  *
@@ -108,6 +109,79 @@ export type RelatedImagesPayload = { images: RelatedImageItem[] };
 export type FileListEnvelope = { items: DocumentRecord[]; total: number };
 
 /**
+ * R7 定义文档类型（IFC-IB-294 / 295；与后端 `ibweb/serializers.py` **逐字段对齐**）。
+ *
+ * 定义文档是「专家 / 路由 / 编排 / 工具授权」的**唯一真源**：前端只**呈现**与**按白名单编辑**，
+ * 绝不另存一份（视图侧零持久化，ADR-14）。
+ */
+export type ExpertSpecInput = {
+  name: string;
+  cn_label: string;
+  keywords: string[];
+  exemplars: string[];
+  is_data_expert: boolean;
+  fallback_prompt: string;
+  is_delegating: boolean;
+  is_default: boolean;
+};
+
+export type RouteSpecInput = {
+  tau: number;
+  margin: number;
+  max_expert_steps: number;
+  default_expert: string;
+};
+
+/** `branch_map` 为**有序** `[branch_key, target_node]` 序列（保序，供界面判定可达性）。 */
+export type ConditionalEdgeSpec = { from_node: string; branch_map: [string, string][] };
+
+export type OrchestrationSpecInput = {
+  nodes: string[];
+  conditional_edges: ConditionalEdgeSpec[];
+};
+
+export type ToolGrantSpec = { expert_name: string; tool_names: string[] };
+
+export type DefinitionDocument = {
+  schema_version: number;
+  project_id: string;
+  content_hash: string;
+  experts: ExpertSpecInput[];
+  route: RouteSpecInput;
+  orchestration: OrchestrationSpecInput;
+  tool_grants: ToolGrantSpec[];
+  updated_at: string;
+};
+
+export type DerivedViewSummary = {
+  capability_digest: string;
+  expert_names: string[];
+  nodes: string[];
+  conditional_edges: ConditionalEdgeSpec[];
+};
+
+export type ValidationErrorItem = { path: string; code: string; message: string };
+
+export type SaveResult = {
+  ok: boolean;
+  content_hash: string;
+  conflict: boolean;
+  errors: ValidationErrorItem[];
+};
+
+export type DefinitionConfigEnvelope = {
+  document: DefinitionDocument;
+  derived: DerivedViewSummary;
+  /** 可编辑字段白名单（IFC-IB-292）：白名单外的字段界面**不得写入**。 */
+  editable_fields: string[];
+  /**
+   * R7 配置**键名**（IFC-IB-297）。
+   * 只有键名，**没有值** —— 凭据 / 路径值一律不回显（AC-IB-17-05）。
+   */
+  config_key_names: string[];
+};
+
+/**
  * 页面图端点的站内相对路径（IFC-IB-283）。
  *
  * 与后端 `ib.streaming.IMAGE_ENDPOINT_TEMPLATE` 是**同一个字面量形状**；`url_path` 字段
@@ -125,12 +199,18 @@ const TOKEN_KEY = 'ib_token';
 export class ApiClientError extends Error {
   readonly status: number;
   readonly code: string;
+  /**
+   * 后端错误体里 `error` 对象的**结构化细节**（如 `PUT` 的逐条 `items`、`409` 的 `receipt`）。
+   * 供界面给出可读回执（IFC-IB-295）；不含任何凭据值（后端保证）。
+   */
+  readonly details: Record<string, unknown>;
 
-  constructor({ status, code, message }: ApiError) {
+  constructor({ status, code, message }: ApiError, details: Record<string, unknown> = {}) {
     super(message);
     this.name = 'ApiClientError';
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -192,10 +272,14 @@ export class ApiClient {
       // **不把响应原文塞进 Error.message**（可能是框架的 HTML 错误页，会污染界面）。
       let code = 'http_error';
       let message = `请求失败（HTTP ${response.status}）`;
+      let details: Record<string, unknown> = {};
       try {
         const parsed = JSON.parse(text);
         if (parsed?.error?.code) code = String(parsed.error.code);
         if (parsed?.error?.message) message = String(parsed.error.message);
+        if (parsed?.error && typeof parsed.error === 'object') {
+          details = parsed.error as Record<string, unknown>;
+        }
       } catch {
         /* 保持通用文案 */
       }
@@ -203,7 +287,7 @@ export class ApiClient {
         // 令牌失效即清除，避免界面持续以无效令牌重试
         this.clearToken();
       }
-      throw new ApiClientError({ status: response.status, code, message });
+      throw new ApiClientError({ status: response.status, code, message }, details);
     }
     return (text ? JSON.parse(text) : null) as T;
   }
@@ -262,6 +346,38 @@ export class ApiClient {
 
   healthDeps(): Promise<HealthzDeps> {
     return this.request<HealthzDeps>('/healthz/deps');
+  }
+
+  // ------------------------------------------------------------------ //
+  // IFC-IB-294 / 295：定义文档（单一真源）读写
+  // ------------------------------------------------------------------ //
+
+  /**
+   * 读取定义文档 + 派生视图摘要 + 可编辑白名单 + 配置键名（IFC-IB-294）。
+   *
+   * `503` 表示定义文档当前不可读（fail-closed）—— 界面应显示「配置不可用」而**不是**空表单；
+   * 后端刻意**不返回空文档**，因为空文档会被误当成「真源就是这么空的」。
+   */
+  definitionConfig(): Promise<DefinitionConfigEnvelope> {
+    return this.request<DefinitionConfigEnvelope>('/api/config/definition');
+  }
+
+  /**
+   * 原子写回定义文档（IFC-IB-295）。
+   *
+   * `expectedContentHash` 传当前文档的 `content_hash` 以启用**乐观并发**；服务端不一致时
+   * 返回 `409`（抛 `ApiClientError`，`details.receipt` 为可读冲突回执），界面须提示用户
+   * 重新载入 —— 绝不静默覆盖他人改动。
+   */
+  saveDefinition(
+    document: DefinitionDocument,
+    expectedContentHash?: string | null,
+  ): Promise<SaveResult> {
+    return this.request<SaveResult>('/api/config/definition', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expected_content_hash: expectedContentHash ?? null, document }),
+    });
   }
 
   // ------------------------------------------------------------------ //
