@@ -1,7 +1,0 @@
-# GROUP_D R3 增量 — 单元测试（真跑，原始输出）
-# command: PYTHONUTF8=1 IB_OFFLINE_MODE=1 python -m pytest tests/unit -q
-# python: Python 3.14.6
-
-.......................................................                  [100%]
-55 passed in 0.09s
-EXIT=0

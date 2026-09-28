@@ -1,4 +1,0 @@
-FND-GROUP-D-01
-  deps.capability_digest  = ''
-  router prompt           = '（无可用工具）'
-  bind_tools(p_alpha)     = ['search_knowledge']

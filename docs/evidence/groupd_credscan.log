@@ -1,4 +1,0 @@
-=== AC-IB-12-02 凭据模式扫描 ===
-命令: grep -rInE '<sk-|ghp_|PRIVATE KEY|AKIA>' src tests docs
-命中数: 0
-结论: ZERO_CREDENTIALS

@@ -1,9 +1,0 @@
-上传 doc_id                                  = c0b0846146c1499cb3be1536f769f997
-上传后 BlobStore 对象数                        = 1
-  对象键前 3 段 (project, kb, doc)              = ('p_alpha', 'kb_a', 'c0b0846146c1499cb3be1536f769f997')
-resolve_scope(ctx)                           = Scope(project_id='p_alpha', kb_ids=None)
-delete_document(scope=项目级)                 = DeleteReport(vectors_deleted=0, blob_deleted=False, ledger_deleted=True)
-删除后 BlobStore 对象数                        = 1
-台账行（应为 None）                           = None
-原文件是否残留（幽灵 blob）？                  = True
-blob_deleted 是否为 False（缺陷在场）？        = True
