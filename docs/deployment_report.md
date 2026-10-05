@@ -8,8 +8,8 @@
 | 产出代理 | 部署执行人（PHASE_11） |
 | 项目 | intelligentbase |
 | 阶段 | GROUP_E / **PHASE_11（生产部署）** |
-| 版本 | 1.3.0（R7/R8「智能体框架通用化」整批特性 `be3f45a..0e54b03` 已部署；B7 DeepSeek 已闭合） |
-| status | **已验证**（D-4/D-5/D-6 已部署复验；通用化特性 + 前端重建 + B7 LLM 均已上线并复验，见 §8） |
+| 版本 | 1.3.1（`0e54b03..fa0a7a4`：完整工具调用循环，修复「聊天检索不落地」根因） |
+| status | **已验证**（D-1~D-6、通用化特性、B7 LLM 均已上线复验；聊天检索落地已修复并目标机端到端复验，见 §8/§9） |
 | 创建日期 | 2026-09-26 |
 | 目标机 | `192.168.31.133`（Ubuntu 26.04 LTS / x86_64 / i7-3770S 4C8T / 11 GiB） |
 | 上游输入 | `docs/deployment_plan.md`(1.1.0/R4)、`src/deploy/checklists.txt`(A1–A8 / B1–B14 / C)、`docs/phase_status.md` |
@@ -202,3 +202,45 @@ total=18 passed=16 failed=2
 > 本轮无 schema 迁移、无新增 env 键（`env.example` 仅 `@author` 注释变更）；新配置键
 > `IB_DEFINITION_DOC_PATH` / `IB_VISUAL_CONFIG_ENABLED` / `IB_CONFIRMATION_GATE_ENABLED` 均可选且带安全默认
 > （定义文档未配置时为内存默认 + WARN），故目标机无需 env/schema 变更即安全启动。
+
+---
+
+## 9. 聊天检索不落地修复（`fa0a7a4`，完整工具调用循环）
+
+**部署时间**：2026-10-05。**交付 commit**：`fa0a7a4`（fast-forward，1 个 commit）。
+
+### 背景与根因
+
+端到端 QA 冒烟暴露出「聊天回答**未落地**到已上传文档」：直接 `qdrant` 搜索能命中文档
+（score 0.7483），但聊天检索返回空 —— 生产日志**无任何 `retrieval` 事件**。
+
+根因在编排层 `_run_expert`：它只把工具 `name`/`description` 当**文字**拼进 prompt，从未执行
+`BoundTool.callable`。于是检索工具被「描述」却从未「执行」，专家 LLM 拿不到任何检索结果，
+只能凭模型固有知识作答 —— 这正是「聊天不落地」的全部解释。
+
+### 修复内容（代码侧）
+
+| 文件 | 改动 |
+|------|------|
+| `src/ib/core/types.py` | `ToolSpec` / `BoundTool` 增加 `parameters`（业务参数 JSON Schema，缺省 `None` 无参） |
+| `src/ib/tools/__init__.py` | `bind_scope` 透传 `parameters` |
+| `src/ibweb/composition.py` | `SEARCH_TOOL_SPEC` 声明 `query` 参数 schema |
+| `src/ib/llm/__init__.py` | 新增 `_PromptedClient.run_tool_loop`（langchain-only function-calling，多轮往返，fail-open） |
+| `src/ib/orchestration/__init__.py` | `_run_expert` 接入工具循环；provider 无工具循环时回退单次文本补全 |
+| `tests/unit/test_llm_tool_loop.py` | 新增 TC-UNIT-076~082（离线、不触网），正向守卫「工具 callable 被真正执行」 |
+
+### 部署动作与端到端复验
+
+| 步骤 | 结果 |
+|------|------|
+| 代码同步 | ✅ `git pull --ff-only origin main` → `HEAD=fa0a7a4` |
+| 服务重启 | ✅ `ib-web` / `ib-worker` 重启，均 active |
+| 健康检查 | ✅ 启动日志 `Serving on http://127.0.0.1:18080`；`llm=openai_compatible`（egress `api.deepseek.com`） |
+| 上传入库 | ✅ 上传「极寒 XL-9000 型制冷机组开机顺序」文档 → 轮询 `status=indexed` |
+| 聊天接地 | ✅ `GET /api/chat/stream` 产出 `event: content` + `event: done`，回答含文档独有序列「冷却水泵 → 冷冻水泵 → 主机」 |
+| **工具循环真跑** | ✅ 聊天后 journal 出现 **2 条 `"stage":"retrieval","outcome":"succeeded"`**（修复前恒为 0） |
+| 清理 | ✅ 删除测试文档 `vectors_deleted=1`，`demo` 回到干净基线（0 文档 / `ib_demo_v1` 0 向量） |
+
+> 复验中「检索事件计数为 0」的首次误报系 journal 查询时区所致（目标机 TZ 误配为 `-0700`，
+> `--since` 用 UTC 时间戳指向了未来）；改用 `--since "15 minutes ago"` 后正确捕获 2 条 `retrieval`
+> 事件，旁证工具循环确已执行。目标机 TZ 误配另记为运维待办，不影响本次功能复验。
