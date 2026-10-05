@@ -160,6 +160,7 @@ def bind_scope(
                 name=spec.name,
                 description=spec.description,
                 callable=_make_bound_callable(spec, fn, scope, retrieval),
+                parameters=getattr(spec, "parameters", None),
             )
         )
     return bound

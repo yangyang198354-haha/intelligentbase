@@ -607,11 +607,17 @@ class ToolResult:
 
 @dataclass(frozen=True, slots=True)
 class ToolSpec:
-    """工具声明（IFC-IB-181）。`description` 进入能力摘要（IFC-IB-182）。"""
+    """工具声明（IFC-IB-181）。`description` 进入能力摘要（IFC-IB-182）。
+
+    `parameters` 是**业务参数**的 JSON Schema（不含 `scope`/`retrieval` 这类构造期注入项），
+    供 function-calling 把工具交给 LLM 时描述「该传什么参数」。缺省 `None` 表示无业务参数
+    （退化为无参工具，`parameters={"type":"object","properties":{}}`）。
+    """
 
     name: str
     description: str
     needs_scope: bool = False
+    parameters: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -627,12 +633,14 @@ class BoundTool:
     """已绑定 scope 的工具（IFC-IB-183）。
 
     **构造期闭包绑定**的结果形态：`callable` 是**无参**的（骨架只见无参工具），
-    scope 已被封闭在闭包内（ADR-09 / §1.4）。
+    scope 已被封闭在闭包内（ADR-09 / §1.4）。`parameters` 从 `ToolSpec.parameters`
+    原样透传（业务参数 JSON Schema，供 function-calling 使用）。
     """
 
     name: str
     description: str
     callable: Any  # Callable[[], ToolResult] 或 Callable[[str], ToolResult]
+    parameters: dict[str, Any] | None = None
 
 
 # --------------------------------------------------------------------------- #

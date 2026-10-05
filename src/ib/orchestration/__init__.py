@@ -1057,18 +1057,17 @@ def _run_expert(payload: dict, llm: Any, tools_by_expert: dict[str, list[Any]]) 
         impl = getattr(role, "impl", None)
         if impl is None:
             return ExpertResult(expert=expert, content="", degraded=True, degrade_reason="llm_unavailable")
-        tool_lines = []
-        for tool in tools_by_expert.get(expert, []):
-            name = getattr(tool, "name", "")
-            desc = getattr(tool, "description", "")
-            if name:
-                tool_lines.append(f"- {name}: {desc}")
-        full_prompt = prompt
-        if tool_lines:
-            full_prompt = f"{prompt}\n\n你可以使用以下工具（按需调用，不要编造工具）：\n" + "\n".join(tool_lines)
-        full_prompt = f"{full_prompt}\n\n用户问题：{query}"
-        result = impl.invoke(full_prompt) if hasattr(impl, "invoke") else impl(full_prompt)
-        text = _text_of(result)
+        tools = tools_by_expert.get(expert, [])
+        full_prompt = f"{prompt}\n\n用户问题：{query}"
+        # 工具调用循环：真正的 function-calling（LLM 自主决定是否/何时检索，多轮往返）。
+        # 若 provider 未实现工具循环（离线替身 `FakeLlmProvider` 等），回退到单次文本补全 ——
+        # 与既有行为逐位一致（替身的输出与 prompt 无关，见 llm._role_callable）。
+        loop = getattr(impl, "run_tool_loop", None)
+        if callable(loop) and tools:
+            text = loop(full_prompt, tools=tools)
+        else:
+            result = impl.invoke(full_prompt) if hasattr(impl, "invoke") else impl(full_prompt)
+            text = _text_of(result)
         if not text:
             return ExpertResult(expert=expert, content="", degraded=True, degrade_reason="empty_response")
         return ExpertResult(expert=expert, content=text, degraded=False, degrade_reason=None)

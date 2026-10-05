@@ -391,8 +391,111 @@ class _PromptedClient:
             [("system", self._system_prompt), ("human", prompt)], **kwargs
         )
 
+    def run_tool_loop(self, prompt: str, tools: list[Any], *, max_iterations: int = 4) -> str:
+        """专家作答的**工具调用循环**（function-calling），返回最终正文。
+
+        把 `BoundTool`（框架无关：`name` / `description` / `parameters` / `callable`）
+        转成 OpenAI function schema 交给底层模型；模型每次返回 `tool_calls` 时，逐一执行
+        对应 `BoundTool.callable` 并把结果以 `ToolMessage` 回填，直到模型给出最终正文、
+        不再调用工具，或到达 `max_iterations` 上限。
+
+        **fail-open**：工具循环的任何异常都不该让问答失败 —— 退化为单次文本补全
+        （`invoke(prompt)`），与检索层 ADR-13 的「检索是增强不是前提」同一纪律。
+        """
+        if not tools:
+            return _extract_text(self.invoke(prompt))
+        from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+
+        schemas = [_tool_schema(t) for t in tools]
+        by_name = {getattr(t, "name", ""): t for t in tools}
+        bound = self._client.bind_tools(schemas)
+        messages: list[Any] = [
+            SystemMessage(content=self._system_prompt),
+            HumanMessage(content=prompt),
+        ]
+        try:
+            response = bound.invoke(messages)
+        except Exception:  # noqa: BLE001 - fail-open：退回单次文本补全
+            return _extract_text(self.invoke(prompt))
+        for _ in range(max(1, int(max_iterations))):
+            calls = list(getattr(response, "tool_calls", None) or [])
+            if not calls:
+                return _extract_text(response)
+            followups: list[Any] = [AIMessage(content=_extract_text(response), tool_calls=calls)]
+            for call in calls:
+                name, args, call_id = _tool_call_parts(call)
+                tool = by_name.get(name)
+                if tool is None:
+                    followups.append(
+                        ToolMessage(content="未知工具，忽略该调用。", tool_call_id=call_id or "unknown")
+                    )
+                    continue
+                followups.append(
+                    ToolMessage(content=_execute_tool(tool, args), tool_call_id=call_id or "unknown")
+                )
+            messages = messages + followups
+            try:
+                response = bound.invoke(messages)
+            except Exception:  # noqa: BLE001 - fail-open
+                return _extract_text(self.invoke(prompt))
+        return _extract_text(response)
+
     def __call__(self, prompt: str) -> Any:
         return self.invoke(prompt)
+
+
+def _tool_schema(tool: Any) -> dict[str, Any]:
+    """`BoundTool` → OpenAI function schema（参数 schema 取自 `tool.parameters`）。"""
+    parameters = getattr(tool, "parameters", None) or {"type": "object", "properties": {}}
+    return {
+        "type": "function",
+        "function": {
+            "name": str(getattr(tool, "name", "") or ""),
+            "description": str(getattr(tool, "description", "") or ""),
+            "parameters": parameters,
+        },
+    }
+
+
+def _tool_call_parts(call: Any) -> tuple[str, dict[str, Any], str]:
+    """拆解单条 `tool_calls` 元素，兼容 dict（langchain-core 0.3）与属性对象两种形态。"""
+    if isinstance(call, dict):
+        return (
+            str(call.get("name") or ""),
+            dict(call.get("args") or {}),
+            str(call.get("id") or ""),
+        )
+    return (
+        str(getattr(call, "name", "") or ""),
+        dict(getattr(call, "args", None) or {}),
+        str(getattr(call, "id", "") or ""),
+    )
+
+
+def _execute_tool(tool: Any, args: dict[str, Any]) -> str:
+    """执行一个 `BoundTool.callable`，返回可进上下文的文本；异常 → 可读占位。"""
+    try:
+        result = tool.callable(**(args or {})) if args else tool.callable()
+    except Exception:  # noqa: BLE001 - 单个工具失败不中断循环
+        return "（工具执行失败）"
+    content = getattr(result, "content", None)
+    if content is None:
+        content = str(result)
+    return str(content) or "（工具无输出）"
+
+
+def _extract_text(result: Any) -> str:
+    """LLM 返回对象 → 文本（兼容 str / 带 `.content` 的消息 / 列表）。"""
+    if result is None:
+        return ""
+    if isinstance(result, str):
+        return result
+    content = getattr(result, "content", None)
+    if isinstance(content, str):
+        return content
+    if isinstance(result, (list, tuple)) and result:
+        return _extract_text(result[0])
+    return str(result)
 
 
 def _host_of(url: str) -> str:

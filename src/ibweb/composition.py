@@ -80,6 +80,16 @@ SEARCH_TOOL_SPEC = ToolSpec(
     name="search_knowledge",
     description="在企业知识库中检索与问题相关的资料片段，返回文件名与位置",
     needs_scope=True,
+    parameters={
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "检索关键词或问题，尽量具体、贴近用户原始提问",
+            },
+        },
+        "required": ["query"],
+    },
 )
 
 
