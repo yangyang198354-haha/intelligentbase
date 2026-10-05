@@ -8,8 +8,8 @@
 | 产出代理 | 部署执行人（PHASE_11） |
 | 项目 | intelligentbase |
 | 阶段 | GROUP_E / **PHASE_11（生产部署）** |
-| 版本 | 1.2.0（D-4/D-5 已部署复验通过；新增 D-6 修复 `be3f45a` 已部署复验） |
-| status | **已验证**（D-4/D-5 目标机端到端复验通过；D-6 列表接口 500 修复并复验；遗留痕迹已清理） |
+| 版本 | 1.3.0（R7/R8「智能体框架通用化」整批特性 `be3f45a..0e54b03` 已部署；B7 DeepSeek 已闭合） |
+| status | **已验证**（D-4/D-5/D-6 已部署复验；通用化特性 + 前端重建 + B7 LLM 均已上线并复验，见 §8） |
 | 创建日期 | 2026-09-26 |
 | 目标机 | `192.168.31.133`（Ubuntu 26.04 LTS / x86_64 / i7-3770S 4C8T / 11 GiB） |
 | 上游输入 | `docs/deployment_plan.md`(1.1.0/R4)、`src/deploy/checklists.txt`(A1–A8 / B1–B14 / C)、`docs/phase_status.md` |
@@ -140,7 +140,7 @@ ib_demo_v1 points_count      → 1  ← 孤儿向量，未随删除清除
 
 | 项 | 状态 | 说明 |
 |----|------|------|
-| **B7** DeepSeek 真跑 | ❌ 阻塞 | `IB_LLM_API_KEY` 未提供，LLM 侧 `AuthenticationError`；须用户提供真实 key 方可闭合（S-1/S-3） |
+| **B7** DeepSeek 真跑 | ✅ 已闭合 | 真实 key 已注入 `ib-web.env` + `ib-worker.env`（0600/属主对齐），`/healthz/deps` `llm.ok=true`（`model=deepseek-chat`），见 §8 |
 | **B13** SSE 长连接容量 | ⏸ 延后 | `[TBD-T15]` 复核前按保守 worker 数 + SSE 超时配置 |
 | **B14** 日志纪律抽查 | ⏸ 待做 | no-body / no-credential 抽查 |
 
@@ -178,3 +178,27 @@ total=18 passed=16 failed=2
 **部署动作**：目标机 `git pull origin main`（`81feff7..be3f45a` fast-forward）→ `systemctl restart ib-web`（D-6 仅改 web 视图，无需重启 worker/embed）→ 复验 → 清理。
 
 > 至此部署报告中的「已修未验」项全部闭合；无未执行步骤。
+
+---
+
+## 8. 「智能体框架通用化」整批部署（be3f45a..0e54b03）+ B7 闭合
+
+**部署时间**：2026-10-05。**交付 commit**：`0e54b03`（fast-forward，10 个 commit）。
+
+本轮把 R7/R8 的「智能体框架通用化」整批特性（定义文档数据层、可视化配置 UI、G2 handoff、
+流式/会话生命周期）部署到目标机 `192.168.31.133`，并闭合 B7（DeepSeek 真跑）。
+
+| 步骤 | 结果 |
+|------|------|
+| 代码同步 | ✅ `git merge --ff-only origin/main` → `HEAD=0e54b03`，工作树干净（清除了陈旧未跟踪 `src/frontend/package-lock.json`） |
+| 前端重建 | ✅ `npm ci`（66 包）+ `npm run build`（vue-tsc + vite，`index-X_8sN3HV.js` 254KB） |
+| dist 上线 | ✅ 部署至 nginx root `/var/www/intelligentbase/`（`server_name 192.168.31.133`），本机外网 HTTP 200 |
+| 服务重启 | ✅ `ib-web` / `ib-worker` / `ib-embed` 重启，全部 active+enabled |
+| 健康检查 | ✅ `/healthz` 200；qdrant ok、embed ok（bge-m3 `model_loaded=true` dim=1024） |
+| 新增路由 | ✅ `/api/chat/resume`、`/api/config/definition`、`/api/rebuild/activate`、`/api/rebuild/rollback` 均已注册（无 token → 401） |
+| 鉴权冒烟 | ✅ `GET /api/config/definition` 200（定义文档数据层生效）；`GET /api/files?page_size=5` 200 |
+| **B7 闭合** | ✅ 真实 key 注入 `ib-web.env` + `ib-worker.env`（0600/属主对齐），`/healthz/deps` `llm.ok=true`（`model=deepseek-chat`，latency 3387ms） |
+
+> 本轮无 schema 迁移、无新增 env 键（`env.example` 仅 `@author` 注释变更）；新配置键
+> `IB_DEFINITION_DOC_PATH` / `IB_VISUAL_CONFIG_ENABLED` / `IB_CONFIRMATION_GATE_ENABLED` 均可选且带安全默认
+> （定义文档未配置时为内存默认 + WARN），故目标机无需 env/schema 变更即安全启动。
