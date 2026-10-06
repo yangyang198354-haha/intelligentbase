@@ -226,8 +226,12 @@ class SqliteAccountStore:
                 isolation_level=None,
                 timeout=self._busy_timeout_ms / 1000.0,
             )
+        # 连接级 PRAGMA（每条新连接都要设置一次）：busy_timeout / synchronous / foreign_keys。
+        # 刻意**不**在此处执行 `PRAGMA journal_mode=WAL`：它是数据库级持久设置，已在
+        # `ensure_schema`（`schema.PRAGMA_DB_LEVEL`）初始化时落地一次；每条新连接重跑
+        # 会冗余地去抢排它锁（与台账同源的问题，见部署报告）。
         connection.execute(f"PRAGMA busy_timeout={self._busy_timeout_ms}")
-        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("PRAGMA synchronous=NORMAL")
         connection.execute("PRAGMA foreign_keys=ON")
         return connection
 

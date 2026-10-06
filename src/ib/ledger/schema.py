@@ -28,16 +28,25 @@ from __future__ import annotations
 # PRAGMA
 # --------------------------------------------------------------------------- #
 
-#: 连接级 PRAGMA（每次开连接都必须执行 —— `busy_timeout` 与 `foreign_keys` 是**连接级**的）。
-PRAGMA_ON_CONNECT = (
+#: 数据库级 PRAGMA（持久化在 DB 文件头、全库共享 —— 只需在库初始化时执行一次）。
+#: `journal_mode=WAL` 是**数据库级**而非连接级：一旦 DB 已切到 WAL，每条新连接自动继承，
+#: 重跑只会冗余地去抢排它锁（这正是「worker 首请求 30~90s 阻塞」的根因，见部署报告）。
+PRAGMA_DB_LEVEL = (
     "PRAGMA journal_mode=WAL",
+)
+
+#: 连接级 PRAGMA（每条新连接都必须执行 —— `synchronous` / `busy_timeout` / `foreign_keys`
+#: 都是**连接级**的，新连接不继承）。
+PRAGMA_ON_CONNECT = (
     "PRAGMA synchronous=NORMAL",
     "PRAGMA busy_timeout=5000",
     "PRAGMA foreign_keys=ON",
 )
 
-#: 每个新连接都会执行的初始化语句（含连接级 PRAGMA）。
-PRAGMA_STATEMENTS = PRAGMA_ON_CONNECT
+#: `ensure_schema` 建表时执行的语句：数据库级 PRAGMA（一次）+ 连接级 PRAGMA + DDL。
+#: `ensure_schema` 由 ibweb 在启动期调用一次，故 `journal_mode` 只在这里落地一次，
+#: 不再每条新连接重跑。
+PRAGMA_STATEMENTS = PRAGMA_DB_LEVEL + PRAGMA_ON_CONNECT
 
 # --------------------------------------------------------------------------- #
 # DDL（幂等）
