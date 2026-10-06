@@ -6,16 +6,16 @@
 | 文档 ID | DOC-IB-DP-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 生产部署计划 |
 | 产出代理 | devops-engineer (author_agent) |
-| 调用 ID | INV-GROUP_E-INTELBASE-004（REV-13 增量；前序 INV-GROUP_E-INTELBASE-002 / -003） |
+| 调用 ID | INV-GROUP_E-INTELBASE-005（**REV-14 增量**；前序 -004 / -002 / -003） |
 | 项目 | intelligentbase |
 | 阶段 | GROUP_E / **PHASE_10（部署计划，仅计划）**；PHASE_11（实际部署）**PENDING，禁止执行** |
-| revision | **REV-13**（认证 / 会话 / 多项目运维账户 / Claude 风格可商用前端 / HTTPS 增量） |
-| 版本 | **1.2.0**（REV-13 增量；在 1.1.0/R4 之上追加 R13 部署面，见 §13） |
-| status | **REVISED_PENDING_REVIEW**（REV-13 修订；GR-E-001 对 R4 前版本有效、GR-E-002 对 1.1.0 有效，本次待 PM 重新门控） |
+| revision | **REV-14**（R13 回归缺陷修复：全局管理员「当前项目」选择与 `X-IB-Project` 传播；前端产物替换 + 后端新端点，**无迁移**） |
+| 版本 | **1.3.0**（REV-14 增量；在 1.2.0/REV-13 之上追加 R14 部署面，见 §14） |
+| status | **APPROVED**（1.3.0/REV-14 经 **GR-E-005 = PASS_WITH_CONDITIONS** 门控通过，仅计划层；GR-E-001 对 R4 前版本有效、GR-E-002 对 1.1.0 有效、GR-E-003 对 1.1.1/R10 有效、GR-E-004 对 1.2.0/REV-13 有效）。**PHASE_11 实际部署仍 PENDING/冻结**，须用户明确 `PRODUCTION_DEPLOY_CONFIRM=true` |
 | 创建日期 | 2026-09-26 |
-| 更新日期 | 2026-10-06（REV-13 增量） |
+| 更新日期 | 2026-10-06（REV-14 增量） |
 | 目标机 | `192.168.31.133`（Ubuntu 26.04 LTS / x86_64 / i7-3770S 4C8T / 11 GiB / 78 GiB 可用 / GTX 960 弃用） |
-| 上游输入 | `docs/architecture_design.md`(**1.5.0/REV-13**)、`docs/module_design.md`(**1.5.0/REV-13**)、`docs/tech_stack.md`(**1.4.0/REV-13**)、`docs/ib_embed_service_contract.md`(1.0.0/R2)、`docs/implementation_plan.md`(**2.7.0/REV-13**)、`docs/test_plan.md`(**1.8.0/R13**)、`docs/test_report.md`(**1.9.0/R13**)、`docs/code_review_report.md`、`src/deploy/**`（含 **`migrations/003_accounts.sql`**、**`nginx/intelligentbase.conf.example`**）、`src/requirements*.txt`（含 **`bcrypt>=4,<5`**）（均**只读**） |
+| 上游输入 | `docs/architecture_design.md`(**1.6.0/REV-14**，ADR-28 + §2.0.5)、`docs/module_design.md`(**1.6.0/REV-14**，IFC-IB-333~336)、`docs/tech_stack.md`(**1.4.0/REV-13**，**NO_CHANGE**)、`docs/ib_embed_service_contract.md`(1.0.0/R2)、`docs/implementation_plan.md`(**2.9.0/R14**)、`docs/test_plan.md`(**1.9.0/R14**)、`docs/test_report.md`(**1.10.0/R14**，§19)、`docs/code_review_report.md`、`docs/phase_status.md`（GR-B-007 / GR-C-010 / GR-D-011）、`docs/rev14_project_context_apply_package.md`、`src/deploy/**`（含 **`migrations/003_accounts.sql`**、**`nginx/intelligentbase.conf.example`**）、`src/requirements*.txt`（含 **`bcrypt>=4,<5`**）、`src/ibweb/{views,urls}.py`、`src/frontend/**`（均**只读**） |
 | 凭据纪律 | 本文件**不含任何真实凭据 / 口令 / 令牌**；凡涉及凭据一律写「经环境变量 / EnvironmentFile 注入」；目标机 SSH 口令**不记录** |
 | 执行门控 | 任何目标机写操作（SSH 写 / rsync / scp / apt / pip / systemctl / 服务启动）**在收到 PM 的 `PRODUCTION_DEPLOY_CONFIRM=true` 之前一律禁止**；本轮为纯文档产出，**未连接、未触碰目标机** |
 
@@ -23,7 +23,13 @@
 >
 > **本轮纪律**：本计划**不执行任何步骤**。所有命令均为**待 PM 确认后**由执行人（或 PHASE_11 的部署代理）在目标机上执行的**计划内容**，不是已执行记录。
 
-> **REV-13 增量声明（本轮，INV-GROUP_E-INTELBASE-004）**：本文件为 **PHASE_10 计划层增量**——**仅更新计划**。**未连接、未触碰目标机 `192.168.31.133`**；**未执行任何 SSH / 写操作 / `git clone` / `apt` / `pip` / `systemctl` / `nginx` 写 / 文件上传**；**未 commit / push**；**未改 `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md`**；**未触发 PHASE_11**（本代理**未**、也**不得**自赋 `PRODUCTION_DEPLOY_CONFIRM`）。R13 增量内容见 **§13**，**所有命令须 PM CONFIRM 后执行**。
+> **REV-13 增量声明（前轮，INV-GROUP_E-INTELBASE-004）**：本文件为 **PHASE_10 计划层增量**——**仅更新计划**。**未连接、未触碰目标机 `192.168.31.133`**；**未执行任何 SSH / 写操作 / `git clone` / `apt` / `pip` / `systemctl` / `nginx` 写 / 文件上传**；**未 commit / push**；**未改 `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md`**；**未触发 PHASE_11**（本代理**未**、也**不得**自赋 `PRODUCTION_DEPLOY_CONFIRM`）。R13 增量内容见 **§13**，**所有命令须 PM CONFIRM 后执行**。
+
+> **REV-14 增量声明（本轮，INV-GROUP_E-INTELBASE-005）**：本文件为 **PHASE_10 计划层增量**——**仅更新计划，未执行任何部署**。**未连接、未触碰目标机 `192.168.31.133`**；**未执行任何 SSH / 写操作 / 连接 / 安装 / 服务启停 / `nginx` 写 / 文件上传**；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改 `src/**` 实现代码 / `tests/**` / 设计真源四文档（`architecture_design.md` / `module_design.md` / `tech_stack.md` / `requirements_spec.md`）/ `user_stories.md` / `docs/phase_status.md` / `docs/test_*.md`**；**未触发 PHASE_11**；**未收到、也未自赋 `PRODUCTION_DEPLOY_CONFIRM`**（本轮 `special_instructions` 明确「无 PRODUCTION_DEPLOY_CONFIRM；PHASE_11 保持冻结」）。R14 增量内容见 **§14**，**所有命令须 PM CONFIRM 后执行**。
+>
+> **R14 变更面（一句话）**：后端**新增 `GET /api/projects`**（`views.py` + `urls.py`，**无 schema 变更 / 无 DB 迁移**）+ 前端 `projectContext` store 与 `client.ts` 单点注入 `X-IB-Project`（**需前端重建 + 发布新 `dist/`**）——**无新第三方依赖（`tech_stack.md` NO_CHANGE）、无新 env 键、无 unit / nginx 站点改动**。故 R14 部署面 = **`git pull` → `npm ci && npm run build` → 发布新 `dist/` → 重启 `ib-web`**（见 §14.3），**风险面最小、回滚无数据迁移**（见 §14.4）。
+>
+> **R14 门控前置备注（如实登记，待 PM 归口）**：本轮读取时，`docs/phase_status.md`（权威控制文档）记载 **GROUP_B = APPROVED（GR-B-007 PASS_WITH_CONDITIONS）**、**GROUP_C = APPROVED（GR-C-010）**、**GROUP_D = APPROVED（GR-D-011）**，三者对 REV-14 增量均为 PASS_WITH_CONDITIONS；设计真源 `architecture_design.md` / `module_design.md` 已落盘 **1.6.0/REV-14**（`tech_stack.md` NO_CHANGE 保持 1.4.0/REV-13）。**测试基线以此为准 = Python 245/245（unit 95 / integration 129 / e2e 21）+ 前端冒烟 21/21 + `selfcheck.py` 47/47**（`test_report.md` 1.10.0 §19；其 `file_header.status` 对 §19 的逐节 APPROVED 标注略滞后于 phase_status 的 GR-D-011，登记为**同源不同步**的 P1 待澄清项，**不阻塞计划层**——`tests/**` 属 test-engineer 制品，本代理不改）。**CRED-01**（未提交工作包不得原样提交）自 GR-B-007 起连续结转，见 §14.6。
 >
 > **门控前置备注（如实登记，待 PM 归口）**：本轮读取时，设计真源文件头 `status` 实测为 **`DRAFT_FOR_GATE_REVIEW`**（`architecture_design.md` 1.5.0/REV-13、`tech_stack.md` 1.4.0/REV-13）；而 `docs/phase_status.md`（权威控制文档）记载 **GROUP_B = APPROVED（GR-B-006）**、**GROUP_C = APPROVED（GR-C-009）**、**GROUP_D = APPROVED（GR-D-010，condition_1「DEFECT-R13-01 已修复并独立复跑闭合」）**。本代理据 phase_status 的**组级 APPROVED** 推进**计划层**；**文件头 status 一致性**登记为本轮 **P1 待澄清项**（不阻塞计划层，但 PHASE_11 执行前须由 PM 归口）。另：`test_report.md` §18 文件副本仍记 **238 pass / 1 fail**（DEFECT-R13-01），与 phase_status 的「已闭合」为**同源不同步**（tests/** 属 test-engineer 制品，本代理不改）——**测试基线以 phase_status 的闭合结论为准 = 239/239**。
 
@@ -573,8 +579,9 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 | **DEPLOY-009** | nginx 站点（`/etc/nginx/sites-available/intelligentbase`：静态 `dist/` 托管 + `/api`、`/healthz` 反代 `127.0.0.1:18080` + **SSE `proxy_buffering off`**，见 §7.5）+ 静态产物 `dist/` 就位 | **ROLLBACK-009** | 回滚 = 恢复**上一版**站点文件（离线备份）→ **`nginx -t` 必须通过** → `systemctl reload nginx`；恢复上一版 `dist/`。**回滚同样须 `nginx -t` 通过后方可 `reload`**（不得带语法错误重载，否则对外服务直接不可用） |
 | **DEPLOY-010** | 部署后验证（§11） + DeepSeek smoke（§9） | **ROLLBACK-010** | 若冒烟失败 → 按 §10.2 决策树整体回滚 |
 | **DEPLOY-011 ~ 016** | **REV-13 增量步骤**（bcrypt 依赖 / 003 迁移 / R13 环境变量 / 默认管理员播种 / nginx HTTPS / 令牌纪律校验）—— 正向定义见 **§13.6** | **ROLLBACK-011 ~ 016** | **R13 逆操作**（详见 **§13.7**；逆序执行，含 `[MANUAL_ROLLBACK_REQUIRED]` 项） |
+| **DEPLOY-017 ~ 021** | **REV-14 增量步骤**（`git pull` / 前端重建 `npm ci && npm run build` / 发布新 `dist/` / 重启 `ib-web` / 部署后验证）—— 正向定义见 **§14.3**。**无 DB 迁移、无新依赖、无新 env 键、无 unit 或站点改动** | **ROLLBACK-017 ~ 021** | **R14 逆操作**（详见 **§14.4**；逆序执行，**不涉数据迁移**，无 `[MANUAL_ROLLBACK_REQUIRED]` 项） |
 
-> **逆序纪律**：一旦某步失败，**立即停止后续步骤**，从该步向 DEPLOY-001 **逆序**回滚，并记录每一步结果。**R13 步骤（DEPLOY-011~016）同样适用**：失败即从该步逆序回滚（先 ROLLBACK-016 → … → ROLLBACK-011），**不跳步**。
+> **逆序纪律**：一旦某步失败，**立即停止后续步骤**，从该步向 DEPLOY-001 **逆序**回滚，并记录每一步结果。**R13 步骤（DEPLOY-011~016）同样适用**：失败即从该步逆序回滚（先 ROLLBACK-016 → … → ROLLBACK-011），**不跳步**。**R14 步骤（DEPLOY-017~021）同样适用**：失败即从该步逆序回滚（先 ROLLBACK-021 → … → ROLLBACK-017），**不跳步**；因 R14 **零迁移**，其回滚**不涉数据迁移**（见 §14.4）。
 
 ### 10.2 按变更类型的回滚动作
 
@@ -852,6 +859,161 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 
 ---
 
+## 14. REV-14 增量：全局管理员「当前项目」选择与 `X-IB-Project` 传播（前端产物替换 + 后端新端点，**无迁移**）
+
+> **本节为 REV-14 增量（INV-GROUP_E-INTELBASE-005），仅计划** —— **未连接、未触碰目标机 `192.168.31.133`**；**所有命令须 PM CONFIRM 后执行**。
+> 依据：`architecture_design.md` **1.6.0/REV-14**（**ADR-28** 项目上下文的选择与传播 + §2.0.5 R14 影响复核表）/ `module_design.md` **1.6.0/REV-14**（**IFC-IB-333~336**）/ `tech_stack.md` **1.4.0/REV-13（NO_CHANGE）** / `implementation_plan.md` **2.9.0/R14** / `test_report.md` **1.10.0/R14** §19 / `docs/phase_status.md`（GR-B-007 / GR-C-010 / GR-D-011 均 PASS_WITH_CONDITIONS）/ `src/ibweb/{views,urls}.py`、`src/frontend/**`（均**只读**）。
+
+### 14.1 R14 交付物清单
+
+| 交付物 | 路径 | 性质 / 交付方式 |
+|--------|------|-----------------|
+| 后端项目枚举端点 | `src/ibweb/views.py`（新增 `projects_endpoint`，IFC-IB-333）、`src/ibweb/urls.py`（新增 `GET /api/projects` 路由） | 代码（**`git pull`** 交付；**无 schema 变更、无 DB 迁移**） |
+| 前端项目上下文 store | `src/frontend/src/stores/project.ts`（新增，IFC-IB-335） | 代码（`git pull` 交付） |
+| 前端单点注入 + 接线 | `src/frontend/src/api/client.ts`、`src/frontend/src/app/env.ts`、`src/frontend/src/layouts/ConsoleLayout.vue`、`src/frontend/src/main.ts`（IFC-IB-336） | 代码（`git pull` 交付） |
+| 前端构建产物 | `src/frontend/dist/`（**不入 git**，`npm run build` 产出） | **构建产物**（目标机构建后发布到 nginx 静态根） |
+| 离线自检增量 | `src/scripts/selfcheck.py`（R14 两条用例，总计 **47/47**） | 代码 / CI 内跑（**不属部署动作**） |
+| 测试增量 | `tests/integration/test_project_context_int_r14.py`、`src/frontend/tests/frontend.smoke.test.js` | 测试（**不属部署动作**，CI 内跑） |
+
+### 14.2 变更类型判定（**关键**）
+
+| 维度 | 判定 | 依据 |
+|------|------|------|
+| **DB / schema 迁移** | **无** | 项目列表数据源 = 组合根 `Deps.projects`（`IB_CONFIG_FILE` 的 `projects.<project_id>` 经 `_seed_projects` 装配）——**不新增表、不经 ORM、无 DDL**（ADR-28 / IFC-IB-333）。R13 的 `003_accounts.sql` **不涉及**，**不新增迁移脚本**。 |
+| **新第三方依赖** | **无** | `tech_stack.md` **NO_CHANGE**（1.4.0/REV-13）：项目枚举走既有 Django + DRF；前端 store 沿用既有 `vue` 模块级 `reactive`（**不引 Pinia**）；SSE 沿用既有 `fetch` 读流。`package.json` / `package-lock.json` **零改动** → **无需 `npm install` 新增依赖**，仅需既有 `npm ci` + `npm run build`。 |
+| **新环境变量键** | **无** | `IB-*` 键名**无新增**；`X-IB-Project` 是**请求头**、**非配置键、非凭据**。R13 的 9 键保持不动。 |
+| **systemd 单元 / nginx 站点** | **无改动** | 四自研 unit 与 nginx 站点（C-02 / §7.5.1）**逐字不变**；`GET /api/projects` 由既有 `location /api/` 反代覆盖，**无需改站点**。 |
+| **后端进程形态** | **仅滚动重启 `ib-web`** | 新增端点属 `ib-web`（Waitress）承载；`ib-worker` / `ib-embed` / `qdrant` **代码路径未变 → 无需重启**（见 §14.3 DEPLOY-020 理由）。 |
+| **前端** | **重建 + 替换 `dist/` 静态产物** | 前端源码改动须 `npm ci && npm run build` 产新 `dist/`，由 nginx（§7.5 / C-02）托管。 |
+| **交付方式** | **仅 `git pull`** | 冻结决策 ⑧；**禁 scp / pscp / rsync**。前端 `dist/` 由**目标机构建**产出（无跨机传输产物），与既有部署记录一致（`deployment_report.md` §8/§10：目标机 `npm ci` + `npm run build` → `/var/www/intelligentbase/`）。 |
+
+> **一句话**：纯代码增量（后端新端点 + 前端改动）——**无迁移、无新依赖、无新 env 键、无 unit / 站点改动**；**风险面 ≈ 「替换 `dist/` + 重启 `ib-web`」**。
+
+### 14.3 正向部署步骤（DEPLOY-017 ~ DEPLOY-021）
+
+> 前置：DEPLOY-001~016 已按 §10.1 / §13.6 完成且全绿。**每步失败即从该步逆序回滚**（§14.4）。**不在本轮执行**——须 PM 的 `PRODUCTION_DEPLOY_CONFIRM=true`。
+
+---
+**DEPLOY-017: 代码交付（`git pull` 到含 R14 的 commit）**
+- **组件**：全部（后端 + 前端源码）
+- **操作**：`cd /opt/intelligentbase && sudo git fetch --prune origin && sudo git checkout main && sudo git pull --ff-only`；随后 `git -C /opt/intelligentbase rev-parse HEAD` 核对 commit。
+- **预期结果**：`HEAD` == 预期 R14 commit（可追溯，§8）；`git status` 工作树干净。
+- **对应回滚**：ROLLBACK-017
+- **备注**：**仅 `git pull`**——禁 scp / pscp / rsync（冻结决策 ⑧）。`dist/` 不入 git（`.gitignore`），故 pull 不含前端产物。
+
+---
+**DEPLOY-018: 前端重建（`npm ci` + `npm run build`）**
+- **组件**：前端（MOD-IB-24）
+- **操作**：`cd /opt/intelligentbase/src/frontend && npm ci && npm run build`（`build` = `vue-tsc --noEmit && vite build`）。
+- **预期结果**：`vue-tsc` **零错**；`vite build` 成功；`src/frontend/dist/index.html` + `dist/assets/*` 产出。
+- **对应回滚**：ROLLBACK-018
+- **备注**：`package.json` / `package-lock.json` **零改动** → `npm ci` 仅按既有锁复现，**不新增依赖**（与 R10 的 `EUSAGE` 教训对齐：锁须同步，本增量未动锁）。
+
+---
+**DEPLOY-019: 发布新 `dist/` 到 nginx 静态根（原子目录替换）**
+- **组件**：系统 nginx 静态根（C-02；`/var/www/intelligentbase/`）
+- **操作**（**本机文件操作，非跨机传输**；须 PM CONFIRM 后执行）：
+  ```bash
+  # 先备份旧产物，再原子替换（避免残留旧哈希资源 → 白屏）
+  sudo rm -rf /var/www/intelligentbase.prev && sudo mv /var/www/intelligentbase /var/www/intelligentbase.prev
+  sudo install -d -o www-data -g www-data /var/www/intelligentbase
+  sudo cp -a /opt/intelligentbase/src/frontend/dist/. /var/www/intelligentbase/
+  ```
+- **预期结果**：`/var/www/intelligentbase/index.html` 与 `assets/` 为新构建；旧产物留存于 `/var/www/intelligentbase.prev`（回滚用）。
+- **对应回滚**：ROLLBACK-019
+- **备注**：**不用 rsync / scp**（冻结决策 ⑧）——构建在目标机进行，产物**本机发布**；站点文件未改，故**不涉 `nginx -t`**（若同批动了站点则须先 `nginx -t`，见 D-2）。
+
+---
+**DEPLOY-020: 后端滚动重启 `ib-web.service`（Waitress）**
+- **组件**：`ib-web`（MOD-IB-23；承载 `GET /api/projects`）
+- **操作**：`sudo systemctl restart ib-web`；随后 `systemctl is-active ib-web` 与 `journalctl -u ib-web -n 30 --no-pager` 抽查启动日志。
+- **预期结果**：`ib-web` **active**；启动日志含 `Serving on http://127.0.0.1:18080`、**无鉴权 / 装配报错**；`GET /healthz` = 200。
+- **对应回滚**：ROLLBACK-020
+- **备注**：**不重启 `ib-worker` / `ib-embed` / `qdrant`**——理由：① 本增量**未改**这三者的代码路径（`views.py` 属 `ib-web`；`ib-worker` 未改；`ib_embed` / Qdrant 未改）；② `ib-web.service` 对 `qdrant` / `ib-embed` 为 `After=` + `Wants=`（**非 `Requires`**），重启 `ib-web` 不影响下游；③ `GET /api/projects` 数据源 `Deps.projects` 在 `ib-web` 进程内装配，与 `ib-worker` / `ib-embed` 无关。**除非** PM 同时批准 R14 以外的变更，否则**不扩大重启面**（最小影响原则）。
+
+---
+**DEPLOY-021: 部署后验证（§14.5 全部条目）**
+- **组件**：端到端（HTTP / SSE / 前端）
+- **操作**：逐条执行 §14.5 验证清单（含 admin 选项目后 `GET /api/config/definition` 由 **503 转 200** 的**直接验收**）。
+- **预期结果**：§14.5 全部条目标注 SUCCESS。
+- **对应回滚**：ROLLBACK-021（验证失败 → 按 §14.4 逆序回滚）
+- **备注**：验证须**离线可判**（curl / 服务端读取，不依赖浏览器 UI 手测）。
+
+---
+
+### 14.4 回滚步骤（ROLLBACK-017 ~ ROLLBACK-021；**逆序执行**）
+
+> **逆序**：最后一个部署的组件最先回滚（021 → 020 → … → 017）。**本增量无 DB 迁移 → 回滚不涉数据迁移**（不丢数据、不需 `DROP TABLE` / 台账快照恢复）。
+
+---
+**ROLLBACK-021: 撤销验证（逆 DEPLOY-021）**
+- **回滚操作**：**无独立副作用**——随 ROLLBACK-017~020 一并回退（代码 / 产物 / 重启）。若验证暴露的是前端产物问题，优先走 ROLLBACK-019。
+- **预期结果**：系统回到上一版行为。
+
+---
+**ROLLBACK-020: 回退 `ib-web` 至上一版（逆 DEPLOY-020）**
+- **回滚操作**：`git checkout <上一版已部署 commit>`（见 ROLLBACK-017）后 `sudo systemctl restart ib-web`。
+- **预期结果**：`ib-web` active 且运行**上一版代码**；`GET /api/projects` 在旧代码下返回 **404**（端点不存在，旧行为）。
+- **备注**：与 ROLLBACK-017 联动（先回代码再重启）。
+
+---
+**ROLLBACK-019: 恢复上一版 `dist/`（逆 DEPLOY-019）**
+- **回滚操作**：
+  ```bash
+  sudo rm -rf /var/www/intelligentbase && sudo mv /var/www/intelligentbase.prev /var/www/intelligentbase
+  ```
+- **预期结果**：nginx 静态根回到上一版产物；`/` 返回上一版 `index.html` 与哈希资源（**资源与 `index.html` 同版，不白屏**）。
+- **备注**：**不动 nginx 站点文件**（本增量未改站点）→ **无需 `nginx -t` / `reload`**。
+
+---
+**ROLLBACK-018: 丢弃新构建产物（逆 DEPLOY-018）**
+- **回滚操作**：`rm -rf /opt/intelligentbase/src/frontend/dist`（构建产物，可重生成）；代码回滚见 ROLLBACK-017。
+- **预期结果**：无遗留新产物；再次部署时可重新构建。
+
+---
+**ROLLBACK-017: 代码回退到上一版已部署 commit（逆 DEPLOY-017）**
+- **回滚操作**：`cd /opt/intelligentbase && sudo git checkout <上一版已部署 commit>`（例如 R13 的 `9e75c61`）→ `sudo systemctl restart ib-web`。
+- **预期结果**：`git rev-parse HEAD` == 上一版 commit；`ib-web` 运行旧代码；既有认证契约（改密态 / 角色 / `?token=` 4xx / 零 `Set-Cookie`）**不受影响**。
+- **备注**：**无迁移** ⇒ 旧代码可**直接**启动（R14 未新增表 / 列，回退无残留 DDL 依赖）；`X-IB-Project` 头在旧代码下被忽略（旧前端也不发头）。
+
+---
+> **回滚数据安全结论**：R14 **零 DB / schema 变更**（§14.2）——回滚仅涉及「代码 + 静态产物 + 重启」，**不触碰台账 SQLite、Qdrant collection、Blob 目录、EnvironmentFile**，**无数据丢失风险**，**无需离线快照**（对照 §13.7 的 `[MANUAL_ROLLBACK_REQUIRED]`——R14 无此类项）。
+
+### 14.5 部署后验证清单（V14-1 ~ V14-9；**实测口径**）
+
+> 全部为**离线可判**（curl / 服务端读取）；`<host>` 与 `<令牌>` 由执行人注入（令牌**不回显、不入日志**，checklists B14）。
+
+| # | 检查项 | 检查方法（命令 / URL） | 成功标准 |
+|---|--------|----------------------|----------|
+| **V14-1** | **端点已注册** | `curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer <令牌>" https://<host>/api/projects` | **200**（未认证 → 401；`?token=` → 4xx） |
+| **V14-2** | **admin 见全部项目** | 以 **admin** 令牌 `GET /api/projects` | `items` = **全部已登记项目**；未选定当前项目时全部 `is_current=false` |
+| **V14-3** | **ops 仅见自身** | 以 **ops** 令牌 `GET /api/projects` | `items` **长度恒为 1** 且 = 该 ops 绑定项目（`is_current=true`）；**不枚举他项目** |
+| **V14-4** | **回归修复直接验收**（核心） | ① admin **无头** `GET /api/config/definition` → 记基线；② admin 带 `X-IB-Project: <项目>` 再 `GET /api/config/definition` | ① **503**（fail-closed）；② **200**（**503 → 200**，R13 回归缺陷修复的**直接证据**） |
+| **V14-5** | **ops 跨项目被拒** | ops 令牌带 `X-IB-Project: <非自身项目>` `GET /api/config/definition` | **403 `project_mismatch`** |
+| **V14-6** | **未选项目仍 fail-closed（实测口径，逐端点陈述）** | admin **无头**分别请求：`/api/config/definition`、`/api/files`（GET）、`/api/chat/stream?q=…&session_id=…`、`/api/rebuild` | **实测**：`/api/config/definition` = **503**；`/api/files` GET = **200 且 `items` 为空**（零匹配，无数据泄露）；`/api/chat/stream` 与 `/api/rebuild` = **500**（R13 既有行为，见 R14-OBS-02）。**共同判据 = 不返回任何项目的业务数据**（**不得**笼统写成「全部 503」） |
+| **V14-7** | **前端随 SSE 携带 `X-IB-Project`** | 浏览器抓包 / 前端行为用例：admin 选定项目后发起 `GET /api/chat/stream`（SSE，`fetch` 读流） | SSE 请求头含 `X-IB-Project: <当前项目>`（`chatStream` / `chatResume` 同经 `client.ts` 的 `headers()` 注入）；**不含 `?token=`**；响应 `Content-Type: text/event-stream` |
+| **V14-8** | **认证契约零破坏** | 登录 → `/api/auth/me`；各端点附 `?token=`；检查响应头 | 登录 200 且 **零 `Set-Cookie`**；`?token=` **全 4xx**；改密态仍 **403 `password_change_required`** |
+| **V14-9** | **前端可用（人工）** | 浏览器 `https://<host>/`：admin 登录 → 侧栏项目选择器出现 → 选项目 → 切至问答 / 文件 / 重建 / 可视化配置页 | 四类项目级页面可用；切换项目后**页面重挂载**（`<router-view :key>`，无旧项目串项显示）；ops 侧栏为**只读**项目标签、**无选择器** |
+
+> **口径纪律（重要）**：V14-6 必须以**实测口径**逐端点陈述（`503` / `200 空` / `500` 三种并存），**不得**笼统写「全部 503」——此系 `test_report.md` §19.5 **R14-OBS-02** 的正式更正：`/api/chat/stream` 与 `/api/rebuild` 返回 **500** 是 **R13 既有**行为（`error_response` 对 `IbError` 统一映射 500），R14 **未改**该路径；fail-closed 仍成立（不返回任何项目数据）。
+> **SSE 判据**：`EventSource` **不能**设自定义头，本项目既有实现已改用 `fetch` 读流，故 SSE 携带 `X-IB-Project` **可行**（ADR-28 / ADR-11）；`proxy_buffering off`（§7.5 / 硬门 **D-3**）仍为该链路的功能正确性硬条件。
+
+### 14.6 风险与前置（承前挂账，如实结转）
+
+| # | 项 | 状态 / 处置 |
+|---|----|-------------|
+| **R14-P0-1** | **CRED-01（未提交工作包）** | **未闭合，连续结转**（GR-B-007 → GR-C-010 → GR-D-011）。R14 改动集（13 modified + 2 untracked + `docs/rev14_project_context_apply_package.md`）**仍在工作区未提交**；**PHASE_11 部署的前置 = 先提交并 push**，且提交时**不得**把未跟踪的工作包（含 R13 的 `docs/rev13_auth_ui_apply_package.md`，其含口令字面量）**按原样纳入**。**本代理本轮未 commit / push / `git add`**（越权）。 |
+| **R14-P0-2** | **git remote 与目标机可达性（原 B-01~B-03）** | 既有部署（`deployment_report.md` §7/§8/§9/§10）已**实证** `git pull --ff-only` 与 `systemctl restart` 在目标机可用 → 原 §1.1 的 **B-01 / B-02 / B-03 在实务上已闭合**（本计划仍**保留其原始登记、不擅改**）。**前置**：R14 的 commit **须已 push 到目标机所拉取的 remote/main**，否则 `git pull` 拉不到 R14。 |
+| **R14-P0-3** | **目标机 Node / npm 可用性** | 既有部署（§8/§10）已在目标机执行 `npm ci && npm run build` 成功 → Node 可用。**前置**：PHASE_11 预检确认 `node -v` / `npm -v` 仍可用（若目标机环境变更则须先补装）。 |
+| **R14-P1-1** | **B-04 `FND-GROUP-D-03`（MAJOR，blob 孤儿）** | **未闭合**（`docs/phase_status.md` 建议阻塞 PHASE_11）。R14 **不涉及**该路径；但作为 PHASE_11 的**总前置**须由 PM 裁决（修复或书面接受风险），**不因 R14 而被掩盖**。 |
+| **R14-P1-2** | **B-05 / B-06（`ib-embed` 运行时三选一 / bge-m3 权重）** | **部分闭合 / 未闭合**（承前）。R14 **不涉及** embedding 链路；PHASE_11 的总前置不变。 |
+| **R14-P1-3** | **R14-OBS-01 / 02 / 03**（LOW） | 承 GROUP_D 登记：① `headers()` 的 `extra` 透传不变式**仅在 provider 非空时成立**（**无生产调用点触发**）；② 未选项目时部分端点 **500**（R13 既有，见 V14-6 口径）；③ 其余观测。**均非阻塞**，登记不修。 |
+| **R14-P1-4** | **R14 OPEN ITEM（需求侧缺口）** | 「项目选择 UX」与「`GET /api/projects`」**无独立 REQ / AC**（ADR-28 / `architecture_design.md` §10.1 R14 行 / `module_design.md` §9.8）——**登记不发明**，待 **GROUP_A** 裁决；**不阻塞部署**（可映射至 AC-IB-24-03 / AC-IB-24-02 / REQ-FUNC-IB-31 / REQ-FUNC-IB-23）。 |
+| **R14-P1-5** | **前端缓存与白屏** | 部署新 `index.html` 指向新哈希 `assets/*`；若旧 `index.html` 被缓存 + 旧哈希资源被删 → 白屏。**缓解**：§7.5.1 的 `location = /index.html { Cache-Control: no-store }` + `/assets/` 长缓存（既有站点已含，R14 不改）；ROLLBACK-019 的**整目录替换**（非增量拷贝）亦消除残留旧哈希。 |
+| **R14-P1-6** | **`X-IB-Project` 未知项目名** | 服务端对全局主体**不校验项目存在性**（`effective_project` 即为头值），项目级端点因此 fail-closed。**不阻塞**；V14-6 已覆盖（`p_ghost` → 项目级端点 503）。 |
+
+---
+
 ## 附：本轮的自我约束声明
 
 - 本文件为**计划**，**未执行任何目标机写操作**；**未连接** `192.168.31.133`；**未** SSH / rsync / scp / apt / pip / systemctl；**未触碰** `tests/`、`architecture/`、`requirements/`、`docs/phase_status.md`（PM 独占）、FreeArk 仓库（严格只读）。
@@ -859,7 +1021,8 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 - 所有命令均为**计划内容**，标注「须 PM CONFIRM 后执行」。
 - 全文**不含任何真实凭据 / 口令 / 令牌**；SSH 口令以「日后经环境变量注入」表述；主机指纹为**非 secret** 的 host key 校验值，按任务要求登记。
 - **PHASE_11（实际生产部署）保持 PENDING，禁止执行**，直至收到 PM 的 `PRODUCTION_DEPLOY_CONFIRM=true`（且建议先闭合 `FND-GROUP-D-03`）。
-- **REV-13 增量边界（本轮，INV-GROUP_E-INTELBASE-004）**：本代理**未连接、未触碰** `192.168.31.133`；**未执行**任何 SSH / 写操作 / 安装 / 服务启停 / `nginx` 写；**未 commit / push**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md`；**未触发 PHASE_11**（**未**自赋 `PRODUCTION_DEPLOY_CONFIRM`）。本节（§13）**只登记计划与回滚**，全部命令须 PM CONFIRM 后执行。
+- **REV-13 增量边界（前轮，INV-GROUP_E-INTELBASE-004）**：本代理**未连接、未触碰** `192.168.31.133`；**未执行**任何 SSH / 写操作 / 安装 / 服务启停 / `nginx` 写；**未 commit / push**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md`；**未触发 PHASE_11**（**未**自赋 `PRODUCTION_DEPLOY_CONFIRM`）。§13 **只登记计划与回滚**，全部命令须 PM CONFIRM 后执行。
+- **REV-14 增量边界（本轮，INV-GROUP_E-INTELBASE-005）**：本代理**未连接、未触碰** `192.168.31.133`；**未执行**任何 SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码（含 R14 交付物，全程只读）/ `tests/**` / 设计真源四文档 / `docs/phase_status.md` / `docs/test_*.md`；**未触发 PHASE_11**，且**本轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（本代理**未**、也**不得**自赋）。**本轮仅改两个文档**：本文件（`deployment_plan.md` 1.2.0 → **1.3.0/REV-14**）与 `docs/cicd_pipeline.md`（1.2.0 → **1.3.0/REV-14**），另同步 `.github/workflows/ci.yml` 的**注释基线标签**（239 → 245 / 123 → 129 / 13 → 21，纯注释、不改 step 逻辑）。§14 **只登记计划与回滚**，全部命令须 PM CONFIRM 后执行。
 
 ---
 
@@ -870,6 +1033,8 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 | 1.0.0 | PHASE_10 首版 | 2026-09-26 | INV-GROUP_E-INTELBASE-001 | 首版（GR-E-001 = PASS_WITH_CONDITIONS，**对该 R4 前版本有效**） | architecture / module_design / tech_stack / ib_embed 契约 / `src/deploy/**` |
 | 1.1.0 | GROUP_E / R4（REV-04-3） | 2026-09-26 | INV-GROUP_E-INTELBASE-002 | **C-02**：§7 改题 + 新增 §7.5 nginx（第 5 交付组件）；§10.1 DEPLOY-009 与 §10.2 补 nginx 行。**C-03**：§7.4 / §7.6 改用新增的 `ib-worker.env.example`。**C-04**：§7.1 / §3.2 / §3.5 统一 Qdrant 二进制路径。**C-05**：新增 §8.1 软链方案。**C-06**：§6.1 重写为有序决策树。**B-05**：§1.1 / §2.2 / §4.2 反映 `src/requirements-embed.txt`。§1.2 C-02~C-06 标状态；§11 / §12 更新；status → REVISED_PENDING_REVIEW | `settings.py` 无 `STATIC_ROOT`（已核验）；`vite.config.ts` 生产注释（反代 127.0.0.1:18080）；`ib-worker.service:42`；`qdrant.service:35`；`ib-embed.service`（WorkingDirectory/ExecStart）；`src/requirements-embed.txt` |
 | **1.2.0** | **GROUP_E / REV-13** | **2026-10-06** | **INV-GROUP_E-INTELBASE-004** | **REV-13 增量（认证 / 会话 / 多项目运维账户 / Claude 风格可商用前端 / HTTPS）**：① header 补 revision=REV-13、上游输入升 R13、新增「REV-13 增量声明 + 门控前置备注」；② 新增 **§1.3**（R13 部署前实测项 R13-D1~D5）；③ 新增 **§7.5.1**（HTTPS/TLS 终止站点，以 `src/deploy/nginx/intelligentbase.conf.example` 为准 + 8 项新增硬条件 + HSTS 纪律）；④ §10.1 补 DEPLOY-011~016 / ROLLBACK-011~016 行（明细见 §13）；⑤ 新增 **§13**「REV-13 增量部署面」（13.1 交付物 / 13.2 bcrypt+003 迁移 / 13.3 九键环境变量（0600 注入，含 `IB_DEFAULT_ADMIN_PASSWORD`）/ 13.4 nginx HTTPS / 13.5 令牌纪律 / 13.6 正向步骤 DEPLOY-011~016 / 13.7 回滚 ROLLBACK-011~016 / 13.8 验证 V13-1~12 / 13.9 风险 R13-R1~R6）；⑥ 附自检补 R13 边界；status → REVISED_PENDING_REVIEW | `architecture_design.md` 1.5.0/REV-13（ADR-18~27）；`module_design.md` 1.5.0/REV-13（IFC-IB-309~332）；`tech_stack.md` 1.4.0/REV-13（§1.4 / §2.2 / §4.5）；`test_report.md` 1.9.0/§18；`src/deploy/migrations/003_accounts.sql`；`src/deploy/nginx/intelligentbase.conf.example`；`src/deploy/env.example`（R13 键）；`src/deploy/checklists.txt` [B15]~[B20]；`src/requirements.txt`（`bcrypt>=4,<5`）；`docs/phase_status.md`（GR-B-006 / GR-C-009 / GR-D-010） |
+| **1.3.0** | **GROUP_E / REV-14** | **2026-10-06** | **INV-GROUP_E-INTELBASE-005** | **REV-14 增量（R13 回归缺陷修复：全局管理员「当前项目」选择与 `X-IB-Project` 传播）**：① header 补 revision=REV-14、版本 1.2.0→**1.3.0**、上游输入升 R14、新增「REV-14 增量声明 + R14 变更面 + 门控前置备注」；② §10.1 补 DEPLOY-017~021 / ROLLBACK-017~021 行 + 逆序纪律补 R14 句；③ 新增 **§14**「REV-14 增量部署面」（14.1 交付物 / **14.2 变更类型判定：无迁移·无新依赖·无新 env 键·无 unit/站点改动** / 14.3 正向步骤 DEPLOY-017~021（`git pull` → `npm ci && npm run build` → 发布新 `dist/` → 重启 `ib-web`，**不重启 `ib-worker`/`ib-embed`/`qdrant` 并给理由**）/ 14.4 回滚 ROLLBACK-017~021（逆序，**不涉数据迁移**）/ **14.5 验证 V14-1~9（含 admin 选项目后 `/api/config/definition` 503→200 直接验收；未选项目逐端点实测口径：config/definition 503 / files 200 空 / chat/stream 与 rebuild 500，不得笼统「全部 503」）** / 14.6 风险与前置（CRED-01 结转 + B-01~B-03 实务已闭合 + B-04/B-05/B-06 承前 + R14-OBS + OPEN ITEM））；④ 附自检补 R14 边界；status → REVISED_PENDING_REVIEW（待 GR-E-005） | `architecture_design.md` 1.6.0/REV-14（ADR-28 / §2.0.5）；`module_design.md` 1.6.0/REV-14（IFC-IB-333~336）；`tech_stack.md` 1.4.0/REV-13（NO_CHANGE）；`implementation_plan.md` 2.9.0/R14；`test_report.md` 1.10.0/R14 §19（Python 245 / 前端 21 / selfcheck 47）；`docs/phase_status.md`（GR-B-007 / GR-C-010 / GR-D-011）；`src/ibweb/{views,urls}.py`；`src/frontend/src/{stores/project.ts,api/client.ts,app/env.ts,layouts/ConsoleLayout.vue,main.ts}` |
 
 > 本修订为**纯文档 / 部署产物修订**：**未执行**任何部署步骤，**未连接、未触碰**目标机 `192.168.31.133`。
-> **1.2.0（REV-13）本轮边界**：**未连接、未触碰**目标机；**未 commit / push**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md`；**未触发 PHASE_11**。本轮**未改任何 `src/` 交付物**（R13 交付物由 GROUP_C 产出，本代理只读引用）。
+> **1.2.0（REV-13）本轮边界**：**未连接、未触碰**目标机；**未 commit / push**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md`；**未触发 PHASE_11**。R13 轮次**未改任何 `src/` 交付物**（R13 交付物由 GROUP_C 产出，本代理只读引用）。
+> **1.3.0（REV-14）本轮边界（INV-GROUP_E-INTELBASE-005）**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何 SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md` / `docs/test_*.md`；**未触发 PHASE_11**，**本轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（PHASE_11 保持冻结）。本轮**仅改两个文档**（`deployment_plan.md` / `cicd_pipeline.md`，均 1.2.0 → **1.3.0/REV-14**）+ 同步 `.github/workflows/ci.yml` 的**注释基线标签**（纯注释，不改 step 逻辑）。

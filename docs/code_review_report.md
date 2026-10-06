@@ -7,13 +7,13 @@
 | 文档 ID | DOC-IB-CR-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 开发者自我代码评审报告 |
 | 产出代理 | software-developer |
-| 调用 ID | INV-GROUP_C-INTELBASE-001（R1）／ INV-GROUP_C-INTELBASE-002（R2 增量）／ INV-GROUP_C-INTELBASE-003（R3 缺陷修复增量）／ INV-GROUP_C-INTELBASE-004（R4 缺陷修复 + 依赖补齐增量）／ INV-GROUP_C-INTELBASE-005（R7 定义外置 + 可视化配置增量）／ INV-GROUP_C-INTELBASE-007（R8 FND-R7-01 校验项补齐）／ INV-GROUP_C-INTELBASE-008（R10 前端构建阻断修复）／ INV-GROUP_C-INTELBASE-010（R11 IB-20 流式 / 会话增量，协调者轮次口径 REV-12）／ **INV-GROUP_C-INTELBASE-012（R13 账户 / 会话 / 商用界面重构增量，设计侧口径 REV-13）** ／ **INV-GROUP_C-INTELBASE-013（R13.1 回修增量：DEFECT-R13-01 来源 IP 维度登录限速修复）** |
+| 调用 ID | INV-GROUP_C-INTELBASE-001（R1）／ INV-GROUP_C-INTELBASE-002（R2 增量）／ INV-GROUP_C-INTELBASE-003（R3 缺陷修复增量）／ INV-GROUP_C-INTELBASE-004（R4 缺陷修复 + 依赖补齐增量）／ INV-GROUP_C-INTELBASE-005（R7 定义外置 + 可视化配置增量）／ INV-GROUP_C-INTELBASE-007（R8 FND-R7-01 校验项补齐）／ INV-GROUP_C-INTELBASE-008（R10 前端构建阻断修复）／ INV-GROUP_C-INTELBASE-010（R11 IB-20 流式 / 会话增量，协调者轮次口径 REV-12）／ **INV-GROUP_C-INTELBASE-012（R13 账户 / 会话 / 商用界面重构增量，设计侧口径 REV-13）** ／ **INV-GROUP_C-INTELBASE-013（R13.1 回修增量：DEFECT-R13-01 来源 IP 维度登录限速修复）** ／ **INV-GROUP_C-INTELBASE-014（R14 回归缺陷修复增量：全局管理员「当前项目」选择与 `X-IB-Project` 传播，设计侧口径 REV-14）** |
 | 项目 | intelligentbase |
 | 阶段 | PHASE_06b（自我代码评审） |
-| 版本 | **R13**（R1 主体 §1~§8 未改写；R2 增量见 **§9**；R3 增量见 **§10**；R4 增量见 **§11**；R7 增量见 **§12**；R8 增量见 **§13**；R10 增量见 **§14**；R11 增量见 **§15**；R13 增量见 **§16**；R13.1 回修增量见 **§17**） |
+| 版本 | **R13**（R1 主体 §1~§8 未改写；R2 增量见 **§9**；R3 增量见 **§10**；R4 增量见 **§11**；R7 增量见 **§12**；R8 增量见 **§13**；R10 增量见 **§14**；R11 增量见 **§15**；R13 增量见 **§16**；R13.1 回修增量见 **§17**；**R14 回归缺陷修复增量见 §18**） |
 | status | DRAFT（待 GROUP_D / PM 复核） |
-| 上游输入 | `docs/architecture_design.md`（**1.4.0 / R8**，GR-B-005 PASS_WITH_CONDITIONS）、`docs/module_design.md`（**1.4.0 / R8**）、`docs/tech_stack.md`（**1.3.1 / R10**，R8 设计轮次判 NO_CHANGE）、`docs/ib_embed_service_contract.md`（R2，权威契约）、`docs/test_report.md`（**1.7.0 / R11**，FND-R11-01 与「2 项未覆盖 + 4 项部分覆盖 AC」登记处）、`docs/user_stories.md`（**1.3.0 / R7**，US-IB-19 / US-IB-20）；**R10 触发输入** = PM 只读取证（`.github/workflows/ci.yml` 阶段9 `npm ci` 因锁不同步 EUSAGE）与 `src/frontend/package.json` / `package-lock.json` / `ConfigPage.vue` 现场（tech_stack 已随 R10 升至 1.3.1，见 §14）。**R13 触发输入** = `docs/module_design.md` **1.5.0/REV-13**（IFC-IB-309~332 / 第 15 个端口 / §2.2.4 段号索引）、`docs/architecture_design.md` **1.5.0/REV-13**（ADR-18~ADR-27）、`docs/tech_stack.md` **1.4.0/REV-13**（§1 三新行 / §1.4 客户端键登记 / §4.5 第 13~18 项）、`docs/requirements_spec.md` **1.4.0/REV-13**（REQ-FUNC-IB-28~36 / REQ-NFR-IB-15~18 / C-IB-09 / DR-09~DR-17）；上游门控 **GR-B-006 = PASS_WITH_CONDITIONS**（见 §16）；**R13.1 触发输入** = GROUP_D 门控 `condition_1` 登记的 **DEFECT-R13-01**（MEDIUM）/ `tests/integration/test_accounts_int_r13.py::TC-INT-119`（见 §17） |
-| 覆盖范围 | MOD-IB-01 ~ MOD-IB-26（**R2 追加 MOD-IB-26**；R1 覆盖 01~25）。**R3 重评 MOD-IB-13 与 MOD-IB-23**；**R4 只重评被触及的部分**：MOD-IB-12 与 MOD-IB-13，外加依赖面新增文件 `src/requirements-embed.txt`（B-05，非模块）；**R7 只重评被触及的部分**：MOD-IB-01（端口 13 → 14 + 结构）、MOD-IB-02（定义文档数据层）、MOD-IB-16（派生注入）、MOD-IB-23（装配期闸门 + 端点）、MOD-IB-24（可视化配置页）；**R8 只重评被触及的部分**：MOD-IB-02（`ib/config/definition.py::validate` 校验项补齐）；**R10 只重评被触及的部分**：MOD-IB-24（前端构建管线：锁同步 / 源文件跟踪 / 类型错误 / 冒烟入口）；**R11 只重评被触及的部分**：MOD-IB-01（R8 类型 / 枚举 / 常量）、MOD-IB-02（键名登记与值域 + `validate` 第 3 子项）、MOD-IB-16（`is_delegating` 消费侧话术）、MOD-IB-21（终态单发 / 可见性 / 确认事件 / 会话存储逐字段复制）、MOD-IB-22（确认门装配 / `resume` fail-closed / G2 单跳交接）、MOD-IB-23（`chat_stream` 显式 4xx + `POST /api/chat/resume`）、MOD-IB-24（确认区呈递 / 决策回传 / 会话标识纪律）；**R13 只重评被触及的部分**：MOD-IB-01（账户 / 会话 / 令牌契约 + 第 15 个端口 `AccountStore`）、MOD-IB-02（IFC-IB-312 键名登记）、MOD-IB-11（bcrypt / `SqliteAccountStore` / `MemoryAccountStore` / 幂等种子）、MOD-IB-23（账户 / 会话 / 账户 CRUD 端点 + `SessionTokenResolver` + 可注入策略 + 中间件扩展 + 装配 + 条件性限速审计）、MOD-IB-24（登录页 / 首登强制改密 / 控制台外壳 / 路由守卫 / 类型化客户端 / 主题 / 组件库本地打包）、MOD-IB-25（迁移 003 / nginx TLS 模板 / 键模板 / 检查清单 B15~B20 / `bcrypt` 依赖登记）；**R13.1 只重评被触及的部分**：MOD-IB-23（`Deps.login_throttle` 应用级装配 + 登录端点判定顺序） |
+| 上游输入 | `docs/architecture_design.md`（**1.4.0 / R8**，GR-B-005 PASS_WITH_CONDITIONS）、`docs/module_design.md`（**1.4.0 / R8**）、`docs/tech_stack.md`（**1.3.1 / R10**，R8 设计轮次判 NO_CHANGE）、`docs/ib_embed_service_contract.md`（R2，权威契约）、`docs/test_report.md`（**1.7.0 / R11**，FND-R11-01 与「2 项未覆盖 + 4 项部分覆盖 AC」登记处）、`docs/user_stories.md`（**1.3.0 / R7**，US-IB-19 / US-IB-20）；**R10 触发输入** = PM 只读取证（`.github/workflows/ci.yml` 阶段9 `npm ci` 因锁不同步 EUSAGE）与 `src/frontend/package.json` / `package-lock.json` / `ConfigPage.vue` 现场（tech_stack 已随 R10 升至 1.3.1，见 §14）。**R13 触发输入** = `docs/module_design.md` **1.5.0/REV-13**（IFC-IB-309~332 / 第 15 个端口 / §2.2.4 段号索引）、`docs/architecture_design.md` **1.5.0/REV-13**（ADR-18~ADR-27）、`docs/tech_stack.md` **1.4.0/REV-13**（§1 三新行 / §1.4 客户端键登记 / §4.5 第 13~18 项）、`docs/requirements_spec.md` **1.4.0/REV-13**（REQ-FUNC-IB-28~36 / REQ-NFR-IB-15~18 / C-IB-09 / DR-09~DR-17）；上游门控 **GR-B-006 = PASS_WITH_CONDITIONS**（见 §16）；**R13.1 触发输入** = GROUP_D 门控 `condition_1` 登记的 **DEFECT-R13-01**（MEDIUM）/ `tests/integration/test_accounts_int_r13.py::TC-INT-119`（见 §17）；**R14 触发输入** = `docs/architecture_design.md` **1.6.0/REV-14**（ADR-28 项目上下文的选择与传播，Option B 选定 + §2.0.5 R14 影响复核 + §10.1 R14 OPEN ITEM）、`docs/module_design.md` **1.6.0/REV-14**（IFC-IB-333~336 / §2.2.5 段号索引 / §3 MOD-IB-23 端点与契约 / §3 MOD-IB-24 store 与传播约束 / §4.2.5 无环性再声明 / §9.8 覆盖率再声明）、`docs/tech_stack.md` **1.4.0/REV-14**（**NO_CHANGE**：无新依赖）、需求侧 US-IB-24 / AC-IB-24-02 / AC-IB-24-03 / REQ-FUNC-IB-23/31/32、`docs/phase_status.md` 的 **IC-IB-02**（REV-14 实现约束）与 REV-14-2；上游 GROUP_B **GR-B-007 = PASS_WITH_CONDITIONS**（见 §18）。**R14 现场根因** = R13 回归：全局管理员（`users.project_id IS NULL` ⇒ `effective_project == "*"`）因项目级端点 fail-closed 而无法使用任何项目级页面（问答 / 文件 / 重建 / 可视化配置一律 503），且无「选择当前项目」入口。 |
+| 覆盖范围 | MOD-IB-01 ~ MOD-IB-26（**R2 追加 MOD-IB-26**；R1 覆盖 01~25）。**R3 重评 MOD-IB-13 与 MOD-IB-23**；**R4 只重评被触及的部分**：MOD-IB-12 与 MOD-IB-13，外加依赖面新增文件 `src/requirements-embed.txt`（B-05，非模块）；**R7 只重评被触及的部分**：MOD-IB-01（端口 13 → 14 + 结构）、MOD-IB-02（定义文档数据层）、MOD-IB-16（派生注入）、MOD-IB-23（装配期闸门 + 端点）、MOD-IB-24（可视化配置页）；**R8 只重评被触及的部分**：MOD-IB-02（`ib/config/definition.py::validate` 校验项补齐）；**R10 只重评被触及的部分**：MOD-IB-24（前端构建管线：锁同步 / 源文件跟踪 / 类型错误 / 冒烟入口）；**R11 只重评被触及的部分**：MOD-IB-01（R8 类型 / 枚举 / 常量）、MOD-IB-02（键名登记与值域 + `validate` 第 3 子项）、MOD-IB-16（`is_delegating` 消费侧话术）、MOD-IB-21（终态单发 / 可见性 / 确认事件 / 会话存储逐字段复制）、MOD-IB-22（确认门装配 / `resume` fail-closed / G2 单跳交接）、MOD-IB-23（`chat_stream` 显式 4xx + `POST /api/chat/resume`）、MOD-IB-24（确认区呈递 / 决策回传 / 会话标识纪律）；**R13 只重评被触及的部分**：MOD-IB-01（账户 / 会话 / 令牌契约 + 第 15 个端口 `AccountStore`）、MOD-IB-02（IFC-IB-312 键名登记）、MOD-IB-11（bcrypt / `SqliteAccountStore` / `MemoryAccountStore` / 幂等种子）、MOD-IB-23（账户 / 会话 / 账户 CRUD 端点 + `SessionTokenResolver` + 可注入策略 + 中间件扩展 + 装配 + 条件性限速审计）、MOD-IB-24（登录页 / 首登强制改密 / 控制台外壳 / 路由守卫 / 类型化客户端 / 主题 / 组件库本地打包）、MOD-IB-25（迁移 003 / nginx TLS 模板 / 键模板 / 检查清单 B15~B20 / `bcrypt` 依赖登记）；**R13.1 只重评被触及的部分**：MOD-IB-23（`Deps.login_throttle` 应用级装配 + 登录端点判定顺序）；**R14 只重评被触及的部分**：MOD-IB-23（`projects_endpoint` + `api/projects` 路由 + `X-IB-Project` 头契约登记）、MOD-IB-24（`stores/project.ts` 新建 / `api/client.ts` 单点注入 + 项目枚举客户端 / `app/env.ts` 接线 / `layouts/ConsoleLayout.vue` 选择器与视图态重置 / `main.ts` 401 清空） |
 | 评审方式 | 5 维评分 + 逐条 finding（含文件:行号）+ 离线实跑证据 |
 ---
 
@@ -2158,3 +2158,104 @@ EXIT=2
 - **TC-INT-119 由 FAIL 转 PASS**；TC-INT-118 同绿（未以牺牲既有断言换取）。
 - 全量重跑 **239/239**、前端冒烟 **13/13**、`compileall` EXIT=0、selfcheck **45/45** —— 全部通过。
 - **本代理已 STOP，等待 PM 门控复核；未进入 GROUP_D、未部署、未提交。**
+
+---
+
+# §18 R14 回归缺陷修复自我评审（全局管理员「当前项目」选择与 `X-IB-Project` 传播：IFC-IB-333~336；设计侧口径 REV-14）
+
+## 18.1 R14 规模与改动面
+
+| 项 | 内容 |
+|----|------|
+| 触发 | R13 交付后回归：**全局管理员**（`users.project_id IS NULL` ⇒ `AuthzContext.project_id == "*"`）因项目级端点 fail-closed（503）而**无法使用任何项目级页面**（问答 / 文件 / 重建 / 可视化配置），且界面无「选择当前项目」入口 —— 即「哨兵恰是唯一出口，而出口未被暴露」。设计侧 **REV-14**（`architecture_design.md` 1.6.0 / ADR-28，Option B）给出修复方案。 |
+| 性质 | **回归缺陷修复增量**（零新增模块 / 零新增端口 / 零新增依赖边 / 零新增第三方依赖；新增 IFC-IB-333~336 四条契约，为**纯追加**） |
+| 新增文件 | `src/frontend/src/stores/project.ts`（MOD-IB-24）、`tests/integration/test_project_context_int_r14.py`（MOD-IB-24 测试，GROUP_C 自验层） |
+| 修改源码 | `src/ibweb/views.py`、`src/ibweb/urls.py`（MOD-IB-23）；`src/frontend/src/api/client.ts`、`src/frontend/src/app/env.ts`、`src/frontend/src/layouts/ConsoleLayout.vue`、`src/frontend/src/main.ts`（MOD-IB-24） |
+| 修改测试/自检 | `src/scripts/selfcheck.py`（新增 `r14_project_context`、`r14_frontend_project_discipline` 两用例）、`src/frontend/tests/frontend.smoke.test.js`（新增用例 14~17） |
+| 未触碰 | `src/ib/**`（核心契约不变）、`src/ibweb/authz.py`（`X-IB-Project` 语义**已存在**，本轮仅登记契约未改代码）、设计真源四文档、`docs/phase_status.md` |
+
+## 18.2 5 维评分（仅被触及的部分：MOD-IB-23 项目枚举端点；MOD-IB-24 项目上下文 store / 单点注入 / 控制台选择器）
+
+| 维度 | 分数 | 依据 |
+|------|------|------|
+| Correctness（正确性） | **9/10** | `/api/projects` 授权口径正确：全局主体返回**全部**已登记项目、ops **恒为 1 项**（服务端裁定可见集合，客户端结构上不可枚举他项目）；`is_current` 反映**本请求**的 `effective_project`。前端 `load` 的 admin/ops 预选分支经行为用例验证（多项目 admin 缺省不选＝fail-closed；ops 预选自身）。扣 1 分：`is_current` 在 admin 未选定项目时全为 `false`（语义正确但界面需另给「未选择」提示，属 UX 增强、非契约缺陷）。 |
+| Security（安全性） | **10/10** | 未新增授权维度——`X-IB-Project` **不是**凭据、判定仍只经注入的 `AuthzPolicy`（ADR-22）；身份判定完全复用 `_ctx_of`/`get_authz`/`is_global`，**未出现第二套授权逻辑**；ops 跨项目头仍 403 `project_mismatch`；未选定项目仍 fail-closed（**未选项目即不泄露**，ADR-28 约束③未削弱）；`?token=` 仍 `4xx`、零 `Set-Cookie`。 |
+| Performance（性能） | **9/10** | `/api/projects` 只读内存 `Deps.projects`（`dict[str, ProjectRecord]`，无 DB / 无网络）；前端仅在「登录/换用户后」拉取一次列表，切换项目为纯本地状态变更（无请求）。扣 1 分：项目列表未做缓存层（规模 = 已登记项目数，当前量级下无收益）。 |
+| Maintainability（可维护性） | **9/10** | `X-IB-Project` 字面量**只出现在 `stores/project.ts` 一处**（`headerValue()` 为唯一取值出口），`client.ts` 零字面量（由自检用例强制）；`client.ts ↔ project.ts` 的 ESM 循环依赖经「提供者注入 + `env.ts` 唯一装配」断开，接线点单一；`import type` 保证编译期无运行期回边。 |
+| Test Coverage（可测试性） | **9/10** | 后端 3 条集成用例（TC-INT-120~122）覆盖 admin 全部 / ops 仅自身 / 跨项目 403 / 未选定 fail-closed / 未知项目不校验存在性 / 零 Cookie；前端新增 4 例，其中用例 17 为**真跑行为断言**（真 import `client.ts` + `project.ts`，断言 `headers()` 依 `current` 注入/不注入**且 SSE 头集合同样携带**）。扣 1 分：前端行为用例在 Node < 22.6（无类型擦除）下自动跳过（已 `t.diagnostic` 标注，非误报）。 |
+
+## 18.3 R14 Finding 统计（诚实口径）
+
+| Finding ID | 严重级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|---------|------------|------|------|
+| FND-R14-00 | **CRITICAL** | `src/frontend/src/layouts/ConsoleLayout.vue`（R13 版 `projectLabel` 静态文案）/ `src/ibweb/views.py`（R13 版缺 `api/projects`） | **本轮修复的回归本身**：全局管理员无「当前项目」选择入口，而项目级端点对 `effective_project == "*"` fail-closed ⇒ 管理员对问答/文件/重建/可视化配置**全部 503**，基座对唯一全局角色实际不可用 | **FIXED** |
+| FND-R14-01 | **MAJOR** | `src/frontend/src/api/client.ts` `import.meta.env`（修复前） | `const ENV = import.meta.env` 在 **Node**（非 Vite 构建期）下 `import.meta.env` 为 `undefined` → **整模块导入即 `TypeError`**，破坏该文件自述契约「可被离线自检脚本直接导入」，并使既有 `src/scripts/sse_parser_selfcheck.mts` 一并不可用（前端唯一有实质算法的 SSE 分帧因此无法离线回归） | **FIXED**（`import.meta.env ?? {}`；Vite 构建期行为不变） |
+| FND-R14-02 | MINOR | `src/frontend/src/stores/project.ts` `load()`（实现中） | 初版存在一段**无副作用死代码**（`if (role_ === 'ops' && state.current === null && ownProjectId) { state.current = null; }`）—— 分支恒等赋值，既无功能也无文档价值 | **FIXED**（改为有意义的 ops 预选：`const own = items.find(...); state.current = (own ?? items[0])?.project_id ?? null;`） |
+| FND-R14-03 | MINOR | `src/ibweb/views.py` `projects_endpoint`（实现中） | 防御性未认证分支初版复用 `_unauthenticated()`，其文案为登录专用「用户名或口令不正确」，用在通用端点语义不当（可能误导排障） | **FIXED**（改为中性文案「缺少或无效的认证凭据」） |
+| FND-R14-04 | COMPLIANT | `src/frontend/src/api/client.ts` + `src/frontend/src/app/env.ts` | 项目头取值路径**不得**由 `client.ts` 直接 `import stores/project.ts`（会形成 `client.ts ↔ project.ts` ESM 循环） | **COMPLIANT**（提供者注入法；ADR-28 Decision 与 IFC-IB-336 均允许「或等价注入」，属契约内实现选择，见 `implementation_plan.md` §21.5「不构成偏差」） |
+
+- **CRITICAL = 1（FND-R14-00 = 本轮修复的回归，已修复清零）、MAJOR = 1（已修复）、MINOR = 2（均已修复）、COMPLIANT = 1。**
+- **遗留 CRITICAL = 0、遗留 MAJOR = 0** —— 满足「存在 CRITICAL 不得提交 SUCCESS」「MAJOR 超 3 条须备注」两条硬约束（本轮 MAJOR 仅 1 条且已修）。
+
+## 18.4 逐模块 R14 评审详情
+
+**MOD-IB-23（`ibweb/`，R14 被触及：`projects_endpoint` + 路由）**
+- Correctness: 9 / Security: 10 / Performance: 9 / Maintainability: 9 / Testability: 9
+- 关键点：`projects_endpoint` 是**非项目级端点** —— 即使 `effective_project == "*"` 也必须 200（它是 fail-closed 的**唯一引导出口**）；`is_global(authz)` 为真取全部、否则只取 `authz.project_id` 对应的那一项（找不到则空列表，**不推断**）；`sorted(..., key=project_id)` 保证返回顺序确定（便于断言与前端稳定渲染）。**未新增第二套授权逻辑**（复用 `_ctx_of` / `get_authz` / `is_global`）。
+
+**MOD-IB-24（`frontend/`，R14 被触及：`stores/project.ts` + `api/client.ts` + `app/env.ts` + `ConsoleLayout.vue` + `main.ts`）**
+- Correctness: 9 / Security: 9 / Performance: 9 / Maintainability: 9 / Testability: 9
+- 关键点：① `headers()` 是 `X-IB-Project` 的**唯一注入点**，且 `projectHeader()` 置于 `...extra` **之后**（store 值权威，调用方不可覆盖，防越权改项目头）；② `chatStream`（GET `/api/chat/stream`）与 `chatResume`（POST `/api/chat/resume`）**同经 `this.headers()`** ⇒ SSE 自动覆盖（EventSource 不能设自定义头，故本项目本就用 `fetch` 流）；③ 切换项目后 `<router-view :key="current ?? 'none'">` 强制重建项目内视图，避免残留上一项目的前端态；④ 登出 / 全局 401 均 `projectContext.clear()`，防「当前项目」跨会话残留。
+
+## 18.5 R14 MINOR finding
+
+**无遗留 MINOR**（FND-R14-02 / FND-R14-03 已在本轮修复）。供 PM 复核的**非缺陷观察**：admin 未选定项目时界面需显式呈现「未选择项目」态（当前以 `is_current` 全 false 表达，语义正确，UX 增强建议留待 PM 裁决是否纳入后续轮次）。
+
+## 18.6 R14 本地不可验证项（如实登记）
+
+| 编号 | 项 | 为何不可本地验证 | 处置 |
+|------|----|----------------|------|
+| R14-L-01 | 真实浏览器下 `el-select` 交互与 `<router-view :key>` 重挂载的端到端行为 | 本代理自验层为**离线**（无浏览器自动化环境；不触网约束下不引入 Playwright 等） | 已在**行为层**用 Node 真跑 `ApiClient.headers()` + `createProjectContext`（用例 17）覆盖「注入/不注入/SSE 头集合/ops 不可切换」；浏览器交互留待 GROUP_D 依据既定门控处置 |
+| R14-L-02 | `npm ci` 在 CI 环境的可复现性（锁与 package.json 同步） | 本轮**未新增任何依赖**（`package.json` / `package-lock.json` 零改动），既有用例 2/13 已常驻保护锁同步 | 无需新增验证；既有 CI 阶段9 覆盖 |
+
+> 说明：本轮**未新增第三方依赖**（`tech_stack.md` 1.4.0/REV-14 判 **NO_CHANGE**），因此 R14 无「新增依赖未真跑」类遗留项。
+
+## 18.7 R14 契约与冻结约束守约复核
+
+- **未改既有 IFC 编号 / 签名**：`IFC-IB-001~332` 一字未改；新增 **333~336**（纯追加）；`IFC-IB-324`（`X-IB-Project` 头语义）仅**加成式登记**，`src/ibweb/authz.py` **零改动**。
+- **模块/端口/依赖边不变**：模块数仍 **26**、端口数仍 **15**、`architecture_design.md` 依赖边逐行未改；`/api/projects` 只是既有 `MOD-IB-24 → MOD-IB-23` HTTP 边上的新端点。
+- **fail-closed 未削弱**：前端未选项目 ⇒ 不注入头 ⇒ 服务端取全局哨兵 ⇒ 项目级端点继续 503；**禁止**把哨兵解析为「并集」（ADR-28 Option C 被拒）。TC-INT-121 直接断言「无头 503 / 带头 200 / 未知项目仍 503」。
+- **授权真源不变**：全局/项目可见集合由**服务端**依 `AuthzPolicy` 裁定，客户端不参与授权决策；`X-IB-Project` 非凭据。
+- **认证契约未破坏**：令牌仅经 `Authorization: Bearer`；`?token=`/`?access_token=` 对 `/api/projects` 仍 `400`（中间件先于路由拒绝）；零 `Set-Cookie`；改密态与 admin/ops 角色划分不变。
+- **依赖 / 架构纪律**：零新增第三方依赖；前端仍 **Element Plus / vue-router 本地打包、禁 CDN、hash 路由、不引 Pinia**（`stores/project.ts` 用模块级 `reactive`/`computed`，与 `stores/session.ts` 同构）；未引入 Docker / PyMuPDF。
+- **凭据 / 脱敏纪律**：未写入任何口令 / 令牌 / 密钥字面量；新增测试口令为**测试替身占位值**（与既有 `R13_*_PASSWORD` 同性质，非生产凭据）；无敏感数据外泄。
+- **只读约束**：未 `git add` / `commit` / `push`；未部署；未触碰目标机 192.168.31.133；未改 `requirements_spec.md` / `user_stories.md` / `architecture_design.md` / `module_design.md` / `tech_stack.md` / `docs/phase_status.md`。
+
+## 18.8 R14 实跑证据（命令 + 原始输出 + EXIT）
+
+| # | 命令（cwd = 仓库根，除注明外） | 结果 | EXIT |
+|---|------------|------|------|
+| 1 | `python -m compileall -q src/ibweb src/ib src/scripts tests` | 无输出（无语法错误） | **0** |
+| 2 | `python src/scripts/selfcheck.py` | `自检结果：47/47 通过`（基线 45 + R14 新增 2） | **0** |
+| 3 | `python -m pytest tests -q` | `242 passed`（基线 239 + R14 新增 3；零回退） | **0** |
+| 4 | `python -m pytest tests/unit -q` | `95 passed` | **0** |
+| 5 | `python -m pytest tests/integration -q` | `126 passed`（基线 123 + R14 新增 3） | **0** |
+| 6 | `python -m pytest tests/e2e -q` | `21 passed` | **0** |
+| 7 | `npm run typecheck`（cwd = `src/frontend`） | 无输出（`vue-tsc --noEmit` 通过） | **0** |
+| 8 | `npm run build`（cwd = `src/frontend`） | `✓ built`（1640 modules transformed，产物正常） | **0** |
+| 9 | `npm test`（cwd = `src/frontend`，`node --test`） | `tests 17 / pass 17 / fail 0`（基线 13 + R14 新增 4；用例 17 为真跑行为断言） | **0** |
+| 10 | `node --experimental-strip-types src/scripts/sse_parser_selfcheck.mts` | `SSE parser selfcheck: ALL PASS`（修复 FND-R14-01 后恢复；修复前因 `import.meta.env` 为 `undefined` 而整模块导入失败） | **0** |
+
+**新增测试用例清单**：
+- `tests/integration/test_project_context_int_r14.py`：`TC-INT-120`（项目枚举非项目级 + admin 全部 + 未选定也 200 + 无凭据 401 + `?token=` 400 + 零 Cookie + 字段集固定）、`TC-INT-121`（无头 503 → 带头 200 → `is_current` 反映 effective → 未知项目仍 503）、`TC-INT-122`（ops 列表恒 1 项 + 跨项目 403 `project_mismatch` + 自身/缺省放行）。
+- `src/frontend/tests/frontend.smoke.test.js` 用例 14（`X-IB-Project` 字面量仅存于 `project.ts`）、15（SSE 调用点同经 `this.headers()`）、16（选择器 + `router-view :key` + `env.ts` 接线）、17（**行为**：`headers()` 依 `current` 注入 / 不注入，含 SSE 头集合，ops 不可切换）。
+- `src/scripts/selfcheck.py` 新增 `r14_project_context`（Django test client 离线镜像 pytest 覆盖）、`r14_frontend_project_discipline`（前端源码纪律：单点注入 / `client.ts` 零字面量 / 选择器 / 视图键）。
+
+## 18.9 §18 结论
+
+**R14 回归缺陷修复自我评审状态：SUCCESS。CRITICAL = 0（1 条 FND-R14-00 已修复）。MAJOR = 0（1 条已修复）。MINOR = 0（2 条已修复）。**
+
+- **回归根因已闭合**：全局管理员现可经 `/api/projects` 获知全部项目、在控制台选择「当前项目」，选择后 `X-IB-Project` 经**唯一注入点**随所有请求（含 SSE）传播 ⇒ 项目级端点由 503 转 200（TC-INT-121 为直接证据）；**未缩短 fail-closed 任一环节**（未选项目仍不泄露）。
+- **契约零破坏 + 收益可回归**：既有 239 条 Python 用例、13 条前端冒烟**零回退**；新增 3 + 4 条用例把「授权口径 / 头传播 / 单点注入 / 视图态重置」固化为常驻断言。
+- 全量重跑 **242/242**、集成 **126/126**、前端冒烟 **17/17**、`compileall` EXIT=0、selfcheck **47/47**、`npm run build` EXIT=0、SSE 自检 ALL PASS —— 全部通过。
+- **本代理已 STOP，等待 PM 门控复核；未进入 GROUP_D、未部署、未提交、未触碰目标机。**

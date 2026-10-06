@@ -244,3 +244,205 @@ describe('R13 前端冒烟：登录 / 会话 / 控制台外壳 / 零旁路', () 
     }
   });
 });
+
+// --------------------------------------------------------------------------- //
+// R14 前端冒烟：项目上下文单点注入 + SSE 覆盖（IFC-IB-333 / 335 / 336）
+//
+// 溯源：US-IB-24 / AC-IB-24-03（admin 全局可选项目）、AC-IB-24-02（ops 跨项目 403）。
+// 说明：用例 14~16 为**源码结构**断言（与既有 R10/R13 层同策略，Node 20 可跑）；
+//       用例 17 为**行为**断言 —— 真跑 `ApiClient.headers()` 与 `createProjectContext`。
+//       Node < 22.6 不支持导入 `.ts`（无类型擦除），此时用例 17 **跳过**（不误报失败）——
+//       与用例 6「dist 不存在则跳过」同一策略：前置条件不满足不是缺陷。
+// --------------------------------------------------------------------------- //
+
+const r14 = {
+  project: join(root, 'src', 'stores', 'project.ts'),
+  client: join(root, 'src', 'api', 'client.ts'),
+  env: join(root, 'src', 'app', 'env.ts'),
+  layout: join(root, 'src', 'layouts', 'ConsoleLayout.vue'),
+};
+
+describe('R14 前端冒烟：项目上下文单点注入 + SSE 覆盖', () => {
+  it('14. X-IB-Project 字面量只出现在 stores/project.ts（单一取值出口）', () => {
+    const projectTs = stripComments(readText(r14.project));
+    const clientTs = stripComments(readText(r14.client));
+    assert.match(projectTs, /X-IB-Project/, 'project store 未产出 X-IB-Project');
+    assert.doesNotMatch(
+      clientTs,
+      /X-IB-Project/,
+      'client.ts 不得出现该字面量（取值只来自 projectContext.headerValue()）',
+    );
+    for (const symbol of ['available', 'current', 'select', 'load', 'clear', 'headerValue']) {
+      assert.ok(projectTs.includes(symbol), `stores/project.ts 缺少 ${symbol}`);
+    }
+  });
+
+  it('15. SSE 调用点同经 this.headers()，不重复拼头', () => {
+    const clientTs = stripComments(readText(r14.client));
+    assert.match(clientTs, /setProjectHeaderProvider/, 'client.ts 未暴露项目头提供者');
+    assert.match(clientTs, /async chatStream/);
+    assert.match(clientTs, /async chatResume/);
+    assert.ok(
+      (clientTs.match(/this\.headers\(/g) || []).length >= 3,
+      'request / chatStream / chatResume 应同经 this.headers()',
+    );
+  });
+
+  it('16. 控制台：项目选择器 + router-view 以当前项目为键（切换重置视图态）', () => {
+    const layout = stripComments(readText(r14.layout));
+    assert.match(layout, /el-select/, '缺少 admin 项目选择器');
+    assert.match(layout, /projectContext\.select/, '选择器未经 projectContext.select');
+    assert.match(layout, /<router-view[^>]*:key/, 'router-view 未以当前项目为键');
+    const env = stripComments(readText(r14.env));
+    assert.match(env, /setProjectHeaderProvider/, 'env.ts 未接线项目头提供者');
+  });
+
+  it('17. 行为：headers() 依 current 注入 / 不注入（含 SSE 头集合）', async (t) => {
+    // sessionStorage 是浏览器 API；补一个最小替身，仅为让 token 读取不抛。
+    globalThis.sessionStorage ??= { getItem: () => null, setItem() {}, removeItem() {} };
+    let ApiClient;
+    let createProjectContext;
+    try {
+      ({ ApiClient } = await import('../src/api/client.ts'));
+      ({ createProjectContext } = await import('../src/stores/project.ts'));
+    } catch (err) {
+      t.diagnostic(`当前 Node 不支持导入 .ts（${err.code ?? err.name}）—— 跳过行为断言`);
+      return;
+    }
+    const api = new ApiClient();
+    const pc = createProjectContext({
+      listProjects: async () => [
+        { project_id: 'p_alpha', name: 'A', is_current: false },
+        { project_id: 'p_beta', name: 'B', is_current: false },
+      ],
+    });
+    api.setProjectHeaderProvider(() => pc.headerValue());
+
+    // 未选择 ⇒ 不注入（fail-closed）。
+    assert.ok(!('X-IB-Project' in api.headers({})), '未选择项目时不得注入 X-IB-Project');
+    await pc.load('admin', null); // 结果集 2 项 ⇒ admin 缺省为空
+    assert.equal(pc.state.current, null);
+    assert.ok(!('X-IB-Project' in api.headers({})));
+
+    // 选择后 ⇒ 注入；SSE 头集合同样含该项目头（chatStream 传的正是该集合）。
+    pc.select('p_alpha');
+    assert.equal(api.headers({})['X-IB-Project'], 'p_alpha');
+    const sse = api.headers({ Accept: 'text/event-stream' });
+    assert.equal(sse['X-IB-Project'], 'p_alpha');
+    assert.equal(sse.Accept, 'text/event-stream');
+
+    // 清空 ⇒ 回到不注入；且 ops 不可切换（三重约束的前端一重）。
+    pc.clear();
+    assert.ok(!('X-IB-Project' in api.headers({})));
+    const ops = createProjectContext({
+      listProjects: async () => [{ project_id: 'p_alpha', name: 'A', is_current: true }],
+    });
+    await ops.load('ops', 'p_alpha');
+    assert.equal(ops.state.current, 'p_alpha');
+    ops.select('p_beta'); // no-op
+    assert.equal(ops.state.current, 'p_alpha', 'ops 不可切换项目');
+  });
+
+  // R14 补测（INV-GROUP-D-INTELBASE-014）：边界行为 —— 失败/空集 fail-closed、单项目预选、
+  // select 白名单、项目头单一真源。与用例 17 同策略：Node 不支持导入 .ts 则跳过（非失败）。
+
+  it('18. 行为：load 失败 ⇒ current 保持 null（不注入头，fail-closed）且记录 error', async (t) => {
+    globalThis.sessionStorage ??= { getItem: () => null, setItem() {}, removeItem() {} };
+    let ApiClient;
+    let createProjectContext;
+    try {
+      ({ ApiClient } = await import('../src/api/client.ts'));
+      ({ createProjectContext } = await import('../src/stores/project.ts'));
+    } catch (err) {
+      t.diagnostic(`当前 Node 不支持导入 .ts（${err.code ?? err.name}）—— 跳过行为断言`);
+      return;
+    }
+    const api = new ApiClient();
+    const pc = createProjectContext({
+      listProjects: async () => {
+        throw new Error('boom');
+      },
+    });
+    api.setProjectHeaderProvider(() => pc.headerValue());
+    await pc.load('admin', null); // 失败：不抛，转 fail-closed
+    assert.equal(pc.state.current, null, '加载失败后不得残留 current');
+    assert.equal(pc.state.available.length, 0, '加载失败后可见集应为空');
+    assert.ok(pc.state.error.length > 0, '加载失败应记录 error 供界面提示');
+    assert.ok(!('X-IB-Project' in api.headers({})), 'load 失败不得注入 X-IB-Project');
+  });
+
+  it('19. 行为：admin 单项目预选 + select 只接受 available 中的 id', async (t) => {
+    globalThis.sessionStorage ??= { getItem: () => null, setItem() {}, removeItem() {} };
+    let ApiClient;
+    let createProjectContext;
+    try {
+      ({ ApiClient } = await import('../src/api/client.ts'));
+      ({ createProjectContext } = await import('../src/stores/project.ts'));
+    } catch (err) {
+      t.diagnostic(`当前 Node 不支持导入 .ts（${err.code ?? err.name}）—— 跳过行为断言`);
+      return;
+    }
+    const api = new ApiClient();
+    const pc = createProjectContext({
+      listProjects: async () => [{ project_id: 'p_only', name: 'Only', is_current: false }],
+    });
+    api.setProjectHeaderProvider(() => pc.headerValue());
+    await pc.load('admin', null); // 结果集恰为 1 项 ⇒ 预选（ADR-28 吸收 Option A）
+    assert.equal(pc.state.current, 'p_only', 'admin 单项目应预选');
+    assert.equal(api.headers({})['X-IB-Project'], 'p_only', '预选后仍显式发送请求头');
+
+    // select 只接受 available 中的 id（不得把任意串当项目名注入头）。
+    pc.select('p_evil');
+    assert.equal(pc.state.current, 'p_only', 'select 不得接受不可见 id');
+    pc.select('   ');
+    assert.equal(pc.state.current, 'p_only', 'select 不得接受空白 id');
+  });
+
+  it('20. 行为：ops 结果集为空 ⇒ current 为 null（不臆造、不注入头）', async (t) => {
+    globalThis.sessionStorage ??= { getItem: () => null, setItem() {}, removeItem() {} };
+    let ApiClient;
+    let createProjectContext;
+    try {
+      ({ ApiClient } = await import('../src/api/client.ts'));
+      ({ createProjectContext } = await import('../src/stores/project.ts'));
+    } catch (err) {
+      t.diagnostic(`当前 Node 不支持导入 .ts（${err.code ?? err.name}）—— 跳过行为断言`);
+      return;
+    }
+    const api = new ApiClient();
+    const pc = createProjectContext({ listProjects: async () => [] });
+    api.setProjectHeaderProvider(() => pc.headerValue());
+    await pc.load('ops', 'p_alpha'); // 自身项目未登记 ⇒ 服务端回空列表
+    assert.equal(pc.state.current, null, 'ops 空列表不得臆造 current');
+    assert.ok(!('X-IB-Project' in api.headers({})), '未选定不得注入 X-IB-Project');
+  });
+
+  it('21. 行为：X-IB-Project 值只来自 provider（调用点 extra 不能覆盖）+ provider 抛错不注入', async (t) => {
+    globalThis.sessionStorage ??= { getItem: () => null, setItem() {}, removeItem() {} };
+    let ApiClient;
+    let createProjectContext;
+    try {
+      ({ ApiClient } = await import('../src/api/client.ts'));
+      ({ createProjectContext } = await import('../src/stores/project.ts'));
+    } catch (err) {
+      t.diagnostic(`当前 Node 不支持导入 .ts（${err.code ?? err.name}）—— 跳过行为断言`);
+      return;
+    }
+    const api = new ApiClient();
+    const pc = createProjectContext({
+      listProjects: async () => [{ project_id: 'p_alpha', name: 'A', is_current: true }],
+    });
+    api.setProjectHeaderProvider(() => pc.headerValue());
+    await pc.load('admin', null); // 单项目 ⇒ 预选 p_alpha
+
+    // 单一真源：调用点即便自带 X-IB-Project，也被 provider 值覆盖。
+    const merged = api.headers({ 'X-IB-Project': 'p_evil' });
+    assert.equal(merged['X-IB-Project'], 'p_alpha', 'extra 不得覆盖 provider 的项目头');
+
+    // provider 抛错 ⇒ 空对象（不炸 headers、不注入），保持 fail-closed。
+    api.setProjectHeaderProvider(() => {
+      throw new Error('provider down');
+    });
+    assert.ok(!('X-IB-Project' in api.headers({})), 'provider 抛错时不得注入项目头');
+  });
+});

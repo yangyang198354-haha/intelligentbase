@@ -2,6 +2,7 @@
 /**
  * @module MOD-IB-24
  * @implements IFC-IB-328 运维控制台外壳（左侧导航 + 右侧内容；深浅色；中文优先）
+ *             IFC-IB-335（R14）项目选择器（admin 可选 / ops 只读）+ 切换项目重置视图态
  * @depends MOD-IB-24（app/env 会话单例, stores/theme）
  * @author software-developer
  *
@@ -29,11 +30,11 @@
  * 菜单项从 `router` 的子路由中筛出（而不是在本文件另写一份列表）—— 两份列表迟早漂移，
  * 表现为「路由存在但菜单里没有」，属于最容易被忽略的一类缺陷。
  */
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessageBox } from 'element-plus';
 
-import { session } from '../app/env';
+import { projectContext, session } from '../app/env';
 import { useTheme } from '../stores/theme';
 
 const route = useRoute();
@@ -66,7 +67,48 @@ const pageTitle = computed(() => {
 });
 
 const roleLabel = computed(() => (session.isAdmin.value ? '管理员' : '运维'));
-const projectLabel = computed(() => session.state.user?.project_id ?? '全部项目');
+
+/**
+ * ops 的只读项目标签（其绑定项目不可切换）：优先显示服务端返回的项目名，
+ * 列表尚未就绪时回退为账户自身 `project_id`。
+ */
+const opsProjectLabel = computed(
+  () => projectContext.currentName.value || session.state.user?.project_id || '未绑定项目',
+);
+
+/**
+ * 切换项目后**重置项目内视图态**的机制（IFC-IB-335）：对 `<router-view>` 施加 `:key`。
+ *
+ * 键变化 ⇒ 现有页面组件被销毁重建 ⇒ 组件内状态（会话历史 / 文件列表 / 可视化草稿）
+ * 一并丢弃，从而**不会**出现「旧项目数据显示在新项目下」的串项显示。
+ * 键不含路由（切换页签时保持不变，不影响正常导航）。
+ */
+const viewKey = computed(() => projectContext.state.current ?? 'none');
+
+/** admin 选择项目（仅 admin 生效；store 对 ops 为 no-op）。 */
+function onSelectProject(value: unknown): void {
+  projectContext.select(String(value ?? ''));
+}
+
+/**
+ * 拉取可见项目并确定「当前项目」（IFC-IB-335）。
+ *
+ * 触发点 = 会话用户就绪时（`bootstrap` / `login` 成功后用户必已就绪；`immediate` 覆盖
+ * 首次挂载，`watch` 覆盖同页内身份变化）。`load` 失败 ⇒ `current` 保持空（不注入头）。
+ */
+async function ensureProjectContext(): Promise<void> {
+  const user = session.state.user;
+  if (!user) return;
+  await projectContext.load(user.role, user.project_id ?? null);
+}
+
+watch(
+  () => session.state.user?.user_id ?? '',
+  () => {
+    void ensureProjectContext();
+  },
+  { immediate: true },
+);
 
 async function confirmLogout(): Promise<void> {
   try {
@@ -79,6 +121,7 @@ async function confirmLogout(): Promise<void> {
     return; // 用户取消
   }
   await session.logout();
+  projectContext.clear(); // 项目上下文不与会话一同残留（回到未选项目的 fail-closed 态）
   await router.replace({ name: 'login' });
 }
 </script>
@@ -107,7 +150,23 @@ async function confirmLogout(): Promise<void> {
       <div class="sidebar-foot ib-muted">
         <span>{{ roleLabel }}</span>
         <span class="dot" aria-hidden="true">·</span>
-        <span class="ellipsis" :title="projectLabel">{{ projectLabel }}</span>
+        <!-- R14（IFC-IB-335）：admin 可显式选择「当前项目」；ops 显示只读的自身项目。 -->
+        <el-select
+          v-if="session.isAdmin.value"
+          class="project-select"
+          size="small"
+          placeholder="选择项目"
+          :model-value="projectContext.state.current ?? ''"
+          @change="onSelectProject"
+        >
+          <el-option
+            v-for="p in projectContext.state.available"
+            :key="p.project_id"
+            :label="p.name"
+            :value="p.project_id"
+          />
+        </el-select>
+        <span v-else class="ellipsis" :title="opsProjectLabel">{{ opsProjectLabel }}</span>
       </div>
     </aside>
 
@@ -136,7 +195,8 @@ async function confirmLogout(): Promise<void> {
       </header>
 
       <main class="content">
-        <router-view />
+        <!-- R14：以当前项目为键，切换项目即重挂载现有页面（重置项目内视图态，防串项）。 -->
+        <router-view :key="viewKey" />
       </main>
     </div>
   </div>
@@ -227,6 +287,11 @@ async function confirmLogout(): Promise<void> {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.project-select {
+  flex: 1;
+  min-width: 0;
 }
 
 .main {

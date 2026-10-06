@@ -5,6 +5,7 @@
             IFC-IB-294/295（R7）`/api/config/definition` 路由
             IFC-IB-307（R8）`/api/chat/resume` 路由
             IFC-IB-316 ~ IFC-IB-321（R13）账户 / 会话路由
+            IFC-IB-333（R14）`/api/projects` 项目枚举路由
 @depends MOD-IB-23（views）
 @author software-developer
 
@@ -56,6 +57,10 @@ urlpatterns = [
     path("api/chat/resume", views.chat_resume_endpoint, name="ib-chat-resume"),
     # R7（IFC-IB-294/295）：定义文档读写。**单一真源**端点（GET 读 / PUT 原子写回）。
     path("api/config/definition", views.definition_config_endpoint, name="ib-config-definition"),
+    # R14（IFC-IB-333）：项目枚举（admin 见全部 / ops 仅见自身）。
+    # **不是**项目级端点：全局主体未选定项目时也返回 200（否则 admin 无法引导选择项目）。
+    # 仅 `Authorization` 头鉴权；`?token=` 由中间件先于路由拒绝（4xx）。
+    path("api/projects", views.projects_endpoint, name="ib-projects"),
     # R13（IFC-IB-316~321）：账户 / 会话。
     # 登录是**唯一**免鉴权端点（尚无令牌），但它**仍**受 `?token=` 4xx 纪律约束；
     # 其余端点一律只认 `Authorization: Bearer`（不接受 `?token=`，中间件先于路由拒绝）。

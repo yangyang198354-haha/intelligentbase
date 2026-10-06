@@ -5,19 +5,19 @@
 | 字段 | 值 |
 |------|-----|
 | 文档 ID | DOC-IB-DR-001 |
-| 标题 | intelligentbase 智能知识库基座 —— 项目交付报告（REV-13） |
+| 标题 | intelligentbase 智能知识库基座 —— 项目交付报告（REV-14 增量） |
 | 产出代理 | pm-orchestrator |
-| 调用 ID | INV-GROUP_A-INTELBASE-005 / INV-GROUP_B-INTELBASE-007 / INV-GROUP_C-INTELBASE-012 + 回修 -013 / INV-GROUP_D-INTELBASE-012 + 收口 -013 / INV-GROUP_E-INTELBASE-004（校验：INV-GROUP_C-VERIFY-REV13-1） |
+| 调用 ID | REV-14：部分流程（PARTIAL_FLOW）—— INV-GROUP_B-INTELBASE-008 / INV-GROUP_C-INTELBASE-014 / INV-GROUP_D-INTELBASE-014 / INV-GROUP_E-INTELBASE-005（校验：INV-GROUP_C-VERIFY-REV14）；承 REV-13：INV-GROUP_A-005 / INV-GROUP_B-007 / INV-GROUP_C-012+013 / INV-GROUP_D-012+013 / INV-GROUP_E-004 |
 | 项目 | intelligentbase |
-| 阶段 | FULL_FLOW REV-13：GROUP_A → GROUP_B → GROUP_C → GROUP_D → GROUP_E（PHASE_10 仅计划层） |
-| 版本 | 1.0.0（REV-13，2026-10-06） |
+| 阶段 | REV-14 PARTIAL_FLOW（回归缺陷修复）：GROUP_B → GROUP_C → GROUP_D → GROUP_E（PHASE_10 仅计划层）；承 REV-13 FULL_FLOW |
+| 版本 | 1.1.0（REV-14 增量，2026-10-06；承接 1.0.0/REV-13） |
 | status | FINAL（PM 交付报告；PHASE_11 生产部署**未执行**，按用户指令冻结待 CONFIRM） |
 | 创建日期 | 2026-10-06 |
 | 更新日期 | 2026-10-06 |
 | 权威状态文件 | `docs/phase_status.md`（唯一权威；本报告为其摘要视图） |
 ---
 
-# intelligentbase 项目交付报告（REV-13）
+# intelligentbase 项目交付报告（REV-13 / REV-14 增量）
 
 ## 项目概览
 - **项目名**：intelligentbase（通用 RAG + 多智能体知识库基座）
@@ -60,24 +60,26 @@
 |---------|---------|---------|------|
 | `docs/requirements_spec.md` | requirement-analyst | 1.4.0 / REV-13 | APPROVED |
 | `docs/user_stories.md` | requirement-analyst | 1.4.0 / REV-13 | APPROVED |
-| `docs/architecture_design.md` | system-architect | 1.5.0 / REV-13 | APPROVED（文件头 status 仍 `DRAFT_FOR_GATE_REVIEW`，偏差 D-01，见遗留） |
-| `docs/module_design.md` | system-architect | 1.5.0 / REV-13 | APPROVED（同上） |
-| `docs/tech_stack.md` | system-architect | 1.4.0 / REV-13 | APPROVED（同上） |
-| `docs/implementation_plan.md` | software-developer | 2.8.0 / REV-13 | APPROVED |
-| `docs/code_review_report.md` | software-developer | R13.1（§17 回修自查） | APPROVED |
+| `docs/architecture_design.md` | system-architect | 1.6.0 / REV-14（ADR-28） | APPROVED（文件头 status 仍 `DRAFT_FOR_GATE_REVIEW`，偏差 D-01，见遗留） |
+| `docs/module_design.md` | system-architect | 1.6.0 / REV-14（IFC-IB-333~336） | APPROVED（同上） |
+| `docs/tech_stack.md` | system-architect | 1.4.0 / REV-14（NO_CHANGE） | APPROVED（同上） |
+| `docs/implementation_plan.md` | software-developer | 2.9.0 / REV-14（§21） | APPROVED |
+| `docs/code_review_report.md` | software-developer | REV-14（§18；CRITICAL 0 / MAJOR 0 / MINOR 0） | APPROVED |
 | `src/ib/core/{accounts,ports,types}.py`、`src/ib/config/__init__.py`、`src/ib/ledger/{accounts,schema}.py` | software-developer | REV-13 | 已实现 |
 | `src/ibweb/accounts/{__init__,policy,throttle}.py`、`src/ibweb/{authz,views,urls,composition}.py` | software-developer | REV-13 | 已实现 |
 | `src/deploy/migrations/003_accounts.sql` | software-developer | REV-13 | 已实现 |
 | `src/deploy/nginx/intelligentbase.conf.example` | software-developer | REV-13 | 已实现 |
 | `src/deploy/{env.example,checklists.txt}`、`src/scripts/selfcheck.py`、`src/requirements.txt`（+bcrypt） | software-developer | REV-13 | 已实现 |
 | `src/frontend/**`（router / layouts / stores / views / styles / api / Element Plus 本地依赖） | software-developer | REV-13 | 已实现 |
-| `docs/test_plan.md` | test-engineer | 1.8.0 / R13 | APPROVED |
-| `docs/test_report.md` | test-engineer | 1.9.1 / R13（收口补丁） | APPROVED |
+| `docs/test_plan.md` | test-engineer | 1.9.0 / REV-14（§19） | APPROVED |
+| `docs/test_report.md` | test-engineer | 1.10.0 / REV-14（§19） | APPROVED |
 | `tests/{unit,integration,e2e}/*_r13.py`、`tests/conftest.py`、`src/frontend/tests/frontend.smoke.test.js` | test-engineer | REV-13 | 已实现 |
-| `docs/deployment_plan.md` | devops-engineer | 1.2.0 / REV-13 | APPROVED（仅计划层） |
-| `docs/cicd_pipeline.md` | devops-engineer | 1.2.0 / REV-13 | APPROVED（仅计划层） |
-| `.github/workflows/ci.yml` | devops-engineer | REV-13 增量 | 已更新（Python 3.12，15 steps） |
-| `docs/phase_status.md` | pm-orchestrator | REV-13 | 权威状态文件 |
+| `tests/integration/test_project_context_int_r14.py`（TC-INT-123~128）、`src/frontend/tests/frontend.smoke.test.js`（TC-FE-014~021） | test-engineer | REV-14 | 已实现 |
+| `docs/deployment_plan.md` | devops-engineer | 1.3.0 / REV-14（§14） | APPROVED（仅计划层） |
+| `docs/cicd_pipeline.md` | devops-engineer | 1.3.0 / REV-14 | APPROVED（仅计划层） |
+| `.github/workflows/ci.yml` | devops-engineer | REV-14（注释层） | 已更新（Python 3.12，15 steps） |
+| `src/frontend/src/stores/project.ts`（新）、`src/frontend/src/api/client.ts`、`app/env.ts`、`layouts/ConsoleLayout.vue`、`main.ts`、`src/ibweb/{views,urls}.py` | software-developer | REV-14 | 已实现 |
+| `docs/phase_status.md` | pm-orchestrator | REV-14 | 权威状态文件 |
 
 ## 遗留问题
 | 问题 | 来源阶段 | 严重级别 | 建议处理 |
@@ -107,5 +109,49 @@
 - C-01：目标机 DNS / 防火墙对外端口（80/443）未定，影响 nginx HTTPS 对外形态。
 - 偏差 D-01（文件头 status）承前未闭合。
 
+## REV-14 增量交付（回归缺陷修复轮 · PARTIAL_FLOW）
+
+### 缺陷
+R13 交付后回归：**全局管理员**（`users.project_id IS NULL` ⇒ `AuthzContext.project_id == GLOBAL_PROJECT`（`"*"`））因项目级端点对哨兵 fail-closed 而**无法使用任何项目级页面**（问答 / 文件管理 / 索引重建 / 可视化配置）；前端从不发送 `X-IB-Project`，且不存在「列出项目」的端点 ⇒ 管理员对唯一全局角色实际不可用。根因链（哨兵恰是唯一出口、而出口未被暴露）由用户侧先行诊断并对目标机实测佐证，本轮不重复定位。
+
+### 设计决策（REV-14 / ADR-28）
+**ADR-28 = Option B（显式选择 + 传播）**——全局 admin 显式选择「当前项目」，前端在**单一注入点**把它作为 `X-IB-Project` 头随**所有项目级请求（含 SSE）**发出；`ops` 账户的项目边界由账户承载，**结构上不可切换**；未选定项目时**不伪造头**，保持后端 fail-closed（未选项目即不泄露）。Option A（服务端隐式默认）被吸收为前端「单项目预选」便利；Option C（哨兵→并集/故障开放）与 Option D（绑定 admin 到单项目）被拒。
+
+### 变更增量
+- **后端**：新增非项目级端点 `GET /api/projects`（IFC-IB-333）——数据源 = 组合根 `Deps.projects`；admin 见全部、ops 仅自身（恒 1 项）；未确定项目的全局主体亦返回 200（fail-closed 的唯一引导出口）；`?token=` 仍 4xx、零 Set-Cookie。**零新表 / 零 ORM / 零迁移 / 零新依赖 / 零新 env 键。**
+- **前端**：新增 `src/frontend/src/stores/project.ts`（IFC-IB-335）；`client.ts` `headers()` 单点注入 `X-IB-Project`（IFC-IB-336，自动覆盖 `chatStream` / `chatResume` 两处 SSE）；控制台项目选择器（仅 admin 可改选）+ `<router-view :key>` 视图态重置 + 401 清空。
+- **契约**：新增 IFC-IB-333~336（纯追加）；`IFC-IB-001~332` 未改；`src/ibweb/authz.py` 零改动（头语义为 R13 既有）；模块仍 26 / 端口仍 15。
+
+### 门控（均 PASS_WITH_CONDITIONS）
+| 阶段组 | 门控 | 结论 |
+|-------|------|------|
+| GROUP_B | GR-B-007 | PASS_WITH_CONDITIONS（ADR-28 4 方案；IFC-IB-333~336；无环、零新模块/端口/边；条件 CRED-01） |
+| GROUP_C | GR-C-010 | PASS_WITH_CONDITIONS（26/26 模块已实现 / CRITICAL 0；独立只读 verifier 五组全 CONFIRMED、零 REFUTED） |
+| GROUP_D | GR-D-011 | PASS_WITH_CONDITIONS（unit 100% / integration 100% / E2E 100% / 算术一致；新增 Python 3 + 前端 4） |
+| GROUP_E | GR-E-005 | PASS_WITH_CONDITIONS（仅 PHASE_10 计划层：零迁移 / 每步有回滚 / 验证覆盖；PHASE_11 冻结） |
+
+### 质量指标（独立实跑实测）
+| 指标 | 值 | 目标 | 达标 |
+|-----|---|------|-----|
+| 单元测试通过率 | 95 / 95 = **100%** | ≥80% | ✓ |
+| 集成测试通过率 | 129 / 129 = **100%** | ≥90% | ✓ |
+| E2E 关键路径 | 21 / 21 = **100%** | 100% | ✓ |
+| 全量 Python 用例 | **245 / 245**（unit 95 + integration 129 + e2e 21），0 fail / 0 skip | — | ✓ |
+| 前端冒烟（独立层） | **21 / 21**（`node --test`，含 TC-FE-014~021） | — | ✓ |
+| selfcheck / compileall / typecheck | 47/47 / EXIT=0 / EXIT=0 | — | ✓ |
+| Code Review CRITICAL | **0** | 0 | ✓ |
+
+### 第 1 步交付物（本轮）
+`docs/architecture_design.md` 1.6.0/REV-14（ADR-28）、`docs/module_design.md` 1.6.0/REV-14（IFC-IB-333~336）、`docs/tech_stack.md` 1.4.0/REV-14（NO_CHANGE）、`docs/implementation_plan.md` 2.9.0/REV-14、`docs/code_review_report.md` §18、`docs/test_plan.md` 1.9.0/REV-14、`docs/test_report.md` 1.10.0/REV-14、`docs/deployment_plan.md` 1.3.0/REV-14、`docs/cicd_pipeline.md` 1.3.0/REV-14、`.github/workflows/ci.yml`（注释层）；代码 `src/frontend/src/stores/project.ts`（新）+ `client.ts` / `app/env.ts` / `ConsoleLayout.vue` / `main.ts` + `src/ibweb/{views,urls}.py`；测试 `tests/integration/test_project_context_int_r14.py` + 前端冒烟用例。
+
+### 需用户裁定 / 知悉
+1. **CRED-01（提交前必办，自 GR-B-007 结转）**：R14 改动集（含未跟踪工作包 `docs/rev14_project_context_apply_package.md`）仍在工作区未提交；**提交时不得把未跟踪工作包按原样纳入**（脱敏或删除）。PM 无提交权限，按纪律不代为提交。
+2. **实测口径更正**：原缺陷表述「项目级页面全部 503」不完全准确——实测未选项目的 admin 命中 `/api/config/definition` = **503**、`/api/files` GET = **200（items 空）**、`/api/chat/stream` 与 `/api/rebuild` = **500**（`orchestrator_for` 抛 `StartupError`，`views.error_response` 把 IbError 统一映射 500）。**fail-closed 仍成立**（不返回任何项目数据），**非 R14 引入**（R13 既有）。
+3. **R14-OBS-01（LOW）**：`client.ts` `headers()` 的「extra 不覆盖项目头」不变式仅在 provider 非空时成立；建议实现侧显式剔除 extra 中的 `X-IB-Project`（非本轮）。
+4. **R14-OBS-03（LOW，与 R14 无关）**：`GET /api/files?status=<非法值>` 返回 500 而非 400。
+5. **R14-L-01（not-verifiable）**：真实浏览器 `el-select` 端到端交互在离线层不可验证；已由行为层真跑（TC-FE-017~021）+ 结构断言（TC-FE-016）覆盖安全相关不变量，浏览器渲染/交互现象登记为残余不可验证项。
+6. **OPEN ITEM**：`GET /api/projects` 与项目选择 UX 无独立 REQ/AC，本轮映射既有 AC-IB-24-02/03 / REQ-FUNC-IB-31/IB-23（**不发明需求**）。
+7. **PHASE_11 解冻**：生产部署须用户明确下达 `PRODUCTION_DEPLOY_CONFIRM=true`（当次有效）；承前 P0 前置（B-01 git 仓库/remote 等）与 B-04/FND-GROUP-D-03、B-05/B-06 待闭合。
+
 ## 最终状态
-**DELIVERED_WITH_ISSUES** —— PHASE_01~10 全部通过门控（GROUP_A~E；PHASE_10 仅计划层），REV-13 的代码、测试、CI 配置与部署计划均已交付且经独立只读复跑证实（239/239 + 前端 13/13）；**PHASE_11 生产部署按用户指令冻结未执行**。存在需用户裁定的开放项（bcrypt pin、`[INFERRED]` 需求归属、TTL/阈值取值、CRED-01 脱敏、提交授权）与承前遗留项（FND-GROUP-D-03、偏差 D-01、环境版本），故判 DELIVERED_WITH_ISSUES 而非 DELIVERED。
+**DELIVERED_WITH_ISSUES** —— REV-14（回归缺陷修复轮，PARTIAL_FLOW：GROUP_B → C → D → E）四组门控全部通过（GR-B-007 / GR-C-010 / GR-D-011 / GR-E-005，均为 PASS_WITH_CONDITIONS），REV-14 的设计、实现、测试与部署计划均已交付且经独立只读复核与独立实跑证实（Python 245/245 + 前端 21/21）；**PHASE_11 生产部署按用户指令冻结未执行**。承载前遗留项（bcrypt pin / `[INFERRED]` 需求 / TTL 阈值 / 偏差 D-01 / FND-GROUP-D-03 / 环境版本）并新增本轮开放项（CRED-01 提交前脱敏、R14-OBS-01/02/03、R14-L-01），故判 DELIVERED_WITH_ISSUES 而非 DELIVERED。

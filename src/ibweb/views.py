@@ -4,6 +4,7 @@
             IFC-IB-283（R2）`GET /api/files/{doc_id}/images/{image_id}` 页面图字节
             IFC-IB-294/295（R7）`GET|PUT /api/config/definition` 定义文档读写
             IFC-IB-307（R8）`POST /api/chat/resume` 会话续跑（fail-closed 准入顺序）
+            IFC-IB-333（R14）`GET /api/projects` 项目枚举（admin 全部 / ops 仅自身）
 @depends MOD-IB-23（authz/composition/serializers/sse）, MOD-IB-11/12/13/14/15/22（服务）
 @author software-developer
 
@@ -113,6 +114,8 @@ __all__ = [
     "healthz_endpoint",
     "healthz_deps_endpoint",
     "definition_config_endpoint",
+    # R14 项目上下文（IFC-IB-333）
+    "projects_endpoint",
     # R13 账户 / 会话（IFC-IB-316~321）
     "auth_login_endpoint",
     "auth_logout_endpoint",
@@ -923,6 +926,75 @@ def _put_definition_config(request: Any) -> Any:
 
     log_event("definition_config", "saved", project_id=project_id)
     return _json(SaveResultSerializer().to_representation(result), status.HTTP_200_OK)
+
+
+# --------------------------------------------------------------------------- #
+# R14（IFC-IB-333）：项目枚举端点（项目上下文的选择入口）
+# --------------------------------------------------------------------------- #
+#
+# ## 该端点**不是**项目级端点
+#
+# 全局主体（admin）在**未选定**当前项目时 `effective_project == GLOBAL_PROJECT`（`"*"`），
+# 项目级端点因此 fail-closed —— 这是刻意设计（未选项目即不泄露）。但 `GET /api/projects`
+# 是 admin **唯一**的引导出口：若它也因「无匹配项目」而 fail-closed，admin 将永远无法
+# 选定项目，缺陷不可自愈。故本端点对**未选定项目的全局主体**同样返回 `200`。
+#
+# ## 授权口径（ADR-28 / IFC-IB-333）
+#
+#   * 全局主体（admin，`is_global`）→ 返回**全部**已登记项目；
+#   * 项目绑定主体（ops）→ **仅返回其自身项目**（`items` 长度恒为 1），**绝不枚举他项目**。
+#
+# 于是「ops 的可选项集合 = {自身项目}」由服务端裁定，叠加后端 `403 project_mismatch`
+# （IFC-IB-334）与前端 `select` 仅 admin 可调用，共三重「结构上不可切换」。
+#
+# ## 数据源与授权真源
+#
+# 数据源 = 组合根 `Deps.projects`（`IB_CONFIG_FILE` 的 `projects.<project_id>` 经
+# `_seed_projects` 装配）—— **不新增表、不经 ORM、不新增端口 / 模块**。
+# 身份判定沿用既有 `_ctx_of` / `get_authz` / `is_global`，**不新增第二套授权逻辑**（ADR-22）。
+# `?token=` 出现在查询串时由中间件在其之前显式 `400`（本视图不为此开例外）。
+
+
+def projects_endpoint(request: Any) -> Any:
+    """`GET /api/projects`（IFC-IB-333）→ `200 {items: [ProjectSummary]}` | `401` | `4xx`。
+
+    `ProjectSummary(project_id: str, name: str, is_current: bool)`；`name` 取
+    `ProjectRecord.name`，`is_current` = 该项目是否等于**本请求**的 `effective_project`
+    （admin 未选定时为全局哨兵，故全部为 `False`）。按 `project_id` 升序稳定输出。
+    """
+    if request.method != "GET":
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+    deps = composition.get_deps()
+    try:
+        ctx = _ctx_of(request)
+        authz = get_authz(request)
+        # 未认证由中间件拦下（401）；此处仅作类型收敛，**不**静默构造主体。
+        if authz is None:
+            return _json(
+                {"error": {"code": "unauthenticated", "message": "缺少或无效的认证凭据"}},
+                status.HTTP_401_UNAUTHORIZED,
+            )
+        effective = ctx.authz.project_id
+        if is_global(authz):
+            visible = list(deps.projects.values())
+        else:
+            own = deps.projects.get(authz.project_id)
+            # ops 只回自身项目；未登记时不臆造记录（宁可空，也不枚举他项目）。
+            visible = [own] if own is not None else []
+        items = [
+            {
+                "project_id": record.project_id,
+                "name": record.name,
+                "is_current": record.project_id == effective,
+            }
+            for record in sorted(visible, key=lambda r: r.project_id)
+        ]
+        return _json({"items": items}, status.HTTP_200_OK)
+    except IbError as exc:
+        return error_response(exc)
 
 
 # --------------------------------------------------------------------------- #

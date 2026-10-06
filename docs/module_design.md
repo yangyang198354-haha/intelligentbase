@@ -3,12 +3,12 @@
   <artifact>module_design</artifact>
   <path>docs/module_design.md</path>
   <doc_id>MOD-INTELBASE-001</doc_id>
-  <version>1.5.0</version>
-  <revision>REV-13</revision>
+  <version>1.6.0</version>
+  <revision>REV-14</revision>
   <status>DRAFT_FOR_GATE_REVIEW</status>
   <phase>GROUP_B / PHASE_04 模块详细设计</phase>
   <author>system-architect</author>
-  <invocation_id>INV-GROUP_B-INTELBASE-007</invocation_id>
+  <invocation_id>INV-GROUP_B-INTELBASE-008</invocation_id>
   <created_at>2026-09-25</created_at>
   <revision_history>
     <rev no="R1" date="2026-09-25" by="system-architect" basis="REV-01（框架切换 FastAPI→Django）">
@@ -25,6 +25,9 @@
     </rev>
     <rev no="REV-13" date="2026-10-06" by="system-architect" invocation_id="INV-GROUP_B-INTELBASE-007" basis="GROUP_A REV-13 下游贯通（认证与商用界面重构：REQ-FUNC-IB-28~36 / REQ-NFR-IB-15~18 / C-IB-09 / DR-09~DR-17）">
       **不新增模块、不新增依赖边**：账户 / 会话 / 令牌的**类型化契约与第 15 个端口** `AccountStore`（IFC-IB-310）并入 **MOD-IB-01**；配置键名登记（IFC-IB-312）并入 **MOD-IB-02**；SQL 适配器 / bcrypt / 默认管理员幂等种子 / `MemoryAccountStore` 替身（IFC-IB-313~315）并入 **MOD-IB-11**（**同一 SQLite 台账与同一手写迁移机制**）；登录/登出/主体查询/改密/续期、账户 CRUD、内置 `SessionTokenResolver` 与可注入策略模块 `ibweb.accounts.policy`、`AuthMiddleware` 扩展（改密态 + `?token=` 4xx）、组合根装配扩展、条件性限速与审计（IFC-IB-316~326）并入 **MOD-IB-23**；登录页与首登改密、运维控制台与 `vue-router`(hash) 鉴权守卫、类型化 API 客户端扩展（IFC-IB-327~329）并入 **MOD-IB-24**；手写迁移 `003_accounts.sql`、nginx TLS 终止模板、部署检查清单 B15~B20（IFC-IB-330~332）并入 **MOD-IB-25**。新增 IFC 编号 **309~332**（24 条，全部类型化、frozen dataclass / Protocol / 纯 stdlib 函数、零第三方依赖；**IFC-IB-285 仍预留未分配**；既有重号 IFC-IB-131 登记不修）。**端口 14 → 15**（纯追加）。既有 MOD-IB-01~26、`IFC-IB-001~308`、§4.1 依赖边清单与 DAG 拓扑**一字不动**（纯追加；零新增边的再声明见 §4.2.4）。**计数同步**：REQ-FUNC 27/27 → **36/36**（新增 IB-28~36，§9.1）、NFR 14 → **18**（新增 NFR-15~18，§9.2）。增补位置：§1 R13 性质段、§2.2 端口行与 R13 增记、§2.2.4 R13 IFC 段号索引、§3 的 MOD-IB-01/02/11/23/24/25 增补、§4.2.4 R13 无环性再声明与 §4.3 R13 注、§5 装配表行与 R13 说明、§7.4 两行降级、§8 替身行与离线可测单元、§9.1 九行 + §9.2 四行 + §9.7 R13 覆盖率再声明、§11 R13 自检。**OQ-IB-11 / 12 / 13 / 14 保持开放**（限速与审计为条件性 ADR-27）。需求侧文档只读；未修改 FreeArk 任何文件；未写入任何口令 / 令牌 / 密钥字面量（只登记键名）。
+    </rev>
+    <rev no="REV-14" date="2026-10-06" by="system-architect" invocation_id="INV-GROUP_B-INTELBASE-008" basis="REV-14 回归缺陷修复（R13 引入的全局管理员无法使用任一项目级页面：前端从不下发 X-IB-Project + 无项目枚举端点）">
+      **不新增模块、不新增端口、不新增依赖边**：项目枚举端点与 `X-IB-Project` 头契约并入 **MOD-IB-23**（IFC-IB-333 / 334）；前端 `projectContext` store 与 `client.ts` 单一注入点（含 SSE `chatStream` / `chatResume`）并入 **MOD-IB-24**（IFC-IB-335 / 336）。新增 IFC 编号 **333 ~ 336**（4 条，全部类型化、零第三方依赖）；**`IFC-IB-324` 仅被加成式扩展，其文本不改**；`IFC-IB-001 ~ 332` 的号 / 名 / 签名 / 字段集**一字不动**；**`IFC-IB-285` 仍预留未分配**。**模块数仍 26、端口数仍 15、§4.1 依赖边逐行不变（零新增边）、DAG 无环**（§4.2.5 再声明）。增补位置：§1 R14 补充纪律段与两条总览行（MOD-IB-23 / MOD-IB-24）、§2.2.5 R14 IFC 段号索引、§3 的 MOD-IB-23 / MOD-IB-24 增补、§4.2.5 R14 无环性再声明、§9.8 R14 覆盖率再声明、§11 R14 自检。需求侧文档只读；未修改 FreeArk 任何文件；未写入任何口令 / 令牌 / 密钥字面量（只登记头名与键名）。
     </rev>
   </revision_history>
   <inputs>
@@ -86,12 +89,14 @@
 | MOD-IB-20 | LLM 端点抽象 | L4 | provider 端口；路由/专家/聚合三角色的构造；外发边界声明 | 01,02,04 |
 | MOD-IB-21 | 流式契约与会话 | L4 | 类型化流事件与 SSE 编码；`SessionStore` 端口 | 01,02,04 |
 | MOD-IB-22 | 编排图 | L4 | StateGraph：route → fan-out → expert/general → gate → aggregate；**R7**：图编译输入 = 经准入闸门校验通过的定义文档，**拓扑不可编辑**（运行期不得由图外输入改变节点/边） | 01,02,03,04,16,17,18,19,20,21 |
-| MOD-IB-23 | HTTP API 与组合根 | L5 | 唯一装配点；REST + SSE 端点；鉴权注入；健康检查；**R7**：装配期 **fail-fast 准入闸门**（拒绝装配而非带病运行）+ 定义文档的 GET / PUT 端点 | 01,02,03,04 + 全部装配目标 |
-| MOD-IB-24 | Web 前端 | L5 | 上传/列表/删除/重试/重建页 + 问答页 + 类型化 API 客户端；**R7**：可视化配置页（编排图只读渲染 + 白名单表单；**视图侧零持久化**） | 23（仅 HTTP/SSE 契约） |
+| MOD-IB-23 | HTTP API 与组合根 | L5 | 唯一装配点；REST + SSE 端点；鉴权注入；健康检查；**R7**：装配期 **fail-fast 准入闸门**（拒绝装配而非带病运行）+ 定义文档的 GET / PUT 端点；**R14**：项目枚举端点 `GET /api/projects` + `X-IB-Project` 头契约（IFC-IB-333 / 334） | 01,02,03,04 + 全部装配目标 |
+| MOD-IB-24 | Web 前端 | L5 | 上传/列表/删除/重试/重建页 + 问答页 + 类型化 API 客户端；**R7**：可视化配置页（编排图只读渲染 + 白名单表单；**视图侧零持久化**）；**R14**：项目上下文 store + `client.ts` 单一注入点（含 SSE `chatStream` / `chatResume`；IFC-IB-335 / 336） | 23（仅 HTTP/SSE 契约） |
 | MOD-IB-25 | 部署运维 | L5 | 四个 systemd 单元、EnvironmentFile 模板、启动校验、检查清单 | 01,02,04 |
 | MOD-IB-26 | ib-embed 服务端 | L2（服务端进程；不被任何模块 import） | bge-m3 常驻推理服务的**线协议实现与模块归属**；单模型、CPU-only、有界并发 + 有界队列 | 01,02,04 |
 
 **R13 补充纪律与性质（账户 / 会话 / 商用界面增量）**：R13 **零新增模块**（仍 **MOD-IB-01 ~ MOD-IB-26**，共 26 个），沿用 §1 既有「编号即拓扑序的边界情形」纪律与 §4.2.2 的固化表述：账户与会话**必然被组合根 MOD-IB-23 依赖**，若新开模块只能取 **≥27** 编号 → 产生 `23 → 27` 边，**违反 `w(A) > w(B)`，构造性无环证明失效**（该先例 R7 已就 `MOD-IB-27` 否决）。故按 ADR-18 **并入既有模块**：契约 → MOD-IB-01；键名 → MOD-IB-02；SQL 适配器 / bcrypt / 种子 → MOD-IB-11（**同一 SQLite 台账与同一手写迁移机制**）；端点 / 解析器 / 可注入策略模块 / 装配 / 中间件扩展 → MOD-IB-23；前端 → MOD-IB-24；迁移 / nginx TLS / 检查清单 → MOD-IB-25。**端口 14 → 15**（`AccountStore`），**依赖边零新增**。
+
+**R14 补充纪律与性质（项目上下文选择与传播增量）**：R14 **零新增模块**（仍 **MOD-IB-01 ~ MOD-IB-26**，共 26 个）、**端口数不变**（仍 15）、**依赖边零新增**：项目列表端点与 `X-IB-Project` 头契约并入 **MOD-IB-23**（IFC-IB-333 / 334）；前端 `projectContext` store 与 `client.ts` 单一注入点并入 **MOD-IB-24**（IFC-IB-335 / 336）。`GET /api/projects` 是既有 `MOD-IB-24 → MOD-IB-23`（HTTP/SSE 契约）**边上的新端点**，**不产生新边**；模块编号仍即拓扑序，DAG 无环（§4 证明不受影响，§4.2.5 给出再声明）。**追踪**：IFC-IB-333 / 334 服务 REQ-FUNC-IB-31 / IB-32（admin 全局 / ops 项目边界）与 US-IB-24 / AC-IB-24-03；对其余需求的映射见 §9.8。
 
 ---
 
@@ -256,6 +261,17 @@
 | IFC-IB-330 ~ 332 | MOD-IB-25 | 手写迁移 `003_accounts.sql`；nginx TLS 终止模板；部署检查清单 B15~B20 | §3 MOD-IB-25（本件） |
 
 **R13 编号规范（强制，延续 R2 / R7 / R8）**：新增号只许**追加**（本轮取 **309 ~ 332**）；`IFC-IB-001 ~ 308` 的号 / 名 / 签名 / 字段集**一字不动**；**`IFC-IB-285` 仍预留未分配**（不得被本轮占用或改义）；既有重号（`IFC-IB-131`）**登记不修**（残余项 R-9）。以上 24 条 IFC 全部为**类型化契约**（`name: type` + 可空性），**不含任何实现体**；**不含任何口令 / 令牌 / 密钥字面量**（只登记键名与类型）。
+
+### 2.2.5 R14 新增 IFC 段号索引（追加式编号；IFC-IB-001~332 一字不动）
+
+| IFC 段 | 归属模块 | 内容 | 权威落点 |
+|--------|----------|------|----------|
+| IFC-IB-333 | MOD-IB-23 | `GET /api/projects`（项目枚举端点；admin 见全部 / ops 仅见自身） | §3 MOD-IB-23（本件） |
+| IFC-IB-334 | MOD-IB-23 | `X-IB-Project` 请求头契约（**加成式扩展** `IFC-IB-324`，其文本不动） | §3 MOD-IB-23（本件） |
+| IFC-IB-335 | MOD-IB-24 | 前端 `projectContext` store（`available` / `current` / `select` / `headerValue`；ops 不可切换） | §3 MOD-IB-24（本件） |
+| IFC-IB-336 | MOD-IB-24 | `ApiClient.headers()` 的**加成式扩展**（唯一注入点；自动覆盖 `chatStream` / `chatResume` 两个 SSE 调用点） | §3 MOD-IB-24（本件） |
+
+**R14 编号规范（强制，延续 R2 / R7 / R8 / R13）**：新增号只许**追加**（本轮取 **333 ~ 336**）；`IFC-IB-001 ~ 332` 的号 / 名 / 签名 / 字段集**一字不动**（其中 `IFC-IB-324` 仅被**加成式扩展**，其文本不改）；**`IFC-IB-285` 仍预留未分配**。以上 4 条 IFC 全部为**类型化契约**（`name: type` + 可空性），**不含任何实现体**；**不含任何口令 / 令牌 / 密钥字面量**（只登记头名与键名）。
 
 ---
 
@@ -686,6 +702,10 @@
 - **R13 装配序列（显式化，任一步失败即启动失败）**: `装载配置（IFC-IB-312）→ 构造 AccountStore（313 / 315）→ 幂等种子（314）→ 构造可注入策略模块 + PrincipalResolver（322 / 323）→ 注入中间件（324）`。**账户装配不改变既有 §3 MOD-IB-23 的 R7 定义文档准入门序列**（二者并列，互不短路）。
 - **R13 鉴权与凭据纪律（强制）**: 沿用 IFC-IB-247 口径，**仅允许 `Authorization` 头鉴权**；`/api/auth/*` 与 `/api/accounts*` **全部不接受** `?token=`；错误体**不回显任何口令 / 令牌**（含掩码 / 前缀）；账户相关端点**不设**「粘贴令牌」旁路（ADR-24）。**授权真源仍唯一**（注入的 `AuthzPolicy`，ADR-22）。
 
+- **R14 新增端点与契约（项目上下文；全程仅 `Authorization` 头，**不接受 `?token=`**）**:
+  - IFC-IB-333: `GET /api/projects` → `200 {items: list[ProjectSummary]}` | `401`（未认证）| `4xx`（`?token=` 出现在查询串，一律 4xx）。**数据源** = 组合根 `Deps.projects`（由 `IB_CONFIG_FILE` 的 `projects.<project_id>` 经 `_seed_projects` 装配；**不新增表、不经 ORM**）。**授权**：全局主体（admin，`AuthzContext.project_id == GLOBAL_PROJECT`）→ 返回**全部**已登记项目；项目绑定主体（ops）→ **仅返回其自身项目**（`items` 长度恒为 1，`is_current` 为真），**不枚举他项目** —— 「可见集合 = {自身项目}」使 ops 在**结构上不可切换**。结构 `ProjectSummary(project_id: str, name: str, is_current: bool)`（`is_current` 表示是否等于该请求的 `effective_project`）。
+  - IFC-IB-334: **`X-IB-Project` 请求头契约**（**加成式扩展** IFC-IB-324 的 `AuthMiddleware`，**不新增中间件、不改 IFC-IB-324 文本**；对应 `src/ibweb/authz.py` 的 `META["HTTP_X_IB_PROJECT"]` 分支）：① **全局主体** —— `effective_project` 取「头值（去首尾空白后非空）」否则取全局哨兵 `GLOBAL_PROJECT`（常量 `"*"`）；头值指向未知项目时服务端**不校验存在性**，`effective_project` 即为该字符串，项目级端点因「无匹配项目」而 **fail-closed（不泄露）**；② **项目绑定主体（ops）** —— 头存在且不等于 `authz.project_id` → **`403 project_mismatch`**；头缺省或等于自身 → `effective_project` 取 `authz.project_id`；③ **头缺省** —— `effective_project` 取 `authz.project_id`（全局主体即全局哨兵）。**不变式**：`project_id` **只认服务端结论**（不信请求体 / 查询串）；该头**不是**鉴权凭据、**不**替换授权判定（仍唯一经 `AuthzPolicy`，ADR-22）；**缺省 ⇒ 全局哨兵 ⇒ 项目级端点 fail-closed**（**未选项目即不泄露**，ADR-04 / ADR-28 约束③）。
+
 ### MOD-IB-24 Web 前端 (L5)
 
 - **职责**: 上传/列表/删除/重试/重建页 + 问答页 + **可视化配置页（R7）**；仅通过类型化 HTTP/SSE 契约与后端交互。
@@ -723,6 +743,10 @@
   - IFC-IB-329: **类型化 API 客户端扩展**（`api/client.ts`）：新增 `login` / `logout` / `me` / `changePassword` / `renewSession` / `listAccounts` / `createAccount` / `disableAccount`；**令牌仅经 `Authorization` 头**（沿用既有 `headers()` 注入）；`401` → 清除会话态并回登录页；`403 password_change_required` → 跳改密页。**移除 `TOKEN_KEY` 的粘贴来源**（保留会话态存储但**不再由用户输入**）。
 - **R13 离线与数据本地化（强制，延续 IFC-IB-296）**: Element Plus / vue-router 及**全部**前端依赖**随构建产物本地打包**；**禁止运行期 CDN** 与任何外发请求（REQ-NFR-IB-17）；产物内公网 URL 扫描须零命中。
 - **R13 凭据不回显（强制）**: 界面只显示**键名**，不显示口令 / 令牌 / 任何值或掩码；登录失败统一文案（**不提示「用户不存在」或「口令错误」的区分**）。
+
+- **R14 项目上下文 store 与传播约束（IFC-IB-335 / 336）**:
+  - IFC-IB-335: 前端 `projectContext` store（新建 `src/frontend/src/stores/project.ts`；与 `stores/session.ts` **同构** —— 模块级 `reactive` + `computed` + 动作，**不引 Pinia**，沿用 `session.ts` 的既有理由）。**状态**：`available: ProjectSummary[]`；`current: string | None`（**空 = 未选择 ⇒ 不注入请求头**）；`error: str`。**动作**：`load(role, ownProjectId)`（调 `listProjects()`；**ops** 结果集恒为单项 → `current` 锁定为该项；**admin** 结果集为全部项目 → `current` 缺省为**空**，若结果集**恰为 1 项**则预选该项 —— 即 ADR-28 吸收 Option A 的「单项目预选」便利，**仍显式发送请求头**）、`select(projectId: str)`（**仅 admin 可调用**；ops 调用为 no-op / 抛错；设置后**必须重置项目内视图态**：会话历史 / 文件列表 / 可视化草稿）、`clear()`（登出 / `401` 时清空）、`headerValue() -> Record[str, str]`（`current` 非空时含键 `X-IB-Project`，否则为空对象；**唯一**取值出口）。**ops 不可切换（三重）**：列表只含自身 + `select` 仅 admin 可调用 + 服务端 `403 project_mismatch`（IFC-IB-334）。
+  - IFC-IB-336: `ApiClient.headers(extra?)` 的**加成式扩展**（IFC-IB-329 既有方法，**不改其签名文本**）：在既有 `Accept` + `Authorization` 之外**追加** `X-IB-Project`（取值只来自 IFC-IB-335 的 `headerValue()`）。这是**唯一**注入点；`chatStream`（`GET /api/chat/stream`，IFC-IB-247）与 `chatResume`（`POST /api/chat/resume`，IFC-IB-307）**均已**经 `this.headers(...)`（`client.ts` 的 SSE 调用点），故扩展 `headers()` 即**自动覆盖两个 SSE 调用点**，调用点**不得**重复拼头。`EventSource` 不能设自定义头，本项目既有实现已改用 `fetch` 读流，故 SSE 携带该头**可行**且**不含 `?token=`**。**约束**：`current` 为空 ⇒ **不注入**（保持 fail-closed）；`headers()` **不得**从组件 / 调用点接收项目参数（避免第二注入点）。
 
 ### MOD-IB-25 部署运维 (L5)
 
@@ -858,6 +882,16 @@ MOD-IB-26 → 01, 02, 04（**本模块不被任何模块 import**；只走线协
 - **既有边被复用而非新增**：`AccountStore` 端口在 **MOD-IB-01**（L0）；其适配器在 **MOD-IB-11**（既有边 `11 → 01`，不新增）；端点 / 解析器 / 策略模块在 **MOD-IB-23**（既有边 `23 → 01/02/03/04/11`）；前端 **MOD-IB-24 → 23**（既有）；部署 **MOD-IB-25 → 01/02/04**（既有）。
 - **单一入口纪律未被绕开**：授权判定仍只经注入的 `AuthzPolicy`（IFC-IB-032/033）；会话令牌解析只有 `SessionTokenResolver` 一个入口（IFC-IB-322）；前端仍只经 HTTP 契约（MOD-IB-24 → MOD-IB-23）取数，**不新增绕过路径**（ADR-22 / ADR-24）。
 - 「编号即拓扑序」继续适用于 GROUP_C；R13 的**边界纪律同 §4.2.2 末句**：新增工件若被低编号模块（尤其组合根）依赖，**不得新开编号更高的模块**。
+
+### 4.2.5 R14 无环性再声明（零新增依赖边）
+
+**结论：DAG 拓扑在 R14 下不变，无环证明（§4.2）继续成立。**
+
+- **零新增依赖边**：R14 新增全部落在 **MOD-IB-23 / MOD-IB-24** 内部（项目枚举端点与 `X-IB-Project` 头契约 / 前端项目上下文 store 与注入点），**§4.1 依赖边清单逐行未改**；`w(MOD-IB-n) = n` 严格递减的构造性证明**不受影响**。
+- **不新增模块**：与 R7 / R8 / R13 同理 —— `GET /api/projects` 必然由组合根 `MOD-IB-23` 承载，若新开模块只能取 **≥27** 编号 → 产生 `23 → 27` 边，**违反 `w(A) > w(B)`**；故并入既有模块（§4.2.2 边界纪律继续适用）。
+- **既有边被复用而非新增**：`GET /api/projects`（IFC-IB-333）与 `X-IB-Project` 头契约（IFC-IB-334）均在 **MOD-IB-23**（不新增边）；前端 store 与 `client.ts` 注入点在 **MOD-IB-24**，其到 MOD-IB-23 的**既有边** `24 → 23`（仅 HTTP/SSE 契约）复用。
+- **单一入口纪律未被绕开**：授权判定仍**只**经注入的 `AuthzPolicy`（IFC-IB-032/033）；`X-IB-Project` **不是**鉴权凭据、不新增授权维度；前端仍**只**经 HTTP/SSE 契约（MOD-IB-24 → MOD-IB-23）取数，**不新增任何绕过路径**（ADR-22 / ADR-24）。
+- 「编号即拓扑序」继续适用于 GROUP_C；R14 的**边界纪律同 §4.2.2 末句**。
 
 ### 4.3 分层视图
 
@@ -1191,6 +1225,16 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 - **OQ 处置**：**OQ-IB-11 / 12 / 13 / 14 保持开放**；R13 只落地「服务端强制 / 可配置 / 可注入」的安全默认，**不裁决业务策略值**（ADR-20 / ADR-22 / ADR-27；`architecture_design.md` §10.1 R13 行）。
 - **架构侧对应**：`architecture_design.md` 1.5.0（REV-13）的 **ADR-18 ~ ADR-27**、**§2.0.4 R13 影响复核表**、§1.3 R13 注、[ARCH-ASSUMPTION-A9]、[TBD-T22] / [TBD-T23]；`tech_stack.md` 1.4.0（REV-13）。
 
+### 9.8 R14 覆盖率再声明（项目上下文选择与传播增量）
+
+**结论：REQ 覆盖不变（36/36 REQ-FUNC + 18 REQ-NFR），无新增缺口、无新增 REQ。**
+
+- **无新 REQ**：R14 为**回归缺陷修复**（修复 R13 实现落差），不新增需求条目；§9.1 / §9.2 的既有覆盖归属**不变**（MOD-IB-23 的「覆盖需求」已含 REQ-FUNC-IB-28 ~ IB-33，故 REQ-FUNC-IB-31 / IB-32 仍归 MOD-IB-23）。
+- **追踪落点**：IFC-IB-333 / 334 → REQ-FUNC-IB-31（账户 : 项目 = 1:1；admin 全局）、REQ-FUNC-IB-32（角色与权限模型 + 项目边界隔离）、REQ-FUNC-IB-23（多项目隔离）、US-IB-24 / AC-IB-24-03（admin 不受项目绑定限制）、AC-IB-24-02（ops 跨项目 403）；IFC-IB-335 / 336 → 上述同一组（前端落点）。
+- **OPEN ITEM（登记，不发明）**：R14 的「项目选择 UX」与「项目枚举端点」**无独立 REQ / AC**，已登记为需求缺口（见 `architecture_design.md` §10.1 R14 行）；在获得新 AC 前，测试门控映射到既有 **AC-IB-24-03 / AC-IB-24-02 / REQ-FUNC-IB-31 / REQ-FUNC-IB-23**。
+- **模块与依赖不变**：模块数仍 **26**、端口数仍 **15**、**§4.1 依赖边逐行未改**（§4.2.5）。
+- **架构侧对应**：`architecture_design.md` 1.6.0（REV-14）的 **ADR-28**、**§2.0.5 R14 影响复核表**、§10.1 R14 行、§10.3 R14 自检；`tech_stack.md` **NO_CHANGE**（无新第三方依赖）。
+
 ## 10. FreeArk 参考模块映射（只读对照，说明复用与改写边界）
 
 | FreeArk 现有资产 | 本基座对应 | 复用方式 |
@@ -1254,3 +1298,11 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
       - **OQ 未越权**：**OQ-IB-11 / 12 / 13 / 14 保持开放**；限速与审计为**条件性**（ADR-27），默认施工不含；架构层不自行扩围或缩围。
       - **凭据纪律**：全文只登记**键名**；**默认初始口令的字面量不在本文件出现**；令牌仅经 `Authorization` 头；`?token=` 纪律扩展至全部新端点；`?token=` / `password` 类在日志中的扫描须零命中（沿用 [B14]）。
       - **边界合规**：R13 增量**不含实现代码**（无函数体、无伪代码）；**未修改 FreeArk 任何文件**；需求侧文档只读未改；`tech_stack.md` **已同步（R13 有新第三方依赖）**；**未写入任何口令 / 令牌 / 密钥字面量**；本阶段**止于 GROUP_B**。
+    - **R14 自检（项目上下文选择与传播增量，回归缺陷修复轮）**：
+      - **零新增模块 / 端口 / 依赖边**：模块数仍 **26**、端口数仍 **15**；**§4.1 依赖边清单逐行未改**；新增工件并入 MOD-IB-23 / MOD-IB-24（§1 R14 补充纪律段；§4.2.5 无环性再声明）。
+      - **类型化未降级**：新增 `IFC-IB-333 ~ 336`（4 条）全部为 `name: type` + 可空性的**类型化契约**，**无实现体**；`X-IB-Project` 头契约的语义与已实现的 `AuthMiddleware` 直接对齐（IFC-IB-334）。
+      - **编号纪律未破**：`IFC-IB-001 ~ 332` 的号 / 名 / 签名 / 字段集**一字不动**（其中 `IFC-IB-324` 仅被**加成式扩展**，其文本不改）；新增 **333 ~ 336** 为**纯追加**；**`IFC-IB-285` 仍预留未分配**；既有重号 `IFC-IB-131` **登记不修**（残余项 R-9）。
+      - **fail-closed 为契约事实**：前端 `current` 为空 ⇒ **不注入** `X-IB-Project`（IFC-IB-335 / 336）⇒ 服务端取全局哨兵 ⇒ 项目级端点 fail-closed（IFC-IB-334）；**未选项目即不泄露**不被削弱。
+      - **单一授权真源为事实**：`X-IB-Project` **不是**鉴权凭据、不新增授权维度；授权判定仍只经注入的 `AuthzPolicy`（`IFC-IB-032/033` 未改）。
+      - **凭据纪律**：全文只登记**头名**（`X-IB-Project`）与**键名**；令牌仅经 `Authorization` 头；`?token=` 纪律对其余端点同样有效；**未写入任何口令 / 令牌 / 密钥字面量**。
+      - **边界合规**：R14 增量**不含实现代码**（无函数体、无伪代码）；**未修改 FreeArk 任何文件**；需求侧文档只读未改；`tech_stack.md` **未改（无新第三方依赖）**；本阶段**止于 GROUP_B**。

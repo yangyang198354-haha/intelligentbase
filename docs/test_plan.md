@@ -7,15 +7,16 @@
 | 文档 ID | DOC-IB-TP-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 测试计划 |
 | 产出代理 | test-engineer |
-| 调用 ID | INV-GROUP_D-INTELBASE-010（R12 增量）；**R13 增量 = INV-GROUP_D-INTELBASE-012**（见 §18）；原 INV-GROUP_D-INTELBASE-001 ~ -009 |
+| 调用 ID | **R14 增量（REV-14）= INV-GROUP_D-INTELBASE-014**（见 §19）；INV-GROUP_D-INTELBASE-010（R12 增量）；R13 增量 = INV-GROUP_D-INTELBASE-012（见 §18）；原 INV-GROUP_D-INTELBASE-001 ~ -009 |
+| revision | **REV-14**（R13 回归缺陷修复轮：全局管理员「当前项目」选择与 `X-IB-Project` 传播 —— 独立测试补测与验证） |
 | 项目 | intelligentbase |
-| 阶段 | GROUP_D / PHASE_07（测试计划）+ R7 增量（US-IB-17 / US-IB-18「UI 可视化配置」纳入测试范围）+ **R8 增量（FND-R7-01 修复回归：装配期唯一性校验）** + **R9 增量（FLAKE-IB-01 测试侧稳定性治理：连接级有界重试）** + **R10 增量（前端冒烟测试层正式化：`src/frontend/tests/frontend.smoke.test.js` 6 例纳入测试计划）** + **R11 增量（REQ-FUNC-IB-20 测试补全：US-IB-19「流式交付最终答复」/ US-IB-20「会话生命周期」纳入测试范围，含 5 条既有用例重挂 + 13 条新增）** + **R12 增量（R8 实现到位后的补测轮 REV-12-5：闭合 AC-IB-19-02 / AC-IB-20-04，补全 19-03 / 20-02 / 20-03 / 20-05 与 FND-R11-01 / BLK-R8-02，新增 16 条）** + **R13 增量（REV-13：US-IB-21 ~ US-IB-29 账户体系 / 会话 / 前端商用界面纳入测试范围；新增 32 条 Python + 7 条前端；登记 DEFECT-R13-01）** |
-| 版本 | 1.8.0（**R13 增量（REV-13）**：US-IB-21 ~ US-IB-29 纳入测试范围；Python 三层用例数 **200 → 239**（unit 76→95 / integration 105→123 / e2e 19→21；其中 **+7 为基线对账项**，见 §18.6）；前端冒烟层 **6 → 13** 例、仍自立一层不计入 239；新增登记 **DEFECT-R13-01**（IP 维度限速未生效））<br>1.7.0（**R12 增量（REV-12-5，补测轮）**：R8 设计（IFC-IB-298~308）**已落地于 `src/`**，本轮把 R11 登记的 2 项「未覆盖」AC（AC-IB-19-02 / AC-IB-20-04）**闭合**、4 项「部分覆盖」补全，并回补 **FND-R11-01**（`/api/chat/stream` 缺 `session_id` → 400）与 **BLK-R8-02**（专家**内部**关键词空/重复 → `expert_keyword_empty` / `expert_keyword_duplicate`）；**Python 三层用例数 184 → 200**（unit 70→76 / integration 96→105 / e2e 18→19，编号只增不改）；**前端冒烟层 6 例仍自立一层、不计入 200**）<br>1.6.1（R11 修复补丁：§3.2 主登记表 TC-INT-039 的归属列补齐为 US-IB-19 / AC-IB-19-01；用例数不变 184）<br>1.6.0（R11 增量：171 → 184；US-IB-19 / US-IB-20 纳入；5 条重挂 + 13 条新增）<br>R10 = 1.5.1（用例数不变 171；前端冒烟层 6 例独立计数）<br>R9 = 1.4.0（用例数不变 171；FLAKE-IB-01 → MITIGATED）<br>**版本线**：1.0.0(R1) → 1.1.0(R3) → 1.2.0(R7) → 1.3.0(R8) → 1.4.0(R9) → 1.5.0(R10) → 1.5.1(R10 修复) → 1.6.0(R11) → 1.6.1(R11 修复补丁) → **1.7.0(R12 补测)**；执行报告文件版本线另见 `docs/test_report.md` 1.8.0/R12） |
+| 阶段 | GROUP_D / PHASE_07（测试计划）+ R7 增量（US-IB-17 / US-IB-18「UI 可视化配置」纳入测试范围）+ **R8 增量（FND-R7-01 修复回归：装配期唯一性校验）** + **R9 增量（FLAKE-IB-01 测试侧稳定性治理：连接级有界重试）** + **R10 增量（前端冒烟测试层正式化：`src/frontend/tests/frontend.smoke.test.js` 6 例纳入测试计划）** + **R11 增量（REQ-FUNC-IB-20 测试补全：US-IB-19「流式交付最终答复」/ US-IB-20「会话生命周期」纳入测试范围，含 5 条既有用例重挂 + 13 条新增）** + **R12 增量（R8 实现到位后的补测轮 REV-12-5：闭合 AC-IB-19-02 / AC-IB-20-04，补全 19-03 / 20-02 / 20-03 / 20-05 与 FND-R11-01 / BLK-R8-02，新增 16 条）** + **R13 增量（REV-13：US-IB-21 ~ US-IB-29 账户体系 / 会话 / 前端商用界面纳入测试范围；新增 32 条 Python + 7 条前端；登记 DEFECT-R13-01）** + **R14 增量（REV-14：R13 回归缺陷修复的独立测试补测与验证 —— `GET /api/projects`（IFC-IB-333）/ `X-IB-Project` 传播（IFC-IB-334）/ 前端 `projectContext`（IFC-IB-335）/ `client.ts` 单一注入点（IFC-IB-336）纳入测试范围；新增 Python 3 条 + 前端 4 条；更正 R14 用例编号撞号并登记 R14-DEF-01）** |
+| 版本 | 1.9.0（**R14 增量（REV-14，INV-GROUP-D-INTELBASE-014）**：`GET /api/projects`（IFC-IB-333）/ `X-IB-Project` 传播（IFC-IB-334）/ 前端 `projectContext`（IFC-IB-335）/ `client.ts` 单一注入点（IFC-IB-336）纳入测试范围；对 REV-14 修复做**独立测试补测与验证**。Python 三层用例数 **242 → 245**（unit 95→95 / integration **126→129** / e2e 21→21；净增 3 条 —— TC-INT-126~128；另把 GROUP_C 的 R14 用例由撞号的 120~122 **更正为 123~125**，计数不变，**编号只增不改**）；前端冒烟层 **17 → 21** 例（R14 组由 4 例扩至 8 例）、仍自立一层不计入 245；登记 **R14-DEF-01**（R14 用例撞号 TC-INT-120~122，与 R13 既有占号冲突）与 R14 观测项）<br>1.8.0（**R13 增量（REV-13）**：US-IB-21 ~ US-IB-29 纳入测试范围；Python 三层用例数 **200 → 239**（unit 76→95 / integration 105→123 / e2e 19→21；其中 **+7 为基线对账项**，见 §18.6）；前端冒烟层 **6 → 13** 例、仍自立一层不计入 239；新增登记 **DEFECT-R13-01**（IP 维度限速未生效））<br>1.7.0（**R12 增量（REV-12-5，补测轮）**：R8 设计（IFC-IB-298~308）**已落地于 `src/`**，本轮把 R11 登记的 2 项「未覆盖」AC（AC-IB-19-02 / AC-IB-20-04）**闭合**、4 项「部分覆盖」补全，并回补 **FND-R11-01**（`/api/chat/stream` 缺 `session_id` → 400）与 **BLK-R8-02**（专家**内部**关键词空/重复 → `expert_keyword_empty` / `expert_keyword_duplicate`）；**Python 三层用例数 184 → 200**（unit 70→76 / integration 96→105 / e2e 18→19，编号只增不改）；**前端冒烟层 6 例仍自立一层、不计入 200**）<br>1.6.1（R11 修复补丁：§3.2 主登记表 TC-INT-039 的归属列补齐为 US-IB-19 / AC-IB-19-01；用例数不变 184）<br>1.6.0（R11 增量：171 → 184；US-IB-19 / US-IB-20 纳入；5 条重挂 + 13 条新增）<br>R10 = 1.5.1（用例数不变 171；前端冒烟层 6 例独立计数）<br>R9 = 1.4.0（用例数不变 171；FLAKE-IB-01 → MITIGATED）<br>**版本线**：1.0.0(R1) → 1.1.0(R3) → 1.2.0(R7) → 1.3.0(R8) → 1.4.0(R9) → 1.5.0(R10) → 1.5.1(R10 修复) → 1.6.0(R11) → 1.6.1(R11 修复补丁) → **1.7.0(R12 补测)**；执行报告文件版本线另见 `docs/test_report.md` 1.8.0/R12） |
 | status | DRAFT（待 PM 门控） |
 | 创建日期 | 2026-09-26 |
-| 更新日期 | 2026-10-06（R13 增量（REV-13）：US-IB-21 ~ US-IB-29 纳入 + §18） |
-| 上游输入 | `docs/user_stories.md`（**1.4.0 / APPROVED，29 US**；R11 新增 US-IB-19 / US-IB-20，**R13 新增 US-IB-21 ~ US-IB-29，29 组 AC-IB-21-* ~ AC-IB-29-***；GROUP_C R13 实现门控 **GR-C-009 = PASS_WITH_CONDITIONS**）、`docs/requirements_spec.md`（**1.3.0 / APPROVED**，含 REQ-FUNC-IB-20 承接（US-IB-19/20）与 REQ-FUNC-IB-25/26/27）、`docs/implementation_plan.md`（**2.6.0 / R11–R12**，GROUP_C 门控 GR-C-005 = R7_PASS；其文件头 `<status>` 字段仍为 DRAFT，以 `docs/phase_status.md` 为权威）、`docs/architecture_design.md`（**1.4.0 / R8**，ADR-17 + IFC-IB-298~308）/ `docs/module_design.md`（**1.4.0 / R8**，§9.6 逐 AC 归属）/ `docs/tech_stack.md`（**1.3.0 / R7**）、`docs/code_review_report.md`（R7 增量 §12）、`docs/cicd_pipeline.md`（**1.1.1 / R10**，阶段9 定义）、`src/ib/**` + `src/ibweb/**` + `src/ib_embed/**` + `src/frontend/**`（只读） |
-| 下游产物 | `docs/test_report.md`（PHASE_08/09 执行报告；R7 增量见其 §12、R8 增量见其 §13、R9 增量见其 §14、R10 增量见其 §15、R11 增量见其 §16、R12 增量见其 §17、**R13 增量见其 §18**） |
+| 更新日期 | 2026-10-06（R14 增量（REV-14）：`GET /api/projects` 与 `X-IB-Project` 传播 / 前端项目上下文纳入 + §19；R13 增量见 §18） |
+| 上游输入 | `docs/user_stories.md`（**1.4.0 / APPROVED，29 US**；R11 新增 US-IB-19 / US-IB-20，**R13 新增 US-IB-21 ~ US-IB-29，29 组 AC-IB-21-* ~ AC-IB-29-***；GROUP_C R13 实现门控 **GR-C-009 = PASS_WITH_CONDITIONS**）、`docs/requirements_spec.md`（**1.3.0 / APPROVED**，含 REQ-FUNC-IB-20 承接（US-IB-19/20）与 REQ-FUNC-IB-25/26/27）、`docs/implementation_plan.md`（**2.6.0 / R11–R12**，GROUP_C 门控 GR-C-005 = R7_PASS；其文件头 `<status>` 字段仍为 DRAFT，以 `docs/phase_status.md` 为权威）、`docs/architecture_design.md`（**1.4.0 / R8**，ADR-17 + IFC-IB-298~308）/ `docs/module_design.md`（**1.4.0 / R8**，§9.6 逐 AC 归属）/ `docs/tech_stack.md`（**1.3.0 / R7**）、`docs/code_review_report.md`（R7 增量 §12）、`docs/cicd_pipeline.md`（**1.1.1 / R10**，阶段9 定义）；**R14 增量新增输入**：`docs/rev14_project_context_apply_package.md`（REV-14 工作包）、`docs/architecture_design.md`（**1.6.0 / REV-14**，ADR-28 + §2.0.5 + §10.1 R14 OPEN ITEM）/ `docs/module_design.md`（**1.6.0 / REV-14**，IFC-IB-333~336）、GROUP_C R14 实现门控 **GR-C-010 = PASS_WITH_CONDITIONS**（open_item_3 = R14-L-01）、`src/ib/**` + `src/ibweb/**` + `src/ib_embed/**` + `src/frontend/**`（只读） |
+| 下游产物 | `docs/test_report.md`（PHASE_08/09 执行报告；R7 增量见其 §12、R8 增量见其 §13、R9 增量见其 §14、R10 增量见其 §15、R11 增量见其 §16、R12 增量见其 §17、R13 增量见其 §18、**R14 增量见其 §19**） |
 | 环境约束 | 全部测试离线可跑：SQLite/内存替身/临时文件系统；**严禁**连接生产库 / 真实 Qdrant / DeepSeek / bge-m3 真实服务 / 任何外部网络 |
 | 凭据纪律 | 任何 secret 只经环境变量注入，测试代码与夹具中不含真实 token/key/密码 |
 ---
@@ -1181,3 +1182,86 @@ selfcheck 31/31；含抖动靶点复跑）见 `docs/test_report.md` **§14**。
 - **+7 差值来源（对账结论）**：**非集合计数错误**，全部落在**单元层**，来自 `tests/unit/test_llm_tool_loop.py` 新增的 **7 条用例**（TC-UNIT-076 ~ TC-UNIT-082），由 commit **`fa0a7a4`（"fix(llm): 实现完整工具调用循环，修复聊天检索不落地的根因"）**引入 —— 属**基线记录之后**由 developer 侧提交新增，未被 R12 门控登记。
 - **`tests/**` 归属观察**：`git status --short tests/` 在 R13 起始快照为空，即 **GROUP_C 的 R13 增量未新增 / 未改动任何 `tests/**` 文件**（`tests/` 全程为 GROUP_D 领地）；但历史上 developer 提交（`fa0a7a4`、`9b04b20`）曾**直接增改 `tests/**`**（即上述 +7 来源）—— 建议 PM 在流程上明确 `tests/**` 的写权边界。
 - **R13 后目标基线**：**239**（unit **95** / integration **123** / e2e **21**），较 207 增 32（本轮新增：unit 12 + integration 18 + e2e 2 = 32）；前端冒烟层 6 → **13**，**仍自立一层、不计入 239**。
+
+---
+
+## §19 R14 增量（REV-14：R13 回归缺陷修复的独立测试补测与验证）
+
+> 触发：**REV-14**（R13 回归缺陷修复：全局管理员「当前项目」选择与 `X-IB-Project` 传播）。上游 GROUP_C 实现门控 **GR-C-010 = PASS_WITH_CONDITIONS**。
+> 调用 ID：**INV-GROUP-D-INTELBASE-014**。本轮**独立复核 + 补测**：新增 Python **3 条**（TC-INT-126 ~ 128）+ 前端 **4 条**（用例 18 ~ 21）；并把 GROUP_C R14 组的 **3 条由撞号 TC-INT-120 ~ 122 更正为 TC-INT-123 ~ 125**（恢复「编号唯一、只增不改」）。
+> 硬约束：**未改 `src/**`**、**未 commit / push / 部署**、**未触网**、**未触碰目标机 192.168.31.133**；测试代码与夹具内**无任何真实凭据**（口令仍为占位替身值）。
+
+### 19.1 测试策略与范围（R14）
+
+- **范围（in-scope）**
+  - **`GET /api/projects`（IFC-IB-333）授权口径**：admin 见全部 / ops 仅见自身 / 未认证 `401` / `?token=`·`?access_token=` 一律 `4xx` / 零 `Set-Cookie` / 非 `GET` 一律 `405`。
+  - **`X-IB-Project` 头契约（IFC-IB-334，加成式扩展既有 `AuthMiddleware`，其代码零改动）**：admin 选定项目后项目级端点解 fail-closed（`/api/config/definition` 无头 `503` → 带头 `200`）；**未选项目仍 fail-closed**；未知项目名不校验存在性（仍 `503`）；ops 跨项目 `403 project_mismatch`；ops 绑定**未登记**项目时刻 fail-closed。
+  - **前端 `projectContext`（IFC-IB-335）**：`load` / `select` / `clear` / `headerValue`；ops 结构上不可切换；`load` 失败 / 结果集为空 ⇒ `current = null`（不注入头，fail-closed）；admin 单项目预选；`select` 白名单。
+  - **`client.ts headers()` 单一注入点（IFC-IB-336）**：`current` 非空 ⇒ 注入 `X-IB-Project`、为空 ⇒ 不注入；SSE 路径（`chatStream` / `chatResume`）同经 `headers()`；调用点 `extra` **不得**覆盖 provider 值；provider 抛错 ⇒ 不注入。
+- **范围（out-of-scope）**：**真实浏览器**下 `el-select` 交互与 `<router-view :key>` 重挂载的**运行期**行为（见 §19.4 **R14-L-01**）；真实 TLS 握手；外部网络 / 真实 Qdrant / DeepSeek / bge-m3（离线约束）。
+- **测试环境**：Python 3.14.6 / pytest 9.1.1 / Django 6.0.6；**内存账户存储** + Django test Client（进程内，不触网）；前端 `node --test`（Node **v24.18.0**，支持 `.ts` 类型擦除导入）。
+- **覆盖率目标（沿用 §6）**：单元 ≥ 80%、集成 ≥ 90%、E2E 关键路径 100%。
+
+### 19.2 测试用例清单（R14）
+
+**（A）集成层（INT）—— `tests/integration/test_project_context_int_r14.py`（6 条：TC-INT-123 ~ 128）**
+
+| TC-ID | 所属 US | 关联 AC | 级别 | 描述 |
+|-------|--------|--------|------|------|
+| TC-INT-123 | US-IB-24 | AC-IB-24-03 | INT | `/api/projects` **非项目级端点**：admin 未选定项目也 `200` 返回**全部**项目；未认证 `401`；`?token=`/`?access_token=` `400`；零 `Set-Cookie`；条目字段集固定 `{project_id,name,is_current}` |
+| TC-INT-124 | US-IB-24 | AC-IB-24-03 | INT | admin 未选 ⇒ `/api/config/definition` `503`（**未选项目即不泄露**）；带头选 `p_alpha` ⇒ `200`（**R13 回归缺陷修复的直接证据**）；未知 `p_ghost` ⇒ `503`；`is_current` 反映**本请求**的 effective_project |
+| TC-INT-125 | US-IB-24 | AC-IB-24-02 | INT | ops 列表**恒 1 项**（自身，`is_current=True`，结构上不可切换）；跨项目头 ⇒ `403 project_mismatch`；自身 / 缺省 ⇒ 放行 |
+| TC-INT-126 | US-IB-24 | AC-IB-24-03 | INT | **方法纪律**：`POST`/`PUT`/`DELETE`/`PATCH` ⇒ `405 method_not_allowed`（admin 与 ops 同此）、零 `Set-Cookie`；`GET` 仍 `200`（此前该 `405` 分支无任何用例触达） |
+| TC-INT-127 | US-IB-24 | AC-IB-24-02 | INT | ops 绑定**未登记**项目 ⇒ 列表**为空**（**不臆造、不回落枚举他项目**）；其项目级端点 `503`；声明他项目仍 `403`（边界不因自身未登记而放宽） |
+| TC-INT-128 | US-IB-24 | AC-IB-24-03 | INT | 列表按 `project_id` **升序**稳定；`X-IB-Project` 首尾空白**归一**（`"  p_alpha  "` ≡ `"p_alpha"`）；未知头值全 `is_current=False` 且项目级 `503` |
+
+> **编号更正（R14-DEF-01）**：TC-INT-123 ~ 125 为 GROUP_C 于本文件最初提交的 3 条（原编号 120 ~ 122），因其与 R13 已登记并占用的 `tests/integration/test_accounts_deploy_int_r13.py`（TC-INT-120 nginx TLS 模板 / TC-INT-121 运行时键登记 / TC-INT-122 迁移列级一致，见 §18.2~18.3）**撞号**，本轮更正为 123 ~ 125（**仅改名，断言与计数不变**）。详见 `docs/test_report.md` §19.5。
+
+**（B）前端冒烟层（FE，独立层）—— `src/frontend/tests/frontend.smoke.test.js` 用例 14 ~ 21（层内合计 21）**
+
+| TC-ID | 所属 US | 关联 AC | 级别 | 描述 |
+|-------|--------|--------|------|------|
+| TC-FE-014 | US-IB-24 | AC-IB-24-03 | FE | 用例 14（结构）：`X-IB-Project` 字面量**只**出现在 `stores/project.ts`（单一取值出口）；`client.ts` 不得含该字面量 |
+| TC-FE-015 | US-IB-24 | AC-IB-24-03 | FE | 用例 15（结构）：SSE 调用点（`chatStream`/`chatResume`）同经 `this.headers()`，不重复拼头 |
+| TC-FE-016 | US-IB-24 | AC-IB-24-03 | FE | 用例 16（结构）：控制台 `el-select` 选择器 + `<router-view :key>`（切换即重置项目内视图态）+ `env.ts` 接线 |
+| TC-FE-017 | US-IB-24 | AC-IB-24-03 | FE | 用例 17（**行为**）：`headers()` 依 `current` 注入 / 不注入（含 SSE 头集合）+ ops `select` 为 no-op |
+| TC-FE-018 | US-IB-24 | AC-IB-24-03 | FE | 用例 18（**行为**）：`load` **失败** ⇒ `current=null`、`available=[]`、记录 `error`，**不注入头**（fail-closed） |
+| TC-FE-019 | US-IB-24 | AC-IB-24-03 | FE | 用例 19（**行为**）：admin 结果集**恰 1 项** ⇒ **预选**并仍显式发送请求头；`select` 只接受 `available` 中的 id（拒不可见 / 空白） |
+| TC-FE-020 | US-IB-24 | AC-IB-24-02 | FE | 用例 20（**行为**）：ops 结果集**为空** ⇒ `current=null`（**不臆造、不注入头**） |
+| TC-FE-021 | US-IB-24 | AC-IB-24-03 | FE | 用例 21（**行为**）：项目头值**只**来自 provider（调用点 `extra` 不能覆盖）；provider 抛错 ⇒ 不注入（不炸 `headers()`） |
+
+> **说明**：用例 14 ~ 17 为 GROUP_C 于本文件最初追加的 4 条；本轮（INV-GROUP-D-INTELBASE-014）将其**正式登记**为 TC-FE-014 ~ 017，并**新增** 18 ~ 21（TC-FE-018 ~ 021）。前端层**自立一层、不并入 Python 计数**。
+
+### 19.3 AC ↔ TC 覆盖矩阵（R14）
+
+| AC-ID / 依据 | 覆盖 TC | 结论 |
+|-------------|---------|------|
+| **AC-IB-24-03**（admin 全局可访问任一项目） | TC-INT-123、TC-INT-124、TC-INT-126、TC-INT-128、TC-FE-014 ~ 019、TC-FE-021 | 覆盖 |
+| **AC-IB-24-02**（ops 跨项目 403） | TC-INT-125、TC-INT-127、TC-FE-020 | 覆盖 |
+| **REQ-FUNC-IB-31**（账户 : 项目 = 1:1；admin 全局） | TC-INT-125、TC-INT-127 | 覆盖 |
+| **REQ-FUNC-IB-23**（多项目隔离 fail-closed） | TC-INT-124、TC-INT-127 | 覆盖 |
+| **REQ-FUNC-IB-32**（角色与项目边界） | TC-INT-125、TC-INT-127 | 覆盖 |
+
+- **OPEN ITEM（需求侧缺口，按纪律不发明 AC）**：`architecture_design.md` §10.1 R14 行登记「项目选择 UX + `GET /api/projects`」**无独立 REQ / AC**；在获得新 AC 前，本计划按设计口径**映射到既有 AC**（AC-IB-24-03 / AC-IB-24-02 / REQ-FUNC-IB-31 / REQ-FUNC-IB-23），**未新增 AC**。
+
+### 19.4 不可测试项与残余（R14-L-01 处置）
+
+| 项 | 已覆盖部分 | 残余（未断言） | 处置与理由 |
+|----|-----------|---------------|-----------|
+| **R14-L-01**：真实浏览器 `el-select` 端到端交互 + `<router-view :key>` 重挂载的**运行期**行为 | **行为层**已真跑：项目头依 `current` 注入/不注入（含 SSE 头集合）、ops 不可切换、`load` 失败/空集 fail-closed、单项目预选（TC-FE-017 ~ 021）；**结构层**已断言选择器与 `:key` 存在（TC-FE-016）；**服务端**已断言越权 `403` 与 `ops` 仅见自身（TC-INT-125/127） | 浏览器内真实点击 `el-select`、下拉展开、切换后组件**真实重挂载**的 DOM 现象 | **接受行为层覆盖**：安全相关不变量（单一注入点、ops 不可切换、fail-closed）已在**模块行为层 + 服务端**双重真跑覆盖，浏览器渲染属前端运行期；按 §5 / §18.4 既有口径，**无自动化浏览器环境**（离线约束），故**登记为 not-verifiable（残余）**，**不引入**浏览器自动化 / 网络依赖。**
+
+### 19.5 门控与度量口径（R14）
+
+- **度量定义**：`total = pass + fail + skip + blocked`（精确等式）；`通过率 = pass / (pass + fail)`（skip / blocked **不计入分母**）。
+- **门控**：unit **≥ 80%** → 才可执行 integration；integration **≥ 90%** → 才可执行 e2e；E2E **关键路径 100%**。
+- **零 masking 纪律**：**0 skip / 0 xfail / 0 blocked**；未执行不得记 PASS。
+- **结论数值**（详见 `docs/test_report.md` §19.1）：unit **95/95 = 100%**、integration **129/129 = 100%**、e2e **21/21 = 100%**（关键路径 100%）；前端 **21/21**（独立层）。
+
+### 19.6 计数基线与算术对账（R14）
+
+- **本轮起始基线（INV-GROUP-D-INTELBASE-014 执行前）**：`python -m pytest tests -q` = **242 passed**（EXIT 0）；分层 unit **95** / integration **126** / e2e **21**（integration 126 **已含** GROUP_C 的 R14 用例 TC-INT-120 ~ 122 共 3 条）；前端冒烟 **17/17**；`selfcheck.py` **47/47**。
+- **本轮净增**：integration **+3**（TC-INT-126 ~ 128）→ **129**；前端 **+4**（用例 18 ~ 21）→ **21**；unit / e2e / selfcheck **不变**。
+- **编号更正（计数中性）**：TC-INT-120 ~ 122 → **TC-INT-123 ~ 125**（仅改名，不增删用例，**不改变计数**）。
+- **本轮后基线**：**245**（unit **95** / integration **129** / e2e **21**）；前端冒烟 **21**（独立层，不计入 245）。
+- **算术**：`95 + 129 + 21 = 245` ✓；`129 = 129 + 0 + 0 + 0` ✓。
+- **`tests/**` 写权说明（如实登记）**：本轮新增 / 正式化**仅**落在 `tests/integration/test_project_context_int_r14.py` 与 `src/frontend/tests/frontend.smoke.test.js`；**未改** `src/scripts/selfcheck.py`（属 `src/**`，只读）；**未改**任何既有编号（105 ~ 122）与既有断言。

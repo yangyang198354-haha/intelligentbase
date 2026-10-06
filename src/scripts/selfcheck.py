@@ -3368,6 +3368,187 @@ def r13_deploy_discipline() -> None:
     assert not leaked, f"R13 键不得进入核心装配开关集合 IB_ENV_KEYS：{leaked}"
 
 
+# --------------------------------------------------------------------------- #
+# R14 增量（项目上下文选择与传播；IFC-IB-333 / 334 / 335 / 336）
+# --------------------------------------------------------------------------- #
+
+
+@_case("r14_project_context：/api/projects 授权口径 + X-IB-Project 传播 + fail-closed（IFC-IB-333/334）")
+def r14_project_context() -> None:
+    """用 Django 测试客户端跑 R14 端点。**不连任何外部服务**（内存账户 / 台账 / 定义文档）。
+
+    验证四条口径（对应 R13 回归缺陷的直接修复证据）：
+      * 该端点**不是**项目级端点 —— admin 未选项目也 `200`（fail-closed 的唯一出口）；
+      * admin 见全部项目 / ops 仅见自身（结构上不可切换）；
+      * admin 选定项目后，带 `X-IB-Project` 的项目级请求成功（`/api/config/definition` 200）；
+      * 未选项目（无头）⇒ 项目级端点仍 fail-closed（503）；ops 跨项目 ⇒ 403 project_mismatch。
+    """
+    os.environ["DJANGO_SETTINGS_MODULE"] = "ibweb.settings"
+    os.environ["IB_CONFIG_SOURCE"] = "dict"
+    os.environ["IB_AUTHZ_POLICY_MODULE"] = "ibweb.accounts.policy"
+    os.environ.pop("IB_ACCOUNT_BACKEND", None)
+
+    import json
+
+    from ibweb.composition import build_application, build_deps
+
+    try:
+        deps = build_deps(OFFLINE_RAW, force=True)
+
+        import django
+
+        django.setup()
+        build_application(deps)
+
+        from django.test import Client
+
+        from ib.ledger import hash_password
+
+        client = Client()
+        store = deps.account_store
+        store.create_user("root_admin", hash_password(_PW_A), "admin", None)
+        store.create_user("ops1", hash_password(_PW_B), "ops", "p_alpha")
+
+        def post(path: str, payload: dict[str, object] | None = None, **extra: object) -> Any:
+            return client.post(
+                path, data=json.dumps(payload or {}), content_type="application/json", **extra
+            )
+
+        # --- 凭据纪律：未认证 401、查询串令牌 4xx（中间件先于路由拒绝） --------- #
+        assert client.get("/api/projects").status_code == 401
+        assert client.get("/api/projects?token=x").status_code == 400
+        assert client.get("/api/projects?access_token=x").status_code == 400
+
+        # --- admin 登录并解除首登强制改密 -------------------------------------- #
+        login = post("/api/auth/login", {"username": "root_admin", "password": _PW_A})
+        assert login.status_code == 200, login.content
+        admin_auth = {"HTTP_AUTHORIZATION": f"Bearer {login.json()['token']}"}
+        assert post(
+            "/api/auth/change-password",
+            {"old_password": _PW_A, "new_password": _PW_C},
+            **admin_auth,
+        ).status_code == 200
+
+        # --- 该端点**不是**项目级端点：未选项目的全局主体也 200 ----------------- #
+        listed = client.get("/api/projects", **admin_auth)
+        assert listed.status_code == 200, listed.content
+        assert "Set-Cookie" not in listed.headers, "出现 Set-Cookie（零 Cookie 纪律）"
+        items = listed.json()["items"]
+        assert {i["project_id"] for i in items} == {"p_alpha", "p_beta"}, items
+        assert {i["project_id"]: i["name"] for i in items}["p_alpha"] == "自检项目 A", items
+        assert all(i["is_current"] is False for i in items), items
+
+        # --- 未选项目：项目级端点 fail-closed（可视化配置 503）----------------- #
+        nocur = client.get("/api/config/definition", **admin_auth)
+        assert nocur.status_code == 503, f"未选项目应 fail-closed（503），实际 {nocur.status_code}"
+
+        # --- admin 选定项目：带 X-IB-Project 的项目级请求成功 ------------------- #
+        alpha = client.get("/api/config/definition", HTTP_X_IB_PROJECT="p_alpha", **admin_auth)
+        assert alpha.status_code == 200, alpha.content
+        cur = {
+            i["project_id"]: i
+            for i in client.get(
+                "/api/projects", HTTP_X_IB_PROJECT="p_alpha", **admin_auth
+            ).json()["items"]
+        }
+        assert cur["p_alpha"]["is_current"] is True and cur["p_beta"]["is_current"] is False, cur
+        # 未知项目名不校验存在性：effective_project 即为该串 ⇒ 项目级端点 fail-closed。
+        assert client.get(
+            "/api/config/definition", HTTP_X_IB_PROJECT="p_ghost", **admin_auth
+        ).status_code == 503
+
+        # --- ops：仅见自身（长度恒为 1）--------------------------------------- #
+        ops_login = post("/api/auth/login", {"username": "ops1", "password": _PW_B})
+        assert ops_login.status_code == 200, ops_login.content
+        ops_auth = {"HTTP_AUTHORIZATION": f"Bearer {ops_login.json()['token']}"}
+        assert post(
+            "/api/auth/change-password",
+            {"old_password": _PW_B, "new_password": _PW_C},
+            **ops_auth,
+        ).status_code == 200
+        ops_items = client.get("/api/projects", **ops_auth).json()["items"]
+        assert len(ops_items) == 1, f"ops 必须仅见自身项目，实际 {ops_items}"
+        assert ops_items[0]["project_id"] == "p_alpha" and ops_items[0]["is_current"] is True, ops_items
+        # ops 发送与其绑定不符的头 → 403 project_mismatch（IFC-IB-334）。
+        mismatch = client.get("/api/config/definition", HTTP_X_IB_PROJECT="p_beta", **ops_auth)
+        assert mismatch.status_code == 403, mismatch.content
+        assert mismatch.json()["error"]["code"] == "project_mismatch"
+        # ops 发送自身项目头 / 缺省 → 放行。
+        assert client.get(
+            "/api/config/definition", HTTP_X_IB_PROJECT="p_alpha", **ops_auth
+        ).status_code == 200
+        assert client.get("/api/config/definition", **ops_auth).status_code == 200
+    finally:
+        os.environ.pop("IB_AUTHZ_POLICY_MODULE", None)
+        build_deps(OFFLINE_RAW, force=True)
+        build_application()
+
+
+@_case("r14_frontend_project_discipline：单点注入 + SSE 覆盖 + 项目选择器 / 视图重置（IFC-IB-335/336）")
+def r14_frontend_project_discipline() -> None:
+    """源码级纪律检查（不需要 `npm install`）：`X-IB-Project` 的**唯一**注入点与 SSE 覆盖。"""
+    import pathlib
+    import re
+
+    root = pathlib.Path(_SRC) / "frontend" / "src"
+
+    def _strip(text: str) -> str:
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+        text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+        return re.sub(r"^[ \t]*//.*$", "", text, flags=re.MULTILINE)
+
+    def read(rel: str) -> str:
+        return _strip((root / rel).read_text(encoding="utf-8"))
+
+    project_ts = read("stores/project.ts")
+    client_ts = read("api/client.ts")
+    env_ts = read("app/env.ts")
+    layout = read("layouts/ConsoleLayout.vue")
+
+    # 1) store 齐备：状态 + 动作 + headerValue 的**唯一**取值出口。
+    for symbol in ("available", "current", "select", "load", "clear", "headerValue"):
+        assert symbol in project_ts, f"stores/project.ts 缺少 {symbol}（IFC-IB-335）"
+    assert "X-IB-Project" in project_ts, "headerValue 未产出 X-IB-Project"
+    assert "role !== 'admin'" in project_ts or "role !== \"admin\"" in project_ts, (
+        "select 未限制为仅 admin 可调用（ops 不可切换）"
+    )
+    # store 对 client 只做**类型**导入（避免 ESM 循环依赖）。
+    assert "import type" in project_ts and "from '../api/client'" in project_ts, (
+        "stores/project.ts 应以 import type 引 client 类型（避免循环依赖）"
+    )
+
+    # 2) client.ts：提供者 + 单一注入点；字面量 `X-IB-Project` **不**出现在 client.ts。
+    assert "setProjectHeaderProvider" in client_ts, "client.ts 未暴露项目头提供者（IFC-IB-336）"
+    assert "projectHeader()" in client_ts or "projectHeader(" in client_ts, (
+        "headers() 未合并项目头提供者"
+    )
+    assert "listProjects" in client_ts, "client.ts 缺少 listProjects（IFC-IB-333）"
+    assert "X-IB-Project" not in client_ts, (
+        "client.ts 出现 X-IB-Project 字面量 —— 取值只应来自 projectContext.headerValue()（单一注入点）"
+    )
+
+    # 3) SSE 覆盖：chatStream / chatResume 均经 `this.headers(`（不重复拼头）。
+    for call in ("async chatStream", "async chatResume"):
+        assert call in client_ts, f"client.ts 缺少 {call}"
+    assert client_ts.count("this.headers(") >= 3, (
+        "headers() 调用点少于 3（预期：request / chatStream / chatResume）—— SSE 未同经注入点"
+    )
+    # 调用点不得自行拼接项目头（第二注入点）。
+    assert client_ts.count("X-IB-Project") == 0
+
+    # 4) 装配点接线：env.ts 用 projectContext 注入提供者。
+    assert "setProjectHeaderProvider" in env_ts and "projectContext" in env_ts, (
+        "app/env.ts 未接线项目头提供者（唯一装配点）"
+    )
+
+    # 5) 控制台：admin 选择器 + ops 只读 + 切换即重置视图态（router-view :key）。
+    assert "el-select" in layout, "控制台缺少项目选择器（admin）"
+    assert "projectContext.select" in layout, "选择器未调用 projectContext.select"
+    assert re.search(r"<router-view[^>]*:key", layout), (
+        "router-view 未以当前项目为键 —— 切换项目不会重置项目内视图态（有串项显示风险）"
+    )
+
+
 def main() -> int:
     print("=" * 72)
     print("intelligentbase 离线自检（GROUP_C 自我验证；正式测试套件属 GROUP_D）")
@@ -3423,6 +3604,9 @@ def main() -> int:
         r13_account_http_contract,
         r13_frontend_auth_discipline,
         r13_deploy_discipline,
+        # ---- R14 增量（项目上下文选择与传播；IFC-IB-333~336） ----
+        r14_project_context,
+        r14_frontend_project_discipline,
     ]
     for case in cases:
         case()

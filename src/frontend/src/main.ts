@@ -30,7 +30,7 @@ import 'element-plus/theme-chalk/dark/css-vars.css';
 import './styles/theme.css';
 
 import App from './App.vue';
-import { client, session } from './app/env';
+import { client, projectContext, session } from './app/env';
 import { router } from './router';
 import { initTheme } from './stores/theme';
 import { setUnauthorizedHandler } from './api/client';
@@ -39,8 +39,10 @@ initTheme();
 
 // 全局 401：清会话态 + 回登录页。用 `replace` 而非 `push`，避免用户按「后退」又回到
 // 一个必然 401 的页面（那会形成「后退 → 401 → 跳登录 → 后退」的死循环观感）。
+// R14：同时清空项目上下文 —— 否则「当前项目」会跨会话残留，落到下一个登录者头上。
 setUnauthorizedHandler(() => {
   session.clear();
+  projectContext.clear();
   const current = router.currentRoute.value;
   if (current.name !== 'login') {
     void router.replace({ name: 'login', query: { next: current.fullPath } });

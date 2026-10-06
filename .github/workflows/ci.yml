@@ -8,6 +8,14 @@
 #   * 阶段2 追加「Schema/迁移检查」（003_accounts.sql 语法 + 幂等 + 与代码生成器单源一致）。
 #   * 测试基线修正：unit 95 / integration 123 / e2e 21 / full 239（0 skip/xfail）；前端冒烟 13。
 #   * bcrypt（>=4,<5）已随 requirements-offline.txt 安装（R13 账户体系离线自测需要真 bcrypt）。
+#
+# REV-14 增量（INV-GROUP_E-INTELBASE-005）：R13 回归缺陷修复（全局管理员「当前项目」选择 +
+#   X-IB-Project 传播）。无迁移 / 无新依赖 / 无新 env 键、package.json 与 lock 零改动 —— 故
+#   **不新增、不删除、不修改任何 step**，仅同步下方注释基线标签：
+#   * 测试基线：unit 95 / integration 129 / e2e 21 / full 245（0 skip/xfail）；前端冒烟 21。
+#   * R14 新用例随既有 step 自动纳入：集成层 test_project_context_int_r14.py（TC-INT-123~128）、
+#     前端层 frontend.smoke.test.js（TC-FE-018~021）；selfcheck.py 47/47（含 2 条 R14 用例）。
+#   * 硬门集合不变（禁 Docker / 禁 PyMuPDF / langchain-openai<0.3 / langchain-core 区间 / Python 范围）。
 
 name: CI
 
@@ -87,15 +95,15 @@ jobs:
       - name: Unit tests (阶段3)
         run: python -m pytest tests/unit -q
 
-      # ---- 阶段 4：Integration（基线 123/123，R13）----
+      # ---- 阶段 4：Integration（基线 129/129，R14；R13 为 123）----
       - name: Integration tests (阶段4)
         run: python -m pytest tests/integration -q
 
-      # ---- 阶段 5：E2E（基线 21/21，R13；含端到端问答 smoke TC-E2E-001）----
+      # ---- 阶段 5：E2E（基线 21/21，R13/R14 未变；含端到端问答 smoke TC-E2E-001）----
       - name: E2E tests (阶段5)
         run: python -m pytest tests/e2e -q
 
-      # ---- 阶段 6：Full suite + coverage（基线 239/239，0 skip/xfail；覆盖率仅记录不设门）----
+      # ---- 阶段 6：Full suite + coverage（基线 245/245，R14；0 skip/xfail；覆盖率仅记录不设门）----
       - name: Full suite + coverage (阶段6)
         run: python -m pytest tests --cov=ib --cov=ibweb --cov=ib_embed -q
 
@@ -149,6 +157,8 @@ jobs:
       #      含「package-lock.json 与 package.json 同步」回归闸，守住 R10 的 EUSAGE 根因）。
       # 顺序为先 build 后 test —— 冒烟用例 6 断言 dist/ 产物，须待 vite build 产出后再运行。
       # R13：前端冒烟扩至 13 例（TC-FE-001~013；新增登录/会话/控制台外壳/零旁路 7 例）。
+      # R14：前端冒烟扩至 21 例（TC-FE-014~021；项目上下文单点注入 / SSE 覆盖 / ops 不可切换 /
+      #      注入 fail-closed —— 行为层真跑）。
       - name: Set up Node
         uses: actions/setup-node@v4
         with:

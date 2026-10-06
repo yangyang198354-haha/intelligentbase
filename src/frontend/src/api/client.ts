@@ -4,6 +4,8 @@
  *             同一契约的路径写法差异，见 implementation_plan §8 偏差 D-09）
  *             IFC-IB-283（R2）`fetchFileImage` / `fileImageUrl`：页面图字节取用
  *             IFC-IB-294 / 295（R7）`definitionConfig` / `saveDefinition`：定义文档读写
+ *             IFC-IB-333 / 336（R14）`listProjects` + `headers()` 的 `X-IB-Project` 单一注入点
+ *             （含 SSE `chatStream` / `chatResume`，二者同经 `headers()`）
  * @depends MOD-IB-23（HTTP / SSE 契约，**仅**契约，不 import 任何后端模块）
  * @author software-developer
  *
@@ -239,6 +241,33 @@ export type CurrentUser = {
 
 export type AccountListEnvelope = { items: AccountSummary[] };
 
+// --------------------------------------------------------------------------- //
+// R14（IFC-IB-333 / 336）：项目上下文
+// --------------------------------------------------------------------------- //
+
+/**
+ * `GET /api/projects` 的项目条目（IFC-IB-333；与后端**逐字段对齐**）。
+ *
+ * `is_current` = 该项目是否等于**本请求**的服务端 `effective_project`
+ * （admin 未选定当前项目时为全局哨兵，故全部为 `false`）。
+ */
+export type ProjectSummary = {
+  project_id: string;
+  name: string;
+  is_current: boolean;
+};
+
+export type ProjectListEnvelope = { items: ProjectSummary[] };
+
+/**
+ * 项目头提供者（IFC-IB-336）：返回要附加到请求头的项目上下文键值对。
+ *
+ * 由 `app/env.ts` 用 `projectContext`（IFC-IB-335）注入 —— `client.ts` **不** import
+ * `stores/project.ts`（否则 `client.ts ← project.ts ← client.ts` 形成 ESM 循环依赖）。
+ * 提供者缺省 / 返回空对象时**不注入** `X-IB-Project`（保持 fail-closed）。
+ */
+export type ProjectHeaderProvider = () => Record<string, string>;
+
 /**
  * 页面图端点的站内相对路径（IFC-IB-283）。
  *
@@ -258,9 +287,18 @@ export type ApiError = { status: number; code: string; message: string };
  * Vite 只把 `VITE_` 前缀的环境变量暴露给客户端代码，因此登记的 `IB_AUTH_*` 在构建期
  * 对应 `VITE_IB_AUTH_*`（前缀是打包器的暴露机制，不是键名漂移）。未设置时用默认值 ——
  * 这两个键是**可选**的接缝（供接入方改登录路径 / 令牌存储键），不是必填配置。
+ *
+ * ## 为什么 `import.meta.env` 要防御性取值
+ *
+ * 本文件需能被**离线自检脚本**直接 `import`（Node 的类型擦除，见文件头 `parseSseStream`
+ * 说明与 `scripts/sse_parser_selfcheck.mts`）。Node 下 `import.meta.env` **不存在**
+ * （它是 Vite 的注入），直接读属性会 `TypeError` 并令整个模块无法导入 —— 这是本文件
+ * 自身契约（可被自检导入）与实际行为的一处落差，故在此显式回退为空对象。
+ * Vite 构建期 `import.meta.env` 恒有定义，行为逐位不变。
  */
-const LOGIN_PATH = import.meta.env.VITE_IB_AUTH_LOGIN_PATH ?? '/api/auth/login';
-const TOKEN_KEY = import.meta.env.VITE_IB_AUTH_SESSION_STORAGE_KEY ?? 'ib_token';
+const ENV: Record<string, string | undefined> = import.meta.env ?? {};
+const LOGIN_PATH = ENV.VITE_IB_AUTH_LOGIN_PATH ?? '/api/auth/login';
+const TOKEN_KEY = ENV.VITE_IB_AUTH_SESSION_STORAGE_KEY ?? 'ib_token';
 
 /**
  * 401 全局回调（R13）：令牌失效时由 `decode()` 触发，交给会话层跳登录页。
@@ -298,6 +336,12 @@ export class ApiClient {
   private readonly baseUrl: string;
 
   /**
+   * 项目上下文头提供者（IFC-IB-336）。缺省 `null` ⇒ `headers()` **不注入**
+   * `X-IB-Project`（fail-closed：未选项目即不泄露）。由 `app/env.ts` 唯一装配。
+   */
+  private projectHeaderProvider: ProjectHeaderProvider | null = null;
+
+  /**
    * 用显式字段赋值而不是参数属性（`constructor(private readonly baseUrl: string)`）：
    * 参数属性是**不可擦除**的 TS 语法，Node 的类型擦除（`--experimental-strip-types`）
    * 无法处理它，`import` 整个模块会直接报错 —— 而本文件需要能被离线自检脚本直接导入
@@ -306,6 +350,27 @@ export class ApiClient {
    */
   constructor(baseUrl = '') {
     this.baseUrl = baseUrl;
+  }
+
+  /**
+   * 装配项目头提供者（IFC-IB-336 的**唯一**注入点接线）。只在 `app/env.ts` 调用一次。
+   *
+   * 为什么不把项目作为 `headers()` / 各调用点的参数：那会造出**第二注入点** ——
+   * 一旦某个调用点忘记传（例如新增的 SSE 调用），就表现为「该请求静默 fail-closed」。
+   * 由提供者中心化取值，`headers()` 是**唯一**决定是否注入的地方。
+   */
+  setProjectHeaderProvider(provider: ProjectHeaderProvider | null): void {
+    this.projectHeaderProvider = provider;
+  }
+
+  /** 从提供者取项目头；提供者缺省 / 抛错 ⇒ 空对象（**不注入**，fail-closed）。 */
+  private projectHeader(): Record<string, string> {
+    if (!this.projectHeaderProvider) return {};
+    try {
+      return this.projectHeaderProvider() ?? {};
+    } catch {
+      return {};
+    }
   }
 
   // ------------------------------------------------------------------ //
@@ -326,8 +391,19 @@ export class ApiClient {
     sessionStorage.removeItem(TOKEN_KEY);
   }
 
+  /**
+   * 请求头构造 —— `X-IB-Project` 的**唯一**注入点（IFC-IB-336）。
+   *
+   * `chatStream`（`GET /api/chat/stream`）与 `chatResume`（`POST /api/chat/resume`）
+   * 均已调用本方法，故扩展此处即**自动覆盖两个 SSE 调用点** —— 调用点**不得**重复拼头。
+   * 项目头置于 `extra` 之后，确保其值只来自 `projectContext`（提供者），不被调用点覆盖。
+   */
   private headers(extra?: Record<string, string>): Record<string, string> {
-    const headers: Record<string, string> = { Accept: 'application/json', ...extra };
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      ...extra,
+      ...this.projectHeader(),
+    };
     const token = this.token;
     if (token) headers.Authorization = `Bearer ${token}`;
     return headers;
@@ -681,6 +757,22 @@ export class ApiClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ new_password: newPassword }),
     });
+  }
+
+  // ------------------------------------------------------------------ //
+  // R14（IFC-IB-333）：项目枚举
+  // ------------------------------------------------------------------ //
+
+  /**
+   * 列出**当前主体可见**的项目（IFC-IB-333）。
+   *
+   * 授权口径由服务端裁定：admin 见全部；ops 仅见自身（结果集长度恒为 1）。
+   * 该端点**不是**项目级端点 —— 全局主体未选定项目时也返回 200。
+   * 返回 `items`（`ProjectSummary[]`），由 `projectContext.load` 消费。
+   */
+  async listProjects(): Promise<ProjectSummary[]> {
+    const envelope = await this.request<ProjectListEnvelope>('/api/projects');
+    return envelope.items;
   }
 }
 

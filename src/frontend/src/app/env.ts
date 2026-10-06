@@ -1,6 +1,7 @@
 /**
  * @module MOD-IB-24
  * @implements IFC-IB-327 / 328 / 329 应用级单例装配（客户端 + 会话）
+ *             IFC-IB-335 / 336（R14）项目上下文 store 与 `client.ts` 项目头提供者的接线
  * @author software-developer
  *
  * 应用级单例的**唯一**装配点。
@@ -16,6 +17,7 @@
  */
 
 import { apiClient } from '../api/client';
+import { createProjectContext } from '../stores/project';
 import { createSession } from '../stores/session';
 
 /** 全局唯一的 API 客户端（与 `client.ts` 导出的 `apiClient` 是同一实例）。 */
@@ -23,3 +25,14 @@ export const client = apiClient;
 
 /** 全局唯一的会话。 */
 export const session = createSession(apiClient);
+
+/** 全局唯一的项目上下文（R14；IFC-IB-335）。 */
+export const projectContext = createProjectContext(apiClient);
+
+// R14（IFC-IB-336）**唯一**注入点接线：`X-IB-Project` 的值只来自 `projectContext`。
+//
+// 为什么在此处装配：`client.ts` import `stores/project.ts` 会形成 ESM 循环依赖
+// （`client.ts ← project.ts ← client.ts`）；改为「客户端暴露提供者、装配点注入」即断开环。
+// `projectContext` 未选定项目（`current === null`）时 `headerValue()` 返回空对象 ⇒ 不注入头
+// （fail-closed，未选项目即不泄露）。
+apiClient.setProjectHeaderProvider(() => projectContext.headerValue());

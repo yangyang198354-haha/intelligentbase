@@ -3,12 +3,12 @@
   <artifact>architecture_design</artifact>
   <path>docs/architecture_design.md</path>
   <doc_id>ARCH-INTELBASE-001</doc_id>
-  <version>1.5.0</version>
-  <revision>REV-13</revision>
+  <version>1.6.0</version>
+  <revision>REV-14</revision>
   <status>DRAFT_FOR_GATE_REVIEW</status>
   <phase>GROUP_B / PHASE_03 系统架构设计</phase>
   <author>system-architect</author>
-  <invocation_id>INV-GROUP_B-INTELBASE-007</invocation_id>
+  <invocation_id>INV-GROUP_B-INTELBASE-008</invocation_id>
   <created_at>2026-09-25</created_at>
   <updated_at>2026-10-06</updated_at>
   <inputs>
@@ -24,6 +24,7 @@
     <rev version="1.3.0" revision="R7" date="2026-09-27" invocation_id="INV-GROUP_B-INTELBASE-005" note="R7 增量贯通（GROUP_A REV-06 裁决：诉求③ UI 可视化配置纳入 v1，新增 REQ-FUNC-IB-25/26/27）：① 新增 ADR-14（可视化配置的编辑模型 = 定义文档唯一真源 + 显式 round-trip，视图零持久化）、ADR-15（定义文档单一真源（双向同源）与只读派生视图）、ADR-16（装配期完备性校验 + fail-fast 准入闸门，无强制继续开关），每条含 ≥2 方案与已评估未采纳留痕；ADR 数 13 → 16；② 新增 §2.0.2 R7 影响复核表（ADR-01~16 逐条：既有 13 条在 R7 下均不受影响、新增 3 条），§2.0 / §2.0.1 保留为 R1 / R2 历史复核；③ 新增第 14 个端口 DefinitionDocumentStore（IFC-IB-287，定义于 MOD-IB-01 的零依赖 frozen dataclass / Protocol 层），§1.3 可替换点增一行；④ §6 增补「图编译输入 = 经准入闸门校验通过的定义文档；拓扑不可编辑」；⑤ §8 新增 [ARCH-ASSUMPTION-A6]（定义文档物理载体 = 本地文件，一项目一文档）与 [ARCH-ASSUMPTION-A7]（可视化落地的前置条件 = IB-01/IB-02 定义外置；REV-07-6 判定 (a) 可登记前置/风险，不阻断）；⑥ §9 新增 [TBD-T19]（装配期装载/校验/派生耗时）与 [TBD-T20]（前端图渲染规模上界）；⑦ 计数同步：REQ-FUNC 24/24 → 27/27（REV-07-3，仅需求计数语境；端口 13 → 14）；⑧ 需求侧文档与 FreeArk 仓库未改动；未写入任何凭据值。"/>
     <rev version="1.4.0" revision="R8" date="2026-09-27" invocation_id="INV-GROUP_B-INTELBASE-006" note="R8 增量贯通（GROUP_A REV-11-1：REQ-FUNC-IB-20「流式输出契约与会话生命周期」补入 US-IB-19 / US-IB-20 与 11 组 AC 后的设计覆盖闭环）：① 新增 ADR-17（「可选手动确认中间态」的承载方式与状态丢失语义；3 候选方案，Option B 选定），ADR 数 16 → 17；② 新增 §2.0.3 R8 影响复核表（ADR-01~17 逐条：既有 16 条在 R8 下均不受影响——其中 ADR-09 判『不受影响，且 R8 是其应用』、ADR-11 判『不受影响，R8 复用其载体』；新增 1 条；无一条跳过）；③ §1.3 可替换点表追加 R8 注（SessionStore 值域扩展 memory 或 external、恢复准入路径、状态丢失 fail-closed）；④ §6 增补『（R8）流式与会话的四条规范化补充』（增量推送与终态单发 / 完成附结构化产物 / 思考分区默认不启用且内部产物永不外流 / 会话状态与确认中间态）；⑤ §8 新增 [ARCH-ASSUMPTION-A8]（v1 默认持久化策略 = 进程内）；⑥ §9 新增 [TBD-T21]（会话状态容量与恢复并发）；⑦ §10.1 新增 OQ-IB-07 / OQ-IB-08 架构默认取值落地行、§10.3 追加 R8 自检。不变约束：模块数 26、端口数 14、IFC-IB-001~297 一字不动（新增 298~308）、§4.1 依赖边逐行不变（零新增边）、DAG 无环、覆盖 27/27 REQ-FUNC + 14 NFR、tech_stack.md 未改（无新第三方依赖）。需求侧文档与 FreeArk 仓库未改动；未写入任何凭据值。"/>
     <rev version="1.5.0" revision="REV-13" date="2026-10-06" invocation_id="INV-GROUP_B-INTELBASE-007" note="REV-13 认证与商用界面增量贯通（GROUP_A REV-13 下游）：① 新增 ADR-18 ~ ADR-27（账户/会话落点与载体、不透明服务端会话令牌（无 Cookie）、bcrypt 口令存储与首登强制改密、账户↔项目 1:1 绑定、与既有 AuthzPolicy 端口协作（单一授权真源 / 生产 fail-closed）、前端重构与路由（Element Plus + vue-router hash）、粘贴令牌入口废除、HTTPS 落点、迁移/种子/回滚、登录失败限速与审计（条件性）），每条 ≥2 方案；ADR 数 17 → 27；② 新增 §2.0.4 R13 影响复核表（既有 17 条 ADR 逐条：全部不受影响——其中 ADR-07 / ADR-11 / ADR-16 判『不受影响且 R13 复用其纪律/机制』；新增 10 条；无一条跳过）；③ 新增第 15 个端口 AccountStore（IFC-IB-310，定义于 MOD-IB-01 零依赖 Protocol 层；14 → 15，纯追加）；④ 新增 IFC-IB-309 ~ IFC-IB-332（24 条类型化契约；IFC-IB-001~308 一字不动，IFC-IB-285 仍预留）；⑤ §1.3 追加 R13 注、§8 新增 [ARCH-ASSUMPTION-A9]、§9 新增 [TBD-T22] / [TBD-T23]、§10.1/§10.2/§10.3 追加 R13 行；⑥ 落点并入既有模块（零新增模块、零新增依赖边）；⑦ 计数同步：REQ-FUNC 27/27 → 36/36（新增 IB-28~36）、NFR 14 → 18（新增 NFR-15~18）。不变约束：模块数 26、IFC-IB-001~308 一字不动、§4.1 依赖边逐行不变（零新增边）、DAG 无环。需求侧文档与 FreeArk 仓库未改动；未写入任何口令 / 令牌 / 密钥字面量。"/>
+    <rev version="1.6.0" revision="REV-14" date="2026-10-06" invocation_id="INV-GROUP_B-INTELBASE-008" note="REV-14 回归缺陷修复（R13 引入：全局管理员因前端从不下发 X-IB-Project 且无项目枚举端点，无法使用任一项目级页面）：① 新增 ADR-28「项目上下文的选择与传播」（4 候选方案：服务端隐式默认 / 显式选择+显式传播 / 全局哨兵解析为并集(拒) / 部署期绑定 admin(拒)；Option B 选定并吸收 Option A 的『单项目预选』便利），ADR 数 27 → 28；② 新增 §2.0.5 R14 影响复核表（既有 27 条 ADR 逐条复核，无一条跳过；ADR-04 判『不受影响且 R14 是其应用』、ADR-11 判『不受影响，R14 复用其纪律』；新增 1 条）；③ 新增 IFC-IB-333 ~ 336（项目枚举端点 / X-IB-Project 头契约（加成式扩展 IFC-IB-324，其文本不动）/ 前端 projectContext store / client.ts 单一注入点）；④ §10.1 新增 R14 OPEN ITEM（项目选择 UX 与项目枚举端点无独立 REQ/AC，登记不发明）、§10.3 追加 R14 自检；⑤ 落点并入既有模块 MOD-IB-23 / MOD-IB-24（零新增模块、零新增依赖边）。不变约束：模块数 26、端口数 15、既有 IFC-IB-001~332 一字不动（新增 333~336）、§4.1 依赖边逐行不变、DAG 无环、fail-closed 纪律不削弱（未选项目即不泄露）。需求侧文档与 FreeArk 仓库未改动；未写入任何口令 / 令牌 / 密钥字面量。"/>
   </revision_history>
   <scope_boundary>只做架构与模块设计；不含实现代码、测试用例、部署脚本。允许接口签名、类型注解、数据结构定义。</scope_boundary>
 </file_header>
@@ -237,6 +238,43 @@
 | **ADR-18 ~ ADR-27（R13 新增）** | **新增 10 条** | 见本节之后新增的 ADR-18 ~ ADR-27 全文（§2 末尾） |
 
 **R13 复核小结**：既有 **17 条 ADR 全部不受影响**（其中 ADR-07、ADR-11、ADR-16 判「不受影响，且 R13 复用其纪律/机制」）；**新增 10 条** → ADR 总数 **17 → 27**。**无一条跳过**。R13 **不触及**：模块数（26，未新增）、`IFC-IB-001~308` 编号体系、§4.1 依赖边与 DAG 无环性、既有 REQ→MOD 覆盖（新增 REQ 单列）。
+
+### 2.0.5 R14 影响复核表（REV-14 回归缺陷修复：全局管理员项目上下文）
+
+> 只新增；§2.0（R1）/ §2.0.1（R2）/ §2.0.2（R7）/ §2.0.3（R8）/ §2.0.4（R13）**原样保留**。逐条复核，**无一条跳过**。本表覆盖既有 **ADR-01 ~ ADR-27** 并登记新增 **ADR-28**。
+
+| ADR | R14 判定 | 复核理由 |
+|-----|---------|---------|
+| ADR-01 | **不受影响** | 向量库抽象层与 collection 维度未动；项目枚举不改 `PointPayload` / `CollectionSpec` |
+| ADR-02 | **不受影响** | `ib-embed` 形态值域与服务端归属未动；项目上下文不涉 embedding 线协议 |
+| ADR-03 | **不受影响** | 部署形态与四单元未动；`GET /api/projects` 是 `ib-web` 内的普通端点，不净增进程 |
+| ADR-04 | **不受影响，且 R14 是其应用** | `Scope` 仍必填、隔离仍 fail-closed；R14 **不得**削弱「未选项目即不泄露」（ADR-28 约束③）；项目枚举只回「可见集合」，不改隔离粒度 |
+| ADR-05 | **不受影响** | BlobStore 与重建机制未动 |
+| ADR-06 | **不受影响** | 解析库选型未动 |
+| ADR-07 | **不受影响** | 台账仍 SQLite + 手写迁移；项目列表取自装配（`Deps.projects` / `_seed_projects`），**不新增表、不经 ORM** |
+| ADR-08 | **不受影响** | LLM 端点与数据外发边界未动；项目枚举不外发 |
+| ADR-09 | **不受影响** | 骨架不见业务语义未动；项目上下文发生在 HTTP 边界（`AuthMiddleware`），不入骨架 |
+| ADR-10 | **不受影响** | 异步入库队列与租约未动 |
+| ADR-11 | **不受影响，R14 复用其纪律** | SSE 载体未动；`X-IB-Project` 经 `headers()` 进入 `chatStream` / `chatResume` 的 `fetch` 请求头（`EventSource` 不能设自定义头，本项目已用 `fetch` 读流）——仍**不含 `?token=`** |
+| ADR-12 | **不受影响** | OCR / 页面渲染端口未动 |
+| ADR-13 | **不受影响** | 「故障与空结果可区分」沿用：未选项目 → 项目级端点 fail-closed（可区分于空结果） |
+| ADR-14 | **不受影响** | 可视化编辑模型（定义文档唯一真源 + 显式 round-trip）未动 |
+| ADR-15 | **不受影响** | 定义文档单一真源与只读派生视图未动 |
+| ADR-16 | **不受影响** | 装配期 fail-fast 准入闸门未动；R14 使可视化配置页能取得当前项目，`503` 消失的原因是**项目上下文就位**而非放宽闸门 |
+| ADR-17 | **不受影响** | 确认中间态承载与状态丢失语义未动 |
+| ADR-18 | **不受影响** | 账户 / 会话模块落点与数据载体未动 |
+| ADR-19 | **不受影响** | 令牌机制（不透明、服务端存储、无 Cookie）未动；`X-IB-Project` **不是**凭据 |
+| ADR-20 | **不受影响** | 口令与首登强制改密未动；改密态放行清单不变 |
+| ADR-21 | **不受影响** | 账户↔项目绑定与角色模型未动；R14 是其在「项目选择」上的应用 |
+| ADR-22 | **不受影响** | 单一授权真源未动；`X-IB-Project` **不**替换授权判定（仍唯一经 `AuthzPolicy`） |
+| ADR-23 | **不受影响** | 前端重构与路由（Element Plus + vue-router hash）未动；`projectContext` 为既有 store 模式（模块级 `reactive`，不引 Pinia） |
+| ADR-24 | **不受影响** | 粘贴令牌入口废除未动；`X-IB-Project` 不引入任何旁路 |
+| ADR-25 | **不受影响** | HTTPS 落点未动 |
+| ADR-26 | **不受影响** | 迁移 / 种子 / 回滚未动；项目列表不新增迁移 |
+| ADR-27 | **不受影响** | 登录限速与审计（条件性）未动 |
+| **ADR-28（R14 新增）** | **新增** | 项目上下文的选择与传播；**4 候选方案**，Option B 选定并吸收 Option A 的「单项目预选」便利 |
+
+**R14 复核小结**：既有 **27 条 ADR 全部不受影响**（其中 ADR-04 判「不受影响，且 R14 是其应用」、ADR-11 判「不受影响，R14 复用其纪律」）；**新增 1 条** → ADR 总数 **27 → 28**。**无一条跳过**。R14 **不触及**：模块数（26，未新增）、端口数（15）、**§4.1 依赖边（零新增边）**、DAG 无环性、既有 `IFC-IB-001~332` 编号体系；新增 IFC 为 **IFC-IB-333 ~ 336**（见 `module_design.md` §2.2.5）。
 
 ### ADR-01 向量库抽象层与 Qdrant 集成方式
 
@@ -744,6 +782,22 @@
   - 负向: v1 若不启用，则在 REQ-NFR-IB-16 威胁模型上留下「无速率限制」缺口，须由用户显式接受；阈值取值 [TBD-T22]。
 ---
 
+---
+**ADR-28: 项目上下文的选择与传播（全局管理员「当前项目」与 `X-IB-Project` 契约）**
+- **Status**: Accepted
+- **Context**: REV-14 回归缺陷修复（R13 引入：全局管理员无法使用任一项目级页面）。REQ-FUNC-IB-31（账户 : 项目 = 1 : 1；**admin 全局**）、REQ-FUNC-IB-32（角色与权限模型：管理员全局 / 运维账户全功能 + 项目边界隔离；AC-IB-24-02 跨项目 403、AC-IB-24-03 admin 不受项目绑定限制）、REQ-FUNC-IB-23（多项目隔离须贯穿全链路）；US-IB-24 / AC-IB-24-03。**已实现的服务端语义**（`src/ibweb/authz.py` `AuthMiddleware.__call__`）：全局主体（`authz.project_id == GLOBAL_PROJECT`，`GLOBAL_PROJECT` 取常量 `"*"`）经 `X-IB-Project` 选定「当前项目」，未选定时沿用全局哨兵，项目级端点因「无匹配项目」而 **fail-closed**（不泄露）——该 fail-closed 是**刻意设计**，本 ADR 不得削弱。**缺口**：前端 `client.ts` 的 `headers()` 从不发送 `X-IB-Project`，且不存在「列出项目」的端点，故 admin 无法选定项目 → 任一项目级页面（问答 / 文件 / 重建 / 可视化配置）不可用（可视化配置返回 `503 定义文档当前不可读（fail-closed）`）。相关既有决策：**ADR-04**（`Scope` 必填、隔离 fail-closed）、**ADR-19**（令牌仅 `Authorization` 头）、**ADR-22**（单一授权真源）、**ADR-24**（无粘贴令牌旁路）。
+- **Options**:
+  - Option A（**较小改动 / 服务端隐式默认**）：服务端在「全局主体且恰有一个项目」时**隐式**选择该项目，前端不改 — 优点: 单项目部署零前端改动即恢复可用；不改 `client.ts` — 缺点: **多项目部署下语义不成立**（无法判定「当前项目」：任选其一即错、拒绝即失败）；**未满足「admin 必须能显式选择当前项目」的诉求**；前端仍无「当前项目」概念，切换项目时可视化配置等页面无落点。**保留为前端「单项目预选」便利**（见 Decision），**不单独采用**。
+  - Option B（**显式选择 + 显式传播**）：新增 `GET /api/projects` 供前端枚举**可见**项目；前端 `projectContext` store 持有「当前项目」；`client.ts` 在**唯一**注入点 `headers()` 向**全部**项目级请求（含 SSE `chatStream` / `chatResume`）附加 `X-IB-Project`；`ops` 锁定为其绑定项目 ← **选定**。
+  - Option C（**全局哨兵解析为「全部项目并集」/ 全库检索** — fail-open）：优—前端零改动。缺—**破坏项目隔离**（违反 REQ-FUNC-IB-23 与 §3.3 FM-1），与「未选项目即不泄露」的 fail-closed 纪律**直接冲突**；admin 的每次检索都跨全部项目，泄漏面最大。**已评估未采纳**。
+  - Option D（**部署期把 admin 绑定到单一项目**，当作 ops）：优—复用既有 ops 语义。缺—与 **DR-15**（admin 全局）与 **AC-IB-24-03**（admin 不受项目绑定限制）**直接冲突**；多项目部署不可用。**已评估未采纳**。
+- **Decision**: 选 **Option B**，并吸收 **Option A 作为纯前端「单项目预选」便利**（**服务端不隐式默认**）。四条强制约束：① **单一注入点** —— `X-IB-Project` 只在 `ApiClient.headers()`（IFC-IB-336）注入，取值只来自 `projectContext` store（IFC-IB-335），**SSE 调用点（`chatStream` / `chatResume`）不重复拼头**（二者已同经 `headers()`）；② **ops 结构上不可切换** —— 项目列表端点对 ops 只返回其自身项目（列表长度恒为 1，IFC-IB-333），叠加后端 `403 project_mismatch`（IFC-IB-334）与前端 `select` 仅 admin 可调用（IFC-IB-335），共三重；③ **fail-closed 纪律不削弱** —— 前端未选择项目时**不发送** `X-IB-Project`，服务端 `effective_project` 取全局哨兵，项目级端点继续 fail-closed（**未选项目 ⇒ 不泄露**）；禁止把哨兵解析为并集（Option C 被拒）；④ **不破坏既有认证契约** —— 令牌仍只经 `Authorization` 头、`?token=` 仍 4xx、零 Set-Cookie、改密态与角色划分不变；`X-IB-Project` **不是**鉴权凭据、**不**替换授权判定（仍唯一经 `AuthzPolicy`，ADR-22）。
+- **Consequences**:
+  - 正向: 多项目语义正确（admin 可显式选择并切换，ops 不可切换）；**新增端点 `GET /api/projects`** 使「可见项目集合」由服务端裁定（admin 全部 / ops 仅自身），跨项目枚举在 ops 侧结构性不可能；SSE 与普通请求同源注入，覆盖问答 / 文件 / 重建 / 可视化配置**全部**项目级页面；**零新增模块、零新增依赖边**（沿既有 `MOD-IB-24 → MOD-IB-23` HTTP 边）；「未选项目即不泄露」的 fail-closed 保持为架构事实。
+  - 负向: 前端净增一个 store（IFC-IB-335）与一处注入点扩展（IFC-IB-336）；**切换当前项目后必须重置项目内视图态**（会话历史 / 文件列表 / 可视化草稿），否则可能出现「旧项目数据显示在新项目下」的**串项显示**风险——登记为施工要点（GROUP_C）；`GET /api/projects` 引入「项目枚举」这一新的读面，须以「ops 仅见自身」避免横向枚举（IFC-IB-333）。**需求侧无独立 REQ / AC 覆盖「项目选择 UX 与项目枚举端点」**，已登记为 **OPEN ITEM**（见 §10.1 R14 行；按纪律**不发明需求**，downstream 需 GROUP_A 澄清）。
+- **R14 新增说明**: 本 ADR 为**纯追加**；`ADR-01 ~ ADR-27` 的 ID / Status / Context / Options / Decision / Consequences **一字不动**（R14 复核见 §2.0.5）。
+---
+
 ## 3. 多项目隔离：链路落点与跨项目泄漏失败模式
 
 ### 3.1 隔离在链路上的落点（REQ-FUNC-IB-23）
@@ -980,6 +1034,8 @@
 | **（R8）OQ-IB-07 / OQ-IB-08 的架构默认取值落地** | ① 写操作确认门（OQ-IB-07）在架构上如何承载；② 会话历史的作用范围（OQ-IB-08） | ① **机制保留、默认关闭**（`IB_CONFIRMATION_GATE_ENABLED` 默认 `false`，且**不绑定业务语义**；见 ADR-17）；② **会话内隔离**（`session_key` 前缀断言，FM-7），**不跨会话注入**历史 | **两项 OQ 均保持开放**，本修订**不裁决**「是否应默认启用确认门」或「历史是否跨会话」；架构层只落地「默认关闭 / 会话内隔离」的安全默认，**不裁决业务语义、不自行扩围** |
 | **（R13）OQ-IB-09 ~ OQ-IB-15 的架构默认取值落地** | ① TTL/续期（OQ-IB-09）；② 首登强制改密（OQ-IB-10）；③ 口令强度策略（OQ-IB-11）；④ 登录限速（OQ-IB-12）；⑤ 认证审计留痕（OQ-IB-13）；⑥ 管理员重置口令路径（OQ-IB-14）；⑦ 粘贴令牌入口处置（OQ-IB-15） | ① 可配置默认值 + [TBD-T22]（[ARCH-ASSUMPTION-A9]）；② **服务端强制改密态**（ADR-20）；③ 键名 `IB_PASSWORD_MIN_LENGTH`，**策略细节 TBD**（OQ-IB-11 开放）；④⑤ **设计提供但条件性**（ADR-27，**未纳入默认施工**）；⑥ 端点设计提供（IFC-IB-321 的 `reset-password`），是否纳入 v1 待确认；⑦ **彻底移除、无旁路**（ADR-24） | **OQ-IB-11 / 12 / 13 / 14 保持开放**，本修订**不裁决**业务策略值；架构层只落地「服务端强制 / 可配置 / 可注入」的安全默认，**不自行扩围或缩围** |
 
+**（R14）OPEN ITEM — 需求侧缺口（登记，不发明）**：R14 引入的「**全局管理员的当前项目选择 UX**」与「**`GET /api/projects` 项目枚举端点**」在 `requirements_spec.md` / `user_stories.md` 中**无独立 REQ / AC** 直接覆盖（REQ-FUNC-IB-32 只规定角色与项目边界，未规定前端如何取得「当前项目」）。按纪律**不发明需求、不新增 AC**，登记为 OPEN ITEM，待 **downstream: requirement clarification / GROUP_A** 裁决。**在获得新 AC 之前**，测试门控可将本设计映射到**既有 AC**：AC-IB-24-03（admin 全局可访问任一项目）、AC-IB-24-02（ops 跨项目 403）、REQ-FUNC-IB-31（1:1 绑定）、REQ-FUNC-IB-23（项目隔离 fail-closed）。
+
 ### 10.2 许可合规结论（REQ-NFR-IB-12）
 
 | 组件 | 许可 | 结论 |
@@ -1039,3 +1095,8 @@
 - **（R13）「单一授权真源 / 安全失败」为架构层事实**：授权判定仍**只**经注入的 `AuthzPolicy`（ADR-22）；生产未配置 `IB_AUTHZ_POLICY_MODULE` 即 `StartupError`（fail-closed，B9）；**首登强制改密由服务端受限会话在结构上保证**（ADR-20，不可由客户端绕过）。
 - **（R13）凭据纪律**：全文**只登记键名**（`IB_ACCOUNT_BACKEND` / `IB_SESSION_TTL_SECONDS` / `IB_SESSION_RENEW_WINDOW_SECONDS` / `IB_DEFAULT_ADMIN_USERNAME` / `IB_DEFAULT_ADMIN_PASSWORD` / `IB_PASSWORD_MIN_LENGTH` / `IB_LOGIN_MAX_FAILURES` / `IB_LOGIN_LOCK_SECONDS` / `IB_AUTHZ_POLICY_MODULE`）；**默认初始口令的字面量不在本文出现**（C-IB-09）；令牌**仅**经 `Authorization` 头；`?token=` 纪律**扩展至全部新端点**（`/api/auth/*`、`/api/accounts*`）。
 - **（R13）未改动他处**：`FreeArk` 仓库**任何文件未作修改**；需求侧文档（`requirements_spec.md`）**只读未改**；`implementation_plan.md`（GROUP_C）**未改**；**未写入任何口令 / 令牌 / 密钥字面量**；本阶段**止于 GROUP_B**。
+- **（R14）回归缺陷修复增量已贯通**：新增 **ADR-28**（项目上下文的选择与传播；**4 候选方案**，Option B 选定，Option A 作为前端单项目预选便利）与 **§2.0.5 R14 影响复核表**（**既有 27 条 ADR 全部不受影响**、新增 1 条、**无一条跳过**）；新增 IFC **IFC-IB-333 ~ 336**（`GET /api/projects` / `X-IB-Project` 头契约 / 前端 `projectContext` store / `client.ts` 单一注入点，见 `module_design.md` §2.2.5）。
+- **（R14）不变约束未被破坏**：模块数仍 **26**（**未新增模块**）、端口数仍 **15**、既有 `IFC-IB-001 ~ 332` 一字不动（新增 **333 ~ 336**）、**§4.1 依赖边逐行不变（零新增依赖边）**、依赖图**仍为 DAG**；ADR 数 27 → **28**。
+- **（R14）fail-closed 纪律未削弱**：前端未选择项目时**不发送** `X-IB-Project`，服务端 `effective_project` 取全局哨兵，项目级端点继续 **fail-closed**（**未选项目 ⇒ 不泄露**）；**禁止**把全局哨兵解析为「全部项目并集」（ADR-28 Option C 被拒）。
+- **（R14）凭据纪律**：`X-IB-Project` **不是**鉴权凭据、**不**携带任何敏感值；令牌**仅**经 `Authorization` 头；`?token=` 纪律**对其余端点同样有效**；全文**未写入任何口令 / 令牌 / 密钥字面量**（只登记头名与键名）。
+- **（R14）未改动他处**：`FreeArk` 仓库**任何文件未作修改**；需求侧文档（`requirements_spec.md` / `user_stories.md`）**只读未改**；`implementation_plan.md` 与 `tech_stack.md` **未改**；本阶段**止于 GROUP_B**。
