@@ -170,6 +170,13 @@ class _ConditionalEdgeSpecSerializer(serializers.Serializer):
         }
 
 
+class _EdgeSpecSerializer(serializers.Serializer):
+    def to_representation(self, instance: Any) -> dict[str, Any]:
+        # 普通边（无条件转移）：界面据此画出 `expert → gate → aggregate` 这条主干，
+        # 缺了它这些节点会渲染成孤立方块。
+        return {"from_node": instance.from_node, "to_node": instance.to_node}
+
+
 class _RouteSpecInputSerializer(_DataclassSerializer):
     _fields = {"tau": None, "margin": None, "max_expert_steps": None, "default_expert": None}
 
@@ -181,6 +188,7 @@ class _OrchestrationSpecInputSerializer(serializers.Serializer):
             "conditional_edges": [
                 _ConditionalEdgeSpecSerializer().to_representation(ce) for ce in instance.conditional_edges
             ],
+            "edges": [_EdgeSpecSerializer().to_representation(e) for e in instance.edges],
         }
 
 
@@ -252,4 +260,5 @@ def definition_derived_summary(view: Any) -> dict[str, Any]:
         "conditional_edges": [
             _ConditionalEdgeSpecSerializer().to_representation(ce) for ce in view.graph_config.conditional_edges
         ],
+        "edges": [_EdgeSpecSerializer().to_representation(e) for e in view.graph_config.edges],
     }

@@ -29,10 +29,12 @@ from hashlib import sha256
 from typing import Any
 
 from ib.core import (
+    RESERVED_GRAPH_ENDPOINTS,
     ConfigError,
     ConditionalEdgeSpec,
     DefinitionDocument,
     DerivedView,
+    EdgeSpec,
     ExpertSpecInput,
     OrchestrationSpecInput,
     RouteSpecInput,
@@ -73,6 +75,7 @@ NON_EDITABLE_FIELDS: frozenset[str] = frozenset(
         "orchestration",
         "orchestration.nodes",
         "orchestration.conditional_edges",
+        "orchestration.edges",
     }
 )
 
@@ -111,6 +114,9 @@ def _semantic_payload(doc: DefinitionDocument) -> dict[str, Any]:
             "conditional_edges": [
                 {"from_node": ce.from_node, "branch_map": [list(b) for b in ce.branch_map]}
                 for ce in doc.orchestration.conditional_edges
+            ],
+            "edges": [
+                {"from_node": e.from_node, "to_node": e.to_node} for e in doc.orchestration.edges
             ],
         },
         "tool_grants": [
@@ -325,6 +331,41 @@ def validate(
                     )
                 )
 
+    # 7b. 普通边：端点允许真实节点**或**保留合成端点（START / END），但不接受自环与重复边。
+    # 条件边的分支目标**不**开这个豁免 —— 分支必须落到可编排的真实节点上，否则「分支到 END」
+    # 会让界面上出现一条指向合成端点的条件边，语义上无从解释。
+    edge_endpoints = node_set | RESERVED_GRAPH_ENDPOINTS
+    seen_edges: set[tuple[str, str]] = set()
+    for index, edge in enumerate(doc.orchestration.edges):
+        for role, endpoint in (("from_node", edge.from_node), ("to_node", edge.to_node)):
+            if endpoint not in edge_endpoints:
+                errors.append(
+                    _err(
+                        f"orchestration.edges[{index}].{role}",
+                        "orchestration_edge_node_unknown",
+                        f"普通边端点 '{endpoint}' 既不在节点集合内，也不是保留端点 "
+                        f"({'/'.join(sorted(RESERVED_GRAPH_ENDPOINTS))})",
+                    )
+                )
+        if edge.from_node == edge.to_node:
+            errors.append(
+                _err(
+                    f"orchestration.edges[{index}]",
+                    "orchestration_edge_self_loop",
+                    f"普通边不得自环（'{edge.from_node}' 指向自身）",
+                )
+            )
+        key = (edge.from_node, edge.to_node)
+        if key in seen_edges:
+            errors.append(
+                _err(
+                    f"orchestration.edges[{index}]",
+                    "orchestration_edge_duplicate",
+                    f"重复的普通边 '{edge.from_node}' → '{edge.to_node}'",
+                )
+            )
+        seen_edges.add(key)
+
     # 8. 工具授权
     known = frozenset(known_tools) if known_tools else None
     granted_experts: set[str] = set()
@@ -481,6 +522,7 @@ def derive(doc: DefinitionDocument) -> DerivedView:
         graph_config=OrchestrationSpecInput(
             nodes=tuple(doc.orchestration.nodes),
             conditional_edges=tuple(doc.orchestration.conditional_edges),
+            edges=tuple(doc.orchestration.edges),
         ),
     )
 
@@ -562,6 +604,10 @@ def document_from_json(project_id: str, text: str) -> DefinitionDocument:
         orchestration = OrchestrationSpecInput(
             nodes=tuple(str(n) for n in orch_d.get("nodes", [])),
             conditional_edges=conditional,
+            edges=tuple(
+                EdgeSpec(from_node=str(e["from_node"]), to_node=str(e["to_node"]))
+                for e in orch_d.get("edges", [])
+            ),
         )
         grants = tuple(
             ToolGrantSpec(

@@ -62,13 +62,121 @@ const canEdit = (field: string): boolean => editable.value.has(field);
 
 const keyNames = computed<string[]>(() => envelope.value?.config_key_names ?? []);
 
-/** 编排图**只读**渲染：节点 + 条件边（按 `branch_map` 表达分支可达性）。 */
+// --------------------------------------------------------------------------- //
+// 编排图（只读）渲染
+//
+// 两类边**缺一不可**：**普通边**（无条件转移，如 `expert → gate → aggregate`）与
+// **条件边**（按分支键择一，如 `route → expert / general`）。只画条件边时，`gate` /
+// `aggregate` 这类只靠普通边相连的节点会渲染成孤立方块 —— 看着像断链，其实拓扑是通的。
+//
+// 节点坐标**按拓扑分层算**，不再按数组下标摆：下标顺序与拓扑无关，图一有分支/汇合，
+// 边就会横穿画面（`general → aggregate` 会从 `gate` 上方掠过）。
+// --------------------------------------------------------------------------- //
+
+const X_GAP = 190;
+const Y_GAP = 90;
+
+/**
+ * 拓扑分层布局（Kahn 最长路径）。纯函数。
+ *
+ * 入度为 0 的节点落在第 0 层，其余节点取「所有前驱层号的最大值 + 1」；同层节点垂直并排、
+ * 以该层中线对齐。成环时剩余节点挂在最大层之后 —— 拓扑运行期不可编辑，界面不必为不可达图
+ * 做特殊表达，但**不能**因此死循环或丢节点。
+ */
+function layeredPositions(
+  names: string[],
+  links: [string, string][],
+): Map<string, { x: number; y: number }> {
+  const rank = new Map<string, number>(names.map((n) => [n, 0]));
+  const indegree = new Map<string, number>(names.map((n) => [n, 0]));
+  const outgoing = new Map<string, string[]>(names.map((n) => [n, []]));
+  for (const [from, to] of links) {
+    if (from === to || !rank.has(from) || !rank.has(to)) continue;
+    outgoing.get(from)!.push(to);
+    indegree.set(to, (indegree.get(to) ?? 0) + 1);
+  }
+
+  const settled = new Set<string>();
+  const queue = names.filter((n) => (indegree.get(n) ?? 0) === 0);
+  for (const n of queue) settled.add(n);
+  while (queue.length > 0) {
+    const node = queue.shift() as string;
+    for (const next of outgoing.get(node) ?? []) {
+      rank.set(next, Math.max(rank.get(next) ?? 0, (rank.get(node) ?? 0) + 1));
+      indegree.set(next, (indegree.get(next) ?? 0) - 1);
+      if ((indegree.get(next) ?? 0) === 0 && !settled.has(next)) {
+        settled.add(next);
+        queue.push(next);
+      }
+    }
+  }
+
+  let tail = names.reduce((max, n) => Math.max(max, rank.get(n) ?? 0), 0);
+  for (const node of names) {
+    if (!settled.has(node)) {
+      tail += 1;
+      rank.set(node, tail);
+    }
+  }
+
+  const byRank = new Map<number, string[]>();
+  for (const node of names) {
+    const r = rank.get(node) ?? 0;
+    const bucket = byRank.get(r);
+    if (bucket) bucket.push(node);
+    else byRank.set(r, [node]);
+  }
+
+  const positions = new Map<string, { x: number; y: number }>();
+  for (const [r, members] of byRank) {
+    const offset = ((members.length - 1) * Y_GAP) / 2;
+    members.forEach((node, i) => {
+      positions.set(node, { x: r * X_GAP, y: i * Y_GAP - offset });
+    });
+  }
+  return positions;
+}
+
+/** 定义文档声明的**真实**节点（合成端点不在此列）。 */
+const declaredNodes = computed<string[]>(() => envelope.value?.derived.nodes ?? []);
+
+/** 图的全部连线：普通边 + 条件边的每个分支（仅供分层用，不区分线型）。 */
+const graphLinks = computed<[string, string][]>(() => {
+  const links: [string, string][] = [];
+  for (const e of envelope.value?.derived.edges ?? []) links.push([e.from_node, e.to_node]);
+  for (const ce of envelope.value?.derived.conditional_edges ?? []) {
+    for (const [, target] of ce.branch_map) links.push([ce.from_node, target]);
+  }
+  return links;
+});
+
+/** 节点集合 = 声明节点 ∪ 只出现在边端点里的合成端点（`START` / `END`）。 */
+const graphNodeNames = computed<string[]>(() => {
+  const declared = declaredNodes.value;
+  const seen = new Set(declared);
+  const extra: string[] = [];
+  for (const [from, to] of graphLinks.value) {
+    for (const name of [from, to]) {
+      if (!seen.has(name)) {
+        seen.add(name);
+        extra.push(name);
+      }
+    }
+  }
+  return [...declared, ...extra];
+});
+
+/** 编排图**只读**渲染：节点 + 普通边（实线）+ 条件边（虚线带分支标签）。 */
 const graphNodes = computed<Node[]>(() => {
-  const names = envelope.value?.derived.nodes ?? [];
-  return names.map((name, index) => ({
+  const names = graphNodeNames.value;
+  const declared = new Set(declaredNodes.value);
+  const positions = layeredPositions(names, graphLinks.value);
+  return names.map((name) => ({
     id: name,
-    position: { x: index * 170, y: index % 2 === 0 ? 40 : 130 },
+    position: positions.get(name) ?? { x: 0, y: 0 },
     data: { label: name },
+    // 合成端点单独一个 class：它不是可编排节点，只是图的入口 / 出口。
+    class: declared.has(name) ? '' : 'graph-endpoint',
     draggable: false,
     connectable: false,
   }));
@@ -76,13 +184,24 @@ const graphNodes = computed<Node[]>(() => {
 
 const graphEdges = computed<Edge[]>(() => {
   const edges: Edge[] = [];
+  // 普通边：实线、无标签 —— 无条件转移，不存在「走哪条分支」的问题。
+  for (const e of envelope.value?.derived.edges ?? []) {
+    edges.push({
+      id: `plain:${e.from_node}->${e.to_node}`,
+      source: e.from_node,
+      target: e.to_node,
+      animated: false,
+    });
+  }
+  // 条件边：虚线 + 分支标签 —— 与普通边必须在视觉上可区分，否则看不出哪条是「择一」。
   for (const ce of envelope.value?.derived.conditional_edges ?? []) {
     for (const [branchKey, target] of ce.branch_map) {
       edges.push({
-        id: `${ce.from_node}->${target}:${branchKey}`,
+        id: `cond:${ce.from_node}->${target}:${branchKey}`,
         source: ce.from_node,
         target,
         label: branchKey,
+        style: { strokeDasharray: '5 3' },
         animated: false,
       });
     }
@@ -252,8 +371,13 @@ async function save(): Promise<void> {
 
       <h3>编排图（只读）</h3>
       <p class="hint">
-        节点与条件边由定义文档派生，**运行期不可编辑**（无增删节点 / 改边入口）。
+        节点与边由定义文档派生，**运行期不可编辑**（无增删节点 / 改边入口）。
         拓扑变更路径 = 改定义文档 → 装配期校验 → 重新编译。
+      </p>
+      <p class="legend">
+        <span class="legend-item"><span class="legend-line solid"></span>普通边（无条件转移）</span>
+        <span class="legend-item"><span class="legend-line dashed"></span>条件边（按分支键择一）</span>
+        <span class="legend-item"><span class="legend-box"></span>START / END（合成端点，非可编排节点）</span>
       </p>
       <div class="graph">
         <VueFlow
@@ -459,6 +583,40 @@ h3 {
   height: 280px;
   border: 1px solid #d8dee4;
   border-radius: 6px;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #57606a;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend-line {
+  display: inline-block;
+  width: 26px;
+  border-top: 2px solid #6b7280;
+}
+.legend-line.dashed {
+  border-top-style: dashed;
+}
+.legend-box {
+  display: inline-block;
+  width: 16px;
+  height: 12px;
+  border: 1px dashed #6b7280;
+  border-radius: 3px;
+}
+/* 节点元素由 Vue Flow 在运行期创建，scoped 样式需经 :deep 才能命中自定义 class。 */
+.graph :deep(.graph-endpoint) {
+  border-style: dashed;
+  background: #f6f8fa;
+  color: #57606a;
 }
 .grid {
   display: flex;

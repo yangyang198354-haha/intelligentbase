@@ -36,6 +36,7 @@ from ib.config import (
 )
 from ib.core import (
     ConditionalEdgeSpec,
+    EdgeSpec,
     ExpertSpecInput,
     OrchestrationSpecInput,
     RouteSpecInput,
@@ -202,6 +203,36 @@ def test_TC_UNIT_057_each_illegal_category_is_rejected_with_locator():
             ),
             "conditional_edge_node_unknown",
         ),
+        "普通边端点不存在": (
+            _doc(
+                orchestration=OrchestrationSpecInput(
+                    nodes=("route", "a", "b"),
+                    conditional_edges=(ConditionalEdgeSpec("route", (("a", "a"),)),),
+                    edges=(EdgeSpec("a", "ghost"),),
+                )
+            ),
+            "orchestration_edge_node_unknown",
+        ),
+        "普通边自环": (
+            _doc(
+                orchestration=OrchestrationSpecInput(
+                    nodes=("route", "a", "b"),
+                    conditional_edges=(ConditionalEdgeSpec("route", (("a", "a"),)),),
+                    edges=(EdgeSpec("a", "a"),),
+                )
+            ),
+            "orchestration_edge_self_loop",
+        ),
+        "普通边重复": (
+            _doc(
+                orchestration=OrchestrationSpecInput(
+                    nodes=("route", "a", "b"),
+                    conditional_edges=(ConditionalEdgeSpec("route", (("a", "a"),)),),
+                    edges=(EdgeSpec("a", "b"), EdgeSpec("a", "b")),
+                )
+            ),
+            "orchestration_edge_duplicate",
+        ),
         "默认专家不在专家集合内": (
             _doc(route=RouteSpecInput(0.65, 0.05, 8, "ghost")),
             "route_default_unknown",
@@ -228,6 +259,27 @@ def test_TC_UNIT_057_each_illegal_category_is_rejected_with_locator():
     # 合法样例（含边界取值 tau=0.0 / 1.0）通过
     assert validate(_doc(route=RouteSpecInput(0.0, 0.0, 1, "a"))).ok is True
     assert validate(_doc(route=RouteSpecInput(1.0, 1.0, 8, "a"))).ok is True
+
+    # `START`/`END` 是**保留合成端点**：作为普通边端点合法（它们不进 `nodes`），
+    # 但作为**条件边分支目标**非法 —— 条件边必须落到真实节点。
+    spine = _doc(
+        orchestration=OrchestrationSpecInput(
+            nodes=("route", "a", "b"),
+            conditional_edges=(ConditionalEdgeSpec("route", (("a", "a"),)),),
+            edges=(EdgeSpec("START", "route"), EdgeSpec("a", "END")),
+        )
+    )
+    assert validate(spine, known_tools=KNOWN_TOOLS).ok is True, _codes(validate(spine, known_tools=KNOWN_TOOLS))
+
+    reserved_as_branch_target = _doc(
+        orchestration=OrchestrationSpecInput(
+            nodes=("route", "a", "b"),
+            conditional_edges=(ConditionalEdgeSpec("route", (("a", "START"),)),),
+        )
+    )
+    assert "conditional_edge_node_unknown" in _codes(
+        validate(reserved_as_branch_target, known_tools=KNOWN_TOOLS)
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -262,7 +314,33 @@ def test_TC_UNIT_058_roundtrip_is_semantically_equivalent():
         assert got.is_default == want.is_default
     assert reloaded.route == original.route
     assert tuple(reloaded.orchestration.nodes) == tuple(original.orchestration.nodes)
+    assert tuple(reloaded.orchestration.conditional_edges) == tuple(original.orchestration.conditional_edges)
+    assert tuple(reloaded.orchestration.edges) == tuple(original.orchestration.edges)
     assert tuple(reloaded.tool_grants) == tuple(original.tool_grants)
+
+    # 普通边**非空**时同样逐项无漂移（默认基线的 `edges=()` 会掩盖重建函数的漏解析）
+    with_edges = _doc(
+        orchestration=OrchestrationSpecInput(
+            nodes=("route", "a", "b"),
+            conditional_edges=(ConditionalEdgeSpec("route", (("a", "a"),)),),
+            edges=(EdgeSpec("START", "route"), EdgeSpec("a", "END")),
+        )
+    )
+    edged = document_from_json("p1", document_to_json(with_edges))
+    assert tuple(edged.orchestration.edges) == (EdgeSpec("START", "route"), EdgeSpec("a", "END"))
+    assert document_to_json(edged) == document_to_json(with_edges), "普通边往返后序列化不逐字一致"
+    assert semantic_hash(edged) == semantic_hash(with_edges)
+
+    # 同一文档只差一条普通边 → 语义哈希**必须不同**。
+    # 否则 `_semantic_payload` 漏收 `edges`，乐观并发对边改动无感（正确性 bug）。
+    fewer_edges = _doc(
+        orchestration=OrchestrationSpecInput(
+            nodes=("route", "a", "b"),
+            conditional_edges=(ConditionalEdgeSpec("route", (("a", "a"),)),),
+            edges=(EdgeSpec("START", "route"),),
+        )
+    )
+    assert semantic_hash(with_edges) != semantic_hash(fewer_edges)
 
     # 往返幂等：再走一轮仍等价
     assert semantic_hash(document_from_json("p1", document_to_json(reloaded))) == semantic_hash(original)
@@ -287,7 +365,7 @@ def test_TC_UNIT_059_whitelist_excludes_topology_and_non_editable_changes_detect
         assert editable in whitelist, f"白名单缺可编辑项 {editable}"
 
     for forbidden in ("orchestration", "orchestration.nodes", "orchestration.conditional_edges",
-                       "schema_version", "project_id"):
+                       "orchestration.edges", "schema_version", "project_id"):
         assert forbidden not in whitelist, f"拓扑/归属类字段不得进入可编辑白名单：{forbidden}"
 
     # 不可编辑清单与白名单互斥（白名单的补集）
@@ -304,6 +382,18 @@ def test_TC_UNIT_059_whitelist_excludes_topology_and_non_editable_changes_detect
     )
     items = non_editable_changes(current, topology_changed)
     assert any(i.code == "field_not_editable" and i.path == "orchestration" for i in items), items
+
+    # 拓扑变更（**只**改普通边，节点与条件边都不变）→ 同样检出且指向 orchestration。
+    # 这条拦住「只比 nodes/conditional_edges 就算完」的半吊子实现。
+    edges_changed = _doc(
+        orchestration=OrchestrationSpecInput(
+            nodes=("route", "a", "b"),
+            conditional_edges=(ConditionalEdgeSpec("route", (("a", "a"),)),),
+            edges=(EdgeSpec("START", "b"),),
+        )
+    )
+    edge_items = non_editable_changes(current, edges_changed)
+    assert any(i.code == "field_not_editable" and i.path == "orchestration" for i in edge_items), edge_items
 
     # project_id / schema_version 变更 → 同样被检出
     assert any(i.path == "project_id" for i in non_editable_changes(current, replace(current, project_id="p9")))

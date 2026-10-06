@@ -775,6 +775,7 @@ def _default_definition_document(project_id: str, cfg: Any) -> Any:
     from ib.config import build_definition_document
     from ib.core import (
         ConditionalEdgeSpec,
+        EdgeSpec,
         ExpertSpecInput,
         OrchestrationSpecInput,
         RouteSpecInput,
@@ -810,6 +811,18 @@ def _default_definition_document(project_id: str, cfg: Any) -> Any:
                 from_node="route",
                 branch_map=(("expert", "expert"), ("general", "general")),
             ),
+        ),
+        # 普通边**逐条镜像**运行期图（`ib/orchestration` 的 add_edge，见该模块 `_compile_graph`）。
+        # 少了这组边，配置页的编排图只剩条件边，`gate` / `aggregate` 会渲染成孤立方块 ——
+        # 那正是「文档描述不全」的表现。此处与运行期的一致性由
+        # `tests/unit/test_orchestration_edges_consistency.py` 把守（防止两处悄悄漂移）。
+        # 注意 `general` **绕过** `gate` 直连 `aggregate`：确认门只作用于 expert 支路。
+        edges=(
+            EdgeSpec(from_node="START", to_node="route"),
+            EdgeSpec(from_node="expert", to_node="gate"),
+            EdgeSpec(from_node="gate", to_node="aggregate"),
+            EdgeSpec(from_node="general", to_node="aggregate"),
+            EdgeSpec(from_node="aggregate", to_node="END"),
         ),
     )
     grants = tuple(

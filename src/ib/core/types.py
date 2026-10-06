@@ -951,16 +951,43 @@ class ConditionalEdgeSpec:
     branch_map: tuple[tuple[str, str], ...]
 
 
+#: 保留的**合成端点**：只允许出现在 `OrchestrationSpecInput.edges` 的端点上，
+#: **不得**出现在 `nodes` 里，也不得作为条件边的分支目标。它们表达的是一张图的入口与
+#: 出口，本身不是可编排的节点 —— 混进 `nodes` 会让「节点集合」同时承载两种语义。
+RESERVED_GRAPH_ENDPOINTS: frozenset[str] = frozenset({"START", "END"})
+
+
+@dataclass(frozen=True, slots=True)
+class EdgeSpec:
+    """普通边（无条件转移）规格（IFC-IB-287 扩展）。
+
+    与 `ConditionalEdgeSpec` 的分工：条件边表达「一个节点按分支键走到多个目标」，
+    普通边表达「无条件从 A 到 B」。二者**都**要声明 —— 只画条件边的图会丢掉主干
+    （典型症状：`gate` / `aggregate` 这类只靠普通边相连的节点在界面上成为孤立方块）。
+
+    端点除真实节点外，还允许 `RESERVED_GRAPH_ENDPOINTS`（`START` / `END`）以表达入口
+    与出口；它们**不**进 `nodes`。
+    """
+
+    from_node: str
+    to_node: str
+
+
 @dataclass(frozen=True, slots=True)
 class OrchestrationSpecInput:
     """编排图规格输入（IFC-IB-287）。
 
-    `nodes` 为节点名集合；`conditional_edges` 为条件边集合。**图拓扑不在运行期可编辑**
-    （REQ-FUNC-IB-26 ②）：本结构一旦派生为 `DerivedView`，进程内不得再被改写。
+    `nodes` 为节点名集合；`conditional_edges` 为条件边集合，`edges` 为普通边集合。
+    **图拓扑不在运行期可编辑**（REQ-FUNC-IB-26 ②）：本结构一旦派生为 `DerivedView`，
+    进程内不得再被改写。
+
+    `edges` **带默认值 `()`**：既有文档与全仓既有的构造点（自检 / 测试 / 探针）都不声明
+    它，不给默认值会因缺参全仓报错。空 `edges` 等价于「本图无普通边」，是合法状态。
     """
 
     nodes: tuple[str, ...]
     conditional_edges: tuple[ConditionalEdgeSpec, ...]
+    edges: tuple[EdgeSpec, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

@@ -386,6 +386,35 @@ def test_TC_INT_084_definition_endpoint_contract_matrix(http_app):
     assert blocked.status_code == 400, blocked.content
     assert any(i["code"] == "field_not_editable" for i in json.loads(blocked.content)["error"]["items"])
 
+    # --- PUT 400：**只**改普通边（nodes / conditional_edges 均不变）→ 仍为 field_not_editable ---
+    # 断言的是**行为**而非清单：真正的拦截是 `_semantic_payload` 整块比较，
+    # 「只比 nodes / conditional_edges」的实现会在此漏网。
+    # 加的那条边 `expert -> aggregate` **通过 validate**（端点真实、非自环、不重复）——
+    # 于是这条请求只能被「非可编辑字段」拦下，排除了「其实是校验失败」的误判。
+    seed_edges = [
+        {"from_node": "START", "to_node": "route"},
+        {"from_node": "expert", "to_node": "gate"},
+        {"from_node": "gate", "to_node": "aggregate"},
+        {"from_node": "general", "to_node": "aggregate"},
+        {"from_node": "aggregate", "to_node": "END"},
+    ]
+    edge_topo = json.loads(json.dumps(after["document"]))
+    assert edge_topo["orchestration"]["edges"] == seed_edges, (
+        "文档契约要求 `edges` 恒存在且为内置默认主干（缺则配置页 gate/aggregate 渲染成孤立方块）"
+    )
+    # 派生视图摘要同样要出 `edges` —— 配置页画图读的是 `derived`，不是 `document`
+    assert after["derived"]["edges"] == seed_edges, "派生视图摘要漏掉 edges，配置页拿不到主干"
+    edge_topo["orchestration"]["edges"] = seed_edges + [{"from_node": "expert", "to_node": "aggregate"}]
+    edge_blocked = client.put(
+        PATH, data=json.dumps({"document": edge_topo}), content_type="application/json", **AUTH
+    )
+    assert edge_blocked.status_code == 400, edge_blocked.content
+    assert any(
+        i["code"] == "field_not_editable" for i in json.loads(edge_blocked.content)["error"]["items"]
+    )
+    # 未落盘：文档仍为上次合法值
+    assert json.loads(client.get(PATH, **AUTH).content)["document"]["orchestration"]["edges"] == seed_edges
+
     # --- PUT 409：乐观并发冲突（陈旧基线），不静默覆盖 ---
     stale = json.loads(json.dumps(after["document"]))
     stale["route"]["tau"] = 0.99

@@ -56,6 +56,7 @@ from .ports import (
 )
 from .types import (
     DEFAULT_SESSION_PERSISTENCE_POLICY,
+    RESERVED_GRAPH_ENDPOINTS,
     SESSION_STATE_LOSS_OUTCOME,
     AccountStatus,
     AccountSummary,
@@ -77,6 +78,7 @@ from .types import (
     DeleteReport,
     DerivedView,
     DocumentRecord,
+    EdgeSpec,
     EmbedderDescriptor,
     EgressDescriptor,
     ExpertResult,
@@ -233,6 +235,8 @@ __all__ = [
     "ExpertSpecInput",
     "RouteSpecInput",
     "ConditionalEdgeSpec",
+    "EdgeSpec",
+    "RESERVED_GRAPH_ENDPOINTS",
     "OrchestrationSpecInput",
     "ToolGrantSpec",
     "DefinitionDocument",

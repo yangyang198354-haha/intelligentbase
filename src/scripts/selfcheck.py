@@ -1778,6 +1778,7 @@ def definition_pure_functions() -> None:
     )
     from ib.core import (
         ConditionalEdgeSpec,
+        EdgeSpec,
         ExpertSpecInput,
         OrchestrationSpecInput,
         RouteSpecInput,
@@ -1824,7 +1825,8 @@ def definition_pure_functions() -> None:
 
     wl = editable_field_whitelist()
     assert "route.tau" in wl and "experts[].cn_label" in wl
-    for forbidden in ("orchestration", "orchestration.nodes", "project_id", "schema_version"):
+    for forbidden in ("orchestration", "orchestration.nodes", "orchestration.edges",
+                      "project_id", "schema_version"):
         assert forbidden not in wl, f"{forbidden} 不应在可编辑白名单内"
 
     # 违规：默认专家两个 / 未知工具
@@ -1844,6 +1846,26 @@ def definition_pure_functions() -> None:
     )
     assert "conditional_edge_branch_map_empty" in {e.code for e in validate(empty_branch).errors}
 
+    # 普通边（无条件转移）：端点可为保留合成端点 START/END（不进 nodes），自环/重复/未知端点被拒
+    spine = _doc(
+        orchestration=OrchestrationSpecInput(
+            ("route", "a", "b"),
+            (ConditionalEdgeSpec("route", (("a", "a"),)),),
+            (EdgeSpec("START", "route"), EdgeSpec("a", "END")),
+        )
+    )
+    assert validate(spine, known_tools=known).ok, {e.code for e in validate(spine, known_tools=known).errors}
+    for bad_orch, want in (
+        ((("route", "a", "b"), (ConditionalEdgeSpec("route", (("a", "a"),)),), (EdgeSpec("a", "ghost"),)),
+         "orchestration_edge_node_unknown"),
+        ((("route", "a", "b"), (ConditionalEdgeSpec("route", (("a", "a"),)),), (EdgeSpec("a", "a"),)),
+         "orchestration_edge_self_loop"),
+        ((("route", "a", "b"), (ConditionalEdgeSpec("route", (("a", "a"),)),),
+          (EdgeSpec("a", "b"), EdgeSpec("a", "b"))), "orchestration_edge_duplicate"),
+    ):
+        got = {e.code for e in validate(_doc(orchestration=OrchestrationSpecInput(*bad_orch))).errors}
+        assert want in got, (want, got)
+
     # 非编辑字段变更检出（拓扑不可编辑）
     changed = _doc(
         orchestration=OrchestrationSpecInput(
@@ -1851,6 +1873,13 @@ def definition_pure_functions() -> None:
         )
     )
     assert any(i.code == "field_not_editable" for i in non_editable_changes(good, changed))
+    # 只改普通边（节点与条件边都不变）同样不可编辑 —— 拦住「只比 nodes 就算完」的实现
+    edges_only = _doc(
+        orchestration=OrchestrationSpecInput(
+            ("route", "a", "b"), (ConditionalEdgeSpec("route", (("a", "a"),)),), (EdgeSpec("START", "b"),)
+        )
+    )
+    assert any(i.code == "field_not_editable" for i in non_editable_changes(good, edges_only))
     # 白名单内变更（route.tau）不算违规
     assert non_editable_changes(good, _doc(route=RouteSpecInput(0.7, 0.05, 8, "a"))) == ()
 

@@ -156,9 +156,16 @@ export type RouteSpecInput = {
 /** `branch_map` 为**有序** `[branch_key, target_node]` 序列（保序，供界面判定可达性）。 */
 export type ConditionalEdgeSpec = { from_node: string; branch_map: [string, string][] };
 
+/**
+ * 普通边（无条件转移）。端点可能是真实节点，也可能是保留合成端点 `START` / `END`
+ * —— 后者**不**出现在 `nodes` 里，是图的入口与出口（见后端 `RESERVED_GRAPH_ENDPOINTS`）。
+ */
+export type EdgeSpec = { from_node: string; to_node: string };
+
 export type OrchestrationSpecInput = {
   nodes: string[];
   conditional_edges: ConditionalEdgeSpec[];
+  edges: EdgeSpec[];
 };
 
 export type ToolGrantSpec = { expert_name: string; tool_names: string[] };
@@ -179,6 +186,7 @@ export type DerivedViewSummary = {
   expert_names: string[];
   nodes: string[];
   conditional_edges: ConditionalEdgeSpec[];
+  edges: EdgeSpec[];
 };
 
 export type ValidationErrorItem = { path: string; code: string; message: string };
