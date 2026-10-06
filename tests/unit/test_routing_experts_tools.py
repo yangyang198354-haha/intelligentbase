@@ -48,19 +48,19 @@ def test_TC_UNIT_026_semantic_router_project_partition_and_failopen():
     from ib.core import Scope
     from ib.routing.semantic import SemanticRouter
 
-    exemplars = {"p_alpha": {"data-expert": ["能耗数据"]}}
+    exemplars = {"p_alpha": {"freeark-expert": ["能耗数据"]}}
     router = SemanticRouter(
         embed_texts=lambda texts: [[1.0, 0.0] for _ in texts],
         exemplars_provider=lambda pid: exemplars.get(pid, {}),
     )
-    assert router.route("能耗", scope=Scope(project_id="p_alpha")) == "data-expert"
+    assert router.route("能耗", scope=Scope(project_id="p_alpha")) == "freeark-expert"
     # 未登记项目的范例：不得回落他项目 → None
     assert router.route("能耗", scope=Scope(project_id="p_beta")) is None
 
     def _boom(texts):
         raise RuntimeError("embed down")
 
-    broken = SemanticRouter(embed_texts=_boom, exemplars_provider=lambda pid: {"data-expert": ["x"]})
+    broken = SemanticRouter(embed_texts=_boom, exemplars_provider=lambda pid: {"freeark-expert": ["x"]})
     assert broken.route("x", scope=Scope(project_id="p_alpha")) is None
     assert broken.scores_for("x", scope=Scope(project_id="p_alpha")) == {}
 
@@ -74,10 +74,10 @@ def test_TC_UNIT_027_parse_route_output_dirty():
     """[TC-UNIT-027] 脏输出解析：代码围栏 / 散文 / 非法名 / 空数组（AC-IB-15-03）。"""
     from ib.routing.intent import parse_route_output, parse_route_output_ex
 
-    assert parse_route_output('```json\n["data-expert"]\n```') == ["data-expert"]
-    assert parse_route_output('好的，结果是 ["inspection-expert", "knowledge-expert"] 请查收') == [
+    assert parse_route_output('```json\n["freeark-expert"]\n```') == ["freeark-expert"]
+    assert parse_route_output('好的，结果是 ["inspection-expert", "sanheng-knowledge"] 请查收') == [
         "inspection-expert",
-        "knowledge-expert",
+        "sanheng-knowledge",
     ]
     # 非法专家名被过滤
     assert parse_route_output('["nonexistent-expert"]') == []
@@ -117,7 +117,7 @@ def test_TC_UNIT_030_composite_multi_expert_parallel_candidates():
     from ib.routing.intent import IntentRouter
 
     decision = IntentRouter().classify_experts("能耗数据和设备故障一起看看", scope=Scope(project_id="p1"))
-    assert set(decision.experts) >= {"data-expert", "inspection-expert"}, decision.experts
+    assert set(decision.experts) >= {"freeark-expert", "inspection-expert"}, decision.experts
     assert len(decision.experts) <= 3
 
 
@@ -147,7 +147,7 @@ def test_TC_UNIT_032_ood_when_allowed():
     router = IntentRouter(llm_provider=_Llm())
     assert router.classify_experts("你好", scope=Scope(project_id="p1"), allow_ood=True).tier == "ood"
     # 不允许 OOD 时退回默认专家（保守：宁可多用一个专家）
-    assert router.classify_experts("你好", scope=Scope(project_id="p1")).experts == ["data-expert"]
+    assert router.classify_experts("你好", scope=Scope(project_id="p1")).experts == ["freeark-expert"]
 
 
 def test_TC_UNIT_033_llm_failure_falls_back_deterministically():
@@ -183,13 +183,13 @@ def test_TC_UNIT_035_guard_reroutes_to_data_expert():
     from ib.core import RouteDecision
     from ib.routing.intent import guard_against_misroute
 
-    decision = RouteDecision(experts=["knowledge-expert"], tier="L2_llm", confidence=0.0)
-    scores = {"data-expert": 0.9, "knowledge-expert": 0.1}
+    decision = RouteDecision(experts=["sanheng-knowledge"], tier="L2_llm", confidence=0.0)
+    scores = {"freeark-expert": 0.9, "sanheng-knowledge": 0.1}
     fixed = guard_against_misroute(decision, scores)
-    assert fixed.experts == ["data-expert"]
+    assert fixed.experts == ["freeark-expert"]
     assert fixed.tier == "L3_keyword_fallback"
     # 无证据时不介入（护栏不得成为新的误路由源）
-    assert guard_against_misroute(decision, {}).experts == ["knowledge-expert"]
+    assert guard_against_misroute(decision, {}).experts == ["sanheng-knowledge"]
 
 
 def test_TC_UNIT_036_router_determinism_same_input_same_route():
@@ -199,7 +199,7 @@ def test_TC_UNIT_036_router_determinism_same_input_same_route():
 
     router = IntentRouter()
     results = {tuple(router.classify_experts("能耗看板", scope=Scope(project_id="p1")).experts) for _ in range(5)}
-    assert results == {("data-expert",)}
+    assert results == {("freeark-expert",)}
 
 
 # --------------------------------------------------------------------------- #
@@ -249,7 +249,7 @@ def test_TC_UNIT_039_get_missing_expert_returns_none():
     from ib.experts import get
 
     assert get("definitely-not-an-expert") is None
-    assert get("data-expert") is not None
+    assert get("freeark-expert") is not None
 
 
 # --------------------------------------------------------------------------- #

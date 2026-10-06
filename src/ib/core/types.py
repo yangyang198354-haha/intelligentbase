@@ -1,6 +1,7 @@
 """
 @module MOD-IB-01
 @implements IFC-IB-001 .. IFC-IB-010 （全部不可变数据结构；逐字段名 + 类型 + 可空性）
+            IFC-IB-337 ~ 342（REV-16-2 提示词分层 / 工具参数 / FreeArk 对齐数据结构）
 @depends (none)
 @author software-developer
 
@@ -32,6 +33,13 @@ DocStatusLiteral: TypeAlias = Literal["pending", "parsing", "indexed", "failed"]
 DegradeReasonLiteral: TypeAlias = Literal[
     "embedding_unavailable", "vectorstore_unavailable", "timeout"
 ]
+
+#: 提示词分层（IFC-IB-337，REV-16-2；ADR-29）：`main` 主提示词（**可缺**）/
+#: `fallback` 兜底提示词（**不得缺**）。分层并存，主缺失时回退兜底。
+PromptLayer: TypeAlias = Literal["main", "fallback"]
+
+#: 工具参数类型（IFC-IB-340，REV-16-2；ADR-30）。纯标准库，零第三方依赖。
+ToolParamTypeLiteral: TypeAlias = Literal["int", "float", "bool", "str"]
 
 
 # --------------------------------------------------------------------------- #
@@ -992,14 +1000,19 @@ class OrchestrationSpecInput:
 
 @dataclass(frozen=True, slots=True)
 class ToolGrantSpec:
-    """工具授权规格（IFC-IB-287）。
+    """工具授权规格（IFC-IB-287；**REV-16-2 加成式扩展** IFC-IB-340）。
 
     `expert_name` → 该专家**可绑定**的工具名集合。工具名须在已知工具注册表内，
     否则 IFC-IB-290 报错（不静默放行未定义工具）。
+
+    **REV-16-2 加成式扩展**：增列 `param_values`（默认空元组）承载**工具参数值**
+    （ADR-30 / REQ-FUNC-IB-39）。既有字段与语义**一字未动**（沿用 IFC-IB-282 / 324
+    的「加成式扩展」先例）。本结构**不提供**新增工具本体的路径。
     """
 
     expert_name: str
     tool_names: tuple[str, ...]
+    param_values: tuple["ToolParamValue", ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -1026,11 +1039,15 @@ class DerivedView:
 
     由 `derive(doc)` **纯函数**产出：**不落盘、不可反写文档**。装配期据此注入运行期
     注册表 / 图配置。`capability_digest` 为工具授权的能力摘要。
+
+    **REV-16-2 加成式扩展**：增列 `prompt_bundles`（默认空元组），承载跨域合并派生的
+    提示词分层结果（IFC-IB-347）。既有字段与 `derive()` 签名文本**一字未动**。
     """
 
     experts: tuple[ExpertSpecInput, ...]
     capability_digest: str
     graph_config: OrchestrationSpecInput
+    prompt_bundles: tuple["ExpertPromptBundle", ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -1070,6 +1087,148 @@ class SaveResult:
     content_hash: str
     conflict: bool
     errors: tuple[ValidationErrorItem, ...] = ()
+
+
+# --------------------------------------------------------------------------- #
+# REV-16-2 提示词 / 工具参数（IFC-IB-337 ~ 342，module_design.md §2.1）
+#
+# 真源边界（ADR-15-R1）：定义文档 = 结构与配置域唯一真源；独立 markdown 提示词目录
+# = 提示词域唯一真源；装配期**按域合并**（合并键 = 专家 `name`）。两域不重叠。
+# 以下均为 **frozen dataclass / Literal，纯 stdlib，无实现体**（零第三方依赖）。
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True, slots=True)
+class ExpertPromptDocumentRef:
+    """单层提示词文档引用（IFC-IB-337）。
+
+    指向独立提示词目录中的**一个文件**（`main.md` 或 `fallback.md`）。
+    `rel_path` 为相对目录根的路径；`content_hash` 为语义哈希（乐观并发判据）；
+    `exists=False` 表示该层文件缺失（`main` 缺失合法，`fallback` 缺失非法）。
+    """
+
+    expert_name: str
+    layer: PromptLayer
+    rel_path: str
+    content_hash: str
+    exists: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ExpertPromptBundle:
+    """专家提示词分层合并结果（IFC-IB-338，ADR-29）。
+
+    * `main_prompt`：主提示词，**可缺**（`None`）；
+    * `fallback_prompt`：兜底提示词，**非空**（否则非法）；
+    * `effective_prompt`：跨域合并后**恒非空**的生效系统提示词
+      （主缺失 → 回退兜底；见 ADR-29「绝不空白系统提示词」）；
+    * `resolved_from`：生效来源（`main_file` / `fallback_file` / `definition_doc_fallback`），
+      供界面可观测（IFC-IB-354）。
+    """
+
+    expert_name: str
+    main_prompt: str | None
+    fallback_prompt: str
+    effective_prompt: str
+    resolved_from: Literal["main_file", "fallback_file", "definition_doc_fallback"]
+
+
+@dataclass(frozen=True, slots=True)
+class PromptDirectoryLayout:
+    """独立提示词目录的物理布局（IFC-IB-338 / [ARCH-ASSUMPTION-A10]）。
+
+    只描述布局事实（键名 / 文件模式 / 命名规则），**不含任何路径值**（路径值不进响应 / 日志）。
+    """
+
+    root_key: str
+    file_pattern: str
+    naming_rule: str
+
+
+@dataclass(frozen=True, slots=True)
+class ToolParamValue:
+    """工具参数的**取值**（IFC-IB-340，ADR-30）。
+
+    `name` 为参数标识：可使用 `<tool_name>.<param_name>` 的限定形式以声明归属工具
+    （从而支持「未授权工具带参」判定）；不含 `.` 时视为全局参数。
+    """
+
+    name: str
+    value: str
+
+
+@dataclass(frozen=True, slots=True)
+class ToolParamSpec:
+    """工具参数的**声明**（IFC-IB-340，ADR-30）。
+
+    类型 / 默认值 / 上下界 / 枚举。参数 schema 须与各工具实现**成对维护**（ADR-30 负向）。
+    """
+
+    name: str
+    type: ToolParamTypeLiteral
+    default: str
+    minimum: float | None = None
+    maximum: float | None = None
+    choices: tuple[str, ...] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PromptSaveResult:
+    """提示词单层保存结果（IFC-IB-341）。
+
+    `saved=False` 时 `errors` 至少一条（校验不通过 / 乐观并发冲突）；
+    **保存失败不破坏在用配置**（fail-safe，REQ-NFR-IB-19）。
+    """
+
+    saved: bool
+    ref: ExpertPromptDocumentRef
+    content_hash: str
+    errors: tuple[ValidationErrorItem, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class DimensionCheck:
+    """FreeArk 对齐比对表的**单维**结果（IFC-IB-342，ADR-31）。
+
+    `unalignable=True` 表示该维**显式排除**（FreeArk 无真源，不得伪造对齐）。
+    """
+
+    dimension: str
+    base_value: str
+    freeark_value: str
+    aligned: bool
+    unalignable: bool
+    note: str
+
+
+@dataclass(frozen=True, slots=True)
+class AlignmentChecklist:
+    """FreeArk 严格对齐**可核验清单**（IFC-IB-342，ADR-31）。
+
+    10 维（9 维专家定义 + 1 维工具名映射），其中**工具参数为显式排除项**（`unalignable=True`）。
+    """
+
+    items: tuple[DimensionCheck, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class FreeArkAlignedExpertSpec:
+    """FreeArk 严格对齐的专家规格（IFC-IB-342，ADR-31）。
+
+    = `ExpertSpec` 的 7 字段 + `main_prompt` + `exemplars`（共 **9 维**）
+    + `tool_names`（第 **10** 维，工具名对齐）。**纯数据，无实现体。**
+    """
+
+    name: str
+    cn_label: str
+    keywords: tuple[str, ...]
+    exemplars: tuple[str, ...]
+    is_data_expert: bool
+    fallback_prompt: str
+    is_delegating: bool
+    is_default: bool
+    main_prompt: str | None
+    tool_names: tuple[str, ...]
 
 
 # --------------------------------------------------------------------------- #
@@ -1166,6 +1325,68 @@ class AccountSummary:
     must_change_password: bool
 
 
+# --------------------------------------------------------------------------- #
+# REV-16-4 配置审计 / 存储态（IFC-IB-356 / 361，module_design.md §2.2.7 / §3 MOD-IB-01）
+# --------------------------------------------------------------------------- #
+#
+# 两件事放在 framework-free 的 `ib.core`：
+#   * `ConfigAuditEntry` 是端口 `ConfigAuditStore`（IFC-IB-357）签名的一部分，
+#     必须与实现（SQLite / 内存）解耦，否则 `ibweb` 会反向依赖 `ib.ledger`（端口倒置失效）；
+#   * `StorageState` 是 `GET /api/config/storage-state`（IFC-IB-362）的响应契约，
+#     definition / prompt 两类编辑器**共用**同一类型化真源（ADR-35）。
+#
+# 凭据 / 取值纪律（ADR-34，硬约束）：
+#   * `ConfigAuditEntry.changed_field_names` **只承载字段名**（如 `route.tau`），
+#     **绝不承载任何配置取值**；
+#   * `detail_code` **只承载结果码**，不回显取值；
+#   * 本层**不提供任何**承载配置取值 / 凭据的字段。
+
+#: 配置审计结果（IFC-IB-356）：成功与失败**均记录**（ADR-34）。取值只许追加，不得改义。
+ConfigAuditResult: TypeAlias = Literal["saved", "rejected"]
+
+#: 存储模式（IFC-IB-361，ADR-35）：`memory` = 「配置仅内存生效、不跨重启保留」。
+StoreMode: TypeAlias = Literal["memory", "file"]
+
+
+@dataclass(frozen=True, slots=True)
+class ConfigAuditEntry:
+    """配置「保存 / 生效」的**可查询记录**（IFC-IB-356，ADR-34）。
+
+    **只读审计，非第二真源**：本结构不含任何配置取值，故**没有任何配置读取路径**
+    能消费它（端口 `ConfigAuditStore`（IFC-IB-357）亦在类型层排除 `update` / `delete`）。
+
+    字段：`timestamp`（UTC 定长串）/ `project` / `actor`（谁）/ `action`（做了什么）/
+    `changed_field_names`（改了**哪些字段**，只出字段名）/ `result ∈ {saved,rejected}` /
+    `detail_code`（拒绝原因 / 结果码，只出码）。
+    """
+
+    timestamp: str
+    project: str
+    actor: str
+    action: str
+    changed_field_names: tuple[str, ...]
+    result: ConfigAuditResult
+    detail_code: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class StorageState:
+    """配置存储态（IFC-IB-361，ADR-35）。
+
+    `definition_store` / `prompt_store ∈ {memory,file}` 为**装配期实际选用**的存储实现
+    的诚实投影（单一来源 = 装配结果，IFC-IB-362）；`*_configured` 表示对应存储
+    **是否已配置**（键已设置）。任一 `memory` 即「**配置仅内存生效、不跨重启保留**」。
+
+    **语义声明（强制）**：本结构**仅增加可观测提示**，**不改变**「保存 + 服务重启重装配」
+    生效口径（ADR-32 / C-IB-40 / OOS-16），**不引入**运行期热重载。
+    """
+
+    definition_store: StoreMode
+    prompt_store: StoreMode
+    definition_store_configured: bool
+    prompt_store_configured: bool
+
+
 __all__ = [
     "Vector",
     "DistanceLiteral",
@@ -1241,4 +1462,21 @@ __all__ = [
     "SessionRecord",
     "PasswordPolicy",
     "AccountSummary",
+    # REV-16-2 提示词 / 工具参数（IFC-IB-337 ~ 342）
+    "PromptLayer",
+    "ToolParamTypeLiteral",
+    "ExpertPromptDocumentRef",
+    "ExpertPromptBundle",
+    "PromptDirectoryLayout",
+    "ToolParamValue",
+    "ToolParamSpec",
+    "PromptSaveResult",
+    "DimensionCheck",
+    "AlignmentChecklist",
+    "FreeArkAlignedExpertSpec",
+    # REV-16-4 配置审计 / 存储态（IFC-IB-356 / 361）
+    "ConfigAuditResult",
+    "StoreMode",
+    "ConfigAuditEntry",
+    "StorageState",
 ]

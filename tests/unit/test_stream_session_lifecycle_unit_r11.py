@@ -99,7 +99,7 @@ def test_TC_UNIT_069_session_state_lost_on_restart_is_fail_closed():
         key,
         SessionState(
             messages=[Message(role="user", content="上一轮提问")],
-            last_expert="data-expert",
+            last_expert="freeark-expert",
             sticky_turns_left=1,
         ),
     )

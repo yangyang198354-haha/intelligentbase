@@ -583,7 +583,7 @@ def orchestration_events_order() -> None:
     deps = _deps()
 
     class _LlmStub:
-        """最小 LLM 替身：路由把问题定向到 knowledge-expert，而该专家**必然失败**。
+        """最小 LLM 替身：路由把问题定向到 sanheng-knowledge，而该专家**必然失败**。
 
         这样一次运行就能同时覆盖三件事：条件边 fan-out、专家级降级、聚合。
         """
@@ -593,7 +593,7 @@ def orchestration_events_order() -> None:
                 name = "router"
 
                 def __init__(self) -> None:
-                    self.impl = lambda prompt: '{"experts": ["knowledge-expert"]}'
+                    self.impl = lambda prompt: '{"experts": ["sanheng-knowledge"]}'
 
             return _Role()
 
@@ -654,7 +654,7 @@ def orchestration_events_order() -> None:
     )
     # 内部分工词不得出现在正文（AC-IB-09-03）
     content = [e.data for e in events if str(e.kind) == "content"][0]
-    for label in ("router", "expert", "聚合", "专家", "knowledge-expert"):
+    for label in ("router", "expert", "聚合", "专家", "sanheng-knowledge"):
         assert label not in content, f"正文暴露了内部分工词汇 {label!r}：{content}"
 
 
@@ -2136,7 +2136,7 @@ def definition_assembly_injects_derived() -> None:
     assert deps.definitions["p_alpha"] is not deps.definitions["p_beta"]
     # 派生的只读视图存在
     view = deps.derived_views["p_alpha"]
-    assert [e.name for e in view.experts] == ["data-expert", "inspection-expert", "knowledge-expert"]
+    assert [e.name for e in view.experts] == ["freeark-expert", "inspection-expert", "sanheng-knowledge"]
     # 注入 MOD-IB-16：派生注册表 == 文档专家集
     assert experts.names() == tuple(e.name for e in view.experts)
     assert experts.default_expert() == deps.definitions["p_alpha"].route.default_expert
@@ -2269,7 +2269,7 @@ def r8_can_resume_fail_closed() -> None:
     )
     from ib.orchestration import ResumePayload, can_resume
 
-    prompt = ConfirmationPrompt(gate_id="g1", expert_name="data-expert", summary="确认执行写操作？")
+    prompt = ConfirmationPrompt(gate_id="g1", expert_name="freeark-expert", summary="确认执行写操作？")
     gate = ConfirmationGateState(gate_id="g1", prompt=prompt, decision=None)
     state = SessionState(gate=gate)
     approve = ResumePayload(decision=ConfirmationDecision(gate_id="g1", approved=True))
@@ -2313,7 +2313,7 @@ def r8_gate_and_resume() -> None:
                     name = "router"
 
                     def __init__(self) -> None:
-                        self.impl = lambda prompt: '{"experts": ["data-expert"]}'
+                        self.impl = lambda prompt: '{"experts": ["freeark-expert"]}'
 
                 return _Role()
 
@@ -2381,7 +2381,7 @@ def r8_gate_and_resume() -> None:
 
     def _builder(query: str, *, decision: Any, scope: Any) -> Any:  # noqa: ANN001
         return ConfirmationPrompt(
-            gate_id="g-1", expert_name="data-expert", summary="将写入温度设定，是否继续？"
+            gate_id="g-1", expert_name="freeark-expert", summary="将写入温度设定，是否继续？"
         )
 
     orch = _orch(builder=_builder, confirmation_gate_enabled=True)
@@ -2705,7 +2705,7 @@ def r8_chat_resume_http_success() -> None:
     gate = ConfirmationGateState(
         gate_id="gate-http-1",
         prompt=ConfirmationPrompt(
-            gate_id="gate-http-1", expert_name="data-expert", summary="确认写入？"
+            gate_id="gate-http-1", expert_name="freeark-expert", summary="确认写入？"
         ),
         decision=None,
     )
@@ -2759,7 +2759,7 @@ def r8_chat_resume_http_success() -> None:
                 gate=ConfirmationGateState(
                     gate_id="gate-http-2",
                     prompt=ConfirmationPrompt(
-                        gate_id="gate-http-2", expert_name="data-expert", summary="确认写入？"
+                        gate_id="gate-http-2", expert_name="freeark-expert", summary="确认写入？"
                     ),
                     decision=None,
                 ),
@@ -3578,6 +3578,229 @@ def r14_frontend_project_discipline() -> None:
     )
 
 
+# --------------------------------------------------------------------------- #
+# REV-16-2 增量（独立提示词目录 + 提示词分层 + 工具授权/参数；IFC-IB-337~354）
+# --------------------------------------------------------------------------- #
+
+
+@_case("r16_prompt_layers：主/兜底分层 + 目录校验 + 跨域合并注入（IFC-IB-343/345/347/349）")
+def r16_prompt_layers() -> None:
+    """纯函数 + 临时目录：分层优先级 / 兜底恒非空 / 目录完备性 / 按 name 合并注入。"""
+    import tempfile
+
+    from ib.config import (
+        FsExpertPromptStore,
+        InMemoryExpertPromptStore,
+        build_definition_document,
+        derive_prompt_layers,
+        load_prompt_directory,
+        merge_prompt_layers,
+        validate_prompt_directory,
+    )
+    from ib.core import (
+        ConditionalEdgeSpec,
+        ExpertSpecInput,
+        OrchestrationSpecInput,
+        PromptNotFoundError,
+        RouteSpecInput,
+    )
+    from ib.experts import install_prompt_bundles, main_prompts, prompt_bundles
+
+    # 分层优先级：主 > 兜底文件 > 文档兜底；三层皆空即非法
+    assert merge_prompt_layers("a", main_content="M", fallback_content="F", doc_fallback="D").resolved_from == "main_file"
+    assert merge_prompt_layers("a", main_content=None, fallback_content="F", doc_fallback="D").resolved_from == "fallback_file"
+    assert merge_prompt_layers("a", main_content="", fallback_content="", doc_fallback="D").resolved_from == "definition_doc_fallback"
+    try:
+        merge_prompt_layers("a", main_content=None, fallback_content="", doc_fallback="  ")
+        raise AssertionError("三层皆空竟未抛 PromptNotFoundError")
+    except PromptNotFoundError:
+        pass
+
+    def _expert(name: str, is_default: bool = False) -> Any:
+        return ExpertSpecInput(
+            name=name,
+            cn_label=f"标签{name}",
+            keywords=(f"k{name}",),
+            exemplars=(),
+            is_data_expert=False,
+            fallback_prompt=f"doc::{name}",
+            is_delegating=False,
+            is_default=is_default,
+        )
+
+    doc = build_definition_document(
+        project_id="p1",
+        experts=(_expert("a", True), _expert("b")),
+        route=RouteSpecInput(tau=0.65, margin=0.05, max_expert_steps=8, default_expert="a"),
+        orchestration=OrchestrationSpecInput(
+            nodes=("route", "a", "b"),
+            conditional_edges=(ConditionalEdgeSpec("route", (("a", "a"),)),),
+        ),
+    )
+
+    with tempfile.TemporaryDirectory() as root:
+        for expert, layer, text in (("a", "main", "MAIN-A"), ("a", "fallback", "FB-A"), ("b", "fallback", "FB-B")):
+            d = os.path.join(root, "p1", expert)
+            os.makedirs(d, exist_ok=True)
+            with open(os.path.join(d, f"{layer}.md"), "w", encoding="utf-8") as fh:
+                fh.write(text)
+        refs = load_prompt_directory(root, "p1")
+        # 完备性：a 有 fallback（ok）；b 有 fallback（ok）；无孤儿 / 命名不符
+        assert validate_prompt_directory(refs, doc=doc) == ()
+        # 孤儿文件被检出
+        os.makedirs(os.path.join(root, "p1", "ghost"), exist_ok=True)
+        with open(os.path.join(root, "p1", "ghost", "fallback.md"), "w", encoding="utf-8") as fh:
+            fh.write("x")
+        codes = {e.code for e in validate_prompt_directory(load_prompt_directory(root, "p1"), doc=doc)}
+        assert "prompt_orphan_file" in codes
+
+        view = derive_prompt_layers(doc, refs)
+        by_name = {b.expert_name: b for b in view.prompt_bundles}
+        assert by_name["a"].effective_prompt == "MAIN-A" and by_name["a"].resolved_from == "main_file"
+        assert by_name["b"].effective_prompt == "FB-B" and by_name["b"].resolved_from == "fallback_file"
+
+        # 存储实现：兜底为空非法 + 乐观并发冲突（两实现语义一致）
+        for store in (InMemoryExpertPromptStore("p1"), FsExpertPromptStore(root, "p1")):
+            first = store.save_layer("a", "main", "v1", expected_hash=None)
+            assert first.saved is True
+            assert store.save_layer("a", "main", "v2", expected_hash="sha256:0").saved is False
+            assert store.save_layer("a", "fallback", "   ", expected_hash=None).saved is False
+
+        install_prompt_bundles(view.prompt_bundles)
+        assert main_prompts().get("a") == "MAIN-A"
+        assert prompt_bundles()["b"].effective_prompt == "FB-B"
+
+
+@_case("r16_prompt_tool_endpoints：提示词端点族 + 工具授权/参数 + 装配序列（IFC-IB-350/352/353）")
+def r16_prompt_tool_endpoints() -> None:
+    """Django 测试客户端跑提示词端点族；并核验授权绑定与参数注入。**不连任何外部服务**。"""
+    os.environ["DJANGO_SETTINGS_MODULE"] = "ibweb.settings"
+    os.environ["IB_CONFIG_SOURCE"] = "dict"
+
+    import json
+
+    from ibweb.composition import (
+        build_application,
+        build_deps,
+        known_tool_param_specs,
+        register_builtin_tools,
+    )
+
+    deps = build_deps(OFFLINE_RAW, force=True)
+
+    import django
+
+    django.setup()
+    build_application(deps)
+
+    # 装配序列（IFC-IB-353）：每项目一份提示词存储 + 跨域合并派生注入（生效提示词恒非空）
+    assert set(deps.prompt_stores) == {"p_alpha", "p_beta"}
+    for view in deps.derived_views.values():
+        assert view.prompt_bundles and all(b.effective_prompt.strip() for b in view.prompt_bundles)
+
+    # 参数规格由既有工具声明派生（不含新增工具本体）；授权绑定 → 最小授权 + scope 闭包
+    from ib.core import Scope, ToolGrantSpec, ToolParamValue, ToolResult
+    from ib.tools import ToolRegistry, bind_scope, build_authorized_tools, derive_tool_param_specs
+
+    assert {s.name for s in known_tool_param_specs()} == {"search_knowledge.query"}
+    reg = register_builtin_tools(ToolRegistry())
+    authorized = build_authorized_tools(
+        (ToolGrantSpec("e1", ("search_knowledge",), (ToolParamValue("search_knowledge.query", "PIN"),)),),
+        registry=reg,
+        specs=derive_tool_param_specs(reg),
+    )
+
+    class _R:
+        def search_as_tool(self, q: str, *, scope: Any) -> Any:
+            return ToolResult(ok=True, content="HIT:" + q)
+
+    bound = bind_scope(authorized, Scope(project_id="p_alpha"), _R())[0]
+    assert bound.callable(query="caller").content == "HIT:caller"  # 调用方显式实参优先
+    assert bound.callable().content == "HIT:PIN"  # 未给实参时配置值生效
+
+    from django.test import Client
+
+    client = Client()
+    auth = {"HTTP_AUTHORIZATION": f"Bearer {os.environ.get('IB_OFFLINE_TOKEN', 'groupd-offline-token')}"}
+
+    # 列表：只出元数据 + 哈希，不出正文；只登记键名
+    listed = client.get("/api/config/prompts", **auth)
+    assert listed.status_code == 200, listed.content
+    payload = json.loads(listed.content)
+    assert set(payload) == {"experts", "tool_param_specs", "available_tools", "layout", "config_key_names"}
+    assert payload["available_tools"] == ["search_knowledge"]
+    assert {e["name"] for e in payload["experts"]} == {"freeark-expert", "inspection-expert", "sanheng-knowledge"}
+    assert payload["config_key_names"] == ["IB_EXPERT_PROMPT_DIR", "IB_EXPERT_PROMPT_ENABLED"]
+
+    # 未保存 → 404；PUT main → 200；GET 回读一致
+    assert client.get("/api/config/prompts/freeark-expert/main", **auth).status_code == 404
+    saved = client.put(
+        "/api/config/prompts/freeark-expert/main",
+        data=json.dumps({"content": "你是系统管家。"}),
+        content_type="application/json",
+        **auth,
+    )
+    assert saved.status_code == 200, saved.content
+    digest = json.loads(saved.content)["content_hash"]
+    got = json.loads(client.get("/api/config/prompts/freeark-expert/main", **auth).content)
+    assert got["content"] == "你是系统管家。" and got["content_hash"] == digest
+
+    # 乐观并发冲突 → 409（不覆盖）
+    conflict = client.put(
+        "/api/config/prompts/freeark-expert/main",
+        data=json.dumps({"content": "改", "expected_hash": "sha256:0"}),
+        content_type="application/json",
+        **auth,
+    )
+    assert conflict.status_code == 409, conflict.content
+    # 兜底为空 → 400（fail-safe）
+    empty = client.put(
+        "/api/config/prompts/freeark-expert/fallback",
+        data=json.dumps({"content": "  "}),
+        content_type="application/json",
+        **auth,
+    )
+    assert empty.status_code == 400, empty.content
+    # 鉴权纪律：不接受 ?token=；缺令牌非 200
+    assert client.get("/api/config/prompts?token=x").status_code in (400, 401, 403)
+    assert client.get("/api/config/prompts").status_code in (401, 403)
+    # 保存不重建编排图（ADR-32）
+    assert deps.orchestrator_for("p_alpha") is deps.orchestrator_for("p_alpha")
+
+
+@_case("r16_rename_alignment：FreeArk 专家名硬改名（无旧名残留）+ 禁止标签并集（ADR-31）")
+def r16_rename_alignment() -> None:
+    """核验专家名 / 中文标签已按 ADR-31 硬改名，且骨架不含业务中文名（仅过渡并集例外）。"""
+    import pathlib
+
+    from ib.experts import cn_map, names
+    from ib.orchestration import forbidden_labels
+
+    assert names() == ("freeark-expert", "inspection-expert", "sanheng-knowledge")
+    assert cn_map() == {
+        "freeark-expert": "系统管家",
+        "inspection-expert": "巡检诊断",
+        "sanheng-knowledge": "三恒知识",
+    }
+    # 派生只读视图：禁止标签含活体中文标签（ACE-IB-09-03），且为过渡并集（旧 ∪ 新）
+    labels = forbidden_labels(cn_map())
+    assert "系统管家" in labels and "三恒知识" in labels and "巡检诊断" in labels
+    # 过渡态：旧标签仍在并集内（ADR-31 Decision 第 4 条）→ 旧聚合标签不得泄漏
+    assert "数据管家" in labels and "知识库问答" in labels
+    # 派生视图可调用（不硬编码业务名，改由 cn_map 派生）
+    assert forbidden_labels({"x": "自定义标签"}) and "自定义标签" in forbidden_labels({"x": "自定义标签"})
+
+    # 源码 / 测试中不含旧专家 slug（硬改名、无并存窗口）
+    repo = pathlib.Path(__file__).resolve().parents[1]
+    offenders: list[str] = []
+    for base in (repo / "ib", repo / "ibweb"):
+        for path in base.rglob("*.py"):
+            text = path.read_text(encoding="utf-8")
+            if "data-expert" in text or "knowledge-expert" in text:
+                offenders.append(str(path))
+    assert not offenders, f"源码仍含旧专家 slug：{offenders}"
+
+
 def main() -> int:
     print("=" * 72)
     print("intelligentbase 离线自检（GROUP_C 自我验证；正式测试套件属 GROUP_D）")
@@ -3636,6 +3859,10 @@ def main() -> int:
         # ---- R14 增量（项目上下文选择与传播；IFC-IB-333~336） ----
         r14_project_context,
         r14_frontend_project_discipline,
+        # ---- REV-16-2 增量（独立提示词目录 + 提示词分层 + 工具授权/参数；IFC-IB-337~354） ----
+        r16_prompt_layers,
+        r16_prompt_tool_endpoints,
+        r16_rename_alignment,
     ]
     for case in cases:
         case()

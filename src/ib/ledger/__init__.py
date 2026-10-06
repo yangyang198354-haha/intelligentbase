@@ -62,6 +62,10 @@ __all__ = [
     "build_account_store",
     "hash_password",
     "verify_password",
+    # REV-16-4（IFC-IB-357/358）：配置审计存储
+    "SqliteConfigAuditStore",
+    "MemoryConfigAuditStore",
+    "build_config_audit_store",
 ]
 
 
@@ -663,6 +667,9 @@ def __getattr__(name: str) -> Any:
     R13：账户 / 会话存储（`ib.ledger.accounts`）同样惰性导出 —— 其 `bcrypt` 依赖为
     **可选**（缺失时只在真正调用哈希时给可读错误），顶层导入会把「缺 bcrypt」提前
     变成「import ib.ledger 就炸」。
+
+    REV-16-4：配置审计存储（`ib.ledger.config_audit`）同样惰性导出，与账户存储保持
+    一致的导入面节奏（审计存储与台账共用同一 SQLite 文件，无独立可选依赖）。
     """
     if name == "SqliteLedgerRepository":
         from ib.ledger.sqlite_repo import SqliteLedgerRepository as _impl
@@ -679,4 +686,12 @@ def __getattr__(name: str) -> Any:
         from ib.ledger import accounts as _accounts
 
         return getattr(_accounts, name)
+    if name in {
+        "SqliteConfigAuditStore",
+        "MemoryConfigAuditStore",
+        "build_config_audit_store",
+    }:
+        from ib.ledger import config_audit as _config_audit
+
+        return getattr(_config_audit, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

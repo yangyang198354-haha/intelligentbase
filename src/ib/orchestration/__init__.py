@@ -102,6 +102,8 @@ __all__ = [
     "aresume",
     "StreamEvent",
     "AGGREGATION_FORBIDDEN_LABELS",
+    # REV-16-2（IFC-IB-351）
+    "forbidden_labels",
     # R8（IFC-IB-305 / 306）
     "ResumePayload",
     "can_resume",
@@ -112,20 +114,72 @@ __all__ = [
 #: （检索 + 作答），再加聚合 —— 8 步足够覆盖最复杂的合法路径，又能拦住失控的委托环。
 MAX_EXPERT_STEPS = 8
 
-#: 聚合输出中**禁止出现**的内部标识（AC-IB-09-03：不得暴露内部分工）。
+#: 聚合输出中**禁止出现**的**结构性**内部标识（AC-IB-09-03：不得暴露内部分工）。
 #: 这些词一旦出现在用户可见回答里，就等于把「内部有几个专家、怎么分工」告诉了用户 ——
 #: 既破坏产品一致性，也会让用户困惑「我到底在跟谁说话」。
-AGGREGATION_FORBIDDEN_LABELS = (
+#:
+#: **REV-16-2 迁移态（ADR-31 Decision 第 4 条）**：专家中文标签的禁止集合**不再硬编码为
+#: 唯一真源** —— 目标形态是由**活体专家注册表派生的只读视图** `forbidden_labels(cn_map)`
+#: （IFC-IB-351；使骨架**不承载业务中文名**，对齐 ADR-09）。重构期间，本常量保留**结构性**
+#: 词（路由 / 专家 / 聚合等），专家中文标签由 `forbidden_labels()` 并入；且必须取
+#: **旧 ∪ 新** label 并集（`系统管家` / `巡检诊断` / `知识库问答` / `数据管家` / `三恒知识`），
+#: 确保 AC-IB-09-03 **不回退**。**禁止只换名**（只删旧名或只加新名都会造成漏网或误伤）。
+_STRUCTURAL_FORBIDDEN_LABELS = (
     "路由到",
     "专家",
     "expert",
     "router",
     "聚合",
     "agent",
-    "系统管家",
-    "巡检诊断",
-    "知识库问答",
 )
+
+#: **过渡态并集**（旧 ∪ 新专家中文标签）。重构完成（`forbidden_labels` 成为唯一来源）后，
+#: 本常量可退化为空元组 —— 但在本增量内**必须保留并集**，否则历史回答里的旧标签会漏网。
+_TRANSITION_EXPERT_LABELS = (
+    # 旧名（改名前的专家中文标签；历史回答可能仍含）
+    "数据管家",
+    "知识库问答",
+    "巡检诊断",
+    # 新名（REV-16-2 FreeArk 对齐后的专家中文标签）
+    "系统管家",
+    "三恒知识",
+)
+
+#: 兼容常量（既有引用不变）：结构化禁止词 ∪ 过渡态并集。
+AGGREGATION_FORBIDDEN_LABELS = _STRUCTURAL_FORBIDDEN_LABELS + _TRANSITION_EXPERT_LABELS
+
+
+def forbidden_labels(cn_map: "dict[str, str]") -> tuple[str, ...]:
+    """由**活体专家注册表**派生「聚合阶段禁止出现的专家中文标签」全集（IFC-IB-351）。
+
+    **纯函数 / 派生视图**：替代硬编码清单，使骨架**不承载业务中文名**（对齐 ADR-09）。
+    用途：AC-IB-09-03「不得暴露内部分工」。
+
+    目标形态为「仅由 `cn_map` 派生」；**过渡态**（本增量）返回
+    `结构化禁止词 ∪ 过渡态并集 ∪ cn_map 取值`，确保旧 / 新标签双向覆盖、不回退。
+    """
+    labels: list[str] = list(_STRUCTURAL_FORBIDDEN_LABELS)
+    labels.extend(_TRANSITION_EXPERT_LABELS)
+    if cn_map:
+        labels.extend(cn_map.values())
+    # 去重且保序（顺序稳定 → 清洗结果确定）
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for label in labels:
+        if label and label not in seen:
+            seen.add(label)
+            ordered.append(label)
+    return tuple(ordered)
+
+
+def _active_forbidden_labels() -> tuple[str, ...]:
+    """运行期取活体注册表标签并入（注册表未装配时退回过渡态并集）。"""
+    try:
+        from ib.experts import cn_map as _cn_map
+
+        return forbidden_labels(_cn_map())
+    except Exception:  # noqa: BLE001 - 清洗是兜底，派生失败不得让聚合失败
+        return AGGREGATION_FORBIDDEN_LABELS
 
 
 # --------------------------------------------------------------------------- #
@@ -668,8 +722,15 @@ class Orchestrator:
             )
 
     def _prompt_of(self, expert: str) -> str:
-        from ib.experts import fallback_prompts, get
+        """专家系统提示词。**REV-16-2（ADR-29）**：优先取跨域合并派生的**生效提示词**
+        （`effective_prompt` = 主提示文件 > 兜底文件 > 定义文档兜底；装配期注入，IFC-IB-349）。
+        未注入分层结果时回退既有 `spec.fallback_prompt`（R7 行为逐位不变）。
+        """
+        from ib.experts import fallback_prompts, get, prompt_bundles
 
+        bundle = prompt_bundles().get(expert)
+        if bundle is not None and bundle.effective_prompt.strip():
+            return bundle.effective_prompt
         spec = get(expert)
         if spec is not None:
             return spec.fallback_prompt
@@ -1138,7 +1199,7 @@ def _strip_internal_labels(text: str, config: GraphConfig) -> str:
     if not config.aggregation_forbids_internal_labels or not text:
         return text
     cleaned = text
-    for label in AGGREGATION_FORBIDDEN_LABELS:
+    for label in _active_forbidden_labels():
         cleaned = cleaned.replace(label, "")
     # 清洗后的多余空白收拢（避免出现「由  负责」这类空洞）
     return "\n".join(" ".join(line.split()) for line in cleaned.split("\n")).strip()

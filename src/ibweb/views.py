@@ -3,8 +3,11 @@
 @implements IFC-IB-242 ~ IFC-IB-249（HTTP 端点）
             IFC-IB-283（R2）`GET /api/files/{doc_id}/images/{image_id}` 页面图字节
             IFC-IB-294/295（R7）`GET|PUT /api/config/definition` 定义文档读写
+            IFC-IB-352（REV-16-2）`/api/config/prompts[/{expert}/{layer}]` 提示词端点族
             IFC-IB-307（R8）`POST /api/chat/resume` 会话续跑（fail-closed 准入顺序）
             IFC-IB-333（R14）`GET /api/projects` 项目枚举（admin 全部 / ops 仅自身）
+            IFC-IB-359/360（REV-16-4）`GET /api/config/audit` + 保存路径审计挂钩
+            IFC-IB-362（REV-16-4）`GET /api/config/storage-state`
 @depends MOD-IB-23（authz/composition/serializers/sse）, MOD-IB-11/12/13/14/15/22（服务）
 @author software-developer
 
@@ -57,6 +60,7 @@ from rest_framework import serializers, status
 
 from ib.core import (
     BlobRef,
+    ConfigAuditEntry,
     ConfigError,
     ConflictError,
     DependencyUnavailableError,
@@ -64,6 +68,7 @@ from ib.core import (
     IbError,
     NotFoundError,
     ScopeViolationError,
+    StorageState,
     ValidationError,
     new_session_token,
     token_digest,
@@ -86,6 +91,7 @@ from ibweb.authz import (
     parse_bearer,
 )
 from ibweb.serializers import (
+    ConfigAuditEntrySerializer,
     DefinitionConfigInputSerializer,
     DefinitionDocumentSerializer,
     DeleteReportSerializer,
@@ -95,6 +101,7 @@ from ibweb.serializers import (
     HealthStatusSerializer,
     RebuildJobSerializer,
     SaveResultSerializer,
+    StorageStateSerializer,
     ValidationErrorItemSerializer,
     definition_derived_summary,
 )
@@ -114,6 +121,11 @@ __all__ = [
     "healthz_endpoint",
     "healthz_deps_endpoint",
     "definition_config_endpoint",
+    # REV-16-2 提示词端点族（IFC-IB-352）
+    "prompt_config_endpoint",
+    # REV-16-4 配置审计 / 存储态端点（IFC-IB-359 / 362）
+    "config_audit_endpoint",
+    "storage_state_endpoint",
     # R14 项目上下文（IFC-IB-333）
     "projects_endpoint",
     # R13 账户 / 会话（IFC-IB-316~321）
@@ -857,11 +869,12 @@ def _get_definition_config(request: Any) -> Any:
 
 
 def _put_definition_config(request: Any) -> Any:
-    from ib.config import document_from_json, non_editable_changes
+    from ib.config import document_from_json, non_editable_changes, validate_definition_full
 
     deps = composition.get_deps()
     try:
         ctx = _require_manage(request)  # 写操作需管理权限（否则 403）
+        actor = ctx.authz.actor_id
         project_id = composition.resolve_scope(ctx).project_id
         raw_body = json.loads(request.body.decode("utf-8") or "{}") if request.body else {}
         form = DefinitionConfigInputSerializer(data=raw_body)
@@ -879,14 +892,25 @@ def _put_definition_config(request: Any) -> Any:
     except Exception as exc:  # noqa: BLE001 - 含 JSON/DRF 校验错误：不合法的请求体 → 400
         return error_response(ValidationError(f"请求体不合法：{type(exc).__name__}"))
 
+    changed = composition.changed_field_names(current, submitted)
+
     # ① 白名单：非编辑字段（拓扑 / 归属）被改动 → 400
     illegal = non_editable_changes(current, submitted)
     if illegal:
+        _audit_definition_save(deps, project_id, actor, changed, "rejected", illegal)
         return _validation_failure_response(illegal, "存在不可编辑字段的变更（REQ-FUNC-IB-26）")
 
     # ② 完备性校验（服务端为唯一裁决者；界面预校验不作数）→ 400
-    report = deps.definition_store.validate(submitted)
+    #    **REV-16-4（ADR-33）**：改用合成纯函数 `validate_definition_full`（IFC-IB-355）
+    #    = IFC-IB-290 ∪ IFC-IB-346 —— 与**装配路径**（`admit_two_domains`）同一校验入口，
+    #    结构性消除 DEFECT-R16-02 根因（保存期漏掉工具参数校验）。
+    report = validate_definition_full(
+        submitted,
+        known_tools=composition.known_tool_names(),
+        tool_param_specs=deps.tool_param_specs(),
+    )
     if not report.ok:
+        _audit_definition_save(deps, project_id, actor, changed, "rejected", report.errors)
         return _validation_failure_response(report.errors, "定义文档校验不通过")
 
     # ③ 原子写回（乐观并发）
@@ -902,6 +926,10 @@ def _put_definition_config(request: Any) -> Any:
         return error_response(exc)
 
     if result.conflict:
+        _audit_definition_save(
+            deps, project_id, actor, changed, "rejected", result.errors,
+            detail_code="content_hash_conflict",
+        )
         return _json(
             {
                 "error": {
@@ -913,6 +941,7 @@ def _put_definition_config(request: Any) -> Any:
             status.HTTP_409_CONFLICT,
         )
     if not result.ok:
+        _audit_definition_save(deps, project_id, actor, changed, "rejected", result.errors)
         return _validation_failure_response(result.errors, "写回未生效")
 
     # ④ **以文档为准**刷新只读派生视图（AC-IB-17-03）；拓扑/注册表的生效点为**下次装配**
@@ -924,8 +953,366 @@ def _put_definition_config(request: Any) -> Any:
     except IbError:  # noqa: BLE001 - 刷新失败不影响「已成功写回」这一事实
         pass
 
+    # ⑤ 审计写（IFC-IB-360）：顺序 = 校验 → 落盘 → 审计写；**审计写与配置写非事务耦合**
+    #    （失败不改变保存结果，但不静默 —— 见 `record_config_audit`）。
+    _audit_definition_save(deps, project_id, actor, changed, "saved", ())
+
     log_event("definition_config", "saved", project_id=project_id)
     return _json(SaveResultSerializer().to_representation(result), status.HTTP_200_OK)
+
+
+def _audit_definition_save(
+    deps: Any,
+    project_id: str,
+    actor: str,
+    changed_field_names: Any,
+    result: str,
+    items: Any = (),
+    *,
+    detail_code: str | None = None,
+) -> None:
+    """保存路径审计挂钩（IFC-IB-360）。
+
+    `detail_code` **只含字段名 / 错误码**（错误项的 `code` 去重升序），**永不**含取值；
+    未显式给出 `detail_code` 时由 `items` 的 `code` 派生。
+    """
+    codes = sorted({getattr(i, "code", "") for i in (items or ()) if getattr(i, "code", "")})
+    effective_detail = detail_code if detail_code is not None else (",".join(codes) or None)
+    entry = ConfigAuditEntry(
+        timestamp=utc_now_iso(),
+        project=project_id,
+        actor=actor,
+        action="definition.save",
+        changed_field_names=tuple(changed_field_names or ()),
+        result=result,  # type: ignore[arg-type]
+        detail_code=effective_detail,
+    )
+    composition.record_config_audit(entry, deps=deps)
+
+
+# --------------------------------------------------------------------------- #
+# REV-16-4（IFC-IB-359 / 362）：配置审计与存储态只读端点
+# --------------------------------------------------------------------------- #
+#
+#   * 仅 `Authorization` 头鉴权（`?token=` 由中间件先于路由拒绝）；
+#   * `project_id` 只认**服务端结论** `ctx.authz.project_id`（ops 自身项目；
+#     admin 经 `X-IB-Project` 选定，未选定为全局哨兵 `*`）—— 请求体一律忽略；
+#   * **fail-closed**：审计 / 存储态不可读即 503，**不返回空集合冒充「无记录」**；
+#   * **只读**：审计端点无写回配置的路径（IFC-IB-357 无 update/delete）；
+#   * 存储态端点**仅暴露**存储态，**不改变**「保存 + 重启重装配」生效口径（ADR-35）。
+
+
+def _query_int(request: Any, name: str, *, default: int, minimum: int = 0) -> int:
+    """读取非负整数查询参数（缺省 / 非法 → `default`；负数夹到 `minimum`）。"""
+    raw = request.GET.get(name) if hasattr(request, "GET") else None
+    if raw is None or str(raw).strip() == "":
+        return default
+    try:
+        value = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, value)
+
+
+def storage_state_endpoint(request: Any) -> Any:
+    """`GET /api/config/storage-state`（IFC-IB-362）→ `200 StorageState` | `403` | `503`。
+
+    **单一来源 = 装配期实际选用的存储实现**（直读装配结果，IFC-IB-361）；**仅暴露**
+    存储态，**不改变**生效口径，**不引入**运行期热重载（ADR-35）。
+    """
+    if request.method != "GET":
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+    deps = composition.get_deps()
+    try:
+        _require_manage(request)  # 非管理者 → 403（fail-closed，不臆造存储态）
+        state = composition.get_storage_state(deps=deps)
+    except IbError as exc:
+        return error_response(exc)
+    except Exception as exc:  # noqa: BLE001
+        return error_response(exc)
+    return _json(StorageStateSerializer().to_representation(state), status.HTTP_200_OK)
+
+
+#: 审计端点一次扫描上限（审计为追加式且写入稀疏；取足够大以得出稳定 `total`）。
+_AUDIT_TOTAL_SCAN_LIMIT = 1000
+
+
+def config_audit_endpoint(request: Any) -> Any:
+    """`GET /api/config/audit?limit=&offset=`（IFC-IB-359）。
+
+    → `200 {items, total}` | `403`（归属断言失败）| `503`（fail-closed：审计存储不可读
+    即明确报错，**不返回空集合冒充「无记录」**）。**只读**；承载成功与失败两类记录
+    （`result ∈ {"saved","rejected"}`）；**字段白名单**：只出字段名与结果码。
+    """
+    if request.method != "GET":
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+    deps = composition.get_deps()
+    try:
+        ctx = _require_manage(request)  # 非管理者 → 403
+        project_id = ctx.authz.project_id  # 服务端结论（只认它，忽略请求体）
+        store = getattr(deps, "config_audit_store", None)
+        if store is None:
+            raise DependencyUnavailableError(
+                "配置审计存储不可用（fail-closed：不返回空集合冒充「无记录」）",
+                dependency="ledger",
+            )
+        limit = _query_int(request, "limit", default=50, minimum=0)
+        offset = _query_int(request, "offset", default=0, minimum=0)
+        all_items = store.list_by_project(
+            project_id, limit=_AUDIT_TOTAL_SCAN_LIMIT, offset=0
+        )
+        total = len(all_items)
+        items = all_items[offset : offset + limit]
+    except IbError as exc:
+        return error_response(exc)
+    except Exception as exc:  # noqa: BLE001
+        return error_response(exc)
+    payload = {
+        "items": [ConfigAuditEntrySerializer().to_representation(e) for e in items],
+        "total": total,
+    }
+    return _json(payload, status.HTTP_200_OK)
+
+
+# --------------------------------------------------------------------------- #
+# REV-16-2（IFC-IB-352）：独立提示词目录端点族
+# --------------------------------------------------------------------------- #
+#
+# 纪律（module_design §3 MOD-IB-23 REV-16-2）：
+#   * 归属恒取自 `ctx.authz.project_id`（请求中的 project_id 一律忽略）；
+#   * **仅 `Authorization` 头**鉴权，**不接受** `?token=`（中间件先于路由拒绝）；
+#   * 目录不可读 → **503（fail-closed）**，**不返回空集合**；
+#   * 校验不通过 → **400**，逐条回执 `path`/`code`/`message`（**不回显提示词正文 / 凭据**）；
+#   * 乐观并发冲突 → **409**，含可读回执，**不静默覆盖**；
+#   * **保存仅原子落盘，不触发运行期重建**（ADR-32 / C-IB-40：生效口径 = 服务重启后重新装配）。
+# --------------------------------------------------------------------------- #
+
+_PROMPT_LAYERS: tuple[str, ...] = ("main", "fallback")
+
+
+def prompt_config_endpoint(request: Any, expert: str | None = None, layer: str | None = None) -> Any:
+    """`/api/config/prompts` 端点族（IFC-IB-352）。
+
+    * `GET  /api/config/prompts`                     → 列表（元数据 + 哈希，**不含正文**）
+    * `GET  /api/config/prompts/{expert}/{layer}`    → 单层正文 + 哈希
+    * `PUT  /api/config/prompts/{expert}/{layer}`    → 原子保存单层（乐观并发）
+    """
+    if not _visual_config_enabled():
+        # 同 IFC-IB-294：键值**不出现在响应体**（只看行为）。
+        return _json(
+            {"error": {"code": "not_found", "message": "可视化配置未启用"}},
+            status.HTTP_404_NOT_FOUND,
+        )
+    if expert is None and layer is None:
+        if request.method == "GET":
+            return _get_prompts_list(request)
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+    if layer not in _PROMPT_LAYERS:
+        return _json(
+            {"error": {"code": "not_found", "message": "提示词层不存在（仅 main / fallback）"}},
+            status.HTTP_404_NOT_FOUND,
+        )
+    if request.method == "GET":
+        return _get_prompt_layer(request, str(expert), str(layer))
+    if request.method == "PUT":
+        return _put_prompt_layer(request, str(expert), str(layer))
+    return _json(
+        {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+        status.HTTP_405_METHOD_NOT_ALLOWED,
+    )
+
+
+def _prompt_store_for(request: Any) -> tuple[Any, Any]:
+    """解析请求归属项目并取该项目提示词存储（缺失即 `DependencyUnavailableError`）。"""
+    deps = composition.get_deps()
+    ctx = _ctx_of(request)
+    project_id = composition.resolve_scope(ctx).project_id
+    store = (getattr(deps, "prompt_stores", None) or {}).get(project_id)
+    if store is None:
+        raise DependencyUnavailableError(
+            "提示词存储未装配（fail-closed：不返回空集合）", dependency="expert_prompt_dir"
+        )
+    return deps, store
+
+
+def _doc_fallback_of(deps: Any, project_id: str, expert: str) -> str:
+    doc = (getattr(deps, "definitions", None) or {}).get(project_id)
+    for e in getattr(doc, "experts", ()) or ():
+        if getattr(e, "name", None) == expert:
+            return getattr(e, "fallback_prompt", "") or ""
+    return ""
+
+
+def _tool_param_spec_payload(spec: Any) -> dict[str, Any]:
+    return {
+        "name": spec.name,
+        "type": spec.type,
+        "default": spec.default,
+        "minimum": spec.minimum,
+        "maximum": spec.maximum,
+        "choices": list(spec.choices) if spec.choices else None,
+    }
+
+
+def _get_prompts_list(request: Any) -> Any:
+    deps = composition.get_deps()
+    try:
+        deps, store = _prompt_store_for(request)
+        refs = store.list_refs()  # IFC-IB-345（不可读 → 抛，转 503）
+        project_id = getattr(store, "project_id", "")
+        doc = (getattr(deps, "definitions", None) or {}).get(project_id)
+    except DependencyUnavailableError:
+        return _read_failure_response()
+    except IbError as exc:
+        return error_response(exc)
+    except Exception as exc:  # noqa: BLE001
+        return error_response(exc)
+
+    by_expert: dict[str, dict[str, Any]] = {}
+    for ref in refs:
+        by_expert.setdefault(ref.expert_name, {})[ref.layer] = ref
+
+    experts = []
+    for e in getattr(doc, "experts", ()) or ():
+        layers: dict[str, Any] = {}
+        for layer in _PROMPT_LAYERS:
+            ref = by_expert.get(e.name, {}).get(layer)
+            layers[layer] = {
+                "exists": bool(getattr(ref, "exists", False)),
+                "content_hash": getattr(ref, "content_hash", "") if ref is not None else "",
+            }
+        experts.append({"name": e.name, "cn_label": e.cn_label, "layers": layers})
+
+    payload = {
+        "experts": experts,
+        # 加成式（IFC-IB-340 / 354）：参数规格供前端生成控件；**只含声明，不含任何凭据**。
+        "tool_param_specs": [
+            _tool_param_spec_payload(s) for s in composition.known_tool_param_specs()
+        ],
+        # 既有工具名单（ADR-30）：勾选**只作用于既有工具集合**；与装配期校验同源。
+        "available_tools": list(composition.known_tool_names()),
+        "layout": {
+            "root_key": "IB_EXPERT_PROMPT_DIR",
+            "file_pattern": "<root>/<project_id>/<expert_name>/{main.md|fallback.md}",
+            "naming_rule": "子目录名 = 专家 name；main.md 可缺，fallback.md 不得缺",
+        },
+        # **只登记键名，不含任何值**（IFC-IB-348）。
+        "config_key_names": ["IB_EXPERT_PROMPT_DIR", "IB_EXPERT_PROMPT_ENABLED"],
+    }
+    return _json(payload, status.HTTP_200_OK)
+
+
+def _get_prompt_layer(request: Any, expert: str, layer: str) -> Any:
+    try:
+        deps, store = _prompt_store_for(request)
+        project_id = getattr(store, "project_id", "")
+        refs = store.list_refs()
+    except DependencyUnavailableError:
+        return _read_failure_response()
+    except IbError as exc:
+        return error_response(exc)
+    except Exception as exc:  # noqa: BLE001
+        return error_response(exc)
+
+    ref = next(
+        (r for r in refs if r.expert_name == expert and r.layer == layer), None
+    )
+    if ref is None or not ref.exists:
+        # 「不存在」与「不属于你」**不区分**（反存在性探测；同 §1.4 第 2 条）。
+        return _json(
+            {"error": {"code": "not_found", "message": "提示词层不存在"}},
+            status.HTTP_404_NOT_FOUND,
+        )
+    doc_fallback = _doc_fallback_of(deps, project_id, expert)
+    try:
+        bundle = store.load_bundle(expert, doc_fallback=doc_fallback)
+    except Exception as exc:  # noqa: BLE001
+        return error_response(exc)
+    content = bundle.main_prompt if layer == "main" else bundle.fallback_prompt
+    if content is None:
+        return _json(
+            {"error": {"code": "not_found", "message": "提示词层不存在"}},
+            status.HTTP_404_NOT_FOUND,
+        )
+    return _json({"content": content, "content_hash": ref.content_hash}, status.HTTP_200_OK)
+
+
+def _prompt_result_body(result: Any) -> dict[str, Any]:
+    return {
+        "saved": result.saved,
+        "content_hash": result.content_hash,
+        "conflict": any(
+            getattr(i, "code", "") == "prompt_content_hash_conflict" for i in result.errors
+        ),
+        "errors": [ValidationErrorItemSerializer().to_representation(i) for i in result.errors],
+    }
+
+
+def _put_prompt_layer(request: Any, expert: str, layer: str) -> Any:
+    try:
+        _require_manage(request)  # 写操作需管理权限（否则 403）
+        deps, store = _prompt_store_for(request)
+        project_id = getattr(store, "project_id", "")
+        raw_body = json.loads(request.body.decode("utf-8") or "{}") if request.body else {}
+        if not isinstance(raw_body, dict):
+            raise ValidationError("请求体必须为 JSON 对象")
+        content = raw_body.get("content")
+        if not isinstance(content, str):
+            raise ValidationError("缺少字符串字段 content")
+        expected = raw_body.get("expected_hash")
+        if expected is not None and not isinstance(expected, str):
+            raise ValidationError("expected_hash 必须为字符串")
+        doc = (getattr(deps, "definitions", None) or {}).get(project_id)
+        known = {getattr(e, "name", "") for e in getattr(doc, "experts", ()) or ()}
+        if known and expert not in known:
+            return _json(
+                {"error": {"code": "not_found", "message": "专家不存在"}},
+                status.HTTP_404_NOT_FOUND,
+            )
+    except ConfigError:
+        return _read_failure_response()
+    except ValidationError as exc:
+        return error_response(exc)
+    except IbError as exc:
+        return error_response(exc)
+    except Exception as exc:  # noqa: BLE001
+        return error_response(exc)
+
+    try:
+        result = store.save_layer(expert, layer, content, expected_hash=expected)  # IFC-IB-344
+    except DependencyUnavailableError:
+        return _read_failure_response()
+    except IbError as exc:
+        return error_response(exc)
+    except Exception as exc:  # noqa: BLE001
+        return error_response(exc)
+
+    conflict = any(getattr(i, "code", "") == "prompt_content_hash_conflict" for i in result.errors)
+    if result.saved:
+        # 生效口径 = 服务重启后重新装配（ADR-32）：**不**在此重建图 / 热重载。
+        log_event("prompt_config", "saved", project_id=project_id, expert=expert, layer=layer)
+        return _json(_prompt_result_body(result), status.HTTP_200_OK)
+    if conflict:
+        return _json(
+            {
+                "error": {
+                    "code": "conflict",
+                    "message": "提示词已被他处修改（乐观并发冲突，未覆盖）",
+                    "receipt": _prompt_result_body(result),
+                }
+            },
+            status.HTTP_409_CONFLICT,
+        )
+    return _validation_failure_response(result.errors, "提示词保存未生效")
 
 
 # --------------------------------------------------------------------------- #

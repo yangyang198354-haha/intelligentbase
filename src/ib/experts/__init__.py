@@ -3,6 +3,7 @@
 @implements IFC-IB-171 EXPERT_SPECS / 172 names / 173 keywords_map / 174 cn_map
             IFC-IB-175 fallback_prompts / 176 data_experts / 177 delegating_experts
             IFC-IB-178 default_expert / 179 get
+            IFC-IB-349（REV-16-2 加成式）install_prompt_bundles / prompt_bundles / main_prompts
 @depends MOD-IB-01
 @author software-developer
 
@@ -39,7 +40,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from ib.core import ExpertSpec
+from ib.core import ExpertPromptBundle, ExpertSpec
 
 __all__ = [
     "EXPERT_SPECS",
@@ -54,22 +55,31 @@ __all__ = [
     "install",
     "install_derived",
     "validate_specs",
+    # REV-16-2（IFC-IB-349）
+    "install_prompt_bundles",
+    "prompt_bundles",
+    "main_prompts",
 ]
 
 # --------------------------------------------------------------------------- #
 # 默认专家表（**单一真源**）
 # --------------------------------------------------------------------------- #
 
-#: 默认注册表。三个专家对应「数据/系统」「设备故障」「知识库问答」三类正交职责，
-#: 关键词刻意选**低撞车**词：数据专家不收「原理/说明书」这类知识库词，
-#: 知识库专家不收「参数/数据」这类会与实时数据查询冲突的泛词。
+#: 默认注册表（**REV-16-2 起与 FreeArk 严格对齐，含专家名**；ADR-31）。
+#: 三个专家对应「系统管家 / 设备巡检 / 三恒知识」三类正交职责；顺序 = 全系统专家顺序
+#: （freeark → inspection → sanheng），与 FreeArk `experts.py` 的 `EXPERT_SPECS` 逐位一致。
 #:
-#: `fallback_prompt` 是**提示文件缺失时的内置兜底**，不是主提示 —— 主提示由 MOD-IB-20
-#: 按 `ExpertSpec.name` 加载，缺失时回落到这里，保证「提示缺失」不会退化成无系统提示。
+#: **硬改名、无并存窗口**（[ARCH-ASSUMPTION-A10] P-3）：专家的 `name` 与 `cn_label` 已按
+#: ADR-31 的 10 维对齐表整体改名（映射见 `docs/architecture_design.md` ADR-31），**不保留
+#: 旧名的并存窗口**；升级后基于文件的定义文档须使用新专家名。
+#:
+#: `fallback_prompt` 是**提示文件缺失时的内置兜底**，不是主提示 —— 主提示由独立 markdown
+#: 提示词目录（`ExpertPromptStore`，IFC-IB-339）按 `ExpertSpec.name` 加载，缺失时回落到这里，
+#: 保证「提示缺失」不会退化成无系统提示（ADR-29）。
 _DEFAULT_SPECS: list[ExpertSpec] = [
     ExpertSpec(
-        name="data-expert",
-        cn_label="数据管家",
+        name="freeark-expert",
+        cn_label="系统管家",
         keywords=(
             "能耗",
             "用电",
@@ -88,13 +98,13 @@ _DEFAULT_SPECS: list[ExpertSpec] = [
             "参数",
             "温度",
             "湿度",
+            "CO₂",
             "风量",
         ),
         is_data_expert=True,
         fallback_prompt=(
-            "你是系统数据管家，负责能耗看板、设备实时参数查询与确认式参数控制。"
-            "同侪专家转来的实时数据问题由你据实作答；"
-            "故障诊断与知识库原理问题由专职专家处理，你无法取得所需数据时应直接说明，不得编造。"
+            "你是 FreeArk（自由方舟）系统管家，负责能耗看板、设备实时参数、"
+            "设备参数确认式控制和业主人格偏好。故障巡检与三恒知识由专职专家处理。"
         ),
         is_delegating=True,
         is_default=True,
@@ -104,18 +114,18 @@ _DEFAULT_SPECS: list[ExpertSpec] = [
         cn_label="巡检诊断",
         keywords=("故障", "巡检", "plc", "离线", "在线", "传感器", "报警", "诊断", "修复"),
         is_data_expert=True,
-        fallback_prompt=(
-            "你是设备巡检诊断专家，结合 PLC 状态与故障汇总定位设备问题。"
-            "缺少实时参数或知识库资料时，可转交对应同侪专家获取支撑；"
-            "无法取得支撑时，据现场信息给出可执行的排查步骤并说明局限。"
-        ),
+        fallback_prompt="你是 FreeArk 巡检诊断专家，结合 PLC 状态与故障汇总定位设备问题。",
         is_delegating=True,
         is_default=False,
     ),
     ExpertSpec(
-        name="knowledge-expert",
-        cn_label="知识库问答",
+        name="sanheng-knowledge",
+        cn_label="三恒知识",
         keywords=(
+            "三恒",
+            "恒温",
+            "恒湿",
+            "恒氧",
             "原理",
             "为什么",
             "接口",
@@ -124,18 +134,19 @@ _DEFAULT_SPECS: list[ExpertSpec] = [
             "接线",
             "图纸",
             "尺寸",
-            "计量表",
             "热量表",
+            "计量表",
+            "主控箱",
+            "手操器",
+            "新风机",
             "modbus",
             "485",
-            "规范",
-            "标准",
+            "毛细管",
         ),
         is_data_expert=False,
         fallback_prompt=(
-            "你是知识库问答专家，依「检索结果 > 领域通用知识 > 模型固有知识」的顺序作答；"
-            "遇到需要实时数据支撑的问题，可转交数据管家协助（转交由编排层受步数上限约束地执行）；"
-            "无法转交时据已有知识作答，并说明结论的适用边界。"
+            "你是三恒系统知识专家，依循三层知识源（RAG 检索 > 三恒行业知识 > 模型已有通用技术知识）"
+            "回答原理性问题。需要实时数据支撑时，可委托系统管家获取数据。"
         ),
         is_delegating=True,
         is_default=False,
@@ -150,6 +161,9 @@ _BY_NAME: dict[str, ExpertSpec] = {spec.name: spec for spec in EXPERT_SPECS}
 
 #: 是否已被接入方显式 `install()`（用于「装配期一次」的校验）。
 _installed = False
+
+#: **REV-16-2 提示词分层派生注册表**（IFC-IB-349）：装配期由两域合并注入的只读视图。
+_PROMPT_BUNDLES: dict[str, ExpertPromptBundle] = {}
 
 
 # --------------------------------------------------------------------------- #
@@ -283,3 +297,39 @@ def default_expert() -> str:
 def get(name: str) -> ExpertSpec | None:
     """按名取专家；不存在返回 `None`（**不抛异常** —— 路由容错需要「优雅未命中」）。[IFC-IB-179]"""
     return _BY_NAME.get(name)
+
+
+# --------------------------------------------------------------------------- #
+# REV-16-2 提示词分层派生注册表（IFC-IB-349，**加成式扩展**）
+#
+# 目标：为上层（提示组装 / 前端可观测）提供「主 / 兜底 / 生效」三态提示词，而**不改变**
+# IFC-IB-171~179 的号 / 名 / 签名。其中 `fallback_prompts()`（IFC-IB-175）语义**不变** ——
+# 其仍返回**兜底层**（非空）。
+#
+# 本注册表持有的是**由两域在装配期合并派生并注入**的只读结果（ADR-15-R1）：
+# 结构与配置域（定义文档）+ 提示词域（独立 markdown 目录）。禁止运行期热改（ADR-32）。
+# --------------------------------------------------------------------------- #
+
+
+def install_prompt_bundles(bundles: "dict[str, ExpertPromptBundle] | object") -> None:
+    """装配期注入提示词分层派生结果（IFC-IB-349）。**幂等可重复**（同 `install_derived`）。
+
+    `bundles` 可为 `dict[str, ExpertPromptBundle]` 或 `ExpertPromptBundle` 的可迭代。
+    **只替换派生注册表**，不触碰任一真源；**不提供**运行期热重载入口（ADR-32 / C-IB-40）。
+    """
+    global _PROMPT_BUNDLES
+    if isinstance(bundles, dict):
+        items = list(bundles.values())
+    else:
+        items = list(bundles)  # type: ignore[arg-type]
+    _PROMPT_BUNDLES = {b.expert_name: b for b in items}
+
+
+def prompt_bundles() -> dict[str, ExpertPromptBundle]:
+    """专家 `name` → 主 / 兜底 / 生效提示词（IFC-IB-349）。返回副本，防调用方改动注册表。"""
+    return dict(_PROMPT_BUNDLES)
+
+
+def main_prompts() -> dict[str, str | None]:
+    """专家 `name` → 主提示词（IFC-IB-349；**可缺**，缺失为 `None`）。"""
+    return {name: bundle.main_prompt for name, bundle in _PROMPT_BUNDLES.items()}

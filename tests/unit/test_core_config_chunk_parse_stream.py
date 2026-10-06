@@ -265,7 +265,7 @@ def test_TC_UNIT_018_session_store_project_isolation():
     from ib.streaming import MemorySessionStore
 
     store = MemorySessionStore()
-    store.save("p_alpha:u1:s1", SessionState(messages=[], last_expert="data-expert", sticky_turns_left=1))
+    store.save("p_alpha:u1:s1", SessionState(messages=[], last_expert="freeark-expert", sticky_turns_left=1))
     assert store.load("p_alpha:u1:s1") is not None
     # 无项目前缀 / 其它项目键：读不到（前缀不符即拒）
     assert store.load("noproject") is None

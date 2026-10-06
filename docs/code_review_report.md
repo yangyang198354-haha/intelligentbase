@@ -7,10 +7,10 @@
 | 文档 ID | DOC-IB-CR-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 开发者自我代码评审报告 |
 | 产出代理 | software-developer |
-| 调用 ID | INV-GROUP_C-INTELBASE-001（R1）／ INV-GROUP_C-INTELBASE-002（R2 增量）／ INV-GROUP_C-INTELBASE-003（R3 缺陷修复增量）／ INV-GROUP_C-INTELBASE-004（R4 缺陷修复 + 依赖补齐增量）／ INV-GROUP_C-INTELBASE-005（R7 定义外置 + 可视化配置增量）／ INV-GROUP_C-INTELBASE-007（R8 FND-R7-01 校验项补齐）／ INV-GROUP_C-INTELBASE-008（R10 前端构建阻断修复）／ INV-GROUP_C-INTELBASE-010（R11 IB-20 流式 / 会话增量，协调者轮次口径 REV-12）／ **INV-GROUP_C-INTELBASE-012（R13 账户 / 会话 / 商用界面重构增量，设计侧口径 REV-13）** ／ **INV-GROUP_C-INTELBASE-013（R13.1 回修增量：DEFECT-R13-01 来源 IP 维度登录限速修复）** ／ **INV-GROUP_C-INTELBASE-014（R14 回归缺陷修复增量：全局管理员「当前项目」选择与 `X-IB-Project` 传播，设计侧口径 REV-14）** |
+| 调用 ID | INV-GROUP_C-INTELBASE-001（R1）／ INV-GROUP_C-INTELBASE-002（R2 增量）／ INV-GROUP_C-INTELBASE-003（R3 缺陷修复增量）／ INV-GROUP_C-INTELBASE-004（R4 缺陷修复 + 依赖补齐增量）／ INV-GROUP_C-INTELBASE-005（R7 定义外置 + 可视化配置增量）／ INV-GROUP_C-INTELBASE-007（R8 FND-R7-01 校验项补齐）／ INV-GROUP_C-INTELBASE-008（R10 前端构建阻断修复）／ INV-GROUP_C-INTELBASE-010（R11 IB-20 流式 / 会话增量，协调者轮次口径 REV-12）／ **INV-GROUP_C-INTELBASE-012（R13 账户 / 会话 / 商用界面重构增量，设计侧口径 REV-13）** ／ **INV-GROUP_C-INTELBASE-013（R13.1 回修增量：DEFECT-R13-01 来源 IP 维度登录限速修复）** ／ **INV-GROUP_C-INTELBASE-014（R14 回归缺陷修复增量：全局管理员「当前项目」选择与 `X-IB-Project` 传播，设计侧口径 REV-14）** ／ **INV-GROUP_C-INTELBASE-015（REV-16-2 提示词分层 + 工具可视化配置增量，设计侧口径 REV-16-3）** ／ **INV-GROUP_C-INTELBASE-016（REV-16-4 配置审计（只读）+ 存储态暴露 + DEFECT-R16-01/02 修复增量，设计侧口径 REV-16-4）** |
 | 项目 | intelligentbase |
 | 阶段 | PHASE_06b（自我代码评审） |
-| 版本 | **R13**（R1 主体 §1~§8 未改写；R2 增量见 **§9**；R3 增量见 **§10**；R4 增量见 **§11**；R7 增量见 **§12**；R8 增量见 **§13**；R10 增量见 **§14**；R11 增量见 **§15**；R13 增量见 **§16**；R13.1 回修增量见 **§17**；**R14 回归缺陷修复增量见 §18**） |
+| 版本 | **R13**（R1 主体 §1~§8 未改写；R2 增量见 **§9**；R3 增量见 **§10**；R4 增量见 **§11**；R7 增量见 **§12**；R8 增量见 **§13**；R10 增量见 **§14**；R11 增量见 **§15**；R13 增量见 **§16**；R13.1 回修增量见 **§17**；**R14 回归缺陷修复增量见 §18**；**REV-16-2 提示词分层与工具可视化配置增量见 §19**；**REV-16-4 配置审计（只读）与存储态暴露 + 两回归缺陷修复增量见 §20**） |
 | status | DRAFT（待 GROUP_D / PM 复核） |
 | 上游输入 | `docs/architecture_design.md`（**1.4.0 / R8**，GR-B-005 PASS_WITH_CONDITIONS）、`docs/module_design.md`（**1.4.0 / R8**）、`docs/tech_stack.md`（**1.3.1 / R10**，R8 设计轮次判 NO_CHANGE）、`docs/ib_embed_service_contract.md`（R2，权威契约）、`docs/test_report.md`（**1.7.0 / R11**，FND-R11-01 与「2 项未覆盖 + 4 项部分覆盖 AC」登记处）、`docs/user_stories.md`（**1.3.0 / R7**，US-IB-19 / US-IB-20）；**R10 触发输入** = PM 只读取证（`.github/workflows/ci.yml` 阶段9 `npm ci` 因锁不同步 EUSAGE）与 `src/frontend/package.json` / `package-lock.json` / `ConfigPage.vue` 现场（tech_stack 已随 R10 升至 1.3.1，见 §14）。**R13 触发输入** = `docs/module_design.md` **1.5.0/REV-13**（IFC-IB-309~332 / 第 15 个端口 / §2.2.4 段号索引）、`docs/architecture_design.md` **1.5.0/REV-13**（ADR-18~ADR-27）、`docs/tech_stack.md` **1.4.0/REV-13**（§1 三新行 / §1.4 客户端键登记 / §4.5 第 13~18 项）、`docs/requirements_spec.md` **1.4.0/REV-13**（REQ-FUNC-IB-28~36 / REQ-NFR-IB-15~18 / C-IB-09 / DR-09~DR-17）；上游门控 **GR-B-006 = PASS_WITH_CONDITIONS**（见 §16）；**R13.1 触发输入** = GROUP_D 门控 `condition_1` 登记的 **DEFECT-R13-01**（MEDIUM）/ `tests/integration/test_accounts_int_r13.py::TC-INT-119`（见 §17）；**R14 触发输入** = `docs/architecture_design.md` **1.6.0/REV-14**（ADR-28 项目上下文的选择与传播，Option B 选定 + §2.0.5 R14 影响复核 + §10.1 R14 OPEN ITEM）、`docs/module_design.md` **1.6.0/REV-14**（IFC-IB-333~336 / §2.2.5 段号索引 / §3 MOD-IB-23 端点与契约 / §3 MOD-IB-24 store 与传播约束 / §4.2.5 无环性再声明 / §9.8 覆盖率再声明）、`docs/tech_stack.md` **1.4.0/REV-14**（**NO_CHANGE**：无新依赖）、需求侧 US-IB-24 / AC-IB-24-02 / AC-IB-24-03 / REQ-FUNC-IB-23/31/32、`docs/phase_status.md` 的 **IC-IB-02**（REV-14 实现约束）与 REV-14-2；上游 GROUP_B **GR-B-007 = PASS_WITH_CONDITIONS**（见 §18）。**R14 现场根因** = R13 回归：全局管理员（`users.project_id IS NULL` ⇒ `effective_project == "*"`）因项目级端点 fail-closed 而无法使用任何项目级页面（问答 / 文件 / 重建 / 可视化配置一律 503），且无「选择当前项目」入口。 |
 | 覆盖范围 | MOD-IB-01 ~ MOD-IB-26（**R2 追加 MOD-IB-26**；R1 覆盖 01~25）。**R3 重评 MOD-IB-13 与 MOD-IB-23**；**R4 只重评被触及的部分**：MOD-IB-12 与 MOD-IB-13，外加依赖面新增文件 `src/requirements-embed.txt`（B-05，非模块）；**R7 只重评被触及的部分**：MOD-IB-01（端口 13 → 14 + 结构）、MOD-IB-02（定义文档数据层）、MOD-IB-16（派生注入）、MOD-IB-23（装配期闸门 + 端点）、MOD-IB-24（可视化配置页）；**R8 只重评被触及的部分**：MOD-IB-02（`ib/config/definition.py::validate` 校验项补齐）；**R10 只重评被触及的部分**：MOD-IB-24（前端构建管线：锁同步 / 源文件跟踪 / 类型错误 / 冒烟入口）；**R11 只重评被触及的部分**：MOD-IB-01（R8 类型 / 枚举 / 常量）、MOD-IB-02（键名登记与值域 + `validate` 第 3 子项）、MOD-IB-16（`is_delegating` 消费侧话术）、MOD-IB-21（终态单发 / 可见性 / 确认事件 / 会话存储逐字段复制）、MOD-IB-22（确认门装配 / `resume` fail-closed / G2 单跳交接）、MOD-IB-23（`chat_stream` 显式 4xx + `POST /api/chat/resume`）、MOD-IB-24（确认区呈递 / 决策回传 / 会话标识纪律）；**R13 只重评被触及的部分**：MOD-IB-01（账户 / 会话 / 令牌契约 + 第 15 个端口 `AccountStore`）、MOD-IB-02（IFC-IB-312 键名登记）、MOD-IB-11（bcrypt / `SqliteAccountStore` / `MemoryAccountStore` / 幂等种子）、MOD-IB-23（账户 / 会话 / 账户 CRUD 端点 + `SessionTokenResolver` + 可注入策略 + 中间件扩展 + 装配 + 条件性限速审计）、MOD-IB-24（登录页 / 首登强制改密 / 控制台外壳 / 路由守卫 / 类型化客户端 / 主题 / 组件库本地打包）、MOD-IB-25（迁移 003 / nginx TLS 模板 / 键模板 / 检查清单 B15~B20 / `bcrypt` 依赖登记）；**R13.1 只重评被触及的部分**：MOD-IB-23（`Deps.login_throttle` 应用级装配 + 登录端点判定顺序）；**R14 只重评被触及的部分**：MOD-IB-23（`projects_endpoint` + `api/projects` 路由 + `X-IB-Project` 头契约登记）、MOD-IB-24（`stores/project.ts` 新建 / `api/client.ts` 单点注入 + 项目枚举客户端 / `app/env.ts` 接线 / `layouts/ConsoleLayout.vue` 选择器与视图态重置 / `main.ts` 401 清空） |
@@ -2259,3 +2259,350 @@ EXIT=2
 - **契约零破坏 + 收益可回归**：既有 239 条 Python 用例、13 条前端冒烟**零回退**；新增 3 + 4 条用例把「授权口径 / 头传播 / 单点注入 / 视图态重置」固化为常驻断言。
 - 全量重跑 **242/242**、集成 **126/126**、前端冒烟 **17/17**、`compileall` EXIT=0、selfcheck **47/47**、`npm run build` EXIT=0、SSE 自检 ALL PASS —— 全部通过。
 - **本代理已 STOP，等待 PM 门控复核；未进入 GROUP_D、未部署、未提交、未触碰目标机。**
+
+---
+
+# §19 REV-16-2 自我评审（提示词分层 + 工具可视化配置：IFC-IB-339~354；设计侧口径 REV-16-3）
+
+> 调用：`INV-GROUP_C-INTELBASE-015`（GROUP_C = PHASE_05 实现 + PHASE_06 自评）。
+> 上游（均 APPROVED）：`architecture_design.md` **1.7.1 / REV-16-3**（ADR-15-R1 / ADR-29 / ADR-30 / ADR-31 / ADR-32 / ARCH-ASSUMPTION-A10）、
+> `module_design.md` **1.7.1 / REV-16-3**、`user_stories.md` **1.6.0 / REV-16-2**（US-IB-29/30/31）、`requirements_spec.md` **1.7.0 / REV-16-3**。
+> 参考仓 `FreeArk` 全程**只读**。
+
+## 19.1 R16 规模与改动面
+
+| 项 | 值 |
+|----|----|
+| 触及模块 | **7**（MOD-IB-01 / 02 / 16 / 17 / 22 / 23 / 24） |
+| 新增文件 | 3（`src/ib/config/prompts.py`、`tests/unit/test_prompt_layers_r16.py`、`tests/integration/test_prompt_config_r16.py`） |
+| 修改文件 | 15 |
+| 新增端口 / 新 IFC | 端口 **15 → 16**（`ExpertPromptStore`）；IFC **339~354**（纯追加，既有 001~338 一字未改） |
+| 新增测试 | Python **19**（unit 14 + integration 5）；selfcheck **3**；前端冒烟 **5** |
+| 新增三方依赖 | **0**（后端 0，前端 0） |
+
+## 19.2 5 维评分（仅被触及的部分）
+
+| 维度 | 分 | 依据 |
+|------|----|------|
+| Correctness | **9.5** | 分层优先级 / `resolved_from` / 「三层皆空 → 拒绝」与 ADR-29 逐条对应；两域在装配期按专家 `name` join；参数注入语义（配置作默认、调用方优先）有直接断言（`bind_scope(authorized,...)[0].callable().content == "top_k=7"` 与 `callable(top_k=2)`）。**扣 0.5**：`admit_two_domains` 与 `admit` 的职责切分是为兼容既有冻结断言而设，非最直观的形态（已在 §22.4 登记为「不构成偏差」的实现选择）。 |
+| Security | **10** | `?token=` 仍被中间件先行拒绝；单层 GET 对「不存在」与「不属于你」**统一 404**（反存在性探测）；`FsExpertPromptStore` **拒绝 `..` 路径穿越**（有测试）；`config_key_names` **只出键名**；列表端点**不出正文**；无任何凭据字面量。 |
+| Performance | **9.0** | 提示词列表只读目录元数据 + 哈希（不读正文），正文按需逐层取；`save_layer` 原子写（tmp + `os.replace`）避免半写文件被装配读到。**扣 1.0**：`loadPrompts()` 对每个存在的层**逐个串行 GET**，专家数增长时是 N 次往返（当前 3 专家 × 2 层 = 最多 6 次，量级可忽略；若未来提示词层数增大，应改为批量端点）。 |
+| Maintainability | **9.5** | 规格**派生**而非手写（`derive_tool_param_specs`），规格与工具声明不可能漂移；工具名名单同样由唯一登记点派生；注释交代「为什么」而非「是什么」。**扣 0.5**：前端 `ConfigPage.vue` 单文件已较长（定义文档域 + 提示词域 + 参数表），后续可拆子组件。 |
+| Test Coverage（可测试性） | **9.5** | 纯函数（合并 / 校验 / 派生）全部离线直测；两个 store 实现由**同名参数化**同测（防语义漂移）；端点走 Django test client（含 200/400/403/404/409/401）；「保存不重建图」有**同一性**断言。**扣 0.5**：前端为**源码结构**断言（本项目无组件测试框架，与 R10/R13/R14 同策略），分层编辑器的**交互**无组件级测试。 |
+
+## 19.3 R16 Finding 统计（诚实口径）
+
+| 级别 | 计数 | 状态 |
+|------|------|------|
+| CRITICAL | **0** | — |
+| MAJOR | **0** | — |
+| MINOR | **2** | 1 条本轮已修 + 1 条登记遗留 |
+
+| Finding ID | 级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|------|------------|------|------|
+| FND-R16-01 | MAJOR（本轮内发现并**已修复**） | `src/ibweb/composition.py::admit`（原签名）| 初版把 `prompt_refs` / `tool_specs` 直接加进 `admit` 形参，**打破** R7 起的冻结断言 `set(inspect.signature(admit).parameters) == {"doc","store"}`（`tests/unit/test_definition_data_layer_r7.py::test_TC_UNIT_061` 立即转红）。 | **FIXED** —— 复原 `admit` 签名，两域聚合改走新函数 `admit_two_domains`；`_assemble` 调用新函数。 |
+| FND-R16-02 | MINOR | `src/frontend/src/views/ConfigPage.vue::loadPrompts` | 逐专家逐层串行 `promptLayer()` 取正文，专家数增大时往返次数线性增长。 | **DOCUMENTED**（当前 3 专家量级可忽略；若提示词层增多应加批量端点，见 §19.2 Performance 扣分项）。 |
+
+> **另记（非 finding，ADR 明令的例外）**：`src/ib/orchestration/__init__.py:125,140-141` 保留旧中文标签 `数据管家` / `知识库问答`，
+> 这是 **ADR-31 Decision 第 4 条**要求的**过渡态旧 ∪ 新并集**（保证过渡期旧标签不被聚合输出、AC-IB-09-03 不回退），
+> **不是遗漏**。全仓旧**slug**（`data-expert` / `knowledge-expert`）在 `src/` `tests/` 中为 **0 处**（唯一命中为本轮新增的反向核验断言自身）。
+
+## 19.4 逐模块 R16 评审详情
+
+---
+**MOD-IB-01：核心契约层（零三方依赖）** —— Correctness 10 / Security 10 / Performance 10 / Maintainability 10 / Test Coverage 9.5
+- Correctness：`ExpertPromptStore` 为 Protocol；新增 dataclass 全部带默认值（**加成式**，既有构造调用零改动）；`PromptNotFoundError` / `ToolParamValidationError` 归入既有错误树。
+- Test Coverage：selfcheck `core_framework_free` / `port_conformance` 覆盖「零三方依赖 + 16 端口齐备」。
+- **finding：无。**
+---
+**MOD-IB-02：配置与定义文档数据层** —— Correctness 9.5 / Security 10 / Performance 9.5 / Maintainability 9.5 / Test Coverage 10
+- Correctness：`_semantic_payload` 补入 `param_values`（> 否则「只改参数不改哈希」会让乐观并发判据形同虚设）；`editable_field_whitelist` 补 `tool_grants[].param_values`；`document_from_json` 解析 `param_values`（缺省 → 空元组，向后兼容旧文档）。
+- Security：`FsExpertPromptStore.save_layer` 对 `expert` 名做穿越拒绝；读取不存在目录 ⇒ 空元组（不报错、不臆造）。
+- **finding：无。**
+---
+**MOD-IB-16：派生注入层（专家登记）** —— Correctness 10 / Security 9.5 / Performance 10 / Maintainability 9.5 / Test Coverage 9.5
+- Correctness：`install_prompt_bundles` / `prompt_bundles()` / `main_prompts()` 供编排层回落链消费；专家名已按 ADR-31 硬改名。
+- Security：`validate_specs` 的同名重复 fail-fast **未被削弱**（selfcheck `r8_*` 与单元用例仍绿）。
+- **finding：无。**
+---
+**MOD-IB-17：工具运行时** —— Correctness 9.5 / Security 9.5 / Performance 9.5 / Maintainability 9.5 / Test Coverage 10
+- Correctness：`derive_tool_param_specs` 由既有 JSON Schema 派生；`build_authorized_tools` 参数经 `functools.partial` 注入且**调用方显式实参优先**；`bind_scope` 对仍需 scope 的 `BoundTool` **重包裹**，补上「授权 + 参数 + 范围」三段包装的可叠加性。
+- Security：**`_wrap_with_params` 按 `_param_belongs` 先做归属过滤**，再以 `_bare_param` 去前缀注入 —— 避免「同名参数跨工具串味」；未授权工具带参 / 未登记参数均 `ToolParamValidationError`。
+- **finding：无。**
+---
+**MOD-IB-22：编排层（禁止标签派生视图）** —— Correctness 10 / Security 10 / Performance 10 / Maintainability 10 / Test Coverage 9.5
+- Correctness：`forbidden_labels(cn_map)` 为**派生只读视图**（纯函数，接受任意 cn_map）；`AGGREGATION_FORBIDDEN_LABELS` 兼容常量 = 结构性词 ∪ 过渡并集，既有引用不变。
+- **finding：无**（过渡并集为 ADR 明令，见 §19.3 另记）。
+---
+**MOD-IB-23：Web 装配与端点** —— Correctness 9.5 / Security 10 / Performance 9 / Maintainability 9.5 / Test Coverage 9.5
+- Correctness：`_assemble` 每项目一份提示词存储 + 派生视图 + `install_prompt_bundles`；`admit_two_domains` 聚合三路校验且**不重复计数**；`known_tool_names` 与装配期校验同源。
+- Security：写操作 `_require_manage`（否则 403）；未存层统一 404；总开关关闭整族 404；列表不出正文、只出键名。
+- Performance：提示词列表只读元数据 + 哈希，不读正文。
+- **finding：** FND-R16-01（已修）。
+---
+**MOD-IB-24：前端配置页** —— Correctness 9.5 / Security 10 / Performance 8.5 / Maintainability 9 / Test Coverage 9
+- Correctness：主 / 兜底两独立文本域 + 逐层保存；`resolvedFrom` 常驻显示当前生效层（US-IB-30）；工具勾选只作用于 `available_tools`；参数控件按类型分派；保存成功文案**逐字**含「保存成功；重启 `ib-web` / `ib-worker` 后生效」（ADR-32 / C-IB-40）。
+- Security：**视图侧零持久化未破坏**（无 `localStorage` / `IndexedDB`）；无 CDN；**无**热重载 / 运行期重建入口。
+- **finding：** FND-R16-02（登记遗留，MINOR）。
+
+## 19.5 R16 本地不可验证项（如实登记）
+
+| 项 | 原因 | 处置 |
+|----|------|------|
+| 提示词目录在**真实部署**下的读写（含 `IB_EXPERT_PROMPT_DIR` 指向的宿主路径权限） | 本代理不部署、不触碰目标机 | 由部署 / 验收阶段覆盖；离线已用临时文件系统验证 Fs 实现语义 |
+| 分层编辑器与参数表单的**组件级交互**（点击、焦点、错误态） | 本项目无组件测试框架（与 R10/R13/R14 同策略） | 以源码结构断言 + 后端端点集成测试双重覆盖；组件级测试如需引入，属 GROUP_D 决策 |
+| 「重启后生效」的**端到端**闭环 | 需要真实进程重启 | 已由「保存不重建图」（同一性断言）+ 装配期两域合并（离线可测）双向锁定语义 |
+
+## 19.6 R16 契约与冻结约束守约复核
+
+- **未新增模块**（26 不变）；**端口 15 → 16**；§4.1 依赖边逐行未改。
+- **未改既有 IFC 编号 / 签名**（含 `admit`，见 FND-R16-01 的修复）；新增 339~354。
+- **验收口径不变**：`ValidationReport` **未**新增 `force` / `ignore` / `warn_only`。
+- **无运行期热重载**：`PUT` 只原子落盘；`deps.orchestrator_for(p) is deps.orchestrator_for(p)` 为直接证据。
+- **凭据纪律**：无任何口令 / 令牌 / 密钥字面量；`IB_EXPERT_PROMPT_DIR` / `IB_EXPERT_PROMPT_ENABLED` **只登记键名**；提示词正文为占位中文。
+- **依赖纪律**：后端与前端**均零新增依赖**；无 Docker；无 PyMuPDF / `fitz`；`langchain-openai` 仍 `<0.3`；bge-m3 权重未入库；无运行期 CDN / 无数据外发。
+- **只读约束**：未 `git add` / `commit` / `push` / `stage`；未部署；未触碰目标机；**FreeArk 参考仓未写入一个字节**。
+
+## 19.7 R16 实跑证据（命令 + 原始输出 + EXIT）
+
+| # | 命令 | 结果 | EXIT |
+|---|------|------|------|
+| 1 | `python -m compileall -q src` | 无输出 | **0** |
+| 2 | `python src/scripts/selfcheck.py` | **50/50 通过**（基线 47 + R16 新增 3） | **0** |
+| 3 | `python -m pytest tests/ -q` | **273 passed**（基线 254 + R16 新增 19；零回退） | **0** |
+| 4 | `npm run typecheck`（cwd = `src/frontend`） | 无输出（`vue-tsc --noEmit` 通过） | **0** |
+| 5 | `npm test`（cwd = `src/frontend`，`node --test`） | `tests 26 / suites 4 / pass 26 / fail 0`（基线 21 + R16 新增 5） | **0** |
+| 6 | 旧 slug 扫描（`src/` + `tests/`） | `data-expert` / `knowledge-expert` **0 处**（唯一命中 = 本轮新增的反向核验断言自身） | — |
+| 7 | 新名扫描 | `freeark-expert` 48 次 / `sanheng-knowledge` 15 次；`系统管家` 15 次 / `三恒知识` 7 次 | — |
+
+**新增测试用例清单（R16）**
+- `tests/unit/test_prompt_layers_r16.py`（14）：分层优先级 + `effective_prompt` 恒非空；`prompt_content_hash` 稳定性；目录装载缺目录 ⇒ 空；孤儿 / 命名不符 / 缺兜底；**两 store 实现同名参数化**的保存冲突 + 空兜底拒绝；Fs 原子写 + 布局 + 穿越拒绝；工具参数五类错误；规格派生 + 授权绑定 + 范围绑定 + 调用方优先；未知工具 / 未登记参数拒绝；跨域 join 派生 + 注入。
+- `tests/integration/test_prompt_config_r16.py`（5）：装配安装存储与 bundle；列表契约（字段集 + 只出元数据 + `available_tools` + 只出键名 + 令牌值不出现在响应体）；层 GET/PUT/409/400/404/401 + `?token=` 拒绝；**保存不重建图**（同一性）。
+- `src/frontend/tests/frontend.smoke.test.js`（用例 22~26）：分层编辑器结构 + 回退可见；**生效口径强制文案**；工具勾选与 `available_tools` 来源；两域独立草稿 / 哈希；视图侧零持久化。
+- `src/scripts/selfcheck.py`：`r16_prompt_layers`、`r16_prompt_tool_endpoints`、`r16_rename_alignment`。
+
+## 19.8 §19 结论
+
+**R16 自我评审状态：SUCCESS。CRITICAL = 0（1 条 MAJOR 于本轮内发现并已修复）。MAJOR = 0。MINOR = 1（登记遗留）。**
+
+- 四项范围（分层提示词 + 工具勾选/参数 + FreeArk 硬改名与禁止标签派生视图 + 装配期两域完备性校验）**全部落地**；生效口径严格为「保存 + 重启后装配期重组」，**无运行期热重载、不重编译编排图**。
+- **契约零破坏 + 收益可回归**：既有 254 条 Python 用例、21 条前端冒烟**零回退**；新增 19 + 3 + 5 条把「分层优先级 / 两域 join / 勾选授权 / 参数注入 / 并发冲突 / 不重建图」固化为常驻断言。
+- 全量重跑 **273/273**、selfcheck **50/50**、前端冒烟 **26/26**、`compileall` EXIT=0、`vue-tsc` EXIT=0 —— 全部通过。
+- **风险提示（供 PM 门控决策，非缺陷）**：本轮按 ADR-31 把 **FreeArk 业务名**（`系统管家` / `三恒知识` 与对应 slug）写入**基座默认种子**，与 OOS-04「骨架不承载业务专有名」存在口径张力（架构侧已以 ADR-31 显式吸收，P-2 相关裁定见 `rev16_2_ruling_apply_package.md`）；如 PM 判定需进一步解耦，属**设计侧**变更，不在本代理本轮授权范围内。
+- **本代理已 STOP，等待 PM 门控复核；未进入 GROUP_D、未部署、未提交、未触碰目标机。**
+
+---
+
+## §20 REV-16-4 增量自评（配置审计 + 存储态暴露 + 两回归缺陷修复）
+
+**调用 ID**：INV-GROUP_C-INTELBASE-016（`flow_mode: PARTIAL_FLOW`）　**设计侧口径**：`docs/module_design.md` **1.8.0/REV-16-4**（§2.2.7 IFC-IB-355~363 / §2.2 第 17 端口行 / §3 模块条目）+ `docs/architecture_design.md` **1.8.0/REV-16-4**（ADR-33 / ADR-34 / ADR-35 + §2.0.7）　**上游门控**：GR-A-009 = PASS / GR-B-009 = PASS。
+
+**本轮范围（恰好四项）**：DEFECT-R16-01（`param_values` 静默丢参）、DEFECT-R16-02（保存 / 装配校验漂移）、GAP-R16-03（存储态暴露，ADR-35）、GAP-R16-04（配置审计，ADR-34）。
+
+### 20.1 评审摘要
+
+| 指标 | 值 |
+|------|-----|
+| 本轮重评模块 | MOD-IB-01（核心契约：端口与结构）、MOD-IB-02（配置 / 定义文档数据层）、MOD-IB-11（台账：审计存储 + 迁移）、MOD-IB-23（Web / 组合根 / 端点 / 序列化）、MOD-IB-24（前端：配置页 + 客户端）、MOD-IB-25（部署交付物：迁移 SQL） |
+| 本轮新增文件 | **2**（`src/ib/ledger/config_audit.py`、`src/deploy/migrations/004_config_audit.sql`） |
+| 本轮修改文件 | **13**（见 §20.6 文件清单） |
+| 端口数 | 16 → **17**（`ConfigAuditStore`，IFC-IB-357，纯追加，2 方法无 update/delete） |
+| 接口契约数 | 354 → **363**（新增 IFC-IB-355~363 共 9 条；`IFC-IB-001~354` 一字未改） |
+| Finding 统计 | **CRITICAL = 0**、**MAJOR = 1**（FND-R164-05 = DEFECT-R16-4-01，**已修复**，见 §20.10）、MINOR = 4（登记遗留，见 §20.5；与 §20.3 逐条表及 §20.9 结论一致；PM 于 GR-C-012 门控时据 §20.3 表订正原「MINOR = 1」笔误；本次追加 1 条 MAJOR 后，§20.1 / §20.3 / §20.9 仍三处一致） |
+| 5 维总体（本轮触及面均值） | Correctness 9.3（回修后：MOD-IB-23 由 9 → 8，见 §20.10）/ Security 9.5 / Performance 9.0 / Maintainability 9.0 / Test Coverage（可测试性）9.0 |
+
+### 20.2 按模块评审详情
+
+---
+**MOD-IB-01：核心契约（端口与结构）** — `src/ib/core/types.py` / `ports.py` / `__init__.py`
+- Correctness: 10/10
+- Security: 10/10
+- Performance: 9/10
+- Maintainability: 10/10
+- Test Coverage（可测试性）: 9/10
+
+| Finding ID | 严重级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|---------|------------|------|------|
+| FND-R164-01 | MINOR | `src/ib/core/types.py`（`ConfigAuditEntry` / `StorageState` 定义处） | 结构体为「只读投影」，与既有 frozen+slots 纪律一致；未生成 `__eq__` 之外的只读防护（Python 值对象惯例），登记为遗留观察项 | OPEN |
+
+- `ConfigAuditEntry` / `StorageState` 均为 `@dataclass(frozen=True, slots=True)`；`ConfigAuditResult` / `StoreMode` 为 `Literal` 类型别名；**只含字段名与结果码**（无取值字段），从类型层即满足「审计只记字段名 / 码」。
+- `ConfigAuditStore` 为 `@runtime_checkable Protocol`，**恰好 2 个方法**（`record` / `list_by_project`），**无 update / delete** —— 「只读审计、非第二真源」为**类型层事实**（已用 `__protocol_attrs__` 程序化核验）。
+
+---
+**MOD-IB-02：配置 / 定义文档数据层** — `src/ib/config/definition.py` / `__init__.py`
+- Correctness: 10/10
+- Security: 9/10
+- Performance: 10/10
+- Maintainability: 9/10
+- Test Coverage（可测试性）: 9/10
+
+| Finding ID | 严重级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|---------|------------|------|------|
+| FND-R164-02 | MINOR | `src/ib/config/definition.py::validate_definition_full`（函数体首行惰性导入） | 因 `prompts` 模块在模块层反向导入本模块，`validate_tool_params` 需**函数内惰性导入**；每次调用有一次 `sys.modules` 命中开销（首次后无 IO），登记为可接受 | DOCUMENTED |
+
+- `validate_definition_full` 为**合成纯函数**（IFC-IB-355）：无 I/O、无副作用、确定性；= `validate`（定义域）∪ `validate_tool_params`（工具参数域），错误顺序固定。
+- **未改 `validate` / `validate_tool_params` 签名**（`inspect.signature` 逐字比对通过）。
+
+---
+**MOD-IB-11：台账（审计存储 + 迁移）** — `src/ib/ledger/schema.py` / `config_audit.py`（新）/ `__init__.py`
+- Correctness: 10/10
+- Security: 9/10
+- Performance: 8/10
+- Maintainability: 9/10
+- Test Coverage（可测试性）: 9/10
+
+| Finding ID | 严重级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|---------|------------|------|------|
+| FND-R164-03 | MINOR | `src/ib/ledger/schema.py::CONFIG_AUDIT_DDL_STATEMENTS`；`src/deploy/migrations/004_config_audit.sql` | DDL 与迁移 SQL 为「单源摘录 + 人工同步」，存在漂移可能；已加头部注释说明以 `config_audit_ddl_script()` 为准 | DOCUMENTED |
+
+- `SqliteConfigAuditStore` 沿用 `SqliteAccountStore` 纪律：线程局部连接、WAL、`busy_timeout=5000`；`record` 只 INSERT（追加式），`list_by_project` 按 `entry_id` **升序**稳定回放（分页稳定）。
+- `CHECK (result IN ('saved','rejected'))` 在库层再约束结果码；构造失败**不静默降级为内存**（fail-closed）。
+
+---
+**MOD-IB-23：Web / 组合根 / 端点 / 序列化** — `src/ibweb/{composition,views,urls,serializers}.py`
+- Correctness: 8/10（回修后修订：初评 9/10 偏乐观 —— 见 §20.10 的验证盲区说明）
+- Security: 10/10
+- Performance: 9/10
+- Maintainability: 9/10
+- Test Coverage（可测试性）: 9/10
+
+| Finding ID | 严重级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|---------|------------|------|------|
+| FND-R164-04 | MINOR | `src/ibweb/views.py::config_audit_endpoint`（`_AUDIT_TOTAL_SCAN_LIMIT = 1000`） | `total` 由上限扫描得出；超 1000 条时为下界（设计侧已在 ADR-34 以「追加式稀疏写入」吸收，不改端口方法集） | DOCUMENTED |
+| FND-R164-05 | MAJOR | `src/ibweb/composition.py::_warn_audit_write_failed`（L968） | **DEFECT-R16-4-01**：审计失败旁路在模块作用域引用 `log_event`，而该名**仅**以函数内局部导入存在 ⇒ `NameError` 逸出 `record_config_audit`，破坏 IFC-IB-360「永不抛」契约（已落盘保存被报 500 / 应 400 的拒绝亦被报 500） | **FIXED**（见 §20.10） |
+
+- **DEFECT-R16-01**：`_ToolGrantSpecSerializer` 改为**手写 `to_representation`**（与 `_EdgeSpecSerializer` 同纪律），补齐 `param_values: [{"name","value"}]`；线形与 `document_to_json` 的 `_semantic_payload` 逐字段一致，**GET→PUT 原样回写逐字节等价**；**其它字段线形零变化**。
+- **DEFECT-R16-02**：保存路径与装配路径**同一校验入口** `validate_definition_full`；校验不过 ⇒ 4xx / 弃装配且**未触达写路径**（fail-safe，在用配置逐字节不变）；`admit` / `admit_two_domains` / `store.validate` 签名逐字未变（`admit_two_domains` 参数集仍为 `{doc, store}`，`admit` 仍为 `{doc, store}`）。
+- **GAP-R16-03**：`storage_state_endpoint` 直读装配期快照 `Deps.storage_state`，**不从环境变量再推导**（真源单一）；`GET` only；`403` / `503` fail-closed。
+- **GAP-R16-04**：`_put_definition_config` 顺序严格 **校验 → 原子写 → 审计写**；`_audit_definition_save` 对「不可编辑拒绝 / 校验拒绝 / 冲突 / 写失败 / 成功」五类均落审计；`detail_code` **只含错误码**（不落取值）；审计写经 `record_config_audit`（**永不抛**），失败发结构化 `WARN config_audit_write_failed`（`error_code` + `level` 均在白名单内，**不使用**未登记键 `detail_code`）。
+- `config_audit_endpoint`：`project_id` **只认服务端结论** `ctx.authz.project_id`（不取客户端入参）；存储不可用 ⇒ `503`，**不返回空集冒充「无记录」**；`limit` / `offset` 经 `_query_int` 有界解析。
+
+---
+**MOD-IB-24：前端（配置页 + 客户端）** — `src/frontend/src/api/client.ts` / `views/ConfigPage.vue`
+- Correctness: 9/10
+- Security: 10/10
+- Performance: 9/10
+- Maintainability: 9/10
+- Test Coverage（可测试性）: 9/10
+
+| Finding ID | 严重级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|---------|------------|------|------|
+| — | — | — | 本轮该模块无 finding | — |
+
+- **GAP-R16-03（IFC-IB-363）**：`loadStorageState()` 消费 `GET /api/config/storage-state`；`memoryNotice`（任一端 == `"memory"`）**常驻显式渲染**非静默提示「配置仅内存生效、不跨重启保留」；读不到存储态时 **fail-closed**（不静默假定文件态）。
+- `client.ts` 新增 `storageState()` / `configAudit()`（`headers()` 仍为 `X-IB-Project` **单点注入**）；前端**不重推导**存储模式，只用端点回包。
+
+---
+**MOD-IB-25：部署交付物** — `src/deploy/migrations/004_config_audit.sql`（新）
+- Correctness: 10/10
+- Security: 10/10
+- Performance: 10/10
+- Maintainability: 9/10
+- Test Coverage（可测试性）: 8/10
+
+| Finding ID | 严重级别 | 文件路径:行号 | 描述 | 状态 |
+|-----------|---------|------------|------|------|
+| FND-R164-03（同条，见 MOD-IB-11） | MINOR | `src/deploy/migrations/004_config_audit.sql` | 与 `config_audit_ddl_script()` 人工同步（已注释声明单源） | DOCUMENTED |
+
+- 迁移为幂等（`CREATE TABLE IF NOT EXISTS` + `CREATE INDEX IF NOT EXISTS`），含回滚说明；**零新增第三方依赖**（仅 stdlib `sqlite3`）。
+
+### 20.3 逐条 Finding 汇总
+
+| Finding ID | 级别 | 位置 | 状态 |
+|-----------|------|------|------|
+| FND-R164-01 | MINOR | `src/ib/core/types.py` | OPEN（登记遗留，非阻塞） |
+| FND-R164-02 | MINOR | `src/ib/config/definition.py::validate_definition_full` | DOCUMENTED |
+| FND-R164-03 | MINOR | `src/ib/ledger/schema.py` + `src/deploy/migrations/004_config_audit.sql` | DOCUMENTED |
+| FND-R164-04 | MINOR | `src/ibweb/views.py::config_audit_endpoint` | DOCUMENTED |
+| FND-R164-05 | **MAJOR** | `src/ibweb/composition.py::_warn_audit_write_failed` | **FIXED**（DEFECT-R16-4-01，GR-D-013 门控发现，回修闭环见 §20.10） |
+
+**CRITICAL = 0 条；MAJOR = 1 条（FND-R164-05，已修复，未触及 3 条上限）；MINOR = 4 条，均登记遗留，不阻塞。**
+
+### 20.4 自身回归缺陷的「发现—复现—修复」闭环
+
+| 缺陷 | 复现用例（测试侧既有断言） | 修复前 | 修复后 |
+|------|--------------------------|--------|--------|
+| DEFECT-R16-01（`param_values` 丢参） | `tests/integration/test_prompt_tool_config_int_r16d.py::TC_INT_140` | **FAIL**（响应缺 `param_values` 键） | **PASS** |
+| DEFECT-R16-02（保存未走全量校验 ⇒ 400 漂移为 200） | `tests/integration/test_prompt_tool_config_int_r16d.py::TC_INT_139` | **FAIL**（期望 400 实得 200） | **PASS** |
+| DEFECT-R16-4-01（审计失败旁路抛 `NameError`，破坏 IFC-IB-360「永不抛」） | `tests/integration/test_config_rev16_4_int.py::TC_INT_147`（GROUP_D rerun 新增） | **FAIL**（`NameError: name 'log_event' is not defined`） | **PASS**（见 §20.10） |
+
+> 说明：上表**前三行**（DEFECT-R16-01 / 02 / 4-01）均为**测试代理（GROUP_D）资产**的断言（前两条为既有，第三条 `TC_INT_147` 为 GROUP_D rerun 新增）——本代理**只运行、未新增/未修改任何测试文件**（端口 `tests/**` 为 GROUP_D 输出目录，本代理无写权）。`test_prompt_tool_config_int_r16d.py` 修改前 `2 failed / 5 passed`、修改后 `7 passed`；`test_config_rev16_4_int.py` 回修前 `1 failed / 6 passed`（唯一失败即 `TC_INT_147` 的 `NameError`）、回修后 `7 passed`。
+
+### 20.5 遗留问题说明（MINOR）
+
+1. **FND-R164-01（OPEN，信息登记）**：`ConfigAuditEntry` / `StorageState` 为 Python frozen 值对象，无额外只读防护；符合本仓既有值对象惯例，**非缺陷**。
+2. **FND-R164-02（DOCUMENTED）**：`validate_definition_full` 的惰性导入为**消除模块级循环依赖**的必要设计（`prompts` → `definition` 为模块级单向导入）。
+3. **FND-R164-03（DOCUMENTED）**：DDL 与迁移 SQL 人工同步；已在迁移文件头声明「以 `config_audit_ddl_script()` 为单源」。
+4. **FND-R164-04（DOCUMENTED）**：审计 `total` 上限扫描（1000）；因 IFC-IB-357 将端口方法钉死为 2 个（不得加 `count`），且审计写入稀疏，故以有界扫描给稳定 `total`；设计侧已在 ADR-34 吸收。
+
+### 20.6 本轮新增 / 修改文件清单
+
+- **新增（2）**：`src/ib/ledger/config_audit.py`、`src/deploy/migrations/004_config_audit.sql`
+- **修改（13）**：`src/ib/core/types.py`、`src/ib/core/ports.py`、`src/ib/core/__init__.py`、`src/ib/config/definition.py`、`src/ib/config/__init__.py`、`src/ib/ledger/schema.py`、`src/ib/ledger/__init__.py`、`src/ibweb/composition.py`、`src/ibweb/views.py`、`src/ibweb/urls.py`、`src/ibweb/serializers.py`、`src/frontend/src/api/client.ts`、`src/frontend/src/views/ConfigPage.vue`
+- **未触碰**：`tests/**`（GROUP_D 输出目录）、`docs/user_stories.md`、`docs/requirements_spec.md`、`docs/architecture_design.md`、`docs/module_design.md`
+
+### 20.7 REV-16-4 契约与冻结约束守约复核
+
+- **未新增模块**（26 不变，MOD-IB-01~26）；**端口 16 → 17**（`ConfigAuditStore` / IFC-IB-357，纯追加，2 方法无 update / delete）；§4.1 依赖边**逐行未改**。
+- **未改任何既有 IFC 编号 / 签名 / 字段集**：`IFC-IB-001~354` 一字未改；新增 **355~363** 共 9 条。`validate` / `validate_tool_params` / `store.validate` / `admit` / `admit_two_domains` 签名逐字未变。
+- **生效口径未变**：仍为「保存 + 服务重启重装配」（ADR-32 / C-IB-40 / OOS-16）；存储态端点**仅暴露**，**不引入**运行期热重载（ADR-35）。
+- **只读审计 / 非第二真源**：审计表无写回配置路径；`ConfigAuditStore` 类型层无 update / delete；`ConfigAuditEntry` 只含字段名与结果码（无取值）。
+- **审计写非事务耦合**：审计失败**不改变**保存结果，但**不静默**（结构化 `WARN config_audit_write_failed`，字段白名单：`error_code` + `level`）。
+- **fail-safe / fail-closed 未削弱**：校验不通过 ⇒ 4xx 且在用配置逐字节不变；审计 / 存储态不可读 ⇒ 503（不返回空集冒充无记录，不静默当文件态）。
+- **依赖纪律**：**零新增第三方依赖**（仅 stdlib `sqlite3`）；无 Docker；无 PyMuPDF / `fitz`；`langchain-openai` 仍 `<0.3`；bge-m3 权重未入库；无运行期 CDN / 无数据外发。
+- **凭据纪律**：无任何口令 / 令牌 / 密钥字面量进入文件、命令行或日志；只登记**键名**（`IB_DEFINITION_DOC_PATH` / `IB_EXPERT_PROMPT_DIR` / `config_audit`）。
+- **测试阈值**：未把任何失败改为 `skip` / `xfail`；未新增 / 未修改任何测试文件。
+- **只读约束**：未 `git add` / `commit` / `push` / `stage`；未部署；未触碰目标机；**FreeArk 参考仓只读（未写入一个字节）**。
+
+### 20.8 REV-16-4 实跑证据（命令 + 结果 + EXIT）
+
+| # | 命令 | 结果 | EXIT |
+|---|------|------|------|
+| 1 | `python -m compileall -q src` | 无输出 | **0** |
+| 2 | `python -m src.scripts.selfcheck` | **50/50 通过**（基线 50，零回退） | **0** |
+| 3 | `python -m pytest tests/unit tests/integration -q` | **273 passed**（零回退；含 r16d 21 项） | **0** |
+| 4 | `python -m pytest tests/e2e -q` | **24 passed** | **0** |
+| 5 | `python -m pytest tests/unit/test_prompt_layers_r16.py tests/unit/test_prompt_tool_config_unit_r16d.py tests/integration/test_prompt_config_r16.py tests/integration/test_prompt_tool_config_int_r16d.py tests/e2e/test_config_restart_effect_r16.py tests/integration/test_definition_config_r7.py -q` | **52 passed**（含 TC_INT_139 / 140 两缺陷复现用例） | **0** |
+| 6 | `cd src/frontend && npx vue-tsc --noEmit` | 无输出 | **0** |
+| 7 | `cd src/frontend && node --test` | **27/27 pass**（基线 27，零回退） | **0** |
+| 8 | 既有 IFC 签名比对（`inspect.signature`） | `validate` / `validate_tool_params` / `store.validate` / `admit` / `admit_two_domains` **逐字未变** | — |
+| 9 | 端点冒烟 | `GET /api/config/storage-state` → `200 {"definition_store":"memory","prompt_store":"memory",...}`；`GET /api/config/audit` 空 → `{"items":[],"total":0}`；保存 → 审计 `saved`；坏保存（400）→ 审计 `rejected` + `detail_code:"tool_param_unknown"` + `changed_field_names:["tool_grants[0].param_values"]` | — |
+
+### 20.9 §20 结论
+
+**REV-16-4 自我评审状态：SUCCESS（回修后）。CRITICAL = 0。MAJOR = 1（FND-R164-05 / DEFECT-R16-4-01，**已修复**，见 §20.10）。MINOR = 4（均登记遗留，非阻塞）。**
+
+> 回修说明（INV-GROUP_C-INTELBASE-017）：GR-D-013 门控判定 **FAIL**（单一 MAJOR）—— 初评将「审计写非事务耦合」判为 SUCCESS，但未覆盖「审计失败旁路**自身**抛错」这一分支。回修后 `record_config_audit` 的「永不抛」契约由**结构性保证**（旁路函数自身不可能抛）兑现；`test_config_rev16_4_int.py` 由回修前 `1 failed / 6 passed` 转为 **7 passed**，全量 `tests/unit + tests/integration + tests/e2e` **308 passed**、selfcheck **50/50**。详见 §20.10。
+
+- 本轮范围四项**全部落地**：两回归缺陷（R16-01 / R16-02）闭环修复（复现用例由 FAIL → PASS，且**未改任何测试文件**）；两缺口（GAP-R16-03 / 04）按 ADR-35 / ADR-34 实现。
+- **契约零破坏 + 收益可回归**：既有 `tests/unit + tests/integration` **273/273**、`tests/e2e` **24/24**、前端 `node --test` **27/27**、selfcheck **50/50**、`compileall` / `vue-tsc` EXIT=0 —— 全部零回退。
+- 生效口径严格为「保存 + 服务重启重装配」，**无运行期热重载**；存储态**仅暴露**；审计**只读、非第二真源**、非事务耦合且失败不静默。
+- **本代理已 STOP，等待 PM 门控复核；未进入 GROUP_D、未部署、未提交、未触碰目标机、未写 FreeArk。**
+
+### 20.10 REV-16-4 回修（INV-GROUP_C-INTELBASE-017）：DEFECT-R16-4-01（FND-R164-05，MAJOR，已修复）
+
+**触发**：GR-D-013 门控 = **FAIL**（单一 MAJOR，PM 独立确认）。**范围**：仅修复该缺陷 + 登记，**不改任何既有 IFC / 签名 / 测试**。
+
+**缺陷与根因**
+- `src/ibweb/composition.py::_warn_audit_write_failed`（L968）在**模块作用域**调用 `log_event(...)`（L970~L976）；但 `log_event` 在本文件中**仅**以**函数内局部导入**引入（L449 `_assemble`、L1130 `build_definition_store`），**不存在模块级 `log_event`** ⇒ 调用即 `NameError: name 'log_event' is not defined`。
+- 该函数的两个调用点 — `record_config_audit` 的 L960（审计存储为 `None`）与 L965（`store.record(entry)` 抛错）— 均位于**审计失败旁路**。故 `record_config_audit`（IFC-IB-360）**不返回而抛 `NameError`**，逸出至调用方 `src/ibweb/views.py::_put_definition_config`（无捕获）⇒ **已成功落盘**的保存被报 **500**；被拒保存（非法工具参数，应 **400**）亦被报 **500**。此举破坏 ADR-34 / IFC-IB-360 契约「审计写失败**不改变**保存结果，但**不静默**」。
+
+**修复（最小改动，零新增能力）** — `src/ibweb/composition.py::_warn_audit_write_failed`：
+1. `log_event` 改为**函数内局部导入**（与本文件 L449 / L1130 既有 `ib.observability` 局部导入约定一致）—— 消除 `NameError`；
+2. 导入 + 打点**整段 `try/except Exception` 兜底** —— 使本函数**自身不可能抛异常**，令 `record_config_audit` 的「**永不**向调用方抛异常」契约成为**结构性事实**（审计旁路**永不反噬**保存结果）。
+
+**语义不变式（保留）**：logger 名仍 `config_audit`、事件仍 `config_audit_write_failed`、字段白名单仍 `project_id` / `error_code` / `level`（**不落任何配置取值 / 凭据**）。**签名零改**：`record_config_audit(entry, *, deps=None) -> None` 逐字未变。成功保存即便审计写失败仍返回其正常成功码；非法参数保存仍返回 **400**。
+
+**验证盲区（诚实登记）**：初评（§20.2）对 MOD-IB-23 的「Correctness 9/10」偏乐观 —— 因既有自验仅覆盖「审计正常写入」的在途路径，**未触发审计失败旁路**，故 L970 的模块级符号解析错误未被任何断言命中。本轮将 MOD-IB-23 Correctness 修订为 **8/10**，§20.1 五维总体 Correctness 相应由 9.5 修订为 **9.3**。（该「模块级符号解析」类缺陷属**结构性可检出**：修复后由「旁路函数自身不可能抛」在设计上封堵，而非仅靠单条用例。）
+
+**§20.10 实跑证据（命令 + 结果 + EXIT）**
+
+| # | 命令 | 结果 | EXIT |
+|---|------|------|------|
+| 1 | `python -X utf8 -m pytest tests/integration/test_config_rev16_4_int.py -q` | **7 passed**（回修前 `1 failed / 6 passed`；`TC_INT_147` 由 `NameError` → PASS；强制负例 `TC_INT_141` 仍 PASS） | **0** |
+| 2 | `python -X utf8 -m pytest tests/unit tests/integration tests/e2e -q` | **308 passed**（零回退） | **0** |
+| 3 | `python -X utf8 src/scripts/selfcheck.py` | **50/50 通过** | **0** |
+| 4 | `python -X utf8 -m compileall -q src` | 无输出 | **0** |
+| 5 | 抗性取证（脚本内即验，不落文件） | `log_event` 自身抛错 / `log_event` 属性缺失两种情形下 `record_config_audit` **均不抛**；WARN payload 键集 == `{stage, outcome, project_id, error_code, level}`（`stage=config_audit`、`outcome=config_audit_write_failed`、`level=WARN`） | — |
+
+**§20.10 守约复核**：未改任何既有 IFC 编号 / 签名 / 字段集；未新增模块 / 端口 / 依赖；`tests/**` **未触碰**（仅运行）；未 `git add` / `commit` / `push` / 部署；FreeArk 参考仓**只读**；无任何口令 / 令牌 / 密钥字面量。（finding 计数：**CRITICAL = 0 / MAJOR = 1（FIXED）/ MINOR = 4** —— §20.1、§20.3、§20.9、§20.10 四处一致。）

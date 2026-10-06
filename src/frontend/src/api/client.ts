@@ -6,6 +6,10 @@
  *             IFC-IB-294 / 295（R7）`definitionConfig` / `saveDefinition`：定义文档读写
  *             IFC-IB-333 / 336（R14）`listProjects` + `headers()` 的 `X-IB-Project` 单一注入点
  *             （含 SSE `chatStream` / `chatResume`，二者同经 `headers()`）
+ *             IFC-IB-352（REV-16-2）`promptList` / `promptLayer` / `savePromptLayer`：
+ *             独立提示词目录（第二真源）的列表元数据 / 单层读 / 单层原子保存
+ *             IFC-IB-359 / 362（REV-16-4）`configAudit` / `storageState`：
+ *             配置审计（只读）与存储态（只读，供 IFC-IB-363 非静默提示）
  * @depends MOD-IB-23（HTTP / SSE 契约，**仅**契约，不 import 任何后端模块）
  * @author software-developer
  *
@@ -168,7 +172,15 @@ export type OrchestrationSpecInput = {
   edges: EdgeSpec[];
 };
 
-export type ToolGrantSpec = { expert_name: string; tool_names: string[] };
+/** 工具参数取值（IFC-IB-340；`name` 用 `<tool>.<param>` 限定名声明归属工具）。 */
+export type ToolParamValue = { name: string; value: string };
+
+export type ToolGrantSpec = {
+  expert_name: string;
+  tool_names: string[];
+  /** REV-16-2 加成式扩展（IFC-IB-340）：工具参数取值；旧文档缺省为空。 */
+  param_values?: ToolParamValue[];
+};
 
 export type DefinitionDocument = {
   schema_version: number;
@@ -209,6 +221,85 @@ export type DefinitionConfigEnvelope = {
    */
   config_key_names: string[];
 };
+
+/**
+ * REV-16-2 提示词分层类型（IFC-IB-352 / 354；与后端 `ibweb/views.py` **逐字段对齐**）。
+ *
+ * 独立提示词目录是**提示词域**的真源（ADR-15-R1）；界面只呈现与编辑，**视图侧零持久化**。
+ */
+export type PromptLayer = 'main' | 'fallback';
+
+export type PromptLayerMeta = { exists: boolean; content_hash: string };
+
+export type PromptExpertEntry = {
+  name: string;
+  cn_label: string;
+  layers: Record<PromptLayer, PromptLayerMeta>;
+};
+
+/** 工具参数规格（IFC-IB-340）：由后端从**既有工具声明**派生；界面据此生成控件。 */
+export type ToolParamSpec = {
+  name: string;
+  type: 'int' | 'float' | 'bool' | 'str';
+  default: string;
+  minimum: number | null;
+  maximum: number | null;
+  choices: string[] | null;
+};
+
+export type PromptListEnvelope = {
+  experts: PromptExpertEntry[];
+  tool_param_specs: ToolParamSpec[];
+  /** **既有**工具名单（ADR-30）：勾选只作用于既有工具集合，不新增工具本体。 */
+  available_tools: string[];
+  layout: { root_key: string; file_pattern: string; naming_rule: string };
+  config_key_names: string[];
+};
+
+export type PromptLayerContent = { content: string; content_hash: string };
+
+export type PromptSaveResult = {
+  saved: boolean;
+  content_hash: string;
+  conflict: boolean;
+  errors: ValidationErrorItem[];
+};
+
+// --------------------------------------------------------------------------- //
+// REV-16-4（IFC-IB-356 / 361）：配置审计与存储态
+// --------------------------------------------------------------------------- //
+
+/**
+ * 存储态（IFC-IB-361；`GET /api/config/storage-state`）。
+ *
+ * `memory` 表示「**配置仅内存生效、不跨重启保留**」（ADR-35）：`definition_store` /
+ * `prompt_store` 为 `memory` 时，配置页**必须显式提示**（IFC-IB-363 非静默提示）。
+ * `*_configured` 是「对应键名是否提供了非空值」——只作为补充信息，**不含任何路径值**。
+ */
+export type StorageState = {
+  definition_store: 'memory' | 'file';
+  prompt_store: 'memory' | 'file';
+  definition_store_configured: boolean;
+  prompt_store_configured: boolean;
+};
+
+/**
+ * 配置审计条目（IFC-IB-356；`GET /api/config/audit`）。
+ *
+ * **字段白名单**：`changed_field_names` **只含字段名**、`detail_code` **只含字段名 /
+ * 错误码** —— 后端**永不**回传任何配置取值（ADR-34）。
+ */
+export type ConfigAuditEntry = {
+  timestamp: string;
+  project: string;
+  actor: string;
+  action: string;
+  changed_field_names: string[];
+  result: 'saved' | 'rejected';
+  detail_code: string | null;
+};
+
+export type ConfigAuditEnvelope = { items: ConfigAuditEntry[]; total: number };
 
 // --------------------------------------------------------------------------- //
 // R13（IFC-IB-316 ~ 321）：账户 / 会话
@@ -549,6 +640,71 @@ export class ApiClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ expected_content_hash: expectedContentHash ?? null, document }),
     });
+  }
+
+  // ------------------------------------------------------------------ //
+  // IFC-IB-352：独立提示词目录（第二真源，ADR-15-R1）
+  // ------------------------------------------------------------------ //
+
+  /** 读取提示词元数据 + 工具参数规格（**不含正文**）。`503` = 目录不可读（fail-closed）。 */
+  promptList(): Promise<PromptListEnvelope> {
+    return this.request<PromptListEnvelope>('/api/config/prompts');
+  }
+
+  /** 读取单个专家的单层提示词正文 + 语义哈希（`404` = 该层不存在）。 */
+  promptLayer(expert: string, layer: PromptLayer): Promise<PromptLayerContent> {
+    return this.request<PromptLayerContent>(
+      `/api/config/prompts/${encodeURIComponent(expert)}/${layer}`,
+    );
+  }
+
+  /**
+   * 原子保存单层提示词（IFC-IB-352）。
+   *
+   * `expectedHash` 传该层当前 `content_hash` 以启用**乐观并发**；服务端不一致时返回 `409`
+   * （抛 `ApiClientError`），界面须提示重新载入 —— **不静默覆盖**。
+   * 保存成功后**不即时生效**（ADR-32：重启服务后重新装配才生效）。
+   */
+  savePromptLayer(
+    expert: string,
+    layer: PromptLayer,
+    content: string,
+    expectedHash?: string | null,
+  ): Promise<PromptSaveResult> {
+    return this.request<PromptSaveResult>(
+      `/api/config/prompts/${encodeURIComponent(expert)}/${layer}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, expected_hash: expectedHash ?? null }),
+      },
+    );
+  }
+
+  // ------------------------------------------------------------------ //
+  // REV-16-4（IFC-IB-359 / 362）：配置审计与存储态（**只读**）
+  // ------------------------------------------------------------------ //
+
+  /**
+   * 读取当前存储态（IFC-IB-362）——**单一来源 = 装配期实际选用的存储实现**。
+   *
+   * 界面据此判定是否**非静默提示**「配置仅内存生效、不跨重启保留」（IFC-IB-363）。
+   * **只读**；`503` = 存储态不可读（fail-closed）——界面不得静默当作「文件态」。
+   */
+  storageState(): Promise<StorageState> {
+    return this.request<StorageState>('/api/config/storage-state');
+  }
+
+  /**
+   * 读取本项目的配置审计（IFC-IB-359）；承载**成功与失败**两类记录（结果码）。
+   *
+   * `project_id` **只认服务端结论**（`X-IB-Project` 由 `headers()` 单点注入，ops 恒为自身）。
+   * **只读**；`503` = 审计不可读（fail-closed，后端不返回空集合冒充「无记录」）。
+   */
+  configAudit(limit = 50, offset = 0): Promise<ConfigAuditEnvelope> {
+    return this.request<ConfigAuditEnvelope>(
+      `/api/config/audit?limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`,
+    );
   }
 
   // ------------------------------------------------------------------ //

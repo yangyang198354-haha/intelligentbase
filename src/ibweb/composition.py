@@ -6,6 +6,9 @@
                 （IFC-IB-294/295，落在 `ibweb/views.py`）
             IFC-IB-326（R13）：登录限速器的**应用级装配** —— 装配期构建一次存入
                 `Deps.login_throttle`，登录端点复用（DEFECT-R13-01 修复）
+            IFC-IB-355（REV-16-4）：装配路径改用 `validate_definition_full`（ADR-33 单一入口）
+            IFC-IB-360（REV-16-4）：`record_config_audit` 服务 / 用例（第 17 个端口装配注入）
+            IFC-IB-362（REV-16-4）：`get_storage_state`（装配期存储态快照）
 @depends MOD-IB-01 ~ MOD-IB-22
 @author software-developer
 
@@ -38,17 +41,20 @@
 
 from __future__ import annotations
 
+import json
 import os
 import threading
 from dataclasses import dataclass, field, replace
 from typing import Any, Sequence
 
 from ib.core import (
+    ConfigAuditEntry,
     ConfigError,
     KbRecord,
     ProjectRecord,
     Scope,
     StartupError,
+    StorageState,
     ToolResult,
     ToolSpec,
 )
@@ -72,6 +78,16 @@ __all__ = [
     "register_builtin_tools",
     "admit",
     "SEARCH_TOOL_SPEC",
+    # REV-16-2（提示词域 / 工具参数；IFC-IB-339 / 340 / 353）
+    "build_definition_store",
+    "build_prompt_stores",
+    "known_tool_param_specs",
+    "known_tool_names",
+    "admit_two_domains",
+    # REV-16-4（配置审计 / 存储态；IFC-IB-360 / 362）
+    "record_config_audit",
+    "get_storage_state",
+    "changed_field_names",
 ]
 
 #: 基座自带的**唯一**工具：知识库检索（scope 在构造期绑定，见 IFC-IB-183）。
@@ -127,8 +143,18 @@ class Deps:
     definition_store: Any = None
     definitions: dict[str, Any] = field(default_factory=dict)
     derived_views: dict[str, Any] = field(default_factory=dict)
+    # REV-16-2 提示词域（第二真源，ADR-15-R1）：每项目一份 `ExpertPromptStore`
+    # （生产 = 本地 markdown 目录；离线 = 进程内替身）。跨域合并键 = 专家 name。
+    prompt_stores: dict[str, Any] = field(default_factory=dict)
     # R13 账户 / 会话存储（第 15 个端口的装配实例；IFC-IB-325）。
     account_store: Any = None
+    # REV-16-4 配置审计存储（第 17 个端口的装配实例；IFC-IB-357/358）。
+    # **只读审计、非第二真源**（ADR-34）：唯一入口，任何需要「查配置保存记录」的路径
+    # 一律经它，**不得**各自读表。
+    config_audit_store: Any = None
+    # REV-16-4 存储态快照（IFC-IB-361）：**装配期一次性判定**、随后只读 —— 单一来源 =
+    # 装配期实际选用的存储实现（IFC-IB-362「直读装配结果，不经第二真源」）。
+    storage_state: Any = None
     # R13 登录限速器（IFC-IB-326）：**每应用实例**一份、装配期构建一次并复用。
     # 为什么挂在 Deps 而不是每请求 `build_throttle()`：`LoginThrottle._hits` 是**实例态**，
     # 每请求新建会让来源 IP 的滑动窗口永不累积（DEFECT-R13-01，429 分支不可达）。
@@ -192,11 +218,32 @@ class Deps:
         注册表是**本项目专属的新实例**（不是进程级 `default_registry`）：闭包持有本请求的
         scope，绝不可跨请求复用。工具的**清单**则来自唯一的登记点 `register_builtin_tools`，
         因此「实际被绑定的工具」与「能力摘要里声称的工具」不可能漂移（FND-GROUP-D-01）。
+
+        **REV-16-2**：清单进一步收窄为**本项目定义文档的授权勾选**（ADR-30「最小授权」）——
+        经 `build_authorized_tools`（IFC-IB-350）绑定被授权工具并注入工具参数，
+        再由 `bind_scope` 完成 scope 闭包注入。默认种子文档对全部专家授予 `search_knowledge`
+        且无参数 → 产出与既有「绑定全部已登记工具」逐位一致（不引入行为变化）。
+        项目未装配定义文档时回退到既有「绑定全部已登记工具」路径（防御性兼容）。
         """
-        from ib.tools import ToolRegistry, bind_scope
+        from ib.tools import ToolRegistry, bind_scope, build_authorized_tools
 
         registry = register_builtin_tools(ToolRegistry())
+        grants = self._effective_grants(scope.project_id)
+        if grants:
+            authorized = build_authorized_tools(
+                grants, registry=registry, specs=self.tool_param_specs()
+            )
+            return bind_scope(authorized, scope, self.retrieval)
         return bind_scope(registry.registered(), scope, self.retrieval)
+
+    def _effective_grants(self, project_id: str) -> tuple[Any, ...]:
+        """取该项目定义文档的工具授权（无文档 / 无授权 → 空元组，回退既有路径）。"""
+        doc = self.definitions.get(project_id)
+        return tuple(getattr(doc, "tool_grants", ()) or ())
+
+    def tool_param_specs(self) -> tuple[Any, ...]:
+        """可配置工具参数规格（由**唯一登记点**的既有工具声明派生；IFC-IB-340）。"""
+        return known_tool_param_specs()
 
     def close(self) -> None:
         """释放资源（flush 向量库写缓冲）。关机路径调用，**失败不抛**（尽力而为）。"""
@@ -491,6 +538,14 @@ def _assemble() -> Deps:
     )
     _seed_accounts(account_store, account_settings, offline=bool(cfg.offline_mode))
 
+    # 4d-2) REV-16-4 配置审计（IFC-IB-357/358；ADR-34）：与台账**同一 SQLite 文件**、
+    #       与账户存储同一条「sqlite 构造失败不静默降级」纪律（审计不可用须 fail-closed）。
+    from ib.ledger import build_config_audit_store
+
+    config_audit_store = build_config_audit_store(
+        cfg, ledger_path=str(getattr(cfg, "ledger_path", "") or ":memory:")
+    )
+
     # 4e) R13 登录限速（IFC-IB-326 / DEFECT-R13-01）：**装配期构建一次、按请求复用**。
     #     为什么必须在组合根构建：`LoginThrottle` 的滑动窗口计数器 `_hits` 是**实例状态**，
     #     若在每个请求内 `build_throttle()` 新建，则每次都得到空窗口、计数永不累积，
@@ -520,14 +575,32 @@ def _assemble() -> Deps:
     #     序列：IFC-IB-288 装载 → IFC-IB-293 准入（内含 IFC-IB-290）→ IFC-IB-291 派生
     #           → 注入 MOD-IB-16/17/19/22 → 图编译一次常驻（首个请求时在 orchestrator_for）。
     definition_store = build_definition_store(cfg, projects)
+    # 4c-2) REV-16-2 提示词域（第二真源；ADR-15-R1）：装载独立提示词目录（IFC-IB-345）。
+    #       序列（IFC-IB-353）：装载定义文档 → 装载提示词目录 → 跨域合并 + 完备性校验
+    #       （290 扩展 + 345 + 346）→ 准入闸门（293）→ 派生（291 扩展，含 347 + 349）。
+    prompt_stores = build_prompt_stores(cfg, projects)
+    tool_specs = known_tool_param_specs()
     definitions: dict[str, Any] = {}
     derived_views: dict[str, Any] = {}
     for project_id in projects:
         doc = definition_store.load(project_id)  # IFC-IB-288
-        view = admit(doc, store=definition_store)  # IFC-IB-293（内含 IFC-IB-290 / 291）
+        prompt_store = prompt_stores.get(project_id)
+        prompt_refs = prompt_store.list_refs() if prompt_store is not None else ()  # IFC-IB-345
+        view = admit_two_domains(  # IFC-IB-353（290 扩展 + 345 + 346 + 347）
+            doc,
+            store=definition_store,
+            prompt_refs=prompt_refs,
+            tool_specs=tool_specs,
+        )
         definitions[project_id] = doc
         derived_views[project_id] = view
     _inject_derived_experts(next(iter(projects), ""), definitions, derived_views)
+    _inject_prompt_bundles(next(iter(projects), ""), derived_views)
+
+    # 4c-3) REV-16-4 存储态快照（IFC-IB-361/362；ADR-35）：**装配期一次性判定**，
+    #       来源 = 上面**实际选用**的 definition_store / prompt_stores（直读装配结果，
+    #       不经第二真源）。**只暴露**存储态，**不改变**「保存 + 重启重装配」生效口径。
+    storage_state = _derive_storage_state(definition_store, prompt_stores)
 
     deps = Deps(
         cfg=cfg,
@@ -555,7 +628,10 @@ def _assemble() -> Deps:
         definition_store=definition_store,
         definitions=definitions,
         derived_views=derived_views,
+        prompt_stores=prompt_stores,
         account_store=account_store,
+        config_audit_store=config_audit_store,
+        storage_state=storage_state,
         login_throttle=login_throttle,
     )
     log_event(
@@ -735,6 +811,10 @@ def admit(doc: Any, *, store: Any | None = None) -> Any:
     带病继续（ADR-16）—— 因此本闸门不存在绕过路径。
 
     `store` 省略时取当前已装配 `Deps.definition_store`（供端点复用同一校验器）。
+
+    **REV-16-2**：本函数签名**刻意保持不变**（既有合法性用例逐字断言 `{doc, store}`，且该
+    断言保护「不存在 force/ignore/warn_only 绕过」这一类型层事实）。两域聚合准入闸门见
+    `admit_two_domains`（IFC-IB-353），本函数仍是其第一段（定义文档域）。
     """
     if store is None:
         deps = get_deps(required=False)
@@ -743,18 +823,218 @@ def admit(doc: Any, *, store: Any | None = None) -> Any:
         raise StartupError("准入闸门缺少定义文档存储：装配未完成或未注入 definition_store")
     report = store.validate(doc)
     if not report.ok:
-        details = "；".join(f"[{item.code}] {item.path}: {item.message}" for item in report.errors)
-        err = ConfigError(
-            f"定义文档校验不通过（{len(report.errors)} 项），拒绝装配：{details}",
-            key="IB_DEFINITION_DOC_PATH",
-        )
-        # 结构化附带全部校验项，供端点逐条回执（不回显任何凭据值）。
-        try:
-            err.validation_items = report.errors  # type: ignore[attr-defined]
-        except Exception:  # noqa: BLE001 - 附带失败不影响拒绝装配这一主语义
-            pass
-        raise err
+        _raise_admission_error(report.errors)
     return store.derive(doc)
+
+
+def admit_two_domains(
+    doc: Any,
+    *,
+    store: Any | None = None,
+    prompt_refs: Any = (),
+    tool_specs: Any = (),
+) -> Any:
+    """**[IFC-IB-353 装配序列] 两域聚合准入闸门 + 跨域派生**（REV-16-2）。
+
+    聚合两段校验（任一段不通过即**拒绝装配**，一次性回执**全部**错误）：
+      1. 定义文档域 + 工具参数域：`validate_definition_full`（IFC-IB-355 = 290 ∪ 346，
+         与保存路径**同一校验入口**，ADR-33）；
+      2. 提示词目录域：`validate_prompt_directory`（IFC-IB-345：孤儿文件 / 命名不符 / 缺兜底）。
+
+    通过后经 `derive_prompt_layers`（IFC-IB-347）产出**跨域合并**的只读派生视图
+    （定义文档专家 `name` ↔ 提示词目录子目录按 name join；`DerivedView.prompt_bundles`）。
+
+    **不提供**「强制继续 / 忽略错误」路径（沿用 ADR-16）；`ValidationReport` 的类型层事实不变。
+
+    **REV-16-4（ADR-33）**：第 1 段改用合成纯函数 `validate_definition_full`，
+    使**装配路径**与**保存路径**（`PUT /api/config/definition`）的校验集**不再发散**
+    （结构性消除 DEFECT-R16-02 根因：保存期漏掉 IFC-IB-346 的工具参数校验）。
+    `known_tools` 取**唯一登记点**的工具名集合（与 `build_definition_store` 注入给存储的
+    集合同源），故工具名校验语义不变。
+    """
+    if store is None:
+        deps = get_deps(required=False)
+        store = getattr(deps, "definition_store", None)
+    if store is None:
+        raise StartupError("准入闸门缺少定义文档存储：装配未完成或未注入 definition_store")
+    from ib.config import (
+        derive_prompt_layers,
+        validate_definition_full,
+        validate_prompt_directory,
+    )
+
+    # IFC-IB-355：定义文档域（290）∪ 工具参数域（346）；与保存路径同一入口。
+    report = validate_definition_full(
+        doc,
+        known_tools=_known_tool_names(),
+        tool_param_specs=tuple(tool_specs),
+    )
+    errors = list(report.errors)
+    errors.extend(validate_prompt_directory(prompt_refs, doc=doc))  # IFC-IB-345
+    if errors:
+        _raise_admission_error(errors)
+    return derive_prompt_layers(doc, prompt_refs)  # IFC-IB-347
+
+
+def _raise_admission_error(errors: Any) -> None:
+    """聚合全部校验项为一次拒绝（**不静默放行**；错误体不回显任何凭据值）。"""
+    errors = tuple(errors)
+    details = "；".join(f"[{item.code}] {item.path}: {item.message}" for item in errors)
+    err = ConfigError(
+        f"定义文档校验不通过（{len(errors)} 项），拒绝装配：{details}",
+        key="IB_DEFINITION_DOC_PATH",
+    )
+    # 结构化附带全部校验项，供端点逐条回执（不回显任何凭据值）。
+    try:
+        err.validation_items = errors  # type: ignore[attr-defined]
+    except Exception:  # noqa: BLE001 - 附带失败不影响拒绝装配这一主语义
+        pass
+    raise err
+
+
+# --------------------------------------------------------------------------- #
+# REV-16-4 配置审计与存储态（IFC-IB-360 / 362；ADR-34 / ADR-35）
+# --------------------------------------------------------------------------- #
+
+
+def changed_field_names(previous: Any, current: Any) -> tuple[str, ...]:
+    """两个定义文档之间的**变更字段名**（IFC-IB-360）。
+
+    **只出字段名 / 结构路径，绝不含任何取值**（ADR-34 / SC-3）：返回如
+    `("route.tau", "tool_grants[0].param_values[1]")` 的稳定升序元组。
+    `content_hash` / `updated_at` 是**非语义字段**（哈希随内容变、时间戳随保存变），
+    一律排除 —— 否则每次保存都会把这两项报成「变更」，审计噪声淹没真正的变更。
+
+    `previous is None`（首次落盘）时，全部语义字段都算「新增」。
+    """
+    from ib.config import document_to_json
+
+    non_semantic = ("content_hash", "updated_at")
+
+    def _normalize(doc: Any) -> dict[str, Any]:
+        if doc is None:
+            return {}
+        data = json.loads(document_to_json(doc))
+        return {key: value for key, value in data.items() if key not in non_semantic}
+
+    return tuple(_diff_field_paths(_normalize(previous), _normalize(current), ""))
+
+
+def _diff_field_paths(left: Any, right: Any, path: str) -> list[str]:
+    """递归求**字段路径**差异（纯结构；列表用下标，字典用键名，绝不落取值）。"""
+    out: list[str] = []
+    if isinstance(left, dict) and isinstance(right, dict):
+        for key in sorted(set(left) | set(right)):
+            child = f"{path}.{key}" if path else str(key)
+            if key not in left or key not in right:
+                out.append(child)
+            else:
+                out.extend(_diff_field_paths(left[key], right[key], child))
+        return out
+    if isinstance(left, list) and isinstance(right, list):
+        if len(left) != len(right):
+            out.append(path)
+        for index, (item_left, item_right) in enumerate(zip(left, right)):
+            child = f"{path}[{index}]" if path else f"[{index}]"
+            out.extend(_diff_field_paths(item_left, item_right, child))
+        return out
+    if left != right:
+        out.append(path)
+    return out
+
+
+def record_config_audit(entry: ConfigAuditEntry, *, deps: Any = None) -> None:
+    """配置审计写入（IFC-IB-360 的服务 / 用例；落在 MOD-IB-23）。
+
+    **审计写与配置写非事务耦合**（ADR-34）：本函数**永不**向调用方抛异常 ——
+    审计写失败**不改变**保存结果，但**不静默**：发结构化 `WARN config_audit_write_failed`
+    （字段白名单）。审计表**只读审计、非第二真源**（IFC-IB-357）。
+
+    单一入口纪律：审计恒经 `Deps.config_audit_store`（组合根装配注入），**不**各自读表。
+    """
+    if deps is None:
+        deps = get_deps(required=False)
+    store = getattr(deps, "config_audit_store", None)
+    if store is None:
+        # 未装配审计存储：不静默（否则「审计悄悄没写」正是 GAP-R16-04 的原始症状）。
+        _warn_audit_write_failed(getattr(entry, "project", None))
+        return
+    try:
+        store.record(entry)
+    except Exception:  # noqa: BLE001 - 审计写失败**不得**改变保存结果（非事务耦合）
+        _warn_audit_write_failed(getattr(entry, "project", None))
+
+
+def _warn_audit_write_failed(project_id: str | None) -> None:
+    """结构化 WARN（字段白名单；不静默，也不改变保存结果）。
+
+    **本函数自身不得抛异常**（DEFECT-R16-4-01）：它只在「审计写失败」这条
+    **旁路**上被调用，而 `record_config_audit` 的契约是**永不**向调用方抛异常
+    （ADR-34 / IFC-IB-360）。若本函数自身抛错，旁路会反噬保存结果 —— 已落盘的
+    成功保存会被报成 500，被拒保存会被报成 500 而非 400。
+
+    为此两处收口：
+      * `log_event` 按本文件既有约定**函数内局部导入**（同 `_assemble` L449 /
+        `build_definition_store` L1130），避免模块级未定义（原缺陷即 `NameError`）；
+      * 导入与打点**整段 try/except 兜底**：即便日志后端自身抛错，也只吞掉、
+        绝不逸出。「不静默」以**尝试打点**为准，而非「打点必成功」。
+
+    字段白名单不变：`project_id` / `error_code` / `level`（**不落任何配置取值**）。
+    """
+    try:
+        from ib.observability import log_event
+
+        log_event(
+            "config_audit",
+            "config_audit_write_failed",
+            project_id=project_id,
+            error_code="config_audit_write_failed",
+            level="WARN",
+        )
+    except Exception:  # noqa: BLE001 - 打点自身失败亦不得逸出（旁路永不反噬保存结果）
+        pass
+
+
+def get_storage_state(*, deps: Any = None) -> StorageState:
+    """当前存储态（IFC-IB-362；`GET /api/config/storage-state` 的只读来源）。
+
+    **单一来源 = 装配期实际选用的存储实现**（IFC-IB-361 / 362）：直读装配结果
+    （`Deps.storage_state` 在 `_assemble` 一次性判定），**不**在请求期从环境变量
+    重新推断（否则「实际跑在内存替身」与「端点自称文件态」可能不一致）。
+    """
+    if deps is None:
+        deps = get_deps()
+    state = getattr(deps, "storage_state", None)
+    if state is not None:
+        return state
+    # 防御性兜底：理论上装配后恒有；此处按实际存储实例即时派生（语义等价）。
+    return _derive_storage_state(
+        getattr(deps, "definition_store", None),
+        getattr(deps, "prompt_stores", None) or {},
+    )
+
+
+def _derive_storage_state(
+    definition_store: Any, prompt_stores: dict[str, Any]
+) -> StorageState:
+    """由**实际存储实例**派生 `StorageState`（装配期调用一次；IFC-IB-361）。"""
+    from ib.config import FileDefinitionDocumentStore, FsExpertPromptStore
+
+    definition_mode = (
+        "file" if isinstance(definition_store, FileDefinitionDocumentStore) else "memory"
+    )
+    prompt_instances = list(prompt_stores.values())
+    if prompt_instances and all(isinstance(s, FsExpertPromptStore) for s in prompt_instances):
+        prompt_mode = "file"
+    else:
+        prompt_mode = "memory"
+    return StorageState(
+        definition_store=definition_mode,  # type: ignore[arg-type]
+        prompt_store=prompt_mode,  # type: ignore[arg-type]
+        # 「是否已配置」= 对应键名是否提供了非空值（只登记键名，不回显值）。
+        definition_store_configured=bool(os.environ.get("IB_DEFINITION_DOC_PATH", "").strip()),
+        prompt_store_configured=bool(os.environ.get("IB_EXPERT_PROMPT_DIR", "").strip()),
+    )
 
 
 def _known_tool_names() -> frozenset[str]:
@@ -762,6 +1042,26 @@ def _known_tool_names() -> frozenset[str]:
     from ib.tools import ToolRegistry
 
     return frozenset(register_builtin_tools(ToolRegistry()).names())
+
+
+def known_tool_names() -> tuple[str, ...]:
+    """**既有**工具名（有序），供配置页渲染「工具授权勾选」（ADR-30）。
+
+    勾选**只作用于既有工具集合**，不新增工具本体；名单与装配期校验、运行期绑定同源
+    （`register_builtin_tools` 唯一登记点），故不可能出现「界面可勾、装配期不认」的漂移。
+    """
+    return tuple(sorted(_known_tool_names()))
+
+
+def known_tool_param_specs() -> tuple[Any, ...]:
+    """可配置工具参数规格（IFC-IB-340）：由**唯一登记点**的既有工具 JSON Schema 派生。
+
+    **只覆盖既有工具的既有参数**，不新增工具本体（ADR-30）；派生（而非手写）使规格集与
+    工具声明不可能漂移。装配期 `admit` 与端点 / 前端均消费同一份规格。
+    """
+    from ib.tools import ToolRegistry, derive_tool_param_specs
+
+    return derive_tool_param_specs(register_builtin_tools(ToolRegistry()))
 
 
 def _default_definition_document(project_id: str, cfg: Any) -> Any:
@@ -862,6 +1162,49 @@ def build_definition_store(cfg: Any, projects: dict[str, ProjectRecord]) -> Any:
     # 每项目一份内置默认文档（一个项目一份定义文档，[ARCH-ASSUMPTION-A6]）。
     seeds = {pid: _default_definition_document(pid, cfg) for pid in projects}
     return InMemoryDefinitionDocumentStore(documents=seeds, known_tools=known)
+
+
+def build_prompt_stores(cfg: Any, projects: dict[str, ProjectRecord]) -> dict[str, Any]:
+    """构造每项目的 `ExpertPromptStore`（IFC-IB-339 的实现选择；ADR-15-R1 第二真源）。
+
+    * **离线模式 / 未配置 `IB_EXPERT_PROMPT_DIR` / `IB_EXPERT_PROMPT_ENABLED=false`**
+      → `InMemoryExpertPromptStore`（进程内替身，无提示词文件 → 生效提示词取自定义文档兜底）；
+    * 非离线且 `IB_EXPERT_PROMPT_DIR` 已配置 → `FsExpertPromptStore`（本地 markdown 目录，
+      原子写回 + 语义哈希乐观并发）。
+
+    **只登记键名，不读取 / 不回显任何凭据**（`IB_EXPERT_PROMPT_DIR` 是路径而非机密）。
+    """
+    from ib.config import (
+        FsExpertPromptStore,
+        InMemoryExpertPromptStore,
+        prompt_domain_enabled,
+    )
+
+    root = os.environ.get("IB_EXPERT_PROMPT_DIR", "").strip()
+    enabled = prompt_domain_enabled()
+    use_fs = (not cfg.offline_mode) and bool(root) and enabled
+    stores: dict[str, Any] = {}
+    for project_id in projects:
+        if use_fs:
+            stores[project_id] = FsExpertPromptStore(root, project_id)
+        else:
+            stores[project_id] = InMemoryExpertPromptStore(project_id)
+    return stores
+
+
+def _inject_prompt_bundles(project_id: str, derived_views: dict[str, Any]) -> None:
+    """把跨域合并派生的提示词分层结果注入 MOD-IB-16（IFC-IB-349；幂等）。
+
+    同 `_inject_derived_experts`：注册表是进程级单例，取**首个项目**的派生结果。
+    """
+    from ib.experts import install_prompt_bundles
+
+    view = derived_views.get(project_id)
+    if view is None:
+        return
+    bundles = tuple(getattr(view, "prompt_bundles", ()) or ())
+    if bundles:
+        install_prompt_bundles(bundles)
 
 
 def _inject_derived_experts(

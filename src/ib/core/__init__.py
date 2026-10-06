@@ -1,6 +1,8 @@
 """
 @module MOD-IB-01
 @implements IFC-IB-001..012（汇总导出）
+            IFC-IB-337 ~ 342 / 339（REV-16-2 提示词 / 工具参数 / 第 16 个端口汇总导出）
+            IFC-IB-355 ~ 363（REV-16-4 统合校验 / 存储态 / 配置审计 / 第 17 个端口汇总导出）
 @depends (none)
 @author software-developer
 
@@ -33,8 +35,10 @@ from .errors import (
     DependencyUnavailableError,
     IbError,
     NotFoundError,
+    PromptNotFoundError,
     ScopeViolationError,
     StartupError,
+    ToolParamValidationError,
     ValidationError,
 )
 from .ports import (
@@ -43,10 +47,12 @@ from .ports import (
     BlobStore,
     Chunker,
     CollectionResolver,
+    ConfigAuditStore,
     ConfigurationSource,
     DefinitionDocumentStore,
     DocumentParser,
     Embedder,
+    ExpertPromptStore,
     LedgerRepository,
     LlmProvider,
     OcrEngine,
@@ -71,19 +77,26 @@ from .types import (
     CollectionSpec,
     CompletionPayload,
     ConditionalEdgeSpec,
+    ConfigAuditEntry,
+    ConfigAuditResult,
     ConfirmationDecision,
     ConfirmationGateState,
     ConfirmationPrompt,
     DefinitionDocument,
     DeleteReport,
     DerivedView,
+    DimensionCheck,
     DocumentRecord,
     EdgeSpec,
     EmbedderDescriptor,
     EgressDescriptor,
+    ExpertPromptBundle,
+    ExpertPromptDocumentRef,
     ExpertResult,
     ExpertSpec,
     ExpertSpecInput,
+    AlignmentChecklist,
+    FreeArkAlignedExpertSpec,
     GraphConfig,
     HealthStatus,
     HnswParams,
@@ -103,6 +116,9 @@ from .types import (
     PointPayload,
     ProcessReport,
     ProjectRecord,
+    PromptDirectoryLayout,
+    PromptLayer,
+    PromptSaveResult,
     RawConfig,
     RebuildJob,
     RebuildPlan,
@@ -123,8 +139,13 @@ from .types import (
     SessionState,
     SessionStateLossOutcome,
     SessionTurn,
+    StorageState,
+    StoreMode,
     StreamEvent,
     ToolGrantSpec,
+    ToolParamSpec,
+    ToolParamTypeLiteral,
+    ToolParamValue,
     ToolResult,
     ToolSpec,
     UpsertResult,
@@ -160,6 +181,8 @@ __all__ = [
     "NotFoundError",
     "ConflictError",
     "StartupError",
+    "PromptNotFoundError",
+    "ToolParamValidationError",
     # 数据结构
     "Vector",
     "Scope",
@@ -244,6 +267,18 @@ __all__ = [
     "ValidationErrorItem",
     "ValidationReport",
     "SaveResult",
+    # REV-16-2 提示词 / 工具参数（IFC-IB-337 ~ 342）
+    "PromptLayer",
+    "ToolParamTypeLiteral",
+    "ExpertPromptDocumentRef",
+    "ExpertPromptBundle",
+    "PromptDirectoryLayout",
+    "ToolParamValue",
+    "ToolParamSpec",
+    "PromptSaveResult",
+    "DimensionCheck",
+    "AlignmentChecklist",
+    "FreeArkAlignedExpertSpec",
     # 端口
     "ConfigurationSource",
     "AuthzPolicy",
@@ -264,4 +299,13 @@ __all__ = [
     "new_session_token",
     "token_digest",
     "token_digest_matches",
+    # REV-16-2 第 16 个端口（IFC-IB-339）
+    "ExpertPromptStore",
+    # REV-16-4 存储态 / 配置审计（IFC-IB-356 ~ 362）
+    "ConfigAuditResult",
+    "StoreMode",
+    "ConfigAuditEntry",
+    "StorageState",
+    # REV-16-4 第 17 个端口（IFC-IB-357）
+    "ConfigAuditStore",
 ]

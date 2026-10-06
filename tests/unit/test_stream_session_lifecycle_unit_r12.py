@@ -188,7 +188,7 @@ def test_TC_UNIT_073_can_resume_fail_closed_matrix():
     from ib.core import ConfirmationDecision, ConfirmationGateState, ConfirmationPrompt, SessionState
     from ib.orchestration import ResumePayload, can_resume
 
-    prompt = ConfirmationPrompt(gate_id="g1", expert_name="data-expert", summary="确认执行写操作？")
+    prompt = ConfirmationPrompt(gate_id="g1", expert_name="freeark-expert", summary="确认执行写操作？")
     gate = ConfirmationGateState(gate_id="g1", prompt=prompt, decision=None)
     state = SessionState(gate=gate)
     approve = ResumePayload(decision=ConfirmationDecision(gate_id="g1", approved=True))

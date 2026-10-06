@@ -446,3 +446,130 @@ describe('R14 前端冒烟：项目上下文单点注入 + SSE 覆盖', () => {
     assert.ok(!('X-IB-Project' in api.headers({})), 'provider 抛错时不得注入项目头');
   });
 });
+
+// --------------------------------------------------------------------------- //
+// R16 前端冒烟：提示词分层编辑 + 工具授权勾选 / 参数 + 生效口径提示
+//
+// 溯源：US-IB-29（提示词主/兜底分层编辑）、US-IB-30（主缺失回退兜底须可见）、
+//       US-IB-31（工具授权勾选 + 参数可配）、ADR-32 / C-IB-40（保存后重启生效）。
+// 策略：与既有 R10/R13/R14 层一致 —— **源码结构**断言（本条无需导入 .ts，Node 20 可跑）。
+//       REV-16-2 未引入任何新的前端依赖（仍为零新增依赖）。
+// --------------------------------------------------------------------------- //
+
+describe('R16 前端冒烟：提示词分层 + 工具勾选/参数 + 生效口径', () => {
+  const page = () => stripComments(readText(configPagePath));
+
+  it('22. 提示词分层编辑器：主 / 兜底两个独立文本域 + 逐层保存', () => {
+    const text = page();
+    assert.match(text, /PROMPT_LAYERS/, '缺少分层常量（主/兜底）');
+    assert.match(text, /savePromptLayer\(/, '缺少逐层保存入口');
+    assert.match(text, /promptLayer\(|promptList\(/, '应经客户端提示词契约读取');
+    // 主缺失时的回退必须**可见**（US-IB-30）—— 必须有 resolved_from 的用户可读表达。
+    assert.match(text, /resolvedFrom\(/, '缺少「当前生效层」派生');
+    assert.match(text, /主提示词缺失，当前生效 = 兜底/, '缺少回退可见文案');
+  });
+
+  it('23. 生效口径显式提示（ADR-32 / C-IB-40）：保存成功必须提示重启后生效', () => {
+    const text = page();
+    assert.match(
+      text,
+      /保存成功；重启 `ib-web` \/ `ib-worker` 后生效/,
+      '缺少「保存成功；重启 ib-web / ib-worker 后生效」强制提示',
+    );
+    assert.match(text, /不热重载/, '应显式声明不热重载');
+    // 不得暗示运行期即时生效（无热重载轮询 / 运行期重建编排图的入口）。
+    assert.doesNotMatch(
+      text,
+      /reload|hotReload|hot-reload|rebuildGraph|scheduleRebuild/i,
+      '不得在视图侧提供热重载 / 运行期重建入口',
+    );
+  });
+
+  it('24. 工具授权勾选（checkbox）+ 既有工具名单来源，不新增工具本体', () => {
+    const text = page();
+    assert.match(text, /grantChecklist\(/, '缺少勾选清单');
+    assert.match(text, /availableTools/, '勾选名单应来自后端 available_tools（既有工具集合）');
+    assert.match(text, /toggleTool\(/, '缺少勾选切换');
+    assert.match(text, /paramsForTool\(/, '缺少按工具聚合的参数规格');
+    // 客户端类型契约：available_tools 必须显式声明（与后端 `_get_prompts_list` 对齐）。
+    const clientTs = stripComments(readText(r13.client));
+    assert.match(clientTs, /available_tools: string\[\]/, '客户端类型须声明 available_tools');
+  });
+
+  it('25. 提示词域与定义文档域各自独立草稿 / 哈希（不互串乐观并发基线）', () => {
+    const text = page();
+    assert.match(text, /promptHashes/, '缺少提示词域独立基线哈希');
+    assert.match(text, /promptTexts/, '缺少提示词域独立草稿');
+    assert.match(text, /prompt_content_hash_conflict|conflict/, '应处理 409 冲突');
+  });
+
+  it('26. 视图侧零持久化（提示词草稿不得落 localStorage / IndexedDB）', () => {
+    const text = page();
+    assert.doesNotMatch(text, /localStorage/, '视图不得使用 localStorage');
+    assert.doesNotMatch(text, /indexedDB|IndexedDB/, '视图不得使用 IndexedDB');
+  });
+
+  it('27. 工具参数表单由 tool_param_specs 派生 + 限定名写入 grant.param_values（ADR-30 / IFC-IB-354）', () => {
+    const text = page();
+    // 参数规格来自后端（既有工具 JSON Schema 派生），前端不硬编码参数表
+    assert.match(text, /tool_param_specs/, '参数规格须来自后端回执');
+    assert.match(text, /toolParamSpecs/, '缺少参数规格派生');
+    // 数值 / 枚举控件受规格约束（越界、非法枚举在界面层即被约束）
+    assert.match(text, /\bspec\.(minimum|maximum)\b/, '数值控件应绑定 min/max');
+    assert.match(text, /\bspec\.choices\b/, '枚举控件应绑定 choices');
+    // 按**限定名** `<tool>.<param>` 归属工具（跨工具参数名隔离）
+    assert.ok(
+      text.includes('startsWith(`${tool}.`)'),
+      'paramsForTool 应按限定名前缀 `<tool>.` 过滤，避免跨工具串味',
+    );
+    // 参数写入 grant.param_values（随该专家工具授权一并保存，AC-IB-31-04）
+    assert.match(text, /setParamValue\(/, '缺少参数写入入口');
+    assert.match(text, /grant\.param_values/, '参数应写入 grant.param_values');
+    // 可编辑性受可编辑白名单约束
+    assert.match(text, /canEdit\('tool_grants\[\]\.param_values'\)/, '参数可编辑性应受白名单约束');
+    // 客户端类型契约（与后端回执字段对齐）
+    const clientTs = stripComments(readText(r13.client));
+    assert.match(clientTs, /tool_param_specs: ToolParamSpec\[\]/, '客户端类型须声明 tool_param_specs');
+    assert.match(clientTs, /param_values\?: ToolParamValue\[\]/, '客户端类型须声明 param_values');
+  });
+});
+
+describe('R16-4 前端冒烟：存储态非静默提示（IFC-IB-361 / 362 / 363，ADR-35）', () => {
+  const page = () => stripComments(readText(configPagePath));
+
+  it('28. 未启用持久化 ⇒ 配置页**非静默**提示「仅内存生效、不跨重启保留」', () => {
+    const text = page();
+    // 读取存储态（单一来源 = 装配期实际选用的存储实现）
+    assert.match(text, /loadStorageState\(/, '缺少存储态读取入口');
+    assert.match(text, /storageState\(\)/, '应经客户端存储态契约读取');
+    assert.match(text, /memoryNotice/, '缺少内存态判定');
+    assert.match(text, /memoryDomains/, '缺少内存域派生（哪些 store 处于 memory）');
+    // **非静默**：必须显式渲染「配置仅内存生效、不跨重启保留」
+    assert.ok(
+      text.includes('配置**仅内存生效、不跨重启保留**'),
+      '缺少「配置仅内存生效、不跨重启保留」非静默提示文案',
+    );
+    // 存储态读取失败须 fail-closed（不得静默当作文件态）
+    assert.match(text, /storageBanner/, '缺少存储态读取失败提示');
+    assert.match(text, /不静默当作文件态/, '存储态不可读不得静默当作文件态');
+
+    // 客户端类型 / 路由契约（与后端 IFC-IB-361 / 362 对齐）
+    const clientTs = stripComments(readText(r13.client));
+    assert.match(clientTs, /export type StorageState = \{/, '客户端须声明 StorageState 类型');
+    assert.match(
+      clientTs,
+      /storageState\(\): Promise<StorageState>/,
+      '客户端须提供 storageState() 方法',
+    );
+    assert.match(clientTs, /'\/api\/config\/storage-state'/, '缺少存储态端点路由');
+    // 审计投影（IFC-IB-356）类型契约
+    assert.match(clientTs, /export type ConfigAuditEntry = \{/, '客户端须声明 ConfigAuditEntry 类型');
+    assert.match(clientTs, /configAudit\(/, '客户端须提供 configAudit() 方法');
+    // 视图不得引入任何热重载 / 运行期重建入口（生效口径不变，ADR-32 / 35）
+    assert.doesNotMatch(
+      text,
+      /reload|hotReload|hot-reload|rebuildGraph|scheduleRebuild/i,
+      '存储态提示不得引入热重载 / 运行期重建入口',
+    );
+  });
+});

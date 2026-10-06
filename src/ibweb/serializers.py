@@ -1,6 +1,9 @@
 """
 @module MOD-IB-23
 @implements IFC-IB-242~249 响应体字段契约（module_design §3 MOD-IB-23）
+            IFC-IB-294/295（R7）定义文档读写字段契约
+            IFC-IB-356（REV-16-4）`ConfigAuditEntry` 投影（字段名 / 结果码白名单）
+            IFC-IB-361（REV-16-4）`StorageState` 投影（只出存储态）
 @depends MOD-IB-01（领域类型）, MOD-IB-11/12/14（台账/Blob/重建类型）
 @author software-developer
 
@@ -45,6 +48,9 @@ __all__ = [
     "SaveResultSerializer",
     "ValidationErrorItemSerializer",
     "definition_derived_summary",
+    # REV-16-4 配置审计 / 存储态（IFC-IB-356 / 361）
+    "ConfigAuditEntrySerializer",
+    "StorageStateSerializer",
 ]
 
 
@@ -192,8 +198,21 @@ class _OrchestrationSpecInputSerializer(serializers.Serializer):
         }
 
 
-class _ToolGrantSpecSerializer(_DataclassSerializer):
-    _fields = {"expert_name": None, "tool_names": None}
+class _ToolGrantSpecSerializer(serializers.Serializer):
+    def to_representation(self, instance: Any) -> dict[str, Any]:
+        # `param_values` 必须**逐值**输出（REV-16-4 / DEFECT-R16-01）：
+        # 工具授权携带的参数值是定义文档的一部分（IFC-IB-340），
+        # 若沿用自动 `_fields` 展开只输出 `expert_name` / `tool_names`，
+        # 则「GET 读回 → PUT 原样写回」会**静默丢参**（读回再写回不再等价）。
+        # 因此与 `_EdgeSpecSerializer` 同纪律：手写 `to_representation`，
+        # 显式保全字段。`param_values` 保序输出为 `[{"name","value"}, ...]`。
+        return {
+            "expert_name": instance.expert_name,
+            "tool_names": list(instance.tool_names),
+            "param_values": [
+                {"name": pv.name, "value": pv.value} for pv in getattr(instance, "param_values", ())
+            ],
+        }
 
 
 class DefinitionDocumentSerializer(serializers.Serializer):
@@ -245,6 +264,42 @@ class DefinitionConfigInputSerializer(serializers.Serializer):
 
     expected_content_hash = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     document = serializers.JSONField()
+
+
+class ConfigAuditEntrySerializer(serializers.Serializer):
+    """`ConfigAuditEntry` 的对外投影（IFC-IB-356 / 359；`GET /api/config/audit`）。
+
+    **字段白名单**：`changed_field_names` **只含字段名**、`detail_code` **只含字段名 /
+    错误码** —— **永不**输出任何配置取值或凭据（ADR-34）。手写 `to_representation`
+    （同本模块总纪律：字段逐个写出，新增领域字段不得静默进/出响应）。
+    """
+
+    def to_representation(self, instance: Any) -> dict[str, Any]:
+        return {
+            "timestamp": instance.timestamp,
+            "project": instance.project,
+            "actor": instance.actor,
+            "action": instance.action,
+            "changed_field_names": list(instance.changed_field_names),
+            "result": instance.result,
+            "detail_code": instance.detail_code,
+        }
+
+
+class StorageStateSerializer(serializers.Serializer):
+    """`StorageState` 的对外投影（IFC-IB-361 / 362；`GET /api/config/storage-state`）。
+
+    **只暴露**存储态（`memory` / `file` + 是否已配置），**不含**任何键值 / 路径值
+    （ADR-35：只登记键名与否，不回显值）。
+    """
+
+    def to_representation(self, instance: Any) -> dict[str, Any]:
+        return {
+            "definition_store": instance.definition_store,
+            "prompt_store": instance.prompt_store,
+            "definition_store_configured": bool(instance.definition_store_configured),
+            "prompt_store_configured": bool(instance.prompt_store_configured),
+        }
 
 
 def definition_derived_summary(view: Any) -> dict[str, Any]:

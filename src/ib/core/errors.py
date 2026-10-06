@@ -2,6 +2,7 @@
 @module MOD-IB-01
 @implements IFC-IB-012 (异常类型层次 IbError -> ConfigError / ScopeViolationError /
                        DependencyUnavailableError / ValidationError)
+            IFC-IB-341 (REV-16-2) PromptNotFoundError / ToolParamValidationError
 @depends (none)
 @author software-developer
 
@@ -98,6 +99,26 @@ class StartupError(IbError):
     code = "startup_error"
 
 
+class PromptNotFoundError(IbError):
+    """提示词不存在 / 兜底层为空（IFC-IB-341，REQ-FUNC-IB-37 / ADR-29）。
+
+    HTTP 映射：**404**（单层不存在）或 **400**（`fallback` 层为空 —— 装配期校验拒绝）。
+    **错误体只出可读原因，绝不回显提示词正文或任何凭据值。**
+    """
+
+    code = "prompt_not_found"
+
+
+class ToolParamValidationError(IbError):
+    """工具参数校验失败（IFC-IB-341 / IFC-IB-346，REQ-FUNC-IB-39 / ADR-30）。
+
+    HTTP 映射：**400**（越界 / 类型不符 / 未知参数 / 未授权工具带参）。装配期则 **fail-fast**
+    拒绝启动（复用 ADR-16 闸门）。**不提供**新增工具本体的路径。
+    """
+
+    code = "tool_param_validation"
+
+
 __all__ = [
     "IbError",
     "ConfigError",
@@ -107,4 +128,6 @@ __all__ = [
     "NotFoundError",
     "ConflictError",
     "StartupError",
+    "PromptNotFoundError",
+    "ToolParamValidationError",
 ]

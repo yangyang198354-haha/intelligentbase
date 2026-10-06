@@ -2,6 +2,8 @@
 @module MOD-IB-02
 @implements IFC-IB-021 ConfigurationSource.load / IFC-IB-022 resolve_project_config
             IFC-IB-023 validate_required（只报键名，不回显值）/ IFC-IB-024 GlobalConfig
+            IFC-IB-288~292（R7 定义文档数据层）
+            IFC-IB-343~348（REV-16-2 独立提示词目录数据层 / 工具参数校验 / 键名登记）
 @depends MOD-IB-01
 @author software-developer
 
@@ -53,6 +55,7 @@ __all__ = [
     "editable_field_whitelist",
     "non_editable_changes",
     "validate",
+    "validate_definition_full",
     "derive",
     "build_definition_document",
     "document_to_json",
@@ -61,6 +64,23 @@ __all__ = [
     "FileDefinitionDocumentStore",
     "InMemoryDefinitionDocumentStore",
     "NON_EDITABLE_FIELDS",
+    # REV-16-2 提示词域数据层（IFC-IB-343 ~ 348）
+    "EXPERT_PROMPT_DIR_KEY",
+    "EXPERT_PROMPT_ENABLED_KEY",
+    "MAIN_FILENAME",
+    "FALLBACK_FILENAME",
+    "LAYER_FILENAMES",
+    "prompt_domain_enabled",
+    "prompt_content_hash",
+    "merge_prompt_layers",
+    "load_prompt_bundle",
+    "load_prompt_directory",
+    "validate_prompt_directory",
+    "validate_tool_params",
+    "derive_prompt_layers",
+    "with_prompt_bundles",
+    "FsExpertPromptStore",
+    "InMemoryExpertPromptStore",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -144,6 +164,12 @@ IB_RUNTIME_ENV_KEYS: tuple[str, ...] = (
     "IB_LOGIN_MAX_FAILURES",
     "IB_LOGIN_LOCK_SECONDS",
     "IB_AUTHZ_POLICY_MODULE",
+    # REV-16-2（IFC-IB-348）：独立提示词目录的键名登记。**只登记键名，不含任何值**
+    #（路径值不入仓库、不入文档、不入日志）。
+    #   IB_EXPERT_PROMPT_DIR —— 独立提示词目录根路径（<root>/<project_id>/<expert_name>/）。
+    #   IB_EXPERT_PROMPT_ENABLED —— 提示词域开关，**默认 true**（REQ-FUNC-IB-37/41 属 v1 范围）。
+    "IB_EXPERT_PROMPT_DIR",
+    "IB_EXPERT_PROMPT_ENABLED",
 )
 
 #: v1 支持的 4 种格式（**OQ-IB-02 默认值**：其余格式按扩展点预留，不实现）。
@@ -836,4 +862,23 @@ from .definition import (  # noqa: E402  (循环导入防护：置于模块末�
     non_editable_changes,
     semantic_hash,
     validate,
+    validate_definition_full,
+)
+from .prompts import (  # noqa: E402  (REV-16-2 提示词域；同「置于模块末尾」防护)
+    EXPERT_PROMPT_DIR_KEY,
+    EXPERT_PROMPT_ENABLED_KEY,
+    FALLBACK_FILENAME,
+    LAYER_FILENAMES,
+    MAIN_FILENAME,
+    FsExpertPromptStore,
+    InMemoryExpertPromptStore,
+    derive_prompt_layers,
+    load_prompt_bundle,
+    load_prompt_directory,
+    merge_prompt_layers,
+    prompt_content_hash,
+    prompt_domain_enabled,
+    validate_prompt_directory,
+    validate_tool_params,
+    with_prompt_bundles,
 )

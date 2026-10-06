@@ -92,7 +92,7 @@ def test_TC_INT_089_internal_expert_products_never_leak(deps):
     class _TwoExpertRouter:
         def classify_experts(self, query, *, history=None, scope=None):
             return RouteDecision(
-                experts=["data-expert", "inspection-expert"],
+                experts=["freeark-expert", "inspection-expert"],
                 tier=RouteTier.KEYWORD_UNIQUE,
                 confidence=0.9,
             )
@@ -108,7 +108,7 @@ def test_TC_INT_089_internal_expert_products_never_leak(deps):
 
     joined = "\n".join(str(e.data) for e in events)
     assert "内部子任务产物" not in joined, "专家的原始（内部）作答不得进入事件流"
-    assert "数据管家" not in joined and "巡检诊断" not in joined, "内部专家标签不得外流"
+    assert "系统管家" not in joined and "巡检诊断" not in joined, "内部专家标签不得外流"
 
 
 def test_TC_INT_090_reasoning_partition_distinct_from_answer(deps):
@@ -166,7 +166,7 @@ def test_TC_INT_092_session_isolation_no_cross_session_injection(deps):
         "p_alpha:u:A",
         SessionState(
             messages=[Message(role="user", content=marker)],
-            last_expert="data-expert",
+            last_expert="freeark-expert",
             sticky_turns_left=1,
         ),
     )

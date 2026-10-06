@@ -744,7 +744,7 @@ def test_TC_E2E_019_confirmation_gate_resume_journey_over_http(gate_http_app):
             turns=(SessionTurn(role="user", text="把温度设定为 26", created_at=""),),
             gate=ConfirmationGateState(
                 gate_id="g-e2e19",
-                prompt=ConfirmationPrompt(gate_id="g-e2e19", expert_name="data-expert", summary="确认执行写操作？"),
+                prompt=ConfirmationPrompt(gate_id="g-e2e19", expert_name="freeark-expert", summary="确认执行写操作？"),
             ),
         ),
     )
@@ -774,7 +774,7 @@ def test_TC_E2E_019_confirmation_gate_resume_journey_over_http(gate_http_app):
             turns=(SessionTurn(role="user", text="再确认一次", created_at=""),),
             gate=ConfirmationGateState(
                 gate_id="g-e2e19b",
-                prompt=ConfirmationPrompt(gate_id="g-e2e19b", expert_name="data-expert", summary="确认？"),
+                prompt=ConfirmationPrompt(gate_id="g-e2e19b", expert_name="freeark-expert", summary="确认？"),
             ),
         ),
     )

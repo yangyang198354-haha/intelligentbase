@@ -7,17 +7,17 @@
 | 文档 ID | DOC-IB-TR-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 测试执行报告 |
 | 产出代理 | test-engineer |
-| 调用 ID | **R14 增量（REV-14）= INV-GROUP_D-INTELBASE-014**（见 §19）；INV-GROUP_D-INTELBASE-001；**R3 增量 = INV-GROUP_D-INTELBASE-002**（见 §10）；**R4 增量 = INV-GROUP_D-INTELBASE-003**（见 §11）；**R7 增量 = INV-GROUP_D-INTELBASE-004**（见 §12）；**R8 增量 = INV-GROUP_D-INTELBASE-005**（见 §13）；**R9 增量 = INV-GROUP_D-INTELBASE-006**（见 §14）；**R10 增量 = INV-GROUP_D-INTELBASE-007**（见 §15）；**R11 增量 = INV-GROUP_D-INTELBASE-008**（见 §16）；**R12 增量 = INV-GROUP_D-INTELBASE-010**（见 §17）；**R13 增量 = INV-GROUP_D-INTELBASE-012**（见 §18）；**R13 缺陷闭合补丁 = INV-GROUP_D-INTELBASE-013**（见 §18.11） |
-| revision | **REV-14**（R13 回归缺陷修复轮：全局管理员「当前项目」选择与 `X-IB-Project` 传播 —— 独立测试补测与验证） |
+| 调用 ID | **R16-4 缺陷闭合复跑（DEFECT-R16-4-01）= INV-GROUP_D-INTELBASE-017**（见 §21）；**R16-4 增量（REV-16-4）= INV-GROUP_D-INTELBASE-016**（见 §21）；**R16-2 增量（REV-16-2）= INV-GROUP_D-INTELBASE-015**（见 §20）；**R14 增量（REV-14）= INV-GROUP_D-INTELBASE-014**（见 §19）；INV-GROUP_D-INTELBASE-001；**R3 增量 = INV-GROUP_D-INTELBASE-002**（见 §10）；**R4 增量 = INV-GROUP_D-INTELBASE-003**（见 §11）；**R7 增量 = INV-GROUP_D-INTELBASE-004**（见 §12）；**R8 增量 = INV-GROUP_D-INTELBASE-005**（见 §13）；**R9 增量 = INV-GROUP_D-INTELBASE-006**（见 §14）；**R10 增量 = INV-GROUP_D-INTELBASE-007**（见 §15）；**R11 增量 = INV-GROUP_D-INTELBASE-008**（见 §16）；**R12 增量 = INV-GROUP_D-INTELBASE-010**（见 §17）；**R13 增量 = INV-GROUP_D-INTELBASE-012**（见 §18）；**R13 缺陷闭合补丁 = INV-GROUP_D-INTELBASE-013**（见 §18.11） |
+| revision | **REV-16-4**（DEFECT-R16-01 / R16-02 修复复跑 + GAP-R16-03 / R16-04 覆盖回补 + fail-safe 强制负例；**DEFECT-R16-4-01 修复后整套复跑闭合**；见 §21） |
 | 项目 | intelligentbase |
 | 阶段 | GROUP_D / PHASE_08（测试执行）+ PHASE_09（测试用例实现）+ **R3 增量（缺陷回归与门控）** + **R4 增量（Blob 删除范围 / 回环契约）** + **R7 增量（US-IB-17 / US-IB-18「UI 可视化配置」纳入测试范围）** + **R8 增量（FND-R7-01 修复回归：装配期唯一性校验）** + **R9 增量（FLAKE-IB-01 测试侧稳定性治理：连接级有界重试）** + **R10 增量（前端冒烟测试层正式化 + 复跑证据）** + **R11 增量（REQ-FUNC-IB-20 测试补全：US-IB-19 / US-IB-20 纳入测试范围，含 5 条重挂 + 13 条新增）** + **R12 增量（R8 实现到位后的补测轮 REV-12-5：闭合 AC-IB-19-02 / AC-IB-20-04 并补全其余，含 16 条新增）** + **R13 增量（REV-13：US-IB-21 ~ US-IB-29 账户体系 / 会话 / 前端商用界面三层执行；新增 32 条 Python + 7 条前端；发现 DEFECT-R13-01）** + **R13 缺陷闭合补丁（INV-GROUP_D-INTELBASE-013：DEFECT-R13-01 经 INV-GROUP_C-INTELBASE-013 修复 + INV-GROUP_C-VERIFY-REV13-1 独立复跑，本代理复跑三层 239/239 全绿 + 前端 13/13）** + **R14 增量（REV-14：R13 回归缺陷修复的独立测试补测与验证 —— `GET /api/projects`（IFC-IB-333）/ `X-IB-Project` 传播（IFC-IB-334）/ 前端 `projectContext`（IFC-IB-335）/ `client.ts` 单一注入点（IFC-IB-336）三层执行；新增 Python 3 条 + 前端 4 条；更正 R14 用例撞号并登记 R14-DEF-01）** |
-| 版本 | 1.10.0（**R14 增量（REV-14，INV-GROUP_D-INTELBASE-014，2026-10-06）**：对 REV-14 修复做**独立测试补测与验证**并**亲自复跑** —— Python 三层 **242 → 245**（unit 95 / integration **126→129** / e2e 21；**245/245 全绿，0 fail / 0 skip / 0 blocked，EXIT=0**）+ 前端冒烟 **17 → 21**（21/21）+ `selfcheck.py` **47/47**（EXIT=0）+ `compileall` EXIT=0 + `vue-tsc` EXIT=0；把 GROUP_C 的 R14 用例由撞号 TC-INT-120~122 **更正为 TC-INT-123~125**（计数中性），新增 TC-INT-126~128 与前端用例 18~21；**独立裁定 REV-14 修复成立、fail-closed 未被削弱**（详见 §19.4）；登记 **R14-DEF-01**（用例撞号）与 3 项观测；**未改 `src/**`**、**未 commit/push/部署**）<br>1.9.1（**R13 缺陷闭合补丁（INV-GROUP_D-INTELBASE-013，2026-10-06）**：`DEFECT-R13-01`（来源 IP 维度登录限速未生效，429 分支不可达；MEDIUM）已由 **INV-GROUP_C-INTELBASE-013** 修复 —— 把 `LoginThrottle` 提升为**组合期单例**（`Deps.login_throttle`，每应用实例一份）+ 「账户锁定优先于 IP 限速」补丁；经**独立只读验证方 INV-GROUP_C-VERIFY-REV13-1** 复跑确认。本代理**亲自复跑**：Python 三层 **239/239 全绿**（unit 95 / integration 123 / e2e 21；**0 fail / 0 skip / 0 xfail**；EXIT=0）+ 前端冒烟 **13/13**；`TC-INT-119` **FAIL→PASS**（状态序列 `[401,401,401,429]`）、`TC-INT-118` **无回归**。本补丁为**纯文档 + 纯注释**收口 —— **未改 `src/**`**、**未改任何断言 / 未增删用例**（见 §18.11））<br>1.9.0（**R13 增量（REV-13，INV-GROUP_D-INTELBASE-012，2026-10-06）**：把 US-IB-21 ~ US-IB-29 纳入测试范围并实跑；Python 层 **239**（unit 95 / integration 123 / e2e 21）→ **238 pass / 1 fail**（EXIT=1）；前端冒烟层 **13/13**（独立，不并入 239）；三层串行门控数值达标（unit 100% / integration 99.19% / e2e 关键路径 100%）但**集成层 1 条真实失败**，暴露 **DEFECT-R13-01**（来源 IP 维度登录限速未生效）→ 本代理自评 **PARTIAL_SUCCESS**；强约束：**未改 `src/**`**）<br>1.8.1（**R12 文档校验补丁（INV-GROUP_D-INTELBASE-011，2026-09-28）**：**纯文档**修订 —— 依独立只读核验 INV-GROUP_D-VERIFY-R12 修 **MINOR-1**（§17.6 门控「未改实现代码」证据改为如实归属）与 **MINOR-2**（§17.1 可测 AC 口径注：**机制层**）；**未改** `tests/**`、`src/**`、`docs/phase_status.md`、设计真源四文档、`docs/test_plan.md`，**未新增/删除用例、未改既有断言与编号**；三门复跑 200/200 不变）<br>1.8.0（**R12 增量（REV-12-5，补测轮）**：R8 实现已落地，Python 层 **200/200 PASSED**（EXIT=0；unit 76 / integration 105 / e2e 19），三层门控 100%/100%/关键路径 16/16；**前端冒烟层 6/6 PASSED**（独立一层，**不并入 200 算术**）；闭合 **AC-IB-19-02 / AC-IB-20-04**（此前「未覆盖」）并补全 19-03 / 20-02 / 20-03 / 20-05；回补 **FND-R11-01**（CLOSED_VERIFIED）与 **BLK-R8-02**（CLOSED_VERIFIED）；**可测 AC 覆盖 90/90 = 100%**（残余 3 项见 §17.5）；强约束：**未改 `src/**`**）<br>1.7.0（R11 增量：**184/184**；前端冒烟层 6/6 独立；可测 AC 覆盖 88/90 = 97.8%）<br>R10 = 1.6.1（**171/171**；前端冒烟层 6/6 独立）<br>R9 = 1.5.0（**171/171**；**FLAKE-IB-01 → MITIGATED**）<br>**版本线**：1.0.0(R1) → 1.1.0(R3) → 1.2.0(R4) → 1.3.0(R7) → 1.4.0(R8) → 1.5.0(R9) → 1.6.0(R10) → 1.6.1(R10 修复) → 1.7.0(R11) → 1.8.0(R12) → **1.8.1(R12 文档校验补丁)** → **1.9.0(R13)** → **1.9.1(R13 缺陷闭合补丁)** |
-| status | §1~§9 APPROVED（GROUP_D 门控 GR-D-001 = PASS_WITH_CONDITIONS，2026-09-26）；§10 ~ §16 为追加节（R11 = PARTIAL_SUCCESS）；**§17（R12 增量）待 PM 门控；判定 SUCCESS（三层全绿 200/200，可测 AC 覆盖 100%，残余 3 项仅登记不阻塞，见 §17.1/§17.5）**；**§18（R13 增量）APPROVED（GROUP_D 门控 **GR-D-010 = PASS_WITH_CONDITIONS**；**condition_1 = DEFECT-R13-01 已修复并独立复跑闭合**；修复后本代理亲自复跑三层 **239/239** 全绿 + 前端 **13/13**，见 **§18.11**）** |
+| 版本 | **1.12.0（R16-4 缺陷闭合复跑（DEFECT-R16-4-01，INV-GROUP_D-INTELBASE-017，2026-10-07））**：**整套复跑** —— Python 三层 **308/308 全绿**（unit **136** / integration **148** / e2e **24**；**308 pass / 0 fail / 0 skip / 0 blocked**，EXIT 0）；`TC-INT-147`（DEFECT-R16-4-01）**FAIL → PASS**，`TC-INT-139 / 140`（R16-2 缺陷用例）与 `TC-INT-141`（强制 fail-safe 负例）**保持 PASS、零回归**；前端冒烟 **28/28**、`selfcheck.py` **50/50**、`compileall` EXIT 0、`vue-tsc` EXIT 0；**未改 `src/**` / `tests/**`**（只读复跑 + 回填文档）、**未 commit / push / deploy**）<br>1.11.0（R16-4 增量（REV-16-4，INV-GROUP_D-INTELBASE-016，2026-10-07））**：**整套复跑 + 强制负例 + 覆盖回补** —— Python 三层 **297 → 308**（unit 132 → **136** / integration 141 → **148** / e2e 24 → 24；**307 pass / 1 fail / 0 skip / 0 blocked**）；**R16-2 的 TC-INT-139 / TC-INT-140 由 FAIL 转 PASS（零回归）**；前端冒烟 **27 → 28/28**（独立层，新增 TC-FE-024）、`selfcheck.py` **50/50**、`compileall` EXIT 0、`vue-tsc` EXIT 0；新增 **12** 条（unit 4 = TC-UNIT-123~126 / integration 7 = TC-INT-141~147 / 前端 1 = TC-FE-024），含 **强制 fail-safe 负例（TC-INT-141，两断言全 PASS）**；**新发现并登记 DEFECT-R16-4-01**（MAJOR：审计写失败非致命契约未满足，TC-INT-147 如实失败）；**未改 `src/**`**、**未 commit/push/deploy**）<br>1.10.0（**R14 增量（REV-14，INV-GROUP_D-INTELBASE-014，2026-10-06）**：对 REV-14 修复做**独立测试补测与验证**并**亲自复跑** —— Python 三层 **242 → 245**（unit 95 / integration **126→129** / e2e 21；**245/245 全绿，0 fail / 0 skip / 0 blocked，EXIT=0**）+ 前端冒烟 **17 → 21**（21/21）+ `selfcheck.py` **47/47**（EXIT=0）+ `compileall` EXIT=0 + `vue-tsc` EXIT=0；把 GROUP_C 的 R14 用例由撞号 TC-INT-120~122 **更正为 TC-INT-123~125**（计数中性），新增 TC-INT-126~128 与前端用例 18~21；**独立裁定 REV-14 修复成立、fail-closed 未被削弱**（详见 §19.4）；登记 **R14-DEF-01**（用例撞号）与 3 项观测；**未改 `src/**`**、**未 commit/push/部署**）<br>1.9.1（**R13 缺陷闭合补丁（INV-GROUP_D-INTELBASE-013，2026-10-06）**：`DEFECT-R13-01`（来源 IP 维度登录限速未生效，429 分支不可达；MEDIUM）已由 **INV-GROUP_C-INTELBASE-013** 修复 —— 把 `LoginThrottle` 提升为**组合期单例**（`Deps.login_throttle`，每应用实例一份）+ 「账户锁定优先于 IP 限速」补丁；经**独立只读验证方 INV-GROUP_C-VERIFY-REV13-1** 复跑确认。本代理**亲自复跑**：Python 三层 **239/239 全绿**（unit 95 / integration 123 / e2e 21；**0 fail / 0 skip / 0 xfail**；EXIT=0）+ 前端冒烟 **13/13**；`TC-INT-119` **FAIL→PASS**（状态序列 `[401,401,401,429]`）、`TC-INT-118` **无回归**。本补丁为**纯文档 + 纯注释**收口 —— **未改 `src/**`**、**未改任何断言 / 未增删用例**（见 §18.11））<br>1.9.0（**R13 增量（REV-13，INV-GROUP_D-INTELBASE-012，2026-10-06）**：把 US-IB-21 ~ US-IB-29 纳入测试范围并实跑；Python 层 **239**（unit 95 / integration 123 / e2e 21）→ **238 pass / 1 fail**（EXIT=1）；前端冒烟层 **13/13**（独立，不并入 239）；三层串行门控数值达标（unit 100% / integration 99.19% / e2e 关键路径 100%）但**集成层 1 条真实失败**，暴露 **DEFECT-R13-01**（来源 IP 维度登录限速未生效）→ 本代理自评 **PARTIAL_SUCCESS**；强约束：**未改 `src/**`**）<br>1.8.1（**R12 文档校验补丁（INV-GROUP_D-INTELBASE-011，2026-09-28）**：**纯文档**修订 —— 依独立只读核验 INV-GROUP_D-VERIFY-R12 修 **MINOR-1**（§17.6 门控「未改实现代码」证据改为如实归属）与 **MINOR-2**（§17.1 可测 AC 口径注：**机制层**）；**未改** `tests/**`、`src/**`、`docs/phase_status.md`、设计真源四文档、`docs/test_plan.md`，**未新增/删除用例、未改既有断言与编号**；三门复跑 200/200 不变）<br>1.8.0（**R12 增量（REV-12-5，补测轮）**：R8 实现已落地，Python 层 **200/200 PASSED**（EXIT=0；unit 76 / integration 105 / e2e 19），三层门控 100%/100%/关键路径 16/16；**前端冒烟层 6/6 PASSED**（独立一层，**不并入 200 算术**）；闭合 **AC-IB-19-02 / AC-IB-20-04**（此前「未覆盖」）并补全 19-03 / 20-02 / 20-03 / 20-05；回补 **FND-R11-01**（CLOSED_VERIFIED）与 **BLK-R8-02**（CLOSED_VERIFIED）；**可测 AC 覆盖 90/90 = 100%**（残余 3 项见 §17.5）；强约束：**未改 `src/**`**）<br>1.7.0（R11 增量：**184/184**；前端冒烟层 6/6 独立；可测 AC 覆盖 88/90 = 97.8%）<br>R10 = 1.6.1（**171/171**；前端冒烟层 6/6 独立）<br>R9 = 1.5.0（**171/171**；**FLAKE-IB-01 → MITIGATED**）<br>**版本线**：1.0.0(R1) → 1.1.0(R3) → 1.2.0(R4) → 1.3.0(R7) → 1.4.0(R8) → 1.5.0(R9) → 1.6.0(R10) → 1.6.1(R10 修复) → 1.7.0(R11) → 1.8.0(R12) → **1.8.1(R12 文档校验补丁)** → **1.9.0(R13)** → **1.9.1(R13 缺陷闭合补丁)** → **1.10.0(R14)** → **1.11.0(R16-4)** → **1.12.0(R16-4 缺陷闭合复跑)** |
+| status | §1~§9 APPROVED（GROUP_D 门控 GR-D-001 = PASS_WITH_CONDITIONS，2026-09-26）；§10 ~ §16 为追加节（R11 = PARTIAL_SUCCESS）；**§17（R12 增量）待 PM 门控；判定 SUCCESS（三层全绿 200/200，可测 AC 覆盖 100%，残余 3 项仅登记不阻塞，见 §17.1/§17.5）**；**§18（R13 增量）APPROVED（GROUP_D 门控 **GR-D-010 = PASS_WITH_CONDITIONS**；**condition_1 = DEFECT-R13-01 已修复并独立复跑闭合**；修复后本代理亲自复跑三层 **239/239** 全绿 + 前端 **13/13**，见 **§18.11**）**；**§21（R16-4 增量 + DEFECT-R16-4-01 修复后复跑）待 PM 门控；**判定 SUCCESS（三层 **308/308** 全绿，前端 28/28；首跑唯一 FAIL = DEFECT-R16-4-01 已由 INV-GROUP_C-INTELBASE-017 修复并经 INV-GROUP_D-INTELBASE-017 复跑闭合）** |
 | 创建日期 | 2026-09-26 |
-| 更新日期 | 2026-10-06（R14 增量（REV-14）+ **独立测试补测与验证 / INV-GROUP_D-INTELBASE-014**，见 §19；R13 增量与缺陷闭合补丁见 §18 / §18.11） |
-| 上游输入 | `docs/test_plan.md`（**1.9.0 / R14**；R13 前 1.8.0/R13）、`docs/user_stories.md`（**1.4.0 / APPROVED / 29 US**）、`docs/requirements_spec.md`（**1.3.0 / APPROVED**）、`docs/implementation_plan.md`（**2.9.0 / R14**）、`docs/architecture_design.md` / `module_design.md`（**1.6.0 / REV-14**，ADR-28 + IFC-IB-333~336）、`docs/rev14_project_context_apply_package.md`（REV-14 工作包）、`docs/tech_stack.md`、`docs/cicd_pipeline.md`（**1.1.1 / R10**，阶段9）、GROUP_C R14 门控 **GR-C-010 = PASS_WITH_CONDITIONS**、`src/**`（只读） |
-| 证据留档 | `docs/evidence/groupd_{unit,integration,e2e,all,coverage,credscan,fnd01_repro,fnd02_repro,defect_repros}.log`；**R3 增量 = `groupd_r3_{unit,integration,e2e,all,collect,credscan,blob_probe,targeted}.log`**；**R7 增量 = `groupd_r7_{*}.log`**；**R8 增量 = `groupd_r8_{*}.log`**；**R9 增量 = `groupd_r9_{*}.log` + `groupd_r9_retry_probe.py`**；**R10 增量 = `groupd_r10_{*}.log`**；**R11 增量 = `groupd_r11_{unit,integration,e2e,all,collect,coverage}_*.log`**；**R12 增量 = `groupd_r12_{unit,integration,e2e,all,collect,coverage,frontend}.log`**；**R13 增量 = `groupd_r13_{unit,integration,e2e,all,collect,frontend}.log`**；**R14 增量 = `groupd_r14_{unit,integration,e2e,all,frontend,typecheck,selfcheck,compileall}.log`**（`.log` 不入 git，见 `.gitignore`） |
-| 测试套件 | `tests/unit/**`（**12 文件 / 95**）、`tests/integration/**`（**15 文件 / 129**）、`tests/e2e/**`（**2 文件 / 21**）、`tests/conftest.py`；**前端层（R10 新增，独立）**：`src/frontend/tests/frontend.smoke.test.js`（**1 文件 / 21 例**，`node --test`）（**R14 后口径**；R13 后为 unit 95 / integration 123 / e2e 21 + 前端 13） |
+| 更新日期 | 2026-10-07（R16-4 增量（REV-16-4）+ 整套复跑 / 强制负例 / 覆盖回补 = INV-GROUP_D-INTELBASE-016；**DEFECT-R16-4-01 修复后整套复跑 = INV-GROUP_D-INTELBASE-017**，见 §21；R16-2 增量见 §20、R14 增量见 §19） |
+| 上游输入 | `docs/test_plan.md`（**2.0.0 / R16-4**，见其 §21；R14 前 1.9.0/R14）、`docs/user_stories.md`（**1.7.0 / REV-16-4 / APPROVED**，AC-IB-30-04 / 31-03 / 32-02 / 33-02）、`docs/architecture_design.md`（**1.8.0 / REV-16-4**，ADR-33 / 34 / 35）、`docs/module_design.md`（**1.8.0 / REV-16-4**，IFC-IB-355 ~ 363）、`docs/implementation_plan.md`（**2.11.0 / REV-16-4**，§23）、`docs/code_review_report.md`（§20，CRITICAL=0 / MAJOR=0 / MINOR=4）、GROUP_C 实现门控 **GR-C-012 = PASS_WITH_CONDITIONS**、`src/**` + `tests/**`（`src/` 只读） |
+| 证据留档 | `docs/evidence/groupd_{unit,integration,e2e,all,coverage,credscan,fnd01_repro,fnd02_repro,defect_repros}.log`；**R3 增量 = `groupd_r3_{unit,integration,e2e,all,collect,credscan,blob_probe,targeted}.log`**；**R7 增量 = `groupd_r7_{*}.log`**；**R8 增量 = `groupd_r8_{*}.log`**；**R9 增量 = `groupd_r9_{*}.log` + `groupd_r9_retry_probe.py`**；**R10 增量 = `groupd_r10_{*}.log`**；**R11 增量 = `groupd_r11_{unit,integration,e2e,all,collect,coverage}_*.log`**；**R12 增量 = `groupd_r12_{unit,integration,e2e,all,collect,coverage,frontend}.log`**；**R13 增量 = `groupd_r13_{unit,integration,e2e,all,collect,frontend}.log`**；**R14 增量 = `groupd_r14_{unit,integration,e2e,all,frontend,typecheck,selfcheck,compileall}.log`**；**R16-4 增量 = `groupd_r16_4_{unit,integration,e2e,all,frontend,typecheck,selfcheck,compileall,negatives}.log`**；**R16-4 缺陷闭合复跑 = `groupd_r16_4_rerun_017_{unit,integration,e2e,all,selfcheck,compileall,npm_test,typecheck,named_139_140,named_141_147}.log`**（`.log` 不入 git，见 `.gitignore`） |
+| 测试套件 | `tests/unit/**`（**R16-4 后 = 17 文件 / 136**）、`tests/integration/**`（**R16-4 后 = 18 文件 / 148**）、`tests/e2e/**`（**3 文件 / 24**）、`tests/conftest.py`；**前端层（R10 新增，独立）**：`src/frontend/tests/frontend.smoke.test.js`（**1 文件 / 28 例**，`node --test`）（**R16-4 后口径**；R14 后为 unit 95 / integration 129 / e2e 21，前端 21；R16-2 后为 unit 132 / integration 141 / e2e 24，前端 27；R16-4 前端 27 → **28**，新增 TC-FE-024） |
 ---
 
 # intelligentbase 测试执行报告（GROUP_D / PHASE_08+09）
@@ -2314,3 +2314,371 @@ $ GET /api/files?status=ready    （合法值仅 pending/parsing/indexed/failed�
 | 4 | **R14-OBS-03** 评估：`GET /api/files?status=<非法值>` → `500` 应否为 `400`（与 R14 无关的既有输入校验面） | software-developer / PM | 信息项（不阻塞） |
 | 5 | **R14-L-01** 处置确认（接受行为层覆盖 + 登记 not-verifiable；不引入浏览器自动化） | PM | 信息项（不阻塞） |
 | 6 | OPEN ITEM 确认：`GET /api/projects` / 项目选择 UX **无独立 REQ/AC**，本轮映射既有 AC-IB-24-03 / 24-02 / REQ-FUNC-IB-31 / IB-23（按纪律不发明 AC） | GROUP_A / PM | 信息项 |
+
+---
+
+## §20 R16-2 增量（REV-16-2：提示词分层 / 工具授权与参数 / FreeArk 硬改名 / 保存即重启生效）
+
+> 调用 ID：**INV-GROUP-D-INTELBASE-015**；上游实现门控 **GR-C-011 = PASS_WITH_CONDITIONS**（0 CRITICAL）。
+> 结论：**PARTIAL_SUCCESS** —— 三层门控全部通过，但发现 **2 个 MAJOR 实现缺陷（如实失败用例）+ 2 个 AC 覆盖缺口**，需 PM 路由 software-developer。
+> 边界：**未改 `src/**`**（只读）、**未 commit / push / stage**、**未触网**、FreeArk 只读、无 Docker / PyMuPDF、`langchain-openai < 0.3`；测试内无真实凭据（离线令牌为占位值 `groupd-offline-token`，与既有基线一致）。
+
+### §20.0 自校验证据（原始输出摘录）
+
+```
+$ python -m compileall -q src tests          → EXIT 0
+$ python src/scripts/selfcheck.py            → 自检项 50/50 通过
+$ python -m pytest tests/unit -q             → 132 passed in 4.85s
+$ python -m pytest tests/integration -q      → 2 failed, 139 passed in 31.34s
+$ python -m pytest tests/e2e -q              → 24 passed in 2.53s
+$ python -m pytest tests/ -q                 → 2 failed, 295 passed in 37.98s
+$ npm test          (src/frontend)           → tests 27, pass 27, fail 0
+$ npm run typecheck (src/frontend, vue-tsc)  → EXIT 0
+```
+
+- 旧标识 grep 证据（`src/`、`tests/` 文本文件）：`data-expert` / `knowledge-expert` **仅**出现于 `src/scripts/selfcheck.py`（反向断言）；`数据管家` / `知识库问答` **仅**出现于 `src/scripts/selfcheck.py` 与 `src/ib/orchestration/__init__.py`（ADR-31 过渡并集）。→ **零残留**（由 **TC-UNIT-122** 常驻回归）。
+
+### §20.1 §unit 单元测试
+
+**摘要**
+- 执行时间：4.85s；环境：Python 3.14.6 / pytest 9.1.1 / Django 6.0.6（离线）。
+- **Total: 132 | Pass: 132 (100.0%) | Fail: 0 (0.0%) | Skip: 0 | Blocked: 0**
+- 通过率：`pass/(pass+fail) = 132/(132+0) = 100.0%` | 门控阈值：80% → **PASSED**
+- 零 masking：**0 skip / 0 xfail / 0 blocked**
+
+**按模块分项结果**
+
+| 组 | 文件 | TC 区间 | 条数 | 结果 |
+|----|------|---------|------|------|
+| GROUP_C R16 | `tests/unit/test_prompt_layers_r16.py` | TC-UNIT-095 ~ 108 | 14 | 全 PASS |
+| **GROUP_D R16（本代理）** | `tests/unit/test_prompt_tool_config_unit_r16d.py` | TC-UNIT-109 ~ 122 | 14 | 全 PASS |
+| R16 之前既有 | `tests/unit/**`（其余） | TC-UNIT-001 ~ 094 | 104 | 全 PASS（零回归） |
+
+**新增用例逐条结果（TC-UNIT-109 ~ 122）**
+
+| TC-ID | 关联 AC | 结果 | 断言要点 |
+|-------|---------|------|---------|
+| TC-UNIT-109 | AC-IB-34-01/02 | PASS | `forbidden_labels` 派生视图：旧∪新 5 标签 + 结构词 + cn_map；去重 / 顺序稳定 |
+| TC-UNIT-110 | AC-IB-30-04 | PASS | `ValidationReport` 字段集 == `{ok, errors}`（无 force/ignore/warn_only） |
+| TC-UNIT-111 | AC-IB-30-04 | PASS | `admit` 签名冻结 `{doc, store}`；`admit_two_domains` 无绕过参数 |
+| TC-UNIT-112 | AC-IB-30-04/31-03 | PASS | 两域闸门五类拒绝（orphan/missing-fallback/unknown/oob/unauthorized-with-param） |
+| TC-UNIT-113 | AC-IB-30-06 | PASS | 合法文档通过 → 派生 bundles 非空、生效提示词非空 |
+| TC-UNIT-114 | AC-IB-31-04 | PASS | 跨工具参数名隔离；调用方显式实参优先；`_bare_param`/`_param_belongs` |
+| TC-UNIT-115 | AC-IB-33-01/02 | PASS | `prompt_domain_enabled()` 默认开 + 5 组开关取值 |
+| TC-UNIT-116 | AC-IB-33-01 | PASS | base 非目录 → `DependencyUnavailableError`；不存在 → 合法空 |
+| TC-UNIT-117 | AC-IB-33-01 | PASS | Fs 原子/事务：冲突不落地、无 `.tmp` 残留、空兜底不改文件、穿越拒绝 |
+| TC-UNIT-118 | AC-IB-30-02/31-02/31-04 | PASS | `param_values` 进哈希 + 白名单；JSON 往返保真；旧文档兼容 |
+| TC-UNIT-119 | AC-IB-34-01/02/04 | PASS | 注册表对齐（names/cn_map/default）；旧 slug 消失；兜底非空 |
+| TC-UNIT-120 | AC-IB-30-06 | PASS | `exists=True` 但文件缺失 → 退回文档兜底 |
+| TC-UNIT-121 | AC-IB-30-03 | PASS | 仅编辑主层，兜底层哈希不变（分层并存） |
+| TC-UNIT-122 | AC-IB-34-01/02 | PASS | 仓库级 grep：旧 slug / 旧 cn_label 零残留（豁免非空洞） |
+
+### §20.2 §integration 集成测试
+
+**摘要**
+- 执行时间：31.34s；环境同上（Django test Client + 内存 / `tmp_path` 文件 prompt store；进程内，不触网）。
+- **Total: 141 | Pass: 139 (98.58%) | Fail: 2 (1.42%) | Skip: 0 | Blocked: 0**
+- 通过率：`pass/(pass+fail) = 139/(139+2) = 98.58%` | 门控阈值：90% → **PASSED**
+- 零 masking：**0 skip / 0 xfail / 0 blocked**
+
+**按集成边界分项结果**
+
+| 组 | 文件 | TC 区间 | 条数 | Pass | Fail |
+|----|------|---------|------|------|------|
+| GROUP_C R16 | `tests/integration/test_prompt_config_r16.py` | TC-INT-129 ~ 133 | 5 | 5 | 0 |
+| **GROUP_D R16（本代理）** | `tests/integration/test_prompt_tool_config_int_r16d.py` | TC-INT-134 ~ 140 | 7 | 5 | **2** |
+| R16 之前既有 | `tests/integration/**`（其余） | TC-INT-001 ~ 128 | 129 | 129 | 0 |
+
+**新增用例逐条结果（TC-INT-134 ~ 140）**
+
+| TC-ID | 集成边界 | 关联 AC | 结果 | 说明 |
+|-------|----------|---------|------|------|
+| TC-INT-134 | views ↔ 开关（`IB_VISUAL_CONFIG_ENABLED`） | AC-IB-33-02 | PASS | 开关关闭 → 端点族三条路径均 404 `not_found` |
+| TC-INT-135 | views ↔ composition ↔ prompts | AC-IB-30-01/02/06 | PASS | 仅兜底：列表 `main.exists=False`/`fallback.exists=True`；主读 404 / 兜底读 200+正文 |
+| TC-INT-136 | composition 唯一登记点 ↔ 端点 | AC-IB-31-01/04 | PASS | `known_tool_names` / `known_tool_param_specs` 与端点回执同源 |
+| TC-INT-137 | composition ↔ config ↔ tools | AC-IB-30-04/31-03 | PASS | 真实 deps 上两域闸门：非法参数拒绝、合法通过并派生 |
+| TC-INT-138 | views ↔ definition store | AC-IB-31-03 | PASS | 未知工具 400 `tool_grant_tool_unknown`；既有配置哈希不变 |
+| **TC-INT-139** | views ↔ definition store ↔ 参数校验 | **AC-IB-30-04** | **FAIL** | **[DEFECT-R16-02]** 非法工具参数保存实测 **200**（期望 400）且**改写既有配置** |
+| **TC-INT-140** | serializers ↔ definition store | **AC-IB-31-02/31-04** | **FAIL** | **[DEFECT-R16-01]** GET 回执缺 `param_values`；GET→PUT 往返**静默清空**已配置参数 |
+
+**失败明细（需路由 software-developer）**
+
+| TC-ID | 实际输出（取证） | 疑似缺陷位置 |
+|-------|-----------------|-------------|
+| TC-INT-139 | `PUT /api/config/definition`（`param_values=[{"name":"search_knowledge.nope",...}]`）→ **status=200**，`store_changed=True`；期望 400 + 不变。根因：保存路径只调 `store.validate`（校验工具名），`validate_tool_params` 仅在 `admit_two_domains`（装配期）生效 | `src/ibweb/views.py::_put_definition_config`（→ `store.validate`）；`src/ib/config/definition.py::validate`（无 `specs` 入参） |
+| TC-INT-140 | `DefinitionDocumentSerializer().to_representation(...)["tool_grants"][0]` 键集 = `{'expert_name','tool_names'}`；期望含 `param_values` | `src/ibweb/serializers.py:195-196`（`_ToolGrantSpecSerializer._fields` 漏 `param_values`） |
+
+> **注**：两条失败**如实记录、未标记 PASS**；集成层通过率 98.58% 仍 ≥ 90%，故门控**通过**，但缺陷须路由修复后由 GROUP_D 复跑。
+
+### §20.3 §e2e 端到端测试
+
+**摘要**
+- 执行时间：2.53s。
+- **Total: 24 | Pass: 24 (100.0%) | Fail: 0 | Skip: 0 | Blocked: 0**
+- **Critical Path 覆盖率（Must Have：US-IB-30 ~ 34）: 100%**（R16 三条关键路径用例全 PASS；既有 21 条关键路径用例零回归）
+- 零 masking：**0 skip / 0 xfail / 0 blocked**
+
+**用户旅程测试详情**
+
+---
+**TC-E2E-022: 保存主提示词（Fs 落盘）→ 「重启」重装配 → 新配置生效**
+- 关联用户故事：US-IB-32（+ US-IB-33）
+- 关联 AC：AC-IB-32-01 / 32-03；AC-IB-33-01 / 33-03
+- 执行环境：离线装配 + `tmp_path` 文件 `ExpertPromptStore`
+- 测试步骤与实际响应：
+
+| 步骤 | 操作 | 期望响应 | 实际响应 | 结果 |
+|------|------|---------|---------|------|
+| 1 | `PUT /api/config/prompts/freeark-expert/main` | 200 `saved=true` 且文件落盘 | 200；`main.md` 内容以「重启后生效」起 | PASS |
+| 2 | `orchestrator_for("p_alpha")` 前后同一实例 | 保存不重建图（ADR-32） | 同一对象 | PASS |
+| 3 | 新 store 读盘 + `load_prompt_directory` + `admit_two_domains` | `resolved_from=main_file`、生效提示词为新值 | 一致（其余专家不受牵连） | PASS |
+
+- 最终结论：**PASS**
+
+---
+**TC-E2E-023: 越界工具授权被拒 + 既有配置不变 + 闸门无绕过**
+- 关联用户故事：US-IB-31（+ US-IB-30）
+- 关联 AC：AC-IB-31-03；AC-IB-30-04
+- 执行环境：Django test Client（离线）
+- 测试步骤与实际响应：
+
+| 步骤 | 操作 | 期望响应 | 实际响应 | 结果 |
+|------|------|---------|---------|------|
+| 1 | PUT 定义文档（`tool_names=["ghost-tool"]`） | 400 `tool_grant_tool_unknown` | 400，items 含该码 | PASS |
+| 2 | 复核既有配置 | 哈希与授权逐位不变 | 一致 | PASS |
+| 3 | 检视 `admit` / `admit_two_domains` 签名 | 无 force/ignore/warn_only | 无 | PASS |
+
+- 最终结论：**PASS**
+
+---
+**TC-E2E-024: demo 示例项目专家定义与 FreeArk 严格对齐**
+- 关联用户故事：US-IB-34
+- 关联 AC：AC-IB-34-01 / 34-02 / 34-04
+- 执行环境：离线装配 + `src/deploy/config.example.json`（只读）
+- 测试步骤与实际响应：
+
+| 步骤 | 操作 | 期望响应 | 实际响应 | 结果 |
+|------|------|---------|---------|------|
+| 1 | 比对 `names()` / `cn_map()` | freeark-expert·系统管家 / inspection-expert·巡检诊断 / sanheng-knowledge·三恒知识 | 一致 | PASS |
+| 2 | 校验各装配项目默认专家集 + 工具名 ⊆ 既有工具 | 等于对齐集、工具名对齐 | 一致 | PASS |
+| 3 | `config.example.json` 项目锚点 | 含 `demo` | 含 | PASS |
+
+- 最终结论：**PASS**
+
+---
+
+### §20.4 前端冒烟层（FE，独立层）
+
+- **Total: 27 | Pass: 27 (100%) | Fail: 0 | Skip: 0**
+- 本轮新增 **用例 27（TC-FE-023）**：工具参数由 `tool_param_specs` 派生（`spec.minimum/maximum/choices`）+ 限定名 `startsWith(\`${tool}.\`)` + 写入 `grant.param_values` + 白名单 `canEdit('tool_grants[].param_values')` + 客户端类型契约；**PASS**。
+- `npm run typecheck`（vue-tsc）：**EXIT 0**。
+
+### §20.5 门控逐条判定（R16-2 增量）
+
+| 门控项 | 阈值 / 要求 | 实测 | 判定 |
+|--------|------------|------|------|
+| 单元通过率 | ≥ 80% | 132/(132+0) = **100.0%** | **PASSED** |
+| 集成通过率 | ≥ 90% | 139/(139+2) = **98.58%** | **PASSED** |
+| E2E 关键路径 | 100% | 24/24；关键路径（Must Have US-IB-30~34）**100%** | **PASSED** |
+| US-IB-30~34 覆盖 | 每故事有覆盖 | 5/5 有覆盖（2 AC 部分覆盖 = 缺陷，2 AC = 缺口） | **PASSED（带缺口登记）** |
+| 算术一致 | `total = pass+fail+skip+blocked` | 132 / 141 / 24 / 297 均成立 | **PASSED** |
+| 零 masking | 0 skip / 0 xfail / 0 blocked | 0 / 0 / 0 | **PASSED** |
+| 基线不回退 | 273 → 上升 | **273 → 297**（+24）；前端 26 → 27；selfcheck 50/50 持平 | **PASSED** |
+| CRITICAL finding | 0 | **0**（2 × MAJOR 缺陷 + 2 × MAJOR 缺口，均非 CRITICAL） | **PASSED** |
+
+**失败用例不掩盖声明**：`TC-INT-139`、`TC-INT-140` 为**如实失败的验收用例**，用于固化 DEFECT-R16-02 / R16-01；**未**以 skip/xfail 掩蔽，**未**标记 PASS。
+
+### §20.6 缺陷与缺口（路由 software-developer / PM）
+
+| ID | 严重度 | 关联 AC | 证据 | 说明 |
+|----|--------|---------|------|------|
+| **DEFECT-R16-01** | MAJOR | AC-IB-31-02/31-04 | TC-INT-140（FAIL） | `src/ibweb/serializers.py:195-196` `_ToolGrantSpecSerializer._fields` 漏 `param_values` → `GET /api/config/definition` 不回读工具参数；GET→PUT 往返**静默清空**已配置参数 |
+| **DEFECT-R16-02** | MAJOR | AC-IB-30-04 | TC-INT-139（FAIL） | 定义文档保存仅 `store.validate`（不校验工具参数）；`validate_tool_params` 只在装配期生效 → 非法参数保存 **200 且改写既有配置**，直至下次重启装配才拒绝（违背 fail-safe） |
+| **GAP-R16-03** | MAJOR | AC-IB-33-02 | 无（未实现） | 「配置仅内存生效、不跨重启保留」提示在 `src/**` 与前端视图**均不存在** |
+| **GAP-R16-04** | MAJOR | AC-IB-32-02 | 无（未实现） | 无**可查询**的配置生效记录；`log_event` 不含 actor / 变更字段 |
+
+### §20.7 不可验证项与残余（R16-2）
+
+- **AC-IB-32-05**（`ib-web` / `ib-worker` 双进程重启均生效）：**离线不可验证**（无进程编排）；已以 TC-E2E-022「新进程视角重装载 + 重装配」覆盖等价语义 + TC-UNIT-117 覆盖共享文件载体。非阻塞残余。
+- **AC-IB-34-03**（FreeArk 未被修改）：**离线不可验证**（跨仓只读事实）；比对全程只读，未写 FreeArk 任何文件。
+
+### §20.8 需 PM 路由的动作（R16-2 增量）
+
+| # | 动作 | 对象 | 优先级 |
+|---|------|------|--------|
+| 1 | GROUP_D R16-2 增量门控复核（三层 **297**：295 pass / 2 fail；前端 27/27；算术一致；裁定 **PARTIAL_SUCCESS**） | PM | 本轮 |
+| 2 | **DEFECT-R16-01** 修复：`_ToolGrantSpecSerializer` 补 `param_values`（serializers.py） | software-developer | **MAJOR** |
+| 3 | **DEFECT-R16-02** 修复：定义文档保存路径并入 `validate_tool_params`（或改为提交即跑两域闸门） | software-developer | **MAJOR** |
+| 4 | **GAP-R16-03** 评估：AC-IB-33-02「仅内存 / 不跨重启」明确提示缺失（后端回执或前端文案） | software-developer / PM | **MAJOR** |
+| 5 | **GAP-R16-04** 评估：AC-IB-32-02「生效记录可查询」缺失（是否纳入本期） | software-developer / PM | **MAJOR** |
+| 6 | **AC-IB-32-05 / AC-IB-34-03** 处置确认（离线不可验证，接受等价语义覆盖） | PM | 信息项（不阻塞） |
+| 7 | **文档对账**：§19 登记 R14 后基线 245，实测 R16 起始前 254（差值 +9 属 R15 developer 侧新增未登记）；建议补登 R15 增量 TC 编号 | GROUP_D / PM | 信息项 |
+| 8 | DEFECT-R16-01 / R16-02 修复后，由 GROUP_D 复跑 **TC-INT-139 / TC-INT-140** 并回填本报告 | GROUP_D | 后续轮 |
+
+**边界声明**：本轮**未改 `src/**`**（全程只读；`src/ibweb/serializers.py`、`src/ibweb/views.py`、`src/ib/config/**`、`src/frontend/src/**`、`src/scripts/selfcheck.py` 均未触碰）；改动**仅**落在 `tests/{unit,integration,e2e}/test_*_r16*.py` 与 `src/frontend/tests/frontend.smoke.test.js`；**未 commit / push / stage**；**未触网**；FreeArk **只读**；无真实凭据字面量。
+
+---
+
+## §21 R16-4 增量（REV-16-4：DEFECT-R16-01 / R16-02 修复复跑 + GAP-R16-03 / R16-04 覆盖回补）
+
+> 调用 ID：**INV-GROUP_D-INTELBASE-016**（R16-4 增量首跑）+ **INV-GROUP_D-INTELBASE-017**（**DEFECT-R16-4-01 修复后的整套复跑**；本节最终数值以复跑为准）；上游实现门控 **GR-C-012 = PASS_WITH_CONDITIONS**（CRITICAL = 0）。
+> 结论：**SUCCESS** —— 三层门控全部通过、**全绿 308/308（0 fail / 0 skip / 0 blocked，EXIT 0）**；R16-2 的 2 条缺陷用例（TC-INT-139 / TC-INT-140）**保持 PASS、零回归**；
+> 首跑（INV-016）登记的 1 个 MAJOR 缺陷 **DEFECT-R16-4-01 已由 software-developer（INV-GROUP_C-INTELBASE-017）修复**，本代理经整套复跑（INV-017）确认 **TC-INT-147 FAIL → PASS → 缺陷闭合**。
+> 边界：**未改 `src/**`**（只读）、**未 commit / push / deploy**（PHASE_11 冻结）、**未触网**、FreeArk 只读、无 Docker / PyMuPDF、`langchain-openai < 0.3`；测试内无真实凭据（离线令牌为占位值）。
+
+### §21.0 自校验证据（原始输出摘录；证据日志见 `docs/evidence/groupd_r16_4_*.log`）
+
+**首跑（INV-GROUP_D-INTELBASE-016）**：
+
+```
+$ python -m compileall -q src tests                    → EXIT 0
+$ python src/scripts/selfcheck.py                       → 自检结果：50/50 通过（EXIT 0）
+$ python -m pytest tests/unit -q                        → 136 passed in 6.39s        (EXIT 0)
+$ python -m pytest tests/integration -q                 → 1 failed, 147 passed in 35.63s (EXIT 1)
+$ python -m pytest tests/e2e -q                         → 24 passed in 2.58s          (EXIT 0)
+$ python -m pytest tests -q                             → 1 failed, 307 passed in 45.06s (EXIT 1)
+$ npm test          (src/frontend, node --test)         → tests 27, pass 27, fail 0   (EXIT 0)
+$ npm run typecheck (src/frontend, vue-tsc --noEmit)    → EXIT 0
+```
+
+**复跑（INV-GROUP_D-INTELBASE-017，DEFECT-R16-4-01 修复后，本节最终数值）**：
+
+```
+$ python -X utf8 -m compileall -q src tests             → EXIT 0
+$ python -X utf8 src/scripts/selfcheck.py               → 自检结果：50/50 通过（EXIT 0）
+$ python -X utf8 -m pytest tests/unit -q                → 136 passed in 6.65s          (EXIT 0)
+$ python -X utf8 -m pytest tests/integration -q         → 148 passed in 37.68s         (EXIT 0)
+$ python -X utf8 -m pytest tests/e2e -q                 → 24 passed in 3.31s           (EXIT 0)
+$ python -X utf8 -m pytest tests -q                     → 308 passed in 46.93s         (EXIT 0)
+$ npm test          (src/frontend, node --test)         → tests 28, pass 28, fail 0    (EXIT 0)
+$ npm run typecheck (src/frontend, vue-tsc --noEmit)    → EXIT 0
+```
+
+**首跑（INV-016）的唯一失败用例**：`tests/integration/test_config_rev16_4_int.py::test_TC_INT_147_audit_write_failure_must_be_non_fatal_DEFECT_R16_4_01`（DEFECT-R16-4-01，如实失败）—— **复跑（INV-017）后已 PASS，缺陷闭合**（详见 §21.2 / §21.6）。复跑证据日志：`docs/evidence/groupd_r16_4_rerun_017_{unit,integration,e2e,all,selfcheck,compileall,npm_test,typecheck,named_139_140,named_141_147}.log`。
+
+### §21.1 §unit 单元测试
+
+**摘要**
+- 执行时间：6.39s（首跑）/ 6.65s（复跑 INV-017）；环境：Python 3.14.6 / pytest 9.1.1 / Django 6.0.6（离线）。
+- **Total: 136 | Pass: 136 (100.0%) | Fail: 0 (0.0%) | Skip: 0 | Blocked: 0**（首跑 / 复跑一致，零回归）
+- 通过率：`pass/(pass+fail) = 136/(136+0) = 100.0%` | 门控阈值：80% → **PASSED**（EXIT 0）
+- 零 masking：**0 skip / 0 xfail / 0 blocked**
+
+**按模块分项结果**
+
+| 组 | 文件 | TC 区间 | 条数 | 结果 |
+|----|------|---------|------|------|
+| **GROUP_D R16-4（本代理新增）** | `tests/unit/test_config_audit_rev16_4_unit.py` | TC-UNIT-123 ~ 126 | 4 | 全 PASS |
+| R16-2 既有 | `tests/unit/test_prompt_tool_config_unit_r16d.py` | TC-UNIT-109 ~ 122 | 14 | 全 PASS（零回归） |
+| R16 及更早既有 | `tests/unit/**`（其余） | TC-UNIT-001 ~ 108 | 118 | 全 PASS（零回归） |
+
+**新增用例逐条结果（TC-UNIT-123 ~ 126）**
+
+| TC-ID | 关联 AC | 结果 | 断言要点 |
+|-------|---------|------|---------|
+| TC-UNIT-123 | AC-IB-30-04 | PASS | `validate_definition_full` 合并两域、固定顺序（定义文档域在前）、`ValidationReport` 字段集恰 `{ok, errors}`、纯函数无 I/O |
+| TC-UNIT-124 | AC-IB-32-02 | PASS | Memory / Sqlite 审计存储语义对齐：只追加、项目过滤、稳定升序、limit/offset 分页 |
+| TC-UNIT-125 | AC-IB-32-02 | PASS | 端口类型层恰 `{record, list_by_project}`（无 update/delete）；`ConfigAuditEntry` 无取值 / 凭据字段 |
+| TC-UNIT-126 | AC-IB-33-02 | PASS | `StorageState` 取值域 `{memory,file}`；离线 = memory/memory + 未配置 |
+
+### §21.2 §integration 集成测试
+
+**摘要**
+- 执行时间：35.63s（首跑）/ 37.68s（复跑 INV-017）；环境同上（Django test Client + 内存 ledger → `MemoryConfigAuditStore`；进程内，不触网）。
+- **Total: 148 | Pass: 148 (100.0%) | Fail: 0 (0.0%) | Skip: 0 | Blocked: 0**（复跑 INV-017；首跑为 147 pass / 1 fail）
+- 通过率：`pass/(pass+fail) = 148/(148+0) = 100.0%` | 门控阈值：90% → **PASSED**（EXIT 0）
+- 零 masking：**0 skip / 0 xfail / 0 blocked**
+
+**按集成边界分项结果**
+
+| 组 | 文件 | TC 区间 | 条数 | Pass | Fail |
+|----|------|---------|------|------|------|
+| **GROUP_D R16-4（本代理新增）** | `tests/integration/test_config_rev16_4_int.py` | TC-INT-141 ~ 147 | 7 | **7** | 0 |
+| R16-2 既有 | `tests/integration/test_prompt_tool_config_int_r16d.py` | TC-INT-134 ~ 140 | 7 | **7**（**TC-INT-139 / 140 转 PASS**） | 0 |
+| R16-2 既有 | `tests/integration/test_prompt_config_r16.py` | TC-INT-129 ~ 133 | 5 | 5 | 0 |
+| R16 及更早既有 | `tests/integration/**`（其余） | TC-INT-001 ~ 128 | 129 | 129 | 0 |
+
+**新增用例逐条结果（TC-INT-141 ~ 147）**
+
+| TC-ID | 集成边界 | 关联 AC | 结果 | 说明 |
+|-------|----------|---------|------|------|
+| **TC-INT-141** | views ↔ definition store（fail-safe） | AC-IB-30-04 | **PASS** | **强制负例**：非法工具参数 PUT → **400**；**随后 GET** 读回**保存前**取值（`after == before`）；存储层逐位不变；对照合法参数 → 200 |
+| TC-INT-142 | views ↔ composition（存储态） | AC-IB-33-02 | PASS | `GET /api/config/storage-state` → 200，字段白名单恰四键、memory/memory、未配置、不回显键值 |
+| TC-INT-143 | views ↔ config_audit_store | AC-IB-32-02 | PASS | 成功保存后 `GET /api/config/audit` 含 `result=saved`，含「谁/何时/改了哪些字段」，字段白名单、不回显取值 |
+| TC-INT-144 | views ↔ config_audit_store | AC-IB-32-02 | PASS | 被拒保存 → 审计含 `result=rejected`、`detail_code` 只含错误码 `tool_grant_tool_unknown` |
+| TC-INT-145 | views ↔ 端口 / 中间件 | AC-IB-32-02 | PASS | 端口无 update/delete；两端点仅 GET（POST → 405）；`?token=` → 400 |
+| TC-INT-146 | views ↔ composition（单一校验入口） | AC-IB-30-04 / 31-03 | PASS | 同非法参数文档：保存路径 400 `tool_param_unknown` 与装配路径 `admit_two_domains` 同码 |
+| **TC-INT-147** | composition（审计写非致命） | **AC-IB-32-02 / 32-04** | **PASS** | **[DEFECT-R16-4-01 已修复闭合]** 复跑（INV-017）确认：`record_config_audit` 在「存储缺失」与「存储写错」两情形均**发 WARN 并返回（不抛）**；修复 = `composition.py::_warn_audit_write_failed` 函数内局部导入 `log_event` + 导入与打点整段 `try/except Exception: pass` 兜底（INV-GROUP_C-INTELBASE-017） |
+
+**失败明细（首跑 INV-016）→ 复跑（INV-017）缺陷闭合**
+
+| TC-ID | 首跑实际输出（取证） | 根因位置 | 复跑（INV-017） |
+|-------|-----------------|---------|----------------|
+| TC-INT-147 | `record_config_audit(entry, deps=Deps(config_audit_store=None))` → `NameError: name 'log_event' is not defined`（`composition.py:970`）；`config_audit_store.record()` 抛错时同样 `NameError`（`composition.py:965 → 970`） | `src/ibweb/composition.py::_warn_audit_write_failed`（:968）引用模块级 `log_event`，而 `log_event` 在本模块**仅**以函数内局部导入引入（:449、:1130）→ 模块层无该名字 | **PASS（FAIL → PASS）** |
+
+> **注**：首跑该失败**如实记录、未标记 PASS、未转 skip/xfail**（集成层 99.32% ≥ 90%，门控通过）。software-developer **INV-GROUP_C-INTELBASE-017** 已修复：`_warn_audit_write_failed` 改为**函数内局部导入** `log_event`，并把导入 + 打点整段 `try/except Exception: pass` 兜底（旁路永不反噬保存结果）。本代理复跑（**INV-GROUP_D-INTELBASE-017**）确认 **TC-INT-147 PASS、集成层 148/148 = 100%** → **缺陷闭合**（详见 §21.6）。
+
+**回归判定（明确结论；含复跑 INV-017）**
+- R16-2 既有 **297** 条 + R16-4 新增 **11** 条（Python：TC-UNIT-123~126 共 4 + TC-INT-141~147 共 7；前端 TC-FE-024 为独立层另计）在本轮复跑**零失败** → **无任何回归**（不存在「此前通过、现在失败」的用例）；`python -X utf8 -m pytest tests -q` = **308 passed（EXIT 0）**。
+- R16-2 登记的 2 条缺陷复现用例**逐条具名确认保持 PASS（零回归）**：
+  - `tests/integration/test_prompt_tool_config_int_r16d.py::test_TC_INT_139_definition_save_rejects_invalid_tool_param_DEFECT_R16_02` → **PASS**（DEFECT-R16-02 已修复）
+  - `tests/integration/test_prompt_tool_config_int_r16d.py::test_TC_INT_140_definition_roundtrip_preserves_param_values_DEFECT_R16_01` → **PASS**（DEFECT-R16-01 已修复）
+- R16-4 新增强制负例 **`test_TC_INT_141_failed_save_is_failsafe_via_subsequent_get` → PASS**；缺陷闭合用例 **`test_TC_INT_147_audit_write_failure_must_be_non_fatal_DEFECT_R16_4_01` → PASS（FAIL → PASS）**。
+  - 复跑取证：`docs/evidence/groupd_r16_4_rerun_017_named_139_140.log`（2 passed）、`docs/evidence/groupd_r16_4_rerun_017_named_141_147.log`（2 passed），均 EXIT 0。
+
+### §21.3 §e2e 端到端测试
+
+**摘要**
+- 执行时间：2.58s（首跑）/ 3.31s（复跑 INV-017）。
+- **Total: 24 | Pass: 24 (100.0%) | Fail: 0 | Skip: 0 | Blocked: 0**（EXIT 0；首跑 / 复跑一致，零回归）
+- **Critical Path 覆盖率（Must Have US）: 100%**（既有 24 条关键路径用例零回归）
+- 零 masking：**0 skip / 0 xfail / 0 blocked**
+
+### §21.4 前端冒烟层（FE，独立层）
+
+- `npm test`（`src/frontend`，`node --test`）：**tests 28 | pass 28 | fail 0 | skipped 0 | todo 0**（EXIT 0）。
+- `npm run typecheck`（`vue-tsc --noEmit`）：**EXIT 0**。
+- 本轮新增 **用例 28（TC-FE-024）**：`describe('R16-4 前端冒烟：存储态非静默提示（IFC-IB-361 / 362 / 363，ADR-35）')` —— 断言 `ConfigPage.vue` 含 `loadStorageState(` / `storageState()` / `memoryNotice` / `memoryDomains`，显式渲染**非静默**文案 `配置**仅内存生效、不跨重启保留**`，存储态读取失败走 `storageBanner`（不静默当作文件态），且视图**不引入**任何 `reload/hotReload/rebuildGraph/scheduleRebuild` 热重载入口；并断言 `client.ts` 声明 `StorageState` 类型与 `storageState(): Promise<StorageState>`（路由 `/api/config/storage-state`）、`ConfigAuditEntry` 类型与 `configAudit()` 契约。**PASS**（源码结构断言；**渲染期**子句见 §21.7 残余）。
+
+### §21.5 门控逐条判定（R16-4 增量）
+
+| 门控项 | 阈值 / 要求 | 实测 | 判定 |
+|--------|------------|------|------|
+| 单元通过率 | ≥ 80% | 136/(136+0) = **100.0%** | **PASSED** |
+| 集成通过率 | ≥ 90% | 148/(148+0) = **100.0%**（首跑 147/148 = 99.32%） | **PASSED** |
+| E2E 关键路径 | 100% | 24/24；关键路径（Must Have US）**100%** | **PASSED** |
+| 算术一致 | `total = pass+fail+skip+blocked` | 136 / 148 / 24 / 308 均成立 | **PASSED** |
+| 零 masking | 0 skip / 0 xfail / 0 blocked | 0 / 0 / 0 | **PASSED** |
+| 基线不回退 | R16-2 既有 297 全 PASS | **297 / 297**（0 回归）；**TC-INT-139 / 140 保持 PASS**；**TC-INT-147 FAIL → PASS** | **PASSED** |
+| 阈值未降低 | 80% / 90% / 关键路径 100% | 未变更；**无 skip / xfail 转换** | **PASSED** |
+| CRITICAL finding | 0 | **0**（首跑 1 × MAJOR = DEFECT-R16-4-01，复跑已闭合） | **PASSED** |
+
+### §21.6 缺陷与缺口（路由 software-developer / PM）
+
+| ID | 严重度 | 关联 AC | 证据 | 说明 |
+|----|--------|---------|------|------|
+| ~~DEFECT-R16-4-01~~ | MAJOR → **CLOSED** | AC-IB-32-02 / 32-04 | TC-INT-147（**FAIL → PASS**，复跑 INV-017） | 首跑（INV-016）：`src/ibweb/composition.py::_warn_audit_write_failed`（:968）引用模块级 `log_event`，后者在本模块**仅**函数内局部导入（:449 / :1130）→ 调用即 `NameError`。「审计写失败不改变保存结果、但不静默（发 `WARN config_audit_write_failed`）」的 ADR-34 / IFC-IB-360 契约**未被满足**：`config_audit_store is None` 或 `store.record()` 抛错时，保存路径（`_put_definition_config` :990，无捕获）会因 `NameError` 回 **500**。**software-developer INV-GROUP_C-INTELBASE-017 已修复**：`_warn_audit_write_failed` 改函数内局部导入 `log_event` + 整段 `try/except Exception: pass` 兜底。**本代理复跑（INV-017）确认 TC-INT-147 PASS、集成层 148/148 = 100% → 缺陷闭合。** |
+| ~~DEFECT-R16-01~~ | MAJOR → CLOSED | AC-IB-31-02 / 31-04 | TC-INT-140 **PASS** | `_ToolGrantSpecSerializer` 已保留 `param_values`。**本轮独立复跑确认修复成立**。 |
+| ~~DEFECT-R16-02~~ | MAJOR → CLOSED | AC-IB-30-04 | TC-INT-139 **PASS** + TC-INT-141 / 146 PASS | 保存路径并入 `validate_definition_full`（= IFC-IB-290 ∪ IFC-IB-346），fail-safe 成立。**本轮独立复跑确认修复成立**。 |
+| ~~GAP-R16-03~~ | MAJOR → COVERED | AC-IB-33-02 | TC-INT-142 / TC-UNIT-126 PASS | `StorageState` + `GET /api/config/storage-state` + 前端非静默提示已落地并覆盖（前端渲染期残余见 §21.7）。 |
+| ~~GAP-R16-04~~ | MAJOR → COVERED | AC-IB-32-02 | TC-INT-143 / 144 / 145、TC-UNIT-124 / 125 PASS | 只读审计（`ConfigAuditEntry` / 端口 / `SqliteConfigAuditStore` / 迁移 004 / `record_config_audit` / `GET /api/config/audit`）已落地并覆盖；**审计写失败路径的 DEFECT-R16-4-01 复跑（INV-017）已闭合（TC-INT-147 PASS）**。 |
+
+### §21.7 不可验证项与残余（R16-4）
+
+- **AC-IB-33-02 的前端渲染期子句**：服务端存储态投影（TC-INT-142）与前端**源码结构**断言（**TC-FE-024**：非静默文案 `配置**仅内存生效、不跨重启保留**` / `memoryDomains` / `storageBanner` fail-closed / 无热重载入口）**均已覆盖**；真实浏览器**挂载后实际渲染**的通知文案**离线不可验证**（无浏览器环境，同 §5 口径）。非阻塞。
+- **AC-IB-32-02 的跨进程重启可查询性**：`SqliteConfigAuditStore` 的写入 / 回放以真实 `tmp_path` SQLite 覆盖（TC-UNIT-124）；`ib-web` / `ib-worker` 双进程重启后的实际可查询性**离线不可验证**（无进程编排）。
+- **AC-IB-32-05 / AC-IB-34-03**：同 §20.7（双进程重启 / 跨仓只读事实），**离线不可验证**（不变）。
+
+### §21.8 需 PM 路由的动作（R16-4 增量）
+
+| # | 动作 | 对象 | 优先级 |
+|---|------|------|--------|
+| 1 | GROUP_D R16-4 增量门控复核（三层 **308**：**308 pass / 0 fail**；前端 **28/28**；算术一致；裁定 **SUCCESS**） | PM | 本轮 |
+| 2 | ~~**DEFECT-R16-4-01** 修复~~ → **已由 software-developer INV-GROUP_C-INTELBASE-017 修复**，并经 **INV-GROUP_D-INTELBASE-017 复跑闭合**（TC-INT-147 FAIL → PASS） | software-developer / GROUP_D | 已闭合 |
+| 3 | 确认 **DEFECT-R16-01 / R16-02** 修复成立（本报告已独立复跑确认）→ 从缺陷台账移除 | PM | 信息项（已闭合） |
+| 4 | 确认 **GAP-R16-03 / R16-04** 已实现并入册（本报告已覆盖） | PM | 信息项（已覆盖） |
+| 5 | ~~DEFECT-R16-4-01 修复后由 GROUP_D 复跑 TC-INT-147 并回填 §21~~ → **已完成（INV-017），本报告 §21 已回填** | GROUP_D | 已完成 |
+| 6 | **AC-IB-32-05 / AC-IB-34-03** 处置确认（离线不可验证，接受等价语义覆盖） | PM | 信息项（不阻塞） |
+
+**边界声明（R16-4）**：首跑（INV-016）**未改 `src/**`**（全程只读）；改动**仅**落在 `tests/unit/test_config_audit_rev16_4_unit.py`、`tests/integration/test_config_rev16_4_int.py` 与 `src/frontend/tests/frontend.smoke.test.js`（新增 TC-FE-024，既有 27 例逐字未动）；**未改**任何既有 Python 用例编号或断言。
+**边界声明（复跑 INV-017）**：**未改任何 `src/**` 或 `tests/**`**（对 `src/`、`tests/` 全程只读，仅**重跑**命令）；仅回填 `docs/test_report.md` §21 与 `docs/test_plan.md` §21，并新增证据日志 `docs/evidence/groupd_r16_4_rerun_017_*.log`（`.log` 不入 git，见 `.gitignore`）；**未 commit / push / deploy**；**未触网**；FreeArk **只读**；测试代码内无任何真实凭据字面量；**未降低任何阈值、未将任何失败转 skip / xfail、未删除或削弱任何断言**。

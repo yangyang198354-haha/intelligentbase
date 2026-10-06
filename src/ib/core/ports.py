@@ -1,8 +1,11 @@
 """
 @module MOD-IB-01
-@implements 14 个端口 Protocol（IFC-IB-021~022 / 032~033 / 051~053 / 061~063 / 071 /
+@implements 17 个端口 Protocol（IFC-IB-021~022 / 032~033 / 051~053 / 061~063 / 071 /
             081~082 / 090~096 / 098 / 100~110 / 120~131 / 131~134 / 211~215 / 221~223 /
-            287~292（R7 第 14 个端口 DefinitionDocumentStore））
+            287~292（R7 第 14 个端口 DefinitionDocumentStore）/
+            310（R13 第 15 个端口 AccountStore）/
+            339（REV-16-2 第 16 个端口 ExpertPromptStore）/
+            357（REV-16-4 第 17 个端口 ConfigAuditStore））
 @depends (none)
 @author software-developer
 
@@ -33,11 +36,14 @@ from .types import (
     ChunkingSpec,
     CollectionInfo,
     CollectionSpec,
+    ConfigAuditEntry,
     DefinitionDocument,
     DerivedView,
     DocumentRecord,
     EmbedderDescriptor,
     EgressDescriptor,
+    ExpertPromptBundle,
+    ExpertPromptDocumentRef,
     ExpertSpec,
     HealthStatus,
     LlmRole,
@@ -45,6 +51,9 @@ from .types import (
     ParsedChunk,
     ParsedDocument,
     PointFilter,
+    PromptDirectoryLayout,
+    PromptLayer,
+    PromptSaveResult,
     RawConfig,
     RetrievalResult,
     SaveResult,
@@ -76,6 +85,8 @@ __all__ = [
     "SessionStore",
     "DefinitionDocumentStore",
     "AccountStore",
+    "ExpertPromptStore",
+    "ConfigAuditStore",
 ]
 
 
@@ -724,4 +735,128 @@ class AccountStore(Protocol):
 
     def purge_expired_sessions(self, *, now: str) -> int:
         """清理已过期 / 已撤销的会话行，返回清理条数（维护任务用）。"""
+        ...
+
+
+# =========================================================================== #
+# MOD-IB-01 REV-16-2 增量（第 16 个端口，IFC-IB-339）
+# =========================================================================== #
+#
+# 与 `DefinitionDocumentStore`（IFC-IB-287，第 14 个端口）的**区别是工件不同**：
+#   * `DefinitionDocumentStore` 管**结构与配置域**（专家元数据 / 路由 / 编排 / 工具授权）；
+#   * `ExpertPromptStore` 管**提示词域**（主 / 兜底提示词 markdown）。
+# 两域真源**按域唯一、内容不得重叠**（ADR-15-R1）；所有需要「按专家取提示词 / 合并派生」
+# 的上层模块**不得**各自读目录或各自解析，一律由组合根在**装配期**经该端口取得并合并注入。
+# 实现实例**按项目**构造（`<root>/<project_id>/` 一项目一目录树，[ARCH-ASSUMPTION-A10]）。
+# 提示词目录根路径经 `IB_EXPERT_PROMPT_DIR` 注入（**只登记键名，不含值**）。
+
+
+@runtime_checkable
+class ExpertPromptStore(Protocol):
+    """独立提示词目录存储端口（IFC-IB-339，**第 16 个端口**，**恰好 5 个方法**）。
+
+    生产实现为 `FsExpertPromptStore`（本地 markdown 目录 + 原子替换 + 语义哈希乐观并发），
+    离线替身为 `InMemoryExpertPromptStore`。契约段落落在 `module_design.md §3 MOD-IB-01/02`。
+
+    纪律：
+      * `load_bundle` **永不返回空白的系统提示词**：主缺失 → 回退兜底；兜底为空即非法（ADR-29）；
+      * `save_layer` 先写临时文件再**原子替换**；`expected_hash` 不匹配 → `saved=False` 且
+        **拒绝覆盖**（乐观并发，同 IFC-IB-289 精神）；保存失败**不破坏在用配置**（fail-safe）；
+      * 错误体**只出** `path` / `code` / `message`，**不回显**提示词正文或任何凭据值。
+    """
+
+    def load_bundle(self, expert_name: str, *, doc_fallback: str) -> ExpertPromptBundle:
+        """按专家取「主 / 兜底 / 生效」分层合并结果（IFC-IB-343）。
+
+        `doc_fallback` 是定义文档侧的兜底字段（结构与配置域）；当提示词目录内
+        `fallback.md` 缺失时作为兜底层的来源。**两者皆空 → 抛 `PromptNotFoundError`**。
+        """
+        ...
+
+    def save_layer(
+        self,
+        expert_name: str,
+        layer: PromptLayer,
+        content: str,
+        *,
+        expected_hash: str | None,
+    ) -> PromptSaveResult:
+        """原子写回单层提示词（IFC-IB-344）。
+
+        `layer="fallback"` 且 `content` 为空 → `saved=False`（兜底恒非空，ADR-29）；
+        `expected_hash` 与当前不一致 → `saved=False`（乐观并发，**拒绝覆盖**）。
+        """
+        ...
+
+    def list_refs(self) -> tuple[ExpertPromptDocumentRef, ...]:
+        """列出目录内全部提示词文件引用（IFC-IB-345 的装载入口）。
+
+        **目录不可读即报错**（fail-closed），**不返回空集合**（否则「读不到」与「本就为空」
+        无法区分）。
+        """
+        ...
+
+    def delete_layer(self, expert_name: str, layer: PromptLayer) -> None:
+        """删除单层提示词文件。缺失即幂等返回（不抛异常）。"""
+        ...
+
+    def layout(self) -> PromptDirectoryLayout:
+        """返回目录布局描述（IFC-IB-338 / [ARCH-ASSUMPTION-A10]）。
+
+        **只描述布局（键名 / 文件模式 / 命名规则），不回显任何路径值。**
+        """
+        ...
+
+
+# =========================================================================== #
+# 配置审计（REV-16-4 / ADR-34）
+# =========================================================================== #
+#
+# 配置审计端口（IFC-IB-357，**第 17 个端口**，**恰好 2 个方法**）。
+# 生产实现为 `SqliteConfigAuditStore`（与账户台账同一 SQLite 账本，手写迁移
+# `004_config_audit.sql`），离线替身为 `MemoryConfigAuditStore`。
+#
+# **追加型只读审计**（ADR-34）：
+#   * 审计表是**只读审计**，**不是第二真源** —— 任何上层模块**不得**从审计表回读
+#     配置来驱动行为；配置真源恒为定义文档 / 提示词目录。
+#   * 端口**无 update / delete**：审计记录一旦写入即不可变（append-only）。
+#   * 审计写入**不与配置写入事务耦合**：审计写失败**不得**改变保存结果，但**不得静默**
+#     （须发结构化 WARN，字段白名单）。
+#   * `changed_field_names` **只含字段名**，`detail_code` **只含字段名 / 错误码**，
+#     **永不**含任何字段值或凭据。
+
+
+@runtime_checkable
+class ConfigAuditStore(Protocol):
+    """配置审计存储端口（IFC-IB-357，**第 17 个端口**，**恰好 2 个方法**）。
+
+    生产实现 `SqliteConfigAuditStore`（同一 SQLite 账本，追加型）；离线替身
+    `MemoryConfigAuditStore`。
+
+    **纪律：**
+      * **恰好 2 个方法**（`record` / `list_by_project`）——**无 update / delete**；
+      * 审计记录一经写入**不可变**（append-only 台账）；
+      * **不是第二真源**：不得从审计表回读配置驱动行为；
+      * 错误体 / 记录**只出**字段名与错误码，**永不**回显字段值或凭据（SC-3）。
+    """
+
+    def record(self, entry: ConfigAuditEntry) -> None:
+        """追加一条配置审计记录（IFC-IB-360）。
+
+        成功保存写 `result="saved"`；被拒保存写 `result="rejected"` 且 `detail_code`
+        只含字段名 / 错误码。**add-only**：实现**不得**提供更新或删除路径。
+        """
+        ...
+
+    def list_by_project(
+        self,
+        project_id: str,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[ConfigAuditEntry, ...]:
+        """按项目列出审计记录（IFC-IB-359），稳定升序（`entry_id` 追加序）。
+
+        审计表是套在**追加台账**上的读视图：分页必须稳定，故按写入序升序回放。
+        """
         ...

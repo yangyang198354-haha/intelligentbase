@@ -1,6 +1,7 @@
 """
 @module MOD-IB-17
 @implements IFC-IB-181 register_tool / 182 build_capability_digest / 183 bind_scope
+            IFC-IB-350（REV-16-2）build_authorized_tools / validate_grants
 @depends MOD-IB-01, MOD-IB-15, MOD-IB-16
 @author software-developer
 
@@ -34,9 +35,20 @@
 
 from __future__ import annotations
 
+import functools
 from typing import Any, Callable, Sequence
 
-from ib.core import BoundTool, RegisteredTool, Scope, ToolResult, ToolSpec
+from ib.core import (
+    BoundTool,
+    RegisteredTool,
+    Scope,
+    ToolGrantSpec,
+    ToolParamSpec,
+    ToolParamValidationError,
+    ToolResult,
+    ToolSpec,
+    ValidationErrorItem,
+)
 
 __all__ = [
     "ToolRegistry",
@@ -44,6 +56,10 @@ __all__ = [
     "register_tool",
     "bind_scope",
     "default_registry",
+    # REV-16-2（IFC-IB-350）
+    "build_authorized_tools",
+    "validate_grants",
+    "derive_tool_param_specs",
 ]
 
 #: 摘要中每个工具的简述长度上限（防止超长 description 挤占提示预算）。
@@ -145,11 +161,25 @@ def bind_scope(
 
     **每个请求都要重新绑定**：闭包持有的是本请求的 scope，绝不可跨请求复用 —— 复用会把
     A 用户的 scope 泄漏给 B 用户的问答（跨项目数据泄露，最严重的一类缺陷）。
+
+    **REV-16-2**：`BoundTool` 输入不再一律透传 —— 若其可调用对象仍需要 `scope` / `retrieval`
+    注入（`build_authorized_tools` 产出的「已注入参数、但尚未绑定 scope」的形态），则在此
+    完成 scope 闭包注入；不需要注入的（调用方已自行绑定的无参工具）仍原样透传。
     """
     bound: list[BoundTool] = []
     for item in tools:
         if isinstance(item, BoundTool):
-            bound.append(item)
+            if _needs_scope_binding(item.callable):
+                bound.append(
+                    BoundTool(
+                        name=item.name,
+                        description=item.description,
+                        callable=_make_bound_callable(item, item.callable, scope, retrieval),
+                        parameters=getattr(item, "parameters", None),
+                    )
+                )
+            else:
+                bound.append(item)
             continue
         spec = getattr(item, "spec", None)
         fn = getattr(item, "fn", None)
@@ -164,6 +194,17 @@ def bind_scope(
             )
         )
     return bound
+
+
+def _needs_scope_binding(fn: Any) -> bool:
+    """可调用对象是否仍接受 `scope` / `retrieval` 关键字（据此决定是否需再绑一次）。"""
+    import inspect
+
+    try:
+        params = inspect.signature(fn).parameters
+    except (TypeError, ValueError):  # pragma: no cover - 内建/极端包装
+        return False
+    return "scope" in params or "retrieval" in params
 
 
 def _make_bound_callable(
@@ -203,3 +244,198 @@ def _make_bound_callable(
     _bound.__name__ = f"bound__{spec.name}"
     _bound.__doc__ = spec.description
     return _bound
+
+
+# --------------------------------------------------------------------------- #
+# REV-16-2 工具授权与参数绑定（IFC-IB-350；ADR-30）
+#
+# 口径（用户裁决，OQ-IB-19 / DR-19）：**对既有工具集的授权勾选 + 工具参数可配**；
+# **不含新增 / 自定义工具本体**。因此本模块**不提供**任何新增工具本体的入口 ——
+# 工具本体仍只经 `register_tool`（IFC-IB-181，签名不变）登记。
+#
+# 参数命名约定：`<tool_name>.<param_name>` 的限定形式声明归属工具；不含 `.` 时视为
+# 全局参数（无工具归属）。该约定使「未授权工具带参」可被确定性检出（IFC-IB-346）。
+# --------------------------------------------------------------------------- #
+
+
+def _owner_tool(param_name: str) -> str | None:
+    if "." not in param_name:
+        return None
+    tool, _, param = param_name.partition(".")
+    return tool if tool and param else None
+
+
+def _bare_param(param_name: str) -> str:
+    """`<tool>.<param>` 限定名 → 裸参数名（注入实现时用裸名，限定名仅用于声明归属）。"""
+    return param_name.split(".", 1)[1] if "." in param_name else param_name
+
+
+#: JSON Schema 类型 → `ToolParamSpec.type` 的确定性映射（成对维护，防规格与工具漂移）。
+_JSON_TYPE_TO_PARAM: dict[str, str] = {
+    "string": "str",
+    "integer": "int",
+    "number": "float",
+    "boolean": "bool",
+}
+
+
+def derive_tool_param_specs(registry: ToolRegistry) -> tuple[ToolParamSpec, ...]:
+    """由**唯一登记点**的工具声明派生可配置参数规格（IFC-IB-340；ADR-30）。**纯函数**。
+
+    **只覆盖既有工具的既有参数**，不新增工具本体；规格集由工具 JSON Schema **派生**，
+    故与工具声明**不可能漂移**（同 FND-GROUP-D-01 的收敛精神）。参数名用
+    `<tool>.<param>` 限定形式声明归属工具（IFC-IB-346 据此判「未授权工具带参」）。
+    """
+    specs: list[ToolParamSpec] = []
+    for item in registry.registered():
+        schema = item.spec.parameters or {}
+        props = schema.get("properties") if isinstance(schema, dict) else None
+        if not isinstance(props, dict):
+            continue
+        for prop_name, prop in props.items():
+            if not isinstance(prop, dict):
+                continue
+            param_type = _JSON_TYPE_TO_PARAM.get(prop.get("type"))
+            if param_type is None:
+                continue
+            default = prop.get("default")
+            minimum = prop.get("minimum")
+            maximum = prop.get("maximum")
+            enum = prop.get("enum")
+            specs.append(
+                ToolParamSpec(
+                    name=f"{item.spec.name}.{prop_name}",
+                    type=param_type,  # type: ignore[arg-type]
+                    default="" if default is None else str(default),
+                    minimum=float(minimum) if isinstance(minimum, (int, float)) else None,
+                    maximum=float(maximum) if isinstance(maximum, (int, float)) else None,
+                    choices=tuple(str(c) for c in enum) if isinstance(enum, list) else None,
+                )
+            )
+    return tuple(specs)
+
+
+def _coerce(spec: ToolParamSpec, raw: str) -> Any:
+    """按声明类型把字符串取值转成 Python 值（校验已由 `validate_tool_params` 前置）。"""
+    if spec.type == "str":
+        return raw
+    if spec.type == "bool":
+        return raw.strip().lower() in {"1", "true", "yes", "on"}
+    if spec.type == "int":
+        return int(float(raw))
+    return float(raw)
+
+
+def validate_grants(
+    grants: tuple[ToolGrantSpec, ...],
+    *,
+    registry: ToolRegistry,
+) -> tuple[ValidationErrorItem, ...]:
+    """授权合法性校验（IFC-IB-350）。**纯函数**（无 I/O）。
+
+    检出：**引用不存在的工具**（`tool_names` 未在注册表）/ **未登记工具带参**
+    （参数名限定归属的工具不在注册表内）。**不提供**新增工具本体的校验路径。
+    """
+    errors: list[ValidationErrorItem] = []
+    known = set(registry.names())
+    for grant in grants:
+        for tool in grant.tool_names:
+            if tool not in known:
+                errors.append(
+                    ValidationErrorItem(
+                        path=f"tool_grants[{grant.expert_name}].tool_names[{tool}]",
+                        code="tool_grant_tool_unknown",
+                        message=f"工具 '{tool}' 不在已知工具注册表内",
+                    )
+                )
+        for pv in grant.param_values:
+            owner = _owner_tool(pv.name)
+            if owner is not None and owner not in known:
+                errors.append(
+                    ValidationErrorItem(
+                        path=f"tool_grants[{grant.expert_name}].param_values[{pv.name}]",
+                        code="tool_param_tool_unregistered",
+                        message=f"参数 '{pv.name}' 归属的工具 '{owner}' 未登记（工具本体不提供运行期新增）",
+                    )
+                )
+    return tuple(errors)
+
+
+def build_authorized_tools(
+    grants: tuple[ToolGrantSpec, ...],
+    *,
+    registry: ToolRegistry,
+    specs: tuple[ToolParamSpec, ...] = (),
+) -> list[BoundTool]:
+    """按**授权勾选**绑定工具并注入**工具参数**（IFC-IB-350）。**最小授权不变**。
+
+    产出顺序 = `grants` 顺序 × 各 `tool_names` 顺序（同名工具只绑定一次）。
+    参数经 `param_values` **闭包注入**：实现以 `functools.partial(fn, **裸参名)` 承载，故
+    配置值作为**默认值**绑定 —— 调用方（LLM 工具调用循环）显式给出的同名实参**优先**
+    （不对抗运行期必需参数，如检索的 `query`），未被调用方给出时配置值生效。
+    引用不存在的工具 / 参数未被任何 spec 声明 → 抛 `ToolParamValidationError`（fail-fast；
+    先经 `validate_grants`）。
+
+    **scope 绑定分工**：本函数只注入参数，**不**绑定 `scope`（构造期无 scope）；产出即为
+    「未绑 scope 的 `BoundTool`」，由 `bind_scope`（IFC-IB-183）完成 scope 闭包注入 ——
+    两段绑定语义分属两个契约，互不越界（ADR-09）。
+    """
+    spec_by_name = {s.name: s for s in specs}
+    known = set(registry.names())
+    bound: list[BoundTool] = []
+    seen: set[str] = set()
+    for grant in grants:
+        authorized = set(grant.tool_names)
+        params: dict[str, Any] = {}
+        for pv in grant.param_values:
+            owner = _owner_tool(pv.name)
+            if owner is not None and owner not in authorized:
+                raise ToolParamValidationError(
+                    f"参数 '{pv.name}' 归属工具 '{owner}'，但该工具未授权给专家 '{grant.expert_name}'"
+                )
+            spec = spec_by_name.get(pv.name)
+            if spec is None:
+                raise ToolParamValidationError(
+                    f"参数 '{pv.name}' 未被任何 ToolParamSpec 声明（拒绝装配）"
+                )
+            params[pv.name] = _coerce(spec, pv.value)
+        for tool in grant.tool_names:
+            if tool in seen:
+                continue
+            if tool not in known:
+                raise ToolParamValidationError(f"工具 '{tool}' 不在已知工具注册表内（拒绝装配）")
+            seen.add(tool)
+            registered = registry.get(tool)
+            assert registered is not None  # 由 `known` 保证
+            bound.append(_wrap_with_params(registered, params))
+    return bound
+
+
+def _param_belongs(param_name: str, tool_spec: ToolSpec) -> bool:
+    """判断参数是否归属某工具：限定名按前缀；裸名按该工具 JSON Schema 的 properties。"""
+    owner = _owner_tool(param_name)
+    if owner is not None:
+        return owner == tool_spec.name
+    schema = tool_spec.parameters or {}
+    properties = schema.get("properties") if isinstance(schema, dict) else None
+    return bool(isinstance(properties, dict) and param_name in properties)
+
+
+def _wrap_with_params(registered: RegisteredTool, params: dict[str, Any]) -> BoundTool:
+    """把工具参数闭包进调用，产出**未绑 scope** 的 `BoundTool`。
+
+    参数以**裸参名**经 `functools.partial` 绑定 —— 于是：
+      * 声明期用 `<tool>.<param>` 限定名判归属（`_param_belongs`，防同名参数跨工具误注入）；
+      * 注入期用裸名（实现的关键字参数），且 partial 绑定的是**默认值**，
+        调用方显式给出的同名实参优先（不对抗运行期必需参数）。
+    """
+    spec = registered.spec
+    fn = registered.fn
+    owned = {_bare_param(k): v for k, v in params.items() if _param_belongs(k, spec)}
+    bound_fn: Callable[..., Any] = functools.partial(fn, **owned) if owned else fn
+    return BoundTool(
+        name=spec.name,
+        description=spec.description,
+        callable=bound_fn,
+        parameters=getattr(spec, "parameters", None),
+    )

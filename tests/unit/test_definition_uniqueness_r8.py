@@ -159,7 +159,7 @@ def test_TC_UNIT_063_duplicate_cn_label_is_rejected():
     空标签由既有第 5 项 `expert_text_missing` 单独报出，本项跳过空值以免重复告警。
     """
     # 通过分支：标签互异
-    ok = validate(_doc(("用电",), ("故障",), a_label="数据管家", b_label="巡检诊断"))
+    ok = validate(_doc(("用电",), ("故障",), a_label="系统管家", b_label="巡检诊断"))
     assert ok.ok is True and "expert_cn_label_duplicate" not in _codes(ok)
 
     # 拒绝分支一：精确重复

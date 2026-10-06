@@ -3,9 +3,11 @@
 @implements IFC-IB-242 ~ IFC-IB-249 路由表
             IFC-IB-283（R2）`/api/files/{doc_id}/images/{image_id}` 路由
             IFC-IB-294/295（R7）`/api/config/definition` 路由
+            IFC-IB-352（REV-16-2）`/api/config/prompts[/{expert}/{layer}]` 提示词端点族路由
             IFC-IB-307（R8）`/api/chat/resume` 路由
             IFC-IB-316 ~ IFC-IB-321（R13）账户 / 会话路由
             IFC-IB-333（R14）`/api/projects` 项目枚举路由
+            IFC-IB-359 / 362（REV-16-4）`/api/config/audit` + `/api/config/storage-state` 路由
 @depends MOD-IB-23（views）
 @author software-developer
 
@@ -57,6 +59,24 @@ urlpatterns = [
     path("api/chat/resume", views.chat_resume_endpoint, name="ib-chat-resume"),
     # R7（IFC-IB-294/295）：定义文档读写。**单一真源**端点（GET 读 / PUT 原子写回）。
     path("api/config/definition", views.definition_config_endpoint, name="ib-config-definition"),
+    # REV-16-2（IFC-IB-352）：提示词端点族（第二真源，ADR-15-R1）。
+    # 列表路由必须在 `<str:expert>` 之前（否则会被当作 expert 名捕获）。
+    path("api/config/prompts", views.prompt_config_endpoint, name="ib-config-prompts"),
+    path(
+        "api/config/prompts/<str:expert>/<str:layer>",
+        views.prompt_config_endpoint,
+        name="ib-config-prompt-layer",
+    ),
+    # REV-16-4（IFC-IB-359 / 362）：配置审计（只读）与存储态（只读）。
+    # **字面量路由必须先于 `api/config/definition` 之外的任何前缀捕获**（此处无冲突）：
+    # `audit` / `storage-state` 均为独立字面量，不会被 `prompts/<str:expert>` 捕获。
+    # 仅 `Authorization` 头鉴权；`?token=` 由中间件先于路由拒绝（4xx）。
+    path("api/config/audit", views.config_audit_endpoint, name="ib-config-audit"),
+    path(
+        "api/config/storage-state",
+        views.storage_state_endpoint,
+        name="ib-config-storage-state",
+    ),
     # R14（IFC-IB-333）：项目枚举（admin 见全部 / ops 仅见自身）。
     # **不是**项目级端点：全局主体未选定项目时也返回 200（否则 admin 无法引导选择项目）。
     # 仅 `Authorization` 头鉴权；`?token=` 由中间件先于路由拒绝（4xx）。

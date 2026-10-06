@@ -73,7 +73,7 @@ def _annotated_builder(gate_id="g-1", summary="确认执行写操作？"):
     def _build(query, *, decision=None, scope=None):
         from ib.core import ConfirmationPrompt
 
-        return ConfirmationPrompt(gate_id=gate_id, expert_name="data-expert", summary=summary)
+        return ConfirmationPrompt(gate_id=gate_id, expert_name="freeark-expert", summary=summary)
 
     return _build
 
@@ -113,7 +113,7 @@ def _preset_gate_session(deps, key, *, gate_id="g-9", query="把温度设定为 
             turns=(SessionTurn(role="user", text=query, created_at=""),),
             gate=ConfirmationGateState(
                 gate_id=gate_id,
-                prompt=ConfirmationPrompt(gate_id=gate_id, expert_name="data-expert", summary="确认执行写操作？"),
+                prompt=ConfirmationPrompt(gate_id=gate_id, expert_name="freeark-expert", summary="确认执行写操作？"),
             ),
         ),
     )
@@ -169,7 +169,7 @@ def test_TC_INT_096_gate_suspend_presents_once_and_persists(deps):
     # 呈递帧载荷：最小字段 + 可对账 gate_id
     presented = next(e for e in events if str(e.kind) == "confirmation_required")
     payload = json.loads(presented.data)
-    assert payload["gate_id"] == "g-1" and payload["expert_name"] == "data-expert" and payload["summary"]
+    assert payload["gate_id"] == "g-1" and payload["expert_name"] == "freeark-expert" and payload["summary"]
 
     # 无空帧：除终态外每一帧都带非空载荷
     for e in events:

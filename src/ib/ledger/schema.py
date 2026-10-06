@@ -1,6 +1,7 @@
 """
 @module MOD-IB-11（schema）
 @implements IFC-IB-120~131 的持久化基座（表结构 / 索引 / PRAGMA）
+            IFC-IB-358（REV-16-4 配置审计表 DDL：`config_audit`）
 @depends (none)
 @author software-developer
 
@@ -268,6 +269,61 @@ ACCOUNT_EXPECTED_COLUMNS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+# --------------------------------------------------------------------------- #
+# REV-16-4 配置审计 DDL（IFC-IB-358；ADR-34；单源 = 迁移 004_config_audit.sql）
+# --------------------------------------------------------------------------- #
+#
+# **只读审计，不是第二真源**（ADR-34）：本表只承载「谁在何时对哪个项目的配置做了
+# 何种动作、结果如何」的追加式记录，**任何**上层模块**不得**从这里回读配置来驱动行为
+# —— 配置真源恒为定义文档（`IB_DEFINITION_DOC_PATH` 指向的文件 / 内存种子）与提示词目录。
+#
+# 与账户台账「逻辑分区」：本表**独立成块、独立迁移文件**（module_design §3 MOD-IB-11
+# 明确建议「审计表与文档/账户台账逻辑分区（表名前缀/仓库内分文件）」），与
+# `users` / `sessions` 一样**不加外键到 `projects`**（审计记录须在项目被删后仍可考）。
+#
+# 三条列设计的纪律（SC-3 / ADR-34）：
+#   * `changed_field_names` 存 **JSON 数组**，且**只含字段名**（如
+#     `["route.tau", "tool_grants[search].param_values"]`），**永不**含字段值；
+#   * `detail_code` **只含** 字段名 / 错误码（如 `tool_param_unknown`），**永不**含值；
+#   * `result` 用 CHECK 限定取值域 —— 在**存储层**再兜一道（与 `documents.status` /
+#     `users.role` 的既有做法一致），杜绝「带病继续」之类非法结果被写进去。
+
+CONFIG_AUDIT_DDL_STATEMENTS: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS config_audit (
+        entry_id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp           TEXT NOT NULL,
+        project             TEXT NOT NULL,
+        actor               TEXT NOT NULL,
+        action              TEXT NOT NULL,
+        changed_field_names TEXT NOT NULL,
+        result              TEXT NOT NULL,
+        detail_code         TEXT,
+        CHECK (result IN ('saved', 'rejected'))
+    )
+    """,
+    # 按项目回放的支撑索引：`list_by_project` 恒按 `(project, entry_id)` 升序稳定分页。
+    """
+    CREATE INDEX IF NOT EXISTS idx_config_audit_project
+        ON config_audit(project, entry_id)
+    """,
+)
+
+#: 配置审计表的期望列（与 `missing_config_audit_columns` 配套）。
+CONFIG_AUDIT_EXPECTED_COLUMNS: dict[str, tuple[str, ...]] = {
+    "config_audit": (
+        "entry_id",
+        "timestamp",
+        "project",
+        "actor",
+        "action",
+        "changed_field_names",
+        "result",
+        "detail_code",
+    ),
+}
+
+
 #: 期望存在的列（用于启动期/自测期的一致性校验，防止「老库缺列」导致的运行期 TypeError）。
 EXPECTED_COLUMNS: dict[str, tuple[str, ...]] = {
     "projects": (
@@ -351,6 +407,11 @@ def account_ddl_script() -> str:
     return ";\n".join(statement.strip() for statement in ACCOUNT_DDL_STATEMENTS) + ";\n"
 
 
+def config_audit_ddl_script() -> str:
+    """把配置审计 DDL 拼为单条脚本（供 `004_config_audit.sql` 交付物与手工建库使用）。"""
+    return ";\n".join(statement.strip() for statement in CONFIG_AUDIT_DDL_STATEMENTS) + ";\n"
+
+
 def ensure_schema(connection) -> None:
     """幂等建表 + 开 PRAGMA（运行期自愈）。
 
@@ -360,6 +421,9 @@ def ensure_schema(connection) -> None:
 
     **R13**：同时幂等创建账户 / 会话表（`users` / `sessions`）—— 账户体系内建，
     不新增 systemd 单元（DR-09 / ADR-18），故与台账共用同一次 `--ensure-schema`。
+
+    **REV-16-4**：再幂等创建配置审计表（`config_audit`）—— 审计与台账同一 SQLite
+    账本（ADR-34 未引入第二个存储后端），同样复用这一次 `--ensure-schema`。
     """
     cursor = connection.cursor()
     try:
@@ -368,6 +432,8 @@ def ensure_schema(connection) -> None:
         for statement in DDL_STATEMENTS:
             cursor.execute(statement)
         for statement in ACCOUNT_DDL_STATEMENTS:
+            cursor.execute(statement)
+        for statement in CONFIG_AUDIT_DDL_STATEMENTS:
             cursor.execute(statement)
         connection.commit()
     finally:
@@ -382,6 +448,11 @@ def missing_columns(connection) -> dict[str, list[str]]:
 def missing_account_columns(connection) -> dict[str, list[str]]:
     """账户 / 会话表的缺失列（R13，IFC-IB-313）。空字典表示结构完整。"""
     return _missing(connection, ACCOUNT_EXPECTED_COLUMNS)
+
+
+def missing_config_audit_columns(connection) -> dict[str, list[str]]:
+    """配置审计表的缺失列（REV-16-4，IFC-IB-358）。空字典表示结构完整。"""
+    return _missing(connection, CONFIG_AUDIT_EXPECTED_COLUMNS)
 
 
 def _missing(connection, expected_tables: dict[str, tuple[str, ...]]) -> dict[str, list[str]]:

@@ -1,6 +1,6 @@
 """
 @module MOD-IB-02
-@implements IFC-IB-288, IFC-IB-289, IFC-IB-290, IFC-IB-291, IFC-IB-292
+@implements IFC-IB-288, IFC-IB-289, IFC-IB-290, IFC-IB-291, IFC-IB-292, IFC-IB-355
 @depends MOD-IB-01
 @author software-developer
 
@@ -40,6 +40,8 @@ from ib.core import (
     RouteSpecInput,
     SaveResult,
     ToolGrantSpec,
+    ToolParamSpec,
+    ToolParamValue,
     ValidationErrorItem,
     ValidationReport,
 )
@@ -52,6 +54,7 @@ __all__ = [
     "editable_field_whitelist",
     "non_editable_changes",
     "validate",
+    "validate_definition_full",
     "derive",
     "build_definition_document",
     "document_from_json",
@@ -120,7 +123,14 @@ def _semantic_payload(doc: DefinitionDocument) -> dict[str, Any]:
             ],
         },
         "tool_grants": [
-            {"expert_name": g.expert_name, "tool_names": list(g.tool_names)} for g in doc.tool_grants
+            {
+                "expert_name": g.expert_name,
+                "tool_names": list(g.tool_names),
+                # REV-16-2 加成式：工具参数取值进入语义载荷（否则「改参数」不改哈希、
+                # 乐观并发判据形同虚设）。
+                "param_values": [{"name": pv.name, "value": pv.value} for pv in g.param_values],
+            }
+            for g in doc.tool_grants
         ],
     }
 
@@ -172,6 +182,8 @@ def editable_field_whitelist() -> frozenset[str]:
             "tool_grants",
             "tool_grants[].expert_name",
             "tool_grants[].tool_names",
+            # REV-16-2：工具参数取值可编辑（授权勾选 + 参数可配；ADR-30）
+            "tool_grants[].param_values",
         }
     )
 
@@ -494,6 +506,42 @@ def validate(
     return ValidationReport(ok=not errors, errors=tuple(errors))
 
 
+def validate_definition_full(
+    doc: DefinitionDocument,
+    *,
+    known_tools: tuple[str, ...] | frozenset[str] | set[str] | None = None,
+    tool_param_specs: tuple[ToolParamSpec, ...] = (),
+) -> ValidationReport:
+    """定义文档**统合校验**（IFC-IB-355 / ADR-33）。**纯函数**：无 I/O、无副作用。
+
+    唯一校验入口 = `validate`（IFC-IB-290）∪ `validate_tool_params`（IFC-IB-346）：
+
+      1. 定义文档域：`validate(doc, known_tools=known_tools)`；
+      2. 工具参数域：`validate_tool_params(doc.tool_grants, specs=tool_param_specs)`。
+
+    两段错误**按上述固定顺序合并**为一次回执（定义文档域在前，工具参数域在后），
+    便于端点与前端得到稳定、可预期的错误列表。
+
+    **不新增任何旁路**：合并结果仍是 `ValidationReport(ok, errors)`，其类型层字段集
+    不含 force / ignore / warn_only（ADR-16 不变，`docs/module_design.md §1.4`）。
+    `known_tools` / `tool_param_specs` 为空时不校验对应类别（离线可测；装配期由组合根
+    传入真实注册表与真实参数 spec）。
+
+    **保存路径与装配路径共用本函数**（ADR-33 单一入口），确保「保存时被接受的文档」
+    与「装配时被接受的文档」判据一致，杜绝两处校验漂移。
+
+    循环导入说明：`validate_tool_params` 位于 `ib.config.prompts`，后者在**模块层**导入
+    本模块（`from .definition import derive as _derive_document`），故此处必须**函数内惰性导入**，
+    不得提升到模块顶部。
+    """
+    from .prompts import validate_tool_params  # 惰性导入，避免模块级循环依赖
+
+    report = validate(doc, known_tools=known_tools)
+    errors: list[ValidationErrorItem] = list(report.errors)
+    errors.extend(validate_tool_params(doc.tool_grants, specs=tool_param_specs))
+    return ValidationReport(ok=not errors, errors=tuple(errors))
+
+
 # --------------------------------------------------------------------------- #
 # 只读派生（IFC-IB-291；纯函数）
 # --------------------------------------------------------------------------- #
@@ -613,6 +661,11 @@ def document_from_json(project_id: str, text: str) -> DefinitionDocument:
             ToolGrantSpec(
                 expert_name=str(g["expert_name"]),
                 tool_names=tuple(str(t) for t in g.get("tool_names", [])),
+                # REV-16-2：参数取值随授权一并持久化（缺省为空元组，向后兼容旧文档）。
+                param_values=tuple(
+                    ToolParamValue(name=str(pv["name"]), value=str(pv.get("value", "")))
+                    for pv in g.get("param_values", [])
+                ),
             )
             for g in data.get("tool_grants", [])
         )
