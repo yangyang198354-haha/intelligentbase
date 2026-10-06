@@ -8,8 +8,8 @@
 | 产出代理 | 部署执行人（PHASE_11） |
 | 项目 | intelligentbase |
 | 阶段 | GROUP_E / **PHASE_11（生产部署）** |
-| 版本 | 1.3.1（`0e54b03..fa0a7a4`：完整工具调用循环，修复「聊天检索不落地」根因） |
-| status | **已验证**（D-1~D-6、通用化特性、B7 LLM 均已上线复验；聊天检索落地已修复并目标机端到端复验，见 §8/§9） |
+| 版本 | 1.4.0（`fa0a7a4..9e75c61`：R13 Claude 风格商用 Web + 用户名密码登录 + admin/ops 账户体系） |
+| status | **已验证**（D-1~D-6、通用化特性、B7 LLM、R13 账户/鉴权/TLS 均已上线复验；见 §8/§9/§10） |
 | 创建日期 | 2026-09-26 |
 | 目标机 | `192.168.31.133`（Ubuntu 26.04 LTS / x86_64 / i7-3770S 4C8T / 11 GiB） |
 | 上游输入 | `docs/deployment_plan.md`(1.1.0/R4)、`src/deploy/checklists.txt`(A1–A8 / B1–B14 / C)、`docs/phase_status.md` |
@@ -244,3 +244,61 @@ total=18 passed=16 failed=2
 > 复验中「检索事件计数为 0」的首次误报系 journal 查询时区所致（目标机 TZ 误配为 `-0700`，
 > `--since` 用 UTC 时间戳指向了未来）；改用 `--since "15 minutes ago"` 后正确捕获 2 条 `retrieval`
 > 事件，旁证工具循环确已执行。目标机 TZ 误配另记为运维待办，不影响本次功能复验。
+
+---
+
+## 10. R13 商用 Web + 账户/鉴权体系部署（`9e75c61`）
+
+**部署时间**：2026-10-06。**交付 commit**：`9e75c61`（fast-forward，58 文件，+9092/−342）。
+
+本轮把 REV-13 的「Claude 风格商用 Web」整批上线：用户名密码登录、默认管理员 + 首次强制改密、
+admin 按项目创建 ops 账户、左侧导航 + 右侧功能区（Element Plus 定制主题），并对生产入口做
+TLS 终止（内网自签）。
+
+### 部署动作
+
+| 步骤 | 结果 |
+|------|------|
+| 代码同步 | ✅ `git pull --ff-only origin main` → `HEAD=9e75c61` |
+| 依赖安装 | ✅ `bcrypt 4.3.0` + `langchain-openai 0.2.14`（R13 增量依赖） |
+| schema 迁移 | ✅ `python -m ibweb.bootstrap --ensure-schema` 幂等执行（`users`/`sessions` 两表 + 索引，纯追加，不动既有表） |
+| env 装配 | ✅ `IB_AUTHZ_POLICY_MODULE=ibweb.accounts.policy` + 6 个 R13 键（会话 TTL/续期窗口/口令最小长度/默认管理员名与初始口令），0600 属主对齐；备份 `ib-web.env.bak.rev13` |
+| 前端重建 | ✅ `npm ci` + `npm run build`（vite 1639 modules）→ dist 上线 `/var/www/intelligentbase/` |
+| TLS | ✅ 内网自签 `server.crt`/`server.key`（0600）置于 `/etc/intelligentbase/tls`，nginx 站点安装 + `nginx -t` 通过 |
+| 服务编排 | ✅ `systemctl daemon-reload` + `restart ib-web ib-worker` + `reload nginx`；80/443 监听（IPv4+IPv6） |
+
+### 服务状态与播种核验
+
+- 服务全部 `active`：`ib-web` / `ib-worker` / `ib-embed` / `qdrant` / `nginx`。
+- 默认管理员已播种：`admin` / `role=admin` / `project_id=NULL`（全局账户，ADR-21）/ `status=active` / `must_change_password=1`（首次强制改密）。
+- 启动日志无鉴权/播种报错（`台账 schema 就绪` + `Serving on http://127.0.0.1:18080`）。
+
+### 鉴权/会话/TLS 端到端验证（真实 nginx TLS 路径）
+
+| 检查 | 期望 | 实际 |
+|------|------|------|
+| `GET /healthz`（HTTPS） | 200 | ✅ 200 |
+| `GET /healthz`（HTTP） | 301 → HTTPS | ✅ 301 |
+| `?token=` 查询串 | 400 `token_in_query_forbidden` | ✅ 400 |
+| 错误口令登录 | 401 | ✅ 401 |
+| 正确登录 | 200 + `must_change_password=true` + **无 Set-Cookie** | ✅ |
+| `GET /api/auth/me`（Bearer） | 200 | ✅ 200 |
+| 改密态访问 `/api/files`、`/api/accounts` | 403 `password_change_required` | ✅ 403 |
+| 无令牌访问 | 401 | ✅ 401 |
+| `POST /api/auth/logout` | 204 | ✅ 204 |
+| logout 后复用令牌 | 401（已失效） | ✅ 401 |
+
+> 全部端点只认 `Authorization: Bearer`（`?token=` 一律 400，连免鉴权的 `/api/auth/login` 也不豁免）；
+> 响应零 `Set-Cookie`；「首次强制改密」由服务端中间件在**任何业务端点之前**强制执行（ADR-20）。
+
+### 下游依赖与前端
+
+- `/healthz/deps`：`qdrant` ok(2ms)、`embed` bge-m3 就绪(20ms)、`llm` deepseek-chat ok(2547ms)、egress 如实声明 `remote=true → api.deepseek.com`。
+- 前端产物：`/` 返回新构建 `index.html`（`/assets/index-b0vEsALg.js`，无 CDN）。
+
+### 未闭合 / 待用户首登完成
+
+- **业务端到端冒烟（上传 → 索引 → 问答接地）延后到用户首次登录后执行**：R13 未改动该链路
+  （R8/R11 已部署复验，见 §7/§9），但本轮复验需以「完成首次强制改密」为前置，而改密是设计上
+  留给用户的动作（首登即强制、不可绕过），故不在此代为消耗（避免篡改管理员口令与脏化 `demo` 基线）。
+- 运维待办（沿用 §9）：目标机系统时区仍误配为 `-0700`，建议校正 `timedatectl`。
