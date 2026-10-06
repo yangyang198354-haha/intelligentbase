@@ -76,6 +76,11 @@ __all__ = [
 #: `fallback_prompt` 是**提示文件缺失时的内置兜底**，不是主提示 —— 主提示由独立 markdown
 #: 提示词目录（`ExpertPromptStore`，IFC-IB-339）按 `ExpertSpec.name` 加载，缺失时回落到这里，
 #: 保证「提示缺失」不会退化成无系统提示（ADR-29）。
+#:
+#: **兜底提示词必须保留 grounding 护栏**（不得编造 / 说明局限 / 说明适用边界）—— 生产未配
+#: `IB_EXPERT_PROMPT_DIR` 时，兜底层**就是生效系统提示词**（`build_prompt_stores` 走
+#: `InMemoryExpertPromptStore`，无主提示可回落）。REV-16-2 改名时曾把三条护栏一并删去，
+#: 等于**静默降低 groundedness**（DEFECT-R16-4-02），现已补回；后续任何改写都不得只留职责描述。
 _DEFAULT_SPECS: list[ExpertSpec] = [
     ExpertSpec(
         name="freeark-expert",
@@ -105,6 +110,7 @@ _DEFAULT_SPECS: list[ExpertSpec] = [
         fallback_prompt=(
             "你是 FreeArk（自由方舟）系统管家，负责能耗看板、设备实时参数、"
             "设备参数确认式控制和业主人格偏好。故障巡检与三恒知识由专职专家处理。"
+            "你无法取得所需数据时应直接说明，不得编造。"
         ),
         is_delegating=True,
         is_default=True,
@@ -114,7 +120,11 @@ _DEFAULT_SPECS: list[ExpertSpec] = [
         cn_label="巡检诊断",
         keywords=("故障", "巡检", "plc", "离线", "在线", "传感器", "报警", "诊断", "修复"),
         is_data_expert=True,
-        fallback_prompt="你是 FreeArk 巡检诊断专家，结合 PLC 状态与故障汇总定位设备问题。",
+        fallback_prompt=(
+            "你是 FreeArk 巡检诊断专家，结合 PLC 状态与故障汇总定位设备问题。"
+            "缺少实时参数或知识库资料时，可转交对应同侪专家获取支撑；"
+            "无法取得支撑时，据现场信息给出可执行的排查步骤并说明局限。"
+        ),
         is_delegating=True,
         is_default=False,
     ),
@@ -146,7 +156,8 @@ _DEFAULT_SPECS: list[ExpertSpec] = [
         is_data_expert=False,
         fallback_prompt=(
             "你是三恒系统知识专家，依循三层知识源（RAG 检索 > 三恒行业知识 > 模型已有通用技术知识）"
-            "回答原理性问题。需要实时数据支撑时，可委托系统管家获取数据。"
+            "回答原理性问题。需要实时数据支撑时，可委托系统管家获取数据；"
+            "无法委托时据已有知识作答，并说明结论的适用边界。"
         ),
         is_delegating=True,
         is_default=False,
