@@ -46,7 +46,7 @@
  * 大小差异纯粹是 CSS。因此点击就是打开这张字节本身，无需第二次请求，也不会出现
  * 「缩略图与原图不一致」这类只有两个端点才会有的漂移。
  */
-import { onBeforeUnmount, ref } from 'vue';
+import { onBeforeUnmount, reactive, ref } from 'vue';
 
 import {
   ApiClientError,
@@ -247,7 +247,9 @@ function openOriginal(image: TurnImage): void {
 async function ask(): Promise<void> {
   const text = query.value.trim();
   if (!text || controller) return;
-  const turn: Turn = {
+  // turn 必须 reactive：apply()/finally 直接改裸对象不会触发 Vue 响应式（绕过 Proxy 的
+  // set 拦截），界面会永久停在「生成中…」——即便 content/done 事件都已正确写入数据（R15 根因）。
+  const turn = reactive<Turn>({
     query: text,
     answer: '',
     reasoning: [],
@@ -257,7 +259,7 @@ async function ask(): Promise<void> {
     streaming: true,
     confirmation: null,
     decided: false,
-  };
+  });
   turns.value.push(turn);
   query.value = '';
   controller = new AbortController();
