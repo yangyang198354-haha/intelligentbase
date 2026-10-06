@@ -21,6 +21,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import threading
+import time
 import uuid
 from contextlib import contextmanager
 from typing import Any, Iterator, Sequence
@@ -550,9 +551,20 @@ class SqliteLedgerRepository:
     # ------------------------------------------------------------------ #
 
     def active_collection_version(self, project_id: str) -> str:
+        from ib.observability import log_event
+
+        # 诊断打点（R15 根因定位）：SELECT 是否阻塞会在两行日志的间隙暴露。
+        started = time.perf_counter()
+        log_event("retrieval", "sqlite_select_start", project_id=project_id)
         row = self._conn().execute(
             "SELECT active_collection_version FROM projects WHERE project_id = ?", (project_id,)
         ).fetchone()
+        log_event(
+            "retrieval",
+            "sqlite_select_done",
+            project_id=project_id,
+            elapsed_ms=int((time.perf_counter() - started) * 1000),
+        )
         if row is None:
             raise StartupError("项目未登记（请检查项目配置）")
         return str(row[0])

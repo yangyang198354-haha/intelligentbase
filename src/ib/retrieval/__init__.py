@@ -111,15 +111,26 @@ class RetrievalService:
 
         with Timer() as timer:
             # --- 1) 绑定读路径 collection（重建期间读旧版本，AC-IB-16-03） ---
-            try:
-                project = self._project_provider(scope.project_id)
-                collection = self._resolver.resolve(scope, project)
-                self._resolver.assert_prefix(collection, scope.project_id)
-                self._vectors.bind_collection(collection)
-            except Exception as exc:  # noqa: BLE001 - 端口契约要求无异常出口
-                return self._degrade(
-                    scope, DegradeReason.VECTORSTORE_UNAVAILABLE, timer, exc, stage="retrieval"
-                )
+            log_event("retrieval", "step1_start", project_id=scope.project_id)
+            with Timer() as step1:
+                try:
+                    project = self._project_provider(scope.project_id)
+                    collection = self._resolver.resolve(scope, project)
+                    self._resolver.assert_prefix(collection, scope.project_id)
+                    self._vectors.bind_collection(collection)
+                except Exception as exc:  # noqa: BLE001 - 端口契约要求无异常出口
+                    log_event(
+                        "retrieval",
+                        "step1_failed",
+                        project_id=scope.project_id,
+                        error_code=type(exc).__name__,
+                    )
+                    return self._degrade(
+                        scope, DegradeReason.VECTORSTORE_UNAVAILABLE, timer, exc, stage="retrieval"
+                    )
+            log_event(
+                "retrieval", "step1_done", project_id=scope.project_id, elapsed_ms=step1.elapsed_ms
+            )
 
             # --- 2) 热路径向量化（单条 / 短超时 / 少重试；超时即降级） ---
             try:
