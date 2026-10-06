@@ -7,16 +7,16 @@
 | 文档 ID | DOC-IB-TR-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 测试执行报告 |
 | 产出代理 | test-engineer |
-| 调用 ID | INV-GROUP_D-INTELBASE-001；**R3 增量 = INV-GROUP_D-INTELBASE-002**（见 §10）；**R4 增量 = INV-GROUP_D-INTELBASE-003**（见 §11）；**R7 增量 = INV-GROUP_D-INTELBASE-004**（见 §12）；**R8 增量 = INV-GROUP_D-INTELBASE-005**（见 §13）；**R9 增量 = INV-GROUP_D-INTELBASE-006**（见 §14）；**R10 增量 = INV-GROUP_D-INTELBASE-007**（见 §15）；**R11 增量 = INV-GROUP_D-INTELBASE-008**（见 §16）；**R12 增量 = INV-GROUP_D-INTELBASE-010**（见 §17） |
+| 调用 ID | INV-GROUP_D-INTELBASE-001；**R3 增量 = INV-GROUP_D-INTELBASE-002**（见 §10）；**R4 增量 = INV-GROUP_D-INTELBASE-003**（见 §11）；**R7 增量 = INV-GROUP_D-INTELBASE-004**（见 §12）；**R8 增量 = INV-GROUP_D-INTELBASE-005**（见 §13）；**R9 增量 = INV-GROUP_D-INTELBASE-006**（见 §14）；**R10 增量 = INV-GROUP_D-INTELBASE-007**（见 §15）；**R11 增量 = INV-GROUP_D-INTELBASE-008**（见 §16）；**R12 增量 = INV-GROUP_D-INTELBASE-010**（见 §17）；**R13 增量 = INV-GROUP_D-INTELBASE-012**（见 §18）；**R13 缺陷闭合补丁 = INV-GROUP_D-INTELBASE-013**（见 §18.11） |
 | 项目 | intelligentbase |
-| 阶段 | GROUP_D / PHASE_08（测试执行）+ PHASE_09（测试用例实现）+ **R3 增量（缺陷回归与门控）** + **R4 增量（Blob 删除范围 / 回环契约）** + **R7 增量（US-IB-17 / US-IB-18「UI 可视化配置」纳入测试范围）** + **R8 增量（FND-R7-01 修复回归：装配期唯一性校验）** + **R9 增量（FLAKE-IB-01 测试侧稳定性治理：连接级有界重试）** + **R10 增量（前端冒烟测试层正式化 + 复跑证据）** + **R11 增量（REQ-FUNC-IB-20 测试补全：US-IB-19 / US-IB-20 纳入测试范围，含 5 条重挂 + 13 条新增）** + **R12 增量（R8 实现到位后的补测轮 REV-12-5：闭合 AC-IB-19-02 / AC-IB-20-04 并补全其余，含 16 条新增）** |
-| 版本 | 1.8.1（**R12 文档校验补丁（INV-GROUP_D-INTELBASE-011，2026-09-28）**：**纯文档**修订 —— 依独立只读核验 INV-GROUP_D-VERIFY-R12 修 **MINOR-1**（§17.6 门控「未改实现代码」证据改为如实归属）与 **MINOR-2**（§17.1 可测 AC 口径注：**机制层**）；**未改** `tests/**`、`src/**`、`docs/phase_status.md`、设计真源四文档、`docs/test_plan.md`，**未新增/删除用例、未改既有断言与编号**；三门复跑 200/200 不变）<br>1.8.0（**R12 增量（REV-12-5，补测轮）**：R8 实现已落地，Python 层 **200/200 PASSED**（EXIT=0；unit 76 / integration 105 / e2e 19），三层门控 100%/100%/关键路径 16/16；**前端冒烟层 6/6 PASSED**（独立一层，**不并入 200 算术**）；闭合 **AC-IB-19-02 / AC-IB-20-04**（此前「未覆盖」）并补全 19-03 / 20-02 / 20-03 / 20-05；回补 **FND-R11-01**（CLOSED_VERIFIED）与 **BLK-R8-02**（CLOSED_VERIFIED）；**可测 AC 覆盖 90/90 = 100%**（残余 3 项见 §17.5）；强约束：**未改 `src/**`**）<br>1.7.0（R11 增量：**184/184**；前端冒烟层 6/6 独立；可测 AC 覆盖 88/90 = 97.8%）<br>R10 = 1.6.1（**171/171**；前端冒烟层 6/6 独立）<br>R9 = 1.5.0（**171/171**；**FLAKE-IB-01 → MITIGATED**）<br>**版本线**：1.0.0(R1) → 1.1.0(R3) → 1.2.0(R4) → 1.3.0(R7) → 1.4.0(R8) → 1.5.0(R9) → 1.6.0(R10) → 1.6.1(R10 修复) → 1.7.0(R11) → 1.8.0(R12) → **1.8.1(R12 文档校验补丁)** |
-| status | §1~§9 APPROVED（GROUP_D 门控 GR-D-001 = PASS_WITH_CONDITIONS，2026-09-26）；§10 ~ §16 为追加节（R11 = PARTIAL_SUCCESS）；**§17（R12 增量）待 PM 门控；判定 SUCCESS（三层全绿 200/200，可测 AC 覆盖 100%，残余 3 项仅登记不阻塞，见 §17.1/§17.5）** |
+| 阶段 | GROUP_D / PHASE_08（测试执行）+ PHASE_09（测试用例实现）+ **R3 增量（缺陷回归与门控）** + **R4 增量（Blob 删除范围 / 回环契约）** + **R7 增量（US-IB-17 / US-IB-18「UI 可视化配置」纳入测试范围）** + **R8 增量（FND-R7-01 修复回归：装配期唯一性校验）** + **R9 增量（FLAKE-IB-01 测试侧稳定性治理：连接级有界重试）** + **R10 增量（前端冒烟测试层正式化 + 复跑证据）** + **R11 增量（REQ-FUNC-IB-20 测试补全：US-IB-19 / US-IB-20 纳入测试范围，含 5 条重挂 + 13 条新增）** + **R12 增量（R8 实现到位后的补测轮 REV-12-5：闭合 AC-IB-19-02 / AC-IB-20-04 并补全其余，含 16 条新增）** + **R13 增量（REV-13：US-IB-21 ~ US-IB-29 账户体系 / 会话 / 前端商用界面三层执行；新增 32 条 Python + 7 条前端；发现 DEFECT-R13-01）** + **R13 缺陷闭合补丁（INV-GROUP_D-INTELBASE-013：DEFECT-R13-01 经 INV-GROUP_C-INTELBASE-013 修复 + INV-GROUP_C-VERIFY-REV13-1 独立复跑，本代理复跑三层 239/239 全绿 + 前端 13/13）** |
+| 版本 | 1.9.1（**R13 缺陷闭合补丁（INV-GROUP_D-INTELBASE-013，2026-10-06）**：`DEFECT-R13-01`（来源 IP 维度登录限速未生效，429 分支不可达；MEDIUM）已由 **INV-GROUP_C-INTELBASE-013** 修复 —— 把 `LoginThrottle` 提升为**组合期单例**（`Deps.login_throttle`，每应用实例一份）+ 「账户锁定优先于 IP 限速」补丁；经**独立只读验证方 INV-GROUP_C-VERIFY-REV13-1** 复跑确认。本代理**亲自复跑**：Python 三层 **239/239 全绿**（unit 95 / integration 123 / e2e 21；**0 fail / 0 skip / 0 xfail**；EXIT=0）+ 前端冒烟 **13/13**；`TC-INT-119` **FAIL→PASS**（状态序列 `[401,401,401,429]`）、`TC-INT-118` **无回归**。本补丁为**纯文档 + 纯注释**收口 —— **未改 `src/**`**、**未改任何断言 / 未增删用例**（见 §18.11））<br>1.9.0（**R13 增量（REV-13，INV-GROUP_D-INTELBASE-012，2026-10-06）**：把 US-IB-21 ~ US-IB-29 纳入测试范围并实跑；Python 层 **239**（unit 95 / integration 123 / e2e 21）→ **238 pass / 1 fail**（EXIT=1）；前端冒烟层 **13/13**（独立，不并入 239）；三层串行门控数值达标（unit 100% / integration 99.19% / e2e 关键路径 100%）但**集成层 1 条真实失败**，暴露 **DEFECT-R13-01**（来源 IP 维度登录限速未生效）→ 本代理自评 **PARTIAL_SUCCESS**；强约束：**未改 `src/**`**）<br>1.8.1（**R12 文档校验补丁（INV-GROUP_D-INTELBASE-011，2026-09-28）**：**纯文档**修订 —— 依独立只读核验 INV-GROUP_D-VERIFY-R12 修 **MINOR-1**（§17.6 门控「未改实现代码」证据改为如实归属）与 **MINOR-2**（§17.1 可测 AC 口径注：**机制层**）；**未改** `tests/**`、`src/**`、`docs/phase_status.md`、设计真源四文档、`docs/test_plan.md`，**未新增/删除用例、未改既有断言与编号**；三门复跑 200/200 不变）<br>1.8.0（**R12 增量（REV-12-5，补测轮）**：R8 实现已落地，Python 层 **200/200 PASSED**（EXIT=0；unit 76 / integration 105 / e2e 19），三层门控 100%/100%/关键路径 16/16；**前端冒烟层 6/6 PASSED**（独立一层，**不并入 200 算术**）；闭合 **AC-IB-19-02 / AC-IB-20-04**（此前「未覆盖」）并补全 19-03 / 20-02 / 20-03 / 20-05；回补 **FND-R11-01**（CLOSED_VERIFIED）与 **BLK-R8-02**（CLOSED_VERIFIED）；**可测 AC 覆盖 90/90 = 100%**（残余 3 项见 §17.5）；强约束：**未改 `src/**`**）<br>1.7.0（R11 增量：**184/184**；前端冒烟层 6/6 独立；可测 AC 覆盖 88/90 = 97.8%）<br>R10 = 1.6.1（**171/171**；前端冒烟层 6/6 独立）<br>R9 = 1.5.0（**171/171**；**FLAKE-IB-01 → MITIGATED**）<br>**版本线**：1.0.0(R1) → 1.1.0(R3) → 1.2.0(R4) → 1.3.0(R7) → 1.4.0(R8) → 1.5.0(R9) → 1.6.0(R10) → 1.6.1(R10 修复) → 1.7.0(R11) → 1.8.0(R12) → **1.8.1(R12 文档校验补丁)** → **1.9.0(R13)** → **1.9.1(R13 缺陷闭合补丁)** |
+| status | §1~§9 APPROVED（GROUP_D 门控 GR-D-001 = PASS_WITH_CONDITIONS，2026-09-26）；§10 ~ §16 为追加节（R11 = PARTIAL_SUCCESS）；**§17（R12 增量）待 PM 门控；判定 SUCCESS（三层全绿 200/200，可测 AC 覆盖 100%，残余 3 项仅登记不阻塞，见 §17.1/§17.5）**；**§18（R13 增量）APPROVED（GROUP_D 门控 **GR-D-010 = PASS_WITH_CONDITIONS**；**condition_1 = DEFECT-R13-01 已修复并独立复跑闭合**；修复后本代理亲自复跑三层 **239/239** 全绿 + 前端 **13/13**，见 **§18.11**）** |
 | 创建日期 | 2026-09-26 |
-| 更新日期 | 2026-09-28（R12 增量（REV-12-5）） |
-| 上游输入 | `docs/test_plan.md`（**1.7.0 / R12**）、`docs/user_stories.md`（**1.3.0 / 20 US / 101 AC / APPROVED**）、`docs/requirements_spec.md`（**1.3.0 / APPROVED**）、`docs/implementation_plan.md`（**2.6.0 / R11–R12**）、`docs/architecture_design.md` / `module_design.md`（**1.4.0 / R8**）、`docs/tech_stack.md`（**1.3.0 / R7**）、`docs/cicd_pipeline.md`（**1.1.1 / R10**，阶段9）、`src/**`（只读） |
-| 证据留档 | `docs/evidence/groupd_{unit,integration,e2e,all,coverage,credscan,fnd01_repro,fnd02_repro,defect_repros}.log`；**R3 增量 = `groupd_r3_{unit,integration,e2e,all,collect,credscan,blob_probe,targeted}.log`**；**R7 增量 = `groupd_r7_{*}.log`**；**R8 增量 = `groupd_r8_{*}.log`**；**R9 增量 = `groupd_r9_{*}.log` + `groupd_r9_retry_probe.py`**；**R10 增量 = `groupd_r10_{*}.log`**；**R11 增量 = `groupd_r11_{unit,integration,e2e,all,collect,coverage}_*.log`**；**R12 增量 = `groupd_r12_{unit,integration,e2e,all,collect,coverage,frontend}.log`**（`.log` 不入 git，见 `.gitignore`） |
-| 测试套件 | `tests/unit/**`（**10 文件 / 76**）、`tests/integration/**`（**12 文件 / 105**）、`tests/e2e/**`（1 文件 / **19**）、`tests/conftest.py`；**前端层（R10 新增，独立）**：`src/frontend/tests/frontend.smoke.test.js`（**1 文件 / 6 例**，`node --test`） |
+| 更新日期 | 2026-10-06（R13 增量（REV-13）+ **R13 缺陷闭合补丁 / INV-GROUP_D-INTELBASE-013**，见 §18.11） |
+| 上游输入 | `docs/test_plan.md`（**1.8.0 / R13**；R13 前 1.7.0/R12）、`docs/user_stories.md`（**1.4.0 / APPROVED / 29 US**；R13 新增 US-IB-21 ~ US-IB-29 / 29 组 AC）、`docs/requirements_spec.md`（**1.3.0 / APPROVED**）、`docs/implementation_plan.md`（**2.6.0 / R11–R12**）、`docs/architecture_design.md` / `module_design.md`（**1.4.0 / R8**）、`docs/tech_stack.md`（**1.3.0 / R7**）、`docs/cicd_pipeline.md`（**1.1.1 / R10**，阶段9）、`src/**`（只读） |
+| 证据留档 | `docs/evidence/groupd_{unit,integration,e2e,all,coverage,credscan,fnd01_repro,fnd02_repro,defect_repros}.log`；**R3 增量 = `groupd_r3_{unit,integration,e2e,all,collect,credscan,blob_probe,targeted}.log`**；**R7 增量 = `groupd_r7_{*}.log`**；**R8 增量 = `groupd_r8_{*}.log`**；**R9 增量 = `groupd_r9_{*}.log` + `groupd_r9_retry_probe.py`**；**R10 增量 = `groupd_r10_{*}.log`**；**R11 增量 = `groupd_r11_{unit,integration,e2e,all,collect,coverage}_*.log`**；**R12 增量 = `groupd_r12_{unit,integration,e2e,all,collect,coverage,frontend}.log`**；**R13 增量 = `groupd_r13_{unit,integration,e2e,all,collect,frontend}.log`**（`.log` 不入 git，见 `.gitignore`） |
+| 测试套件 | `tests/unit/**`（**12 文件 / 95**）、`tests/integration/**`（**14 文件 / 123**）、`tests/e2e/**`（**2 文件 / 21**）、`tests/conftest.py`；**前端层（R10 新增，独立）**：`src/frontend/tests/frontend.smoke.test.js`（**1 文件 / 13 例**，`node --test`）（**R13 后口径**；R13 前为 unit 83 / integration 105 / e2e 19） |
 ---
 
 # intelligentbase 测试执行报告（GROUP_D / PHASE_08+09）
@@ -1858,3 +1858,274 @@ tests 6 / pass 6 / fail 0 / skipped 0   EXIT=0   （前端层，独立计数）
 | 2 | 计数基线更新确认（**184 → 200**：unit 76 / integration 105 / e2e 19；前端 6 独立） | PM | 信息项 |
 | 3 | **残余 3 项**后续轮处置（AC-IB-19-02 端到端装配来源 → developer 接线；AC-IB-19-03 前端呈递 / AC-IB-20-02 部署文档声明 → 前端轮 / GROUP_E） | PM | 信息项（不阻塞） |
 | 4 | FND-R11-01 / BLK-R8-02 状态在缺陷台账中标记 **CLOSED_VERIFIED** | PM | 信息项 |
+
+---
+
+## §18 R13 增量（REV-13：账户体系 / 会话 / 前端商用界面三层执行报告）
+
+> 调用 ID：**INV-GROUP_D-INTELBASE-012**。上游 GROUP_C R13 实现门控 **GR-C-009 = PASS_WITH_CONDITIONS**（42 文件，CRITICAL 0）。
+> 本轮把 `user_stories.md` **1.4.0** 新增的 **US-IB-21 ~ US-IB-29**（29 组 AC）纳入测试范围并**实际执行**：
+> 新增 **32 条 Python 用例** + **7 条前端冒烟用例**。硬约束：**未改 `src/**`**、**未改 `docs/phase_status.md`**、**未 commit / push / 部署**；测试代码与报告**无任何真实凭据**。
+> **结论**：三层串行门控**数值达标**（unit 100% / integration 99.19% / e2e 关键路径 100%），但集成层存在 **1 条真实失败**（`TC-INT-119`），**暴露实现缺陷 DEFECT-R13-01**（来源 IP 维度限速未生效）。据实判定：**PARTIAL_SUCCESS**（见 §18.10）。
+
+### §18.1 结论摘要（R13 增量三阶段 metrics）
+
+| 级别 | Total | Pass | Fail | Skip | Blocked | 通过率（公式） | 门控阈值 | 门控结论 |
+|------|-------|------|------|------|---------|----------------|---------|---------|
+| 单元（UNIT） | 95 | 95 | 0 | 0 | 0 | 95/(95+0) = **100.0%** | ≥ 80% | **PASSED** |
+| 集成（INT） | 123 | 122 | 1 | 0 | 0 | 122/(122+1) = **99.19%** | ≥ 90% | **PASSED**（数值达标；含 1 项缺陷证据） |
+| E2E | 21 | 21 | 0 | 0 | 0 | 21/(21+0) = **100.0%** | 关键路径 100% | **PASSED** |
+| **合计（Python）** | **239** | **238** | **1** | **0** | **0** | 238/(238+1) = **99.58%** | — | **1 FAIL（DEFECT-R13-01）** |
+| **前端冒烟（FE，独立层）** | **13** | **13** | **0** | **0** | **0** | **100.0%** | 全通过 | **PASSED** |
+
+- **算术一致性（精确等式）**：
+  - unit：`95 = 95 + 0 + 0 + 0` ✓
+  - integration：`123 = 122 + 1 + 0 + 0` ✓
+  - e2e：`21 = 21 + 0 + 0 + 0` ✓
+  - **合计：`239 = 238 + 1 + 0 + 0`** ✓
+- **口径**：前端层 **13** 与 Python 层 **239** **分列、不混算**（跨运行时 / 跨框架）。
+- **R13 增量子集通过率**（诊断用，非门控口径）：新增 unit **12/12 = 100%**；新增 integration **17/18 = 94.44%**（1 fail）；新增 e2e **2/2 = 100%**；新增前端 **7/7 = 100%**。
+- **三层串行门控**：unit 100% ≥ 80% → 放行 integration；integration 99.19% ≥ 90% → 放行 e2e。**门控未阻断**。
+- **零 masking**：**0 skip / 0 xfail**；`TC-INT-119` 为**真实执行失败**，保留为 FAIL 作缺陷证据，**不以 skip / xfail 掩蔽**。
+
+### §18.2 §unit 单元测试（R13 增量）
+
+- **执行时间 / 环境**：2026-10-06，Python 3.14.6 / pytest 9.1.1 / bcrypt 5.0.0；内存账户存储 + `SqliteAccountStore`（`tmp_path`）。
+- **文件**：`tests/unit/test_accounts_unit_r13.py`（**12 条**，编号 TC-UNIT-083 ~ TC-UNIT-094，紧接既有最高 TC-UNIT-082）。
+- **摘要**：Total **95** | Pass **95** | Fail **0** | Skip **0** | Blocked **0** | 通过率 **100.0%**（阈值 80%）→ **PASSED**。
+
+| TC-ID | 关联 AC | 描述 | 结果 |
+|-------|--------|------|------|
+| TC-UNIT-083 | AC-IB-25-01 | 令牌不透明 / 唯一 / 服务端只存 sha256 摘要 | PASS |
+| TC-UNIT-084 | AC-IB-22-01、AC-IB-23-01/02 | 内存存储建户语义 + 1:1 绑定（无项目 ops 被拒） | PASS |
+| TC-UNIT-085 | AC-IB-22-03 | 口令只落 bcrypt（`$2…`）摘要、永不落明文 | PASS |
+| TC-UNIT-086 | AC-IB-25-01/02 | 会话签发 / 解析 / 过期 / 撤销语义 | PASS |
+| TC-UNIT-087 | AC-IB-25-03 | 续期前滑 `expires_at`、**`issued_at` 不变**（不延长绝对寿命） | PASS |
+| TC-UNIT-088 | AC-IB-23-03 | `revoke_sessions_for_user` 全撤 / 保留当前 | PASS |
+| TC-UNIT-089 | AC-IB-22-01 | `seed_default_admin` 幂等且不覆盖既有口令 | PASS |
+| TC-UNIT-090 | AC-IB-27-01/03、AC-IB-24-03、AC-IB-23-03 | 解析器 fail-closed + 角色 + 全局哨兵 + **无授权方法** | PASS |
+| TC-UNIT-091 | AC-IB-22-02 | 口令强度策略边界 | PASS |
+| TC-UNIT-092 | AC-IB-27-01、AC-IB-29-01/02 | `AccountsPolicy` / `LoginThrottle` / `audit` 签名（不含凭据字段） | PASS |
+| TC-UNIT-093 | AC-IB-23-01/02、AC-IB-25-01 | `SqliteAccountStore` 真实往返 + CHECK 约束 | PASS |
+| TC-UNIT-094 | AC-IB-27-02/03 | `build_authz` 缺策略 → `StartupError`（fail-closed） | PASS |
+
+- **失败汇总（需路由给 developer）**：无。
+
+### §18.3 §integration 集成测试（R13 增量）
+
+- **执行时间 / 环境**：2026-10-06，Django test Client（进程内），`accounts_app` / `locked_accounts_app` 夹具。
+- **文件**：`tests/integration/test_accounts_int_r13.py`（**15 条**，TC-INT-105 ~ TC-INT-119）+ `tests/integration/test_accounts_deploy_int_r13.py`（**3 条**，TC-INT-120 ~ TC-INT-122）。
+- **摘要**：Total **123** | Pass **122** | Fail **1** | Skip **0** | Blocked **0** | 通过率 **99.19%**（阈值 90%）→ **PASSED（数值）**，但含 1 项缺陷证据。
+
+| TC-ID | 集成边界 | 关联 AC | 结果 |
+|-------|---------|--------|------|
+| TC-INT-105 | views ↔ AccountStore/会话 | AC-IB-21-01、AC-IB-25-04 | PASS |
+| TC-INT-106 | views ↔ AccountStore（防枚举） | AC-IB-21-02 | PASS |
+| TC-INT-107 | authz 中间件 ↔ 受限会话白名单 | AC-IB-22-01/02 | PASS |
+| TC-INT-108 | change-password ↔ 会话撤销 | AC-IB-22-02、AC-IB-25-01 | PASS |
+| TC-INT-109 | 会话校验 / 登出 / 续期 | AC-IB-25-01/03 | PASS |
+| TC-INT-110 | 过期会话 ↔ 中间件 | AC-IB-25-02 | PASS |
+| TC-INT-111 | accounts 端点 ↔ 存储（CRUD） | AC-IB-23-01/02/03 | PASS |
+| TC-INT-112 | 非 admin ↔ `_require_admin` | AC-IB-23-04 | PASS |
+| TC-INT-113 | 项目边界 ↔ AuthzPolicy | AC-IB-24-01/02/03 | PASS |
+| TC-INT-114 | 停用账户 ↔ 登录 | AC-IB-23-03 | PASS |
+| TC-INT-115 | authz 查询串纪律 ↔ 全端点 | AC-IB-21-04 | PASS |
+| TC-INT-116 | 响应头 ↔ 零 Set-Cookie | AC-IB-25-04 | PASS |
+| TC-INT-117 | 离线 EnvTokenResolver ↔ 账户面 | AC-IB-21-03、AC-IB-27-01 | PASS |
+| TC-INT-118 | 账户维度锁定 ↔ AccountStore | AC-IB-29-01 | PASS |
+| **TC-INT-119** | **IP 维度限速 ↔ LoginThrottle** | **AC-IB-29-01** | **FAIL（DEFECT-R13-01）** |
+| TC-INT-120 | nginx TLS 模板（静态） | AC-IB-28-01/02 | PASS |
+| TC-INT-121 | 键登记 / 凭据纪律 / 迁移 | REQ-NFR-IB-15、AC-IB-27-02 | PASS |
+| TC-INT-122 | 迁移 003 ↔ 运行时 schema（列级） | REQ-FUNC-IB-30 | PASS |
+
+- **失败汇总（需路由给 developer）**：
+  | TC-ID | 失败原因 | 疑似缺陷位置 |
+  |-------|---------|------------|
+  | TC-INT-119 | 同一来源 IP 连续失败第 4 次仍返回 **401**，**429 分支不可达** | `src/ibweb/views.py` `auth_login_endpoint`（`throttle = build_throttle()` **每请求新建**） |
+
+### §18.4 §e2e 端到端测试（R13 增量）
+
+- **文件**：`tests/e2e/test_accounts_journeys_r13.py`（**2 条**，TC-E2E-020 / TC-E2E-021）。
+- **摘要**：Total **21** | Pass **21** | Fail **0** | Skip **0** | Blocked **0** | 通过率 **100.0%**。
+- **Critical Path 覆盖率（R13 Must Have 故事）**：账户体系关键路径（登录 → 首登改密 → 建 ops 绑定项目 → ops 登录改密 → 项目内全功能 → 跨项目 403 → 登出 → 停用）与「零粘贴令牌旁路」旅程 **100% 覆盖且全通过**。
+
+**TC-E2E-020: admin → ops 完整账户旅程**
+- 关联用户故事：US-IB-21 + US-IB-22 + US-IB-23 + US-IB-24 + US-IB-25；关联 AC：AC-IB-21-01、AC-IB-22-01/02、AC-IB-23-01/03、AC-IB-24-01/02
+- 测试步骤与实际响应：
+
+  | 步骤 | 操作 | 期望响应 | 实际响应 | 结果 |
+  |---|---|---|---|---|
+  | ① | admin 初始口令登录 | 200 + `must_change_password=true` | 200，标志 true | PASS |
+  | ② | 改密前访问 `/api/files?X-IB-Project=p_alpha` | 403 `password_change_required` | 403，code 一致 | PASS |
+  | ③ | 改密后访问 `/api/files` | 200 | 200 | PASS |
+  | ④ | admin 创建 ops（绑定 p_alpha） | 201 + `project_id=p_alpha` | 201，绑定一致 | PASS |
+  | ⑤ | ops 首登 + 改密 | 200 + 改密 200 | 一致 | PASS |
+  | ⑥ | ops 项目内上传（管理动作） | 201 | 201 | PASS |
+  | ⑦ | ops 声明 p_beta 访问 | 403 | 403 | PASS |
+  | ⑧ | ops 登出 → 401；admin 停用 ops → ops 登录 401 | 401 / 401 | 一致 | PASS |
+
+- 最终结论：**PASS**
+
+**TC-E2E-021: 无粘贴令牌旁路旅程**
+- 关联用户故事：US-IB-21；关联 AC：AC-IB-21-03、AC-IB-21-04
+- 覆盖端点：`/api/files?token=…`、`/api/accounts?token=…`、`/api/auth/me?access_token=…`、`/healthz?token=…`、`/api/chat/stream?token=…`、`POST /api/auth/login?token=…` → **全部 400 `token_in_query_forbidden`**，且**零 `Set-Cookie`**。
+- 最终结论：**PASS**
+
+### §18.5 前端冒烟层（FE，独立）
+
+- **命令**：`cd src/frontend && node --test`
+- **文件**：`src/frontend/tests/frontend.smoke.test.js`（既有 6 条 TC-FE-001 ~ TC-FE-006 **逐字未动**，追加 7 条 TC-FE-007 ~ TC-FE-013）。
+- **摘要**：Total **13** | Pass **13** | Fail **0** | Skip **0** | Todo **0** | 通过率 **100.0%** → **PASSED**。
+- **原始输出**：`ℹ tests 13 / ℹ pass 13 / ℹ fail 0 / ℹ cancelled 0 / ℹ skipped 0 / ℹ todo 0`；**EXIT=0**。
+- **性质**：**源码结构层**断言（本项目无组件测试框架），对 `App.vue` 刻意采用**结构性判据**（`<input` / `setToken(` / `v-model`）并先去注释（`stripComments`），避免被文档散文误触发。
+
+### §18.6 缺陷与观察（R13 增量）
+
+**DEFECT-R13-01 —— 来源 IP 维度登录限速未生效（429 分支不可达）**
+
+| 项 | 内容 |
+|----|------|
+| 严重级别 | **MEDIUM**（安全控制部分失效：无法缓解「挑用户名爆破」的来源 IP 维度；账户维度锁定仍有效） |
+| 发现用例 | `TC-INT-119`（`tests/integration/test_accounts_int_r13.py`） |
+| 关联 AC | AC-IB-29-01（「同一**账户 / 来源**连续失败达阈值」——来源维度未兑现） |
+| 期望输出 | 同一来源 IP 连续失败达阈值后，再次尝试 → **429** `too_many_requests` |
+| 实际输出 | `[401, 401, 401, 401]`（**第 4 次仍 401**，429 分支不可达） |
+| 根因（只读分析） | `src/ibweb/views.py` `auth_login_endpoint` 在**每个请求**内执行 `throttle = build_throttle()`（views.py 第 1027 行附近），得到**新建的空 `LoginThrottle`**；`check()` 恒见 0 条历史 → 恒 `allow=True`；`record_failure()` 把失败时刻写入**随请求丢弃的实例**（throttle.py 第 83~88 行，`_hits` 为实例态）。故来源 IP 的滑动窗口**永不累积**。 |
+| 对照（为何 118 PASS） | 账户维度锁定经 `AccountStore.record_login_failure` **持久化**于用户记录（`views.py` 读 `user.locked_until`），故 TC-INT-118 通过；IP 维度依赖**跨请求共享**的 `LoginThrottle` 实例，而该实例未被共享。 |
+| 修复方向（**不由本代理实施**） | 将 `LoginThrottle` 提升为**应用级单例**（装配期构建一次、存于 deps/模块级），请求期复用；或改由可持久化后端承载。**属 `src/**`，须路由 software-developer。** |
+| 证据 | `TC-INT-119` 失败原始输出（进程内断言 `statuses == [401,401,401,429]`，实测 `[401,401,401,401]`）；**保留为真实 FAIL，未以 skip / xfail 掩蔽**。 |
+
+**观察 OBS-R13-01 —— 存储后端异常类型不一致（Memory vs Sqlite）**
+
+- 用例 TC-UNIT-084 观察到：**内存**存储对「ops 无项目」抛 `ConflictError`，而 **Sqlite** 存储（TC-UNIT-093，CHECK 约束）抛 `IntegrityError`。二者最终均**拒绝**该非法写入（1:1 绑定约束成立），**不影响门控**；仅登记为一致性观察，供 developer 决定是否统一封装。
+
+**观察 OBS-R13-02 —— 续期不设绝对寿命上限**
+
+- TC-UNIT-087 断言续期**前滑窗口**且 **`issued_at` 不变**；当前实现**无绝对寿命封顶**（无限续期可达）。AC-IB-25-03 仅要求「有效期被延长」，未要求绝对上限，故**不判为缺陷**；登记为设计观察（OQ-IB-09 仍开放）。
+
+**NOT_TESTABLE / 残余（如实登记，不臆造 PASS）**
+
+| 项 | 说明 | 去向 |
+|----|------|------|
+| AC-IB-26-01/02/03 运行期渲染与交互 | 仅源码结构层断言（TC-FE-011） | 前端运行期轮 |
+| AC-IB-28-01 运行期 TLS 握手 | 仅静态模板断言（TC-INT-120） | 部署面（GROUP_E） |
+| AC-IB-22-03 日志文件级明文扫描 | 接口响应 / 存储面已断言；日志面属证据流程（credscan） | 证据流程 |
+| AC-IB-21-02 响应**时延**侧信道 | 统一文案已断言；时延无法离线确定性断言 | 残余风险 |
+| REQ-FUNC-IB-30 迁移**语句级**字节一致 | 列级已断言（TC-INT-122） | 后续轮 |
+
+### §18.7 命令与证据（命令 + EXIT + 用例数）
+
+| # | 命令 | 结果 | EXIT |
+|---|------|------|------|
+| 1 | `python -m pytest tests/unit -q` | `95 passed in 4.09s` | **0** |
+| 2 | `python -m pytest tests/integration -q` | `1 failed, 122 passed in 25.43s`（FAILED: `test_accounts_int_r13.py::test_TC_INT_119_ip_dimension_throttle_returns_429`） | **1** |
+| 3 | `python -m pytest tests/e2e -q` | `21 passed in 2.49s` | **0** |
+| 4 | `python -m pytest tests -q` | `1 failed, 238 passed in 31.31s` | **1** |
+| 5 | `cd src/frontend && node --test` | `tests 13 / pass 13 / fail 0` | **0** |
+| 6 | `python -m pytest <R13 四文件> --collect-only -q` | `32 tests collected in 0.06s` | **0** |
+
+- 运行顺序**严格串行**：unit（EXIT 0）→ integration（门控前序满足）→ e2e（integration 99.19% ≥ 90% 满足）→ 全量 → 前端。
+- 原始日志建议留档 `docs/evidence/groupd_r13_{unit,integration,e2e,all,collect,frontend}.log`（`.log` 不入 git，见 `.gitignore`）。
+
+### §18.8 计数基线对账（+7 delta）与 `tests/**` 归属
+
+- **R12 门控（GR-D-009）登记基线**：**200**（unit **76** / integration **105** / e2e **19**）。
+- **R13 起始实测基线**：`python -m pytest tests -q` = **207 passed**（EXIT 0）；分层 unit **83** / integration **105** / e2e **19**。
+- **+7 差值定位**：差值 **+7 全部落在单元层**，来源为 `tests/unit/test_llm_tool_loop.py` 的 **7 条用例**（TC-UNIT-076 ~ TC-UNIT-082），由 commit **`fa0a7a4`（"fix(llm): 实现完整工具调用循环，修复聊天检索不落地的根因"）**引入。
+- **对账结论**：**非集合计数错误**，而是**基线登记之后**由 developer 侧提交**直接新增**的单元用例，未被 R12 门控登记。
+- **`tests/**` 归属观察**：`git status --short tests/` 在 R13 起始快照为**空**即 **GROUP_C 的 R13 增量未新增 / 未改动任何 `tests/**`**（`tests/` 是 GROUP_D 领地）；但历史上 `fa0a7a4` / `9b04b20` 等 developer 提交**曾直接增改 `tests/**`** —— 建议 PM 明确写权边界。
+- **R13 后基线**：**239**（unit **95** / integration **123** / e2e **21**）；前端冒烟层 **6 → 13**（独立层）。
+
+### §18.9 守约复核与交付物（R13 增量）
+
+- **未改实现**：本轮**未对 `src/**` 执行任何写操作**（`src/**` 全程只读；`git status --porcelain src` 的 `M` 项为**本轮之前**由 GROUP_C 引入，与本轮测试无关）。
+- **未改 `docs/phase_status.md`**。
+- **编号只增不改**：既有最高 TC-UNIT-082 / TC-INT-104 / TC-E2E-019 / TC-FE-006；新增紧接其后续编，既有用例**未改一行**。
+- **未削弱断言 / 无 skip·xfail**：全量 **0 skip / 0 xfail**；`TC-INT-119` 作真实 FAIL 保留。
+- **离线纪律**：内存 / SQLite / 进程内 Django test Client / 本地 `node --test`；**未连**任何外部网络 / 真实 Qdrant / DeepSeek / bge-m3；**无 Docker**。
+- **凭据纪律**：测试代码 / 夹具 / 本报告**无任何真实 token / key / 密码**；口令占位符仅经 `IB_DEFAULT_ADMIN_PASSWORD` 注入（**只引用键名，不出现字面值**）。
+- **未 commit / 未 push / 未部署**（PM 统一原子提交）。
+- **本轮改动面**：
+  - `docs/test_plan.md`（**1.7.0/R12 → 1.8.0/R13**；文件头 + **新增 §18**）；
+  - `docs/test_report.md`（**1.8.1/R12 → 1.9.0/R13**；文件头 + **新增 §18**）；
+  - `tests/conftest.py`（追加 R13 夹具 `accounts_app` / `locked_accounts_app` + 助手 `login` / `bearer` / `change_password`；**既有夹具未改**）；
+  - `tests/unit/test_accounts_unit_r13.py`（新增，12 例）；
+  - `tests/integration/test_accounts_int_r13.py`（新增，15 例）；
+  - `tests/integration/test_accounts_deploy_int_r13.py`（新增，3 例）；
+  - `tests/e2e/test_accounts_journeys_r13.py`（新增，2 例）；
+  - `src/frontend/tests/frontend.smoke.test.js`（追加 TC-FE-007 ~ TC-FE-013；既有 6 例未改）。
+
+### §18.10 需 PM 路由的动作（R13 增量）
+
+| # | 动作 | 对象 | 优先级 |
+|---|------|------|--------|
+| 1 | **DEFECT-R13-01 修复**（IP 维度限速：`LoginThrottle` 应跨请求共享）→ 修复后回归 `TC-INT-119` | software-developer | **HIGH** |
+| 2 | GROUP_D R13 增量门控复核（三层 **239**：238 pass / 1 fail；前端 **13/13**；§18.1 算术一致） | PM | 本轮 |
+| 3 | 计数基线更新确认（**207 → 239**；其中 **+7 为 `fa0a7a4` 基线对账项**，见 §18.8） | PM | 信息项 |
+| 4 | `tests/**` 写权边界澄清（developer 曾直接增改测试文件） | PM | 信息项 |
+| 5 | 残余项处置（AC-IB-26 运行期 / AC-IB-28 运行期握手 / 时延侧信道 / 迁移语句级一致） | PM | 信息项（不阻塞） |
+
+---
+
+### §18.11 DEFECT-R13-01 修复后收口复跑（R13 缺陷闭合补丁，INV-GROUP_D-INTELBASE-013）
+
+> **本节为修复后（post-fix）的收口复跑记录。**
+> **§18.1 ~ §18.10 为修复前（pre-fix）的现场快照**（当时 `TC-INT-119` FAIL、判定 PARTIAL_SUCCESS；其中 §18.9「守约复核」/§18.10「需 PM 路由的动作」同属修复前口径）—— **全部保留不改，属历史留档**。本节的实测数字**取代**其对**当前代码状态**的描述。
+>
+> - **缺陷**：`DEFECT-R13-01`（来源 IP 维度登录限速未生效，429 分支不可达；MEDIUM）—— 由本代理于 INV-GROUP_D-INTELBASE-012 记录（见 §18.6）。
+> - **修复**：**INV-GROUP_C-INTELBASE-013**（software-developer）。
+> - **独立验证**：**INV-GROUP_C-VERIFY-REV13-1**（独立只读复跑方）。
+> - **收口复跑**：**INV-GROUP_D-INTELBASE-013**（本代理，本节）。
+
+#### §18.11.1 修复内容（只读核对，本代理未改 `src/**`）
+
+| 项 | 修复前（缺陷） | 修复后 |
+|----|---------------|-------|
+| 限速器实例 | `views.auth_login_endpoint` **每请求** `build_throttle()` 新建 → `_hits` 为实例态、随 GC 丢弃，滑动窗口**永不跨请求累积** | **组合根装配期构建一次**，存入 `Deps.login_throttle`（**每应用实例一份**），请求期经 `views._login_throttle()` 复用 |
+| 代码位置 | `src/ibweb/views.py`（请求内新建，约 L1027） | `src/ibweb/composition.py` L494~502 / L559（构建并注入）+ `src/ibweb/views.py` L1008~1025（取用） |
+| 401 / 429 优先级 | 先按 IP 判 429，可能遮蔽已锁定账户应有的统一 401 | **账户锁定优先**：已锁定 → 统一 **401**（不泄露「已锁定」）；未锁定 / 未知账户才走 IP 滑动窗口 → **429**（保 `TC-INT-118` 契约） |
+
+- 该修复**属 `src/**`**，由 GROUP_C 实施；本代理仅**只读核对**（`git status` 中 `src/ibweb/views.py`、`src/ibweb/composition.py` 的 `M` 为 GROUP_C 所引入，与本补丁无关）。
+
+#### §18.11.2 修复后复跑结果（本代理亲自执行）
+
+| 级别 | Total | Pass | Fail | Skip | Blocked | 通过率（公式） | 门控阈值 | 门控结论 |
+|------|-------|------|------|------|---------|----------------|---------|---------|
+| 单元（UNIT） | 95 | 95 | 0 | 0 | 0 | 95/(95+0) = **100.0%** | ≥ 80% | **PASSED** |
+| 集成（INT） | 123 | 123 | 0 | 0 | 0 | 123/(123+0) = **100.0%** | ≥ 90% | **PASSED** |
+| E2E | 21 | 21 | 0 | 0 | 0 | 21/(21+0) = **100.0%** | 关键路径 100% | **PASSED** |
+| **合计（Python）** | **239** | **239** | **0** | **0** | **0** | 239/(239+0) = **100.0%** | — | **全部 PASSED** |
+| **前端冒烟（FE，独立层）** | **13** | **13** | **0** | **0** | **0** | **100.0%** | 全通过 | **PASSED** |
+
+- **算术一致性（精确等式）**：unit `95 = 95 + 0 + 0 + 0` ✓；integration `123 = 123 + 0 + 0 + 0` ✓；e2e `21 = 21 + 0 + 0 + 0` ✓；**合计 `239 = 239 + 0 + 0 + 0`** ✓。
+- **零 masking**：**0 skip / 0 xfail / 0 blocked**；相对修复前（§18.1：238 pass / 1 fail）**无任何新增失败**，仅 `TC-INT-119` 由 FAIL 转 PASS。
+- **口径**：前端层 **13** 与 Python 层 **239** **分列、不混算**（跨运行时 / 跨框架）。
+
+#### §18.11.3 缺陷针对性与无回归
+
+| 用例 | 修复前（§18.3） | 修复后 | 证据 |
+|------|----------------|-------|------|
+| `TC-INT-119`（IP 维度限速，AC-IB-29-01） | **FAIL**，序列 `[401,401,401,401]` | **PASS**，序列 `[401,401,401,429]` | 定向复跑 `-v` → PASSED |
+| `TC-INT-118`（账户维度锁定，AC-IB-29-01） | PASS | **PASS（无回归）** | 定向复跑同批 → PASSED |
+
+#### §18.11.4 命令与证据（本代理实测）
+
+| # | 命令（前缀 `PYTHONUTF8=1 IB_OFFLINE_MODE=1`） | 结果 | EXIT |
+|---|------|------|------|
+| 1 | `python -m pytest tests/unit -q` | `95 passed in 4.11s` | **0** |
+| 2 | `python -m pytest tests/integration -q` | `123 passed in 25.50s` | **0** |
+| 3 | `python -m pytest tests/e2e -q` | `21 passed in 2.49s` | **0** |
+| 4 | `python -m pytest tests -q` | `239 passed in 31.18s` | **0** |
+| 5 | `python -m pytest tests/integration/test_accounts_int_r13.py::test_TC_INT_118_account_lockout_after_threshold tests/integration/test_accounts_int_r13.py::test_TC_INT_119_ip_dimension_throttle_returns_429 -v` | `2 passed in 1.15s`（**119 PASSED**） | **0** |
+| 6 | `cd src/frontend && node --test` | `ℹ tests 13 / ℹ pass 13 / ℹ fail 0 / ℹ skipped 0 / ℹ todo 0` | **0** |
+
+- 运行顺序**严格串行**：unit（EXIT 0）→ integration（unit 100% ≥ 80% 满足）→ e2e（integration 100% ≥ 90% 满足）→ 全量 → 前端。
+- 与独立验证方 **INV-GROUP_C-VERIFY-REV13-1** 结论**一致**：unit 95 / integration 123 / e2e 21 = **239/239**、前端 **13/13**、`TC-INT-119` **FAIL→PASS**。
+- 原始日志建议留档 `docs/evidence/groupd_r13_fix_{unit,integration,e2e,all,frontend}.log`（`.log` 不入 git，见 `.gitignore`）。
+
+#### §18.11.5 门控与边界声明
+
+- **GROUP_D R13 门控（GR-D-010）**：**PASS_WITH_CONDITIONS**；**condition_1 = DEFECT-R13-01 已修复并经独立复跑闭合** → 就本代理测试侧口径，**§18 由 PARTIAL_SUCCESS → 全绿收口**（Python **239/239** + 前端 **13/13**）。
+- **边界声明**：本节为**纯文档 + 纯注释**收口补丁 —— **未改 `src/**`**（全程只读）；**未改任何断言 / 未增删用例 / 未改编号 / 无 skip·xfail**；**未 commit / push / 部署**；**未改** `docs/phase_status.md`、设计真源四文档、`src/frontend/tests/**`。
+- **注释刷新**：`tests/integration/test_accounts_int_r13.py` 中**已过时**的**现在时缺陷描述**（`#` 注释 + `TC-INT-119` docstring）已改为**过去时 / 历史注记**（说明该缺陷已由 INV-GROUP_C-INTELBASE-013 修复，本用例现为**回归守卫**）。
+- **遗留（如实登记，不臆造）**：`test_TC_INT_119_...` 的**断言失败消息字符串**中仍残留「DEFECT-R13-01：build_throttle() 每请求新建…」的历史措辞。因硬约束「**严禁改动任何断言**」（该字符串属 `assert` 语句的组成部分），本补丁**仅刷新其 `#` 注释与 docstring，未触碰该 assert 字符串**；该消息**仅在用例再次失败时**才会显示，**不影响当前全绿结论**。**建议**在下次允许改动断言文本的窗口内一并刷新（**信息项，不阻塞**）。

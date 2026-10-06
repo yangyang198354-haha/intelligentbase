@@ -3,6 +3,11 @@
 # 平台实现选择：GitHub Actions（原定义文档 §附注「待 PM 确认平台」，此处选定）。
 # 触发：push main 全量 / PR 全量 / workflow_dispatch 手动（供 PHASE_11 部署前复跑）。
 # 纪律：任一阶段失败即 abort（原生 fail-fast，后续 step 自动跳过），不 continue-on-error。
+#
+# REV-13 增量（INV-GROUP_E-INTELBASE-004）：
+#   * 阶段2 追加「Schema/迁移检查」（003_accounts.sql 语法 + 幂等 + 与代码生成器单源一致）。
+#   * 测试基线修正：unit 95 / integration 123 / e2e 21 / full 239（0 skip/xfail）；前端冒烟 13。
+#   * bcrypt（>=4,<5）已随 requirements-offline.txt 安装（R13 账户体系离线自测需要真 bcrypt）。
 
 name: CI
 
@@ -47,28 +52,50 @@ jobs:
 
       # 离线纪律：只装 requirements-offline.txt（不含 qdrant-client / rapidocr /
       # onnxruntime / pypdfium2 / langchain-openai），另补测试工具 pytest + pytest-cov。
+      # R13：requirements-offline.txt 含 bcrypt>=4,<5（账户体系离线自测须真 bcrypt；
+      # 纯计算库，不触网、不连任何外部服务 —— 不降低离线隔离性）。
       - name: Install offline deps + test tooling
         run: |
           python -m pip install --upgrade pip
           pip install -r src/requirements-offline.txt pytest pytest-cov
 
-      # ---- 阶段 2：Config（compileall）----
+      # ---- 阶段 2：Config + Schema Check（compileall + 迁移/模式检查）----
       - name: Compile check (阶段2 Config)
         run: python -m compileall -q src
 
-      # ---- 阶段 3：Unit（基线 55/55）----
+      # R13（阶段2）：Schema/迁移门 —— 003_accounts.sql 语法合法 + 幂等可重放 +
+      # 与代码生成器（ib/ledger/schema.py::account_ddl_script()）单源一致。
+      # 对齐 checklists B20；只用标准库（runner 无需 sqlite3 CLI）。
+      - name: Schema / migration check (阶段2 R13)
+        run: |
+          python - <<'PY'
+          import sqlite3, pathlib, sys
+          sql = pathlib.Path("src/deploy/migrations/003_accounts.sql").read_text(encoding="utf-8")
+          con = sqlite3.connect(":memory:")
+          con.executescript(sql)   # first apply
+          con.executescript(sql)   # idempotent replay (no side effects => pass)
+          names = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+          assert {"users", "sessions"} <= names, names
+          sys.path.insert(0, "src")
+          from ib.ledger.schema import account_ddl_script  # noqa: E402
+          norm = lambda s: "".join(s.split())   # collapse whitespace (snapshot reflowed indentation)
+          assert norm(account_ddl_script()) in norm(sql), "003 snapshot != schema generator"
+          print("PASS: 003_accounts.sql syntax-ok / idempotent / single-source")
+          PY
+
+      # ---- 阶段 3：Unit（基线 95/95，R13）----
       - name: Unit tests (阶段3)
         run: python -m pytest tests/unit -q
 
-      # ---- 阶段 4：Integration（基线 69→73）----
+      # ---- 阶段 4：Integration（基线 123/123，R13）----
       - name: Integration tests (阶段4)
         run: python -m pytest tests/integration -q
 
-      # ---- 阶段 5：E2E（基线 14/14）----
+      # ---- 阶段 5：E2E（基线 21/21，R13；含端到端问答 smoke TC-E2E-001）----
       - name: E2E tests (阶段5)
         run: python -m pytest tests/e2e -q
 
-      # ---- 阶段 6：Full suite + coverage（覆盖率仅记录不设门）----
+      # ---- 阶段 6：Full suite + coverage（基线 239/239，0 skip/xfail；覆盖率仅记录不设门）----
       - name: Full suite + coverage (阶段6)
         run: python -m pytest tests --cov=ib --cov=ibweb --cov=ib_embed -q
 
@@ -80,6 +107,13 @@ jobs:
       - name: Version gate (阶段8)
         run: |
           set -euo pipefail
+          echo "== bcrypt >=4,<5（R13 / DR-11）=="
+          python -c "import importlib.metadata as m; v=m.version('bcrypt'); major=int(v.split('.')[0]); assert 4 <= major < 5, f'bcrypt {v} not in >=4,<5'; print('PASS: bcrypt', v)"
+
+          echo "== langchain-core >=0.3,<2.0 =="
+          # langchain-core 随 requirements-offline.txt 安装，直接断言实际装到的版本区间。
+          python -c "import importlib.metadata as m; v=m.version('langchain-core'); ma,mi=v.split('.')[:2]; assert (int(ma),int(mi)) >= (0,3) and int(ma) < 2, f'langchain-core {v} not in >=0.3,<2.0'; print('PASS: langchain-core', v)"
+
           echo "== langchain-openai < 0.3 =="
           # 离线依赖集刻意不含 langchain-openai，故改为校验 requirements.txt 的声明 pin
           # （0.3.x 删除 _convert_chunk_to_generation_chunk 致流式断流，必须 <0.3）。
@@ -114,6 +148,7 @@ jobs:
       # R10：阶段9 现含前端单测 `npm test`（Node 20 内置 node:test，零新增依赖；
       #      含「package-lock.json 与 package.json 同步」回归闸，守住 R10 的 EUSAGE 根因）。
       # 顺序为先 build 后 test —— 冒烟用例 6 断言 dist/ 产物，须待 vite build 产出后再运行。
+      # R13：前端冒烟扩至 13 例（TC-FE-001~013；新增登录/会话/控制台外壳/零旁路 7 例）。
       - name: Set up Node
         uses: actions/setup-node@v4
         with:

@@ -44,3 +44,11 @@ qdrant-client>=1.7,<2.0
 
 # --- 中文切分（可选；缺失时回退到朴素定长切分，不阻塞）----------------------
 jieba>=0.42,<1.0
+
+# --- 口令哈希（R13 增量；IFC-IB-311 / DR-11）---------------------------------
+# 许可：Apache-2.0（tech_stack §2 已登记，非 copyleft）。
+# **只用** `hashpw` / `gensalt` / `checkpw` 三个函数，不涉及任何 Django 组件 ——
+# 本项目的账户表是手写迁移（deploy/migrations/003_accounts.sql），**不用** contrib.auth / ORM。
+# 版本上限 `<5` 依 tech_stack §1「建议 >=4,<5」（[TBD-T22]：目标机 CPU-only 的单次哈希耗时待实测，
+# 实测后由 cost 旋钮（环境变量，非本 pin）调优，**不需要**改代码或改本条 pin）。
+bcrypt>=4,<5

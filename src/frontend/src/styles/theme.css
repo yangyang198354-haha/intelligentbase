@@ -1,0 +1,198 @@
+/**
+ * @module MOD-IB-24
+ * @implements IFC-IB-328 运维控制台外壳（Claude 风格主题：左导航 + 右内容、深浅色、中文优先排版）
+ * @author software-developer
+ *
+ * 主题令牌（design tokens）与全局排版。
+ *
+ * ## 为什么是「令牌层」而不是在每个组件里写颜色
+ *
+ * 深浅色主题要求**同一份组件代码**在两种模式下都正确。若颜色散落在各组件的 scoped 样式里，
+ * 加一组深色规则就要改 N 个文件，且迟早出现「这个卡片在深色下是白底白字」。因此：
+ * 颜色 / 间距 / 圆角 / 字号**只**在本文件定义一次，组件一律 `var(--ib-*)` 取用。
+ *
+ * ## 为什么字体不外链
+ *
+ * 目标机在内网运行（REQ-NFR-IB-08 / AC-IB-17-06）：外链字体在断网时会让整页回退到
+ * 系统默认字体（甚至先白屏等超时）。故一律用**系统字体栈**，中文优先，不引入任何
+ * `@font-face` 外链。
+ *
+ * ## Element Plus 的变量覆盖
+ *
+ * Element Plus 自带的 `--el-color-primary` 等变量在此**被覆写**为本主题的强调色，
+ * 这样组件库内部的所有派生色（hover / active / light-3 …）自动跟随，无需逐组件覆盖。
+ */
+
+/* ------------------------------------------------------------------ */
+/* 浅色（默认）                                                        */
+/* ------------------------------------------------------------------ */
+:root {
+  /* 主色：克制的暖橙（Claude 风格），与「企业知识库」的冷静中性底形成对比 */
+  --ib-accent: #d97757;
+  --ib-accent-hover: #c96543;
+  --ib-accent-soft: #fdf3ef;
+
+  --ib-bg: #f7f6f3;
+  --ib-bg-elevated: #ffffff;
+  --ib-bg-sunken: #efece6;
+  --ib-sidebar-bg: #f0ede7;
+
+  --ib-text: #262625;
+  --ib-text-muted: #6b6862;
+  --ib-text-faint: #9a968e;
+
+  --ib-border: #e0dcd4;
+  --ib-border-strong: #cfc9be;
+
+  --ib-danger: #c0392b;
+  --ib-success: #3f8f5f;
+  --ib-warning: #b8860b;
+
+  --ib-radius: 10px;
+  --ib-radius-sm: 6px;
+  --ib-gap: 16px;
+  --ib-sidebar-width: 232px;
+
+  --ib-shadow-sm: 0 1px 2px rgba(38, 38, 37, 0.06);
+  --ib-shadow-md: 0 4px 16px rgba(38, 38, 37, 0.08);
+
+  /* 系统字体栈：中文优先，不外链任何字体文件 */
+  --ib-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Source Han Sans SC', 'Noto Sans CJK SC', sans-serif;
+  --ib-font-mono: ui-monospace, SFMono-Regular, 'JetBrains Mono', Consolas, 'Liberation Mono',
+    monospace;
+}
+
+/* ------------------------------------------------------------------ */
+/* 深色                                                                */
+/* ------------------------------------------------------------------ */
+:root[data-theme='dark'] {
+  --ib-accent: #e08a6b;
+  --ib-accent-hover: #eda283;
+  --ib-accent-soft: #3a2b25;
+
+  --ib-bg: #1c1b19;
+  --ib-bg-elevated: #262523;
+  --ib-bg-sunken: #141312;
+  --ib-sidebar-bg: #201f1d;
+
+  --ib-text: #eceae5;
+  --ib-text-muted: #a8a49c;
+  --ib-text-faint: #7c7871;
+
+  --ib-border: #35332f;
+  --ib-border-strong: #474440;
+
+  --ib-danger: #e2776a;
+  --ib-success: #6fbf8e;
+  --ib-warning: #d9b25a;
+
+  --ib-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --ib-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+/* ------------------------------------------------------------------ */
+/* Element Plus 变量覆写                                                */
+/* ------------------------------------------------------------------ */
+:root {
+  --el-color-primary: var(--ib-accent);
+  --el-color-primary-light-3: var(--ib-accent-hover);
+  --el-border-radius-base: var(--ib-radius-sm);
+  --el-font-family: var(--ib-font);
+}
+
+:root[data-theme='dark'] {
+  --el-bg-color: var(--ib-bg-elevated);
+  --el-bg-color-overlay: var(--ib-bg-elevated);
+  --el-text-color-primary: var(--ib-text);
+  --el-text-color-regular: var(--ib-text-muted);
+  --el-border-color: var(--ib-border);
+  --el-fill-color-blank: var(--ib-bg-elevated);
+}
+
+/* ------------------------------------------------------------------ */
+/* 基础排版                                                            */
+/* ------------------------------------------------------------------ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--ib-font);
+  /* 中文优先排版：正文 15px / 行高 1.6，「专业、可长时间阅读」的默认值 */
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ib-text);
+  background: var(--ib-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.5em;
+}
+
+h1 {
+  font-size: 22px;
+}
+h2 {
+  font-size: 18px;
+}
+h3 {
+  font-size: 16px;
+}
+
+code,
+pre {
+  font-family: var(--ib-font-mono);
+  font-size: 0.92em;
+}
+
+/* 焦点可见性（可访问性）：键盘用户必须能看见焦点落在哪 */
+:focus-visible {
+  outline: 2px solid var(--ib-accent);
+  outline-offset: 2px;
+}
+
+/* 主题切换的过渡：只过渡颜色，避免带动画地重排布局 */
+body,
+.ib-card {
+  transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+/* 通用卡片 */
+.ib-card {
+  background: var(--ib-bg-elevated);
+  border: 1px solid var(--ib-border);
+  border-radius: var(--ib-radius);
+  box-shadow: var(--ib-shadow-sm);
+  padding: 20px;
+}
+
+.ib-muted {
+  color: var(--ib-text-muted);
+}
+
+.ib-page-title {
+  margin: 0 0 4px;
+}
+
+.ib-page-sub {
+  margin: 0 0 20px;
+  color: var(--ib-text-muted);
+  font-size: 13px;
+}

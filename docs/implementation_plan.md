@@ -3,14 +3,14 @@
   <artifact>implementation_plan</artifact>
   <path>docs/implementation_plan.md</path>
   <doc_id>IMPL-INTELBASE-001</doc_id>
-  <version>2.6.0</version>
+  <version>2.8.0</version>
   <status>DRAFT</status>
-  <phase>GROUP_C / PHASE_05 实现计划（R7 定义外置增量 + R8 缺陷修复增量 + R10 前端构建阻断修复增量 + R11 IB-20 流式/会话增量）</phase>
+  <phase>GROUP_C / PHASE_05 实现计划（R7 定义外置增量 + R8 缺陷修复增量 + R10 前端构建阻断修复增量 + R11 IB-20 流式/会话增量 + R13 账户/会话/商用界面增量 + R13.1 回修增量 DEFECT-R13-01 来源 IP 限速修复）</phase>
   <author>software-developer</author>
   <invocation_id>INV-GROUP_C-INTELBASE-002</invocation_id>
-  <latest_invocation_id>INV-GROUP_C-INTELBASE-010</latest_invocation_id>
+  <latest_invocation_id>INV-GROUP_C-INTELBASE-013</latest_invocation_id>
   <created_at>2026-09-25</created_at>
-  <updated_at>2026-09-28</updated_at>
+  <updated_at>2026-10-06</updated_at>
   <revision_note>R1（v1.0.0）为 GROUP_C 首轮交付（69 文件 / 16,396 行 / 25 模块）。
     R2（v2.0.0）为**增量**：只做两件事 ——（L-03）实现 MOD-IB-26 `ib-embed` 服务端 + 进程内第三种 Embedder 形态；
     （M-02）实现页面图关联的生产与读路径（related_images）。**R1 内容一律保留**，本轮只追加与最小改动（见 §12）。
@@ -34,7 +34,9 @@
     ⑥**配置键**（IFC-IB-297）：`IB_DEFINITION_DOC_PATH`、`IB_VISUAL_CONFIG_ENABLED`——**仅登记键名，任何文件与响应体均不含键值**。
     **未新增模块（仍 26，MOD-IB-01~26）/ 端口 13 → 14（纯追加）/ 未改既有 IFC 签名 / 未改既有配置键名与默认值 / 未改依赖边**，只追加（见 §15）。正文 §1~§14 为 R1~R4 的**历史记录，未改写**（§1 概览表仅追加 R7 计数订正行，见 §15.1）。（R7 门控订正：INV-GROUP_C-INTELBASE-006，PM 门控 GR-C-005 复核修正版本线与计数口径。）
     R8（v2.4.0，invocation INV-GROUP_C-INTELBASE-007）为**缺陷修复增量**（输入 = GROUP_D `docs/test_report.md` §12.6 / §12.10 登记的 **FND-R7-01（MAJOR）**；协调者裁决 A / REV-08）：在 `src/ib/config/definition.py::validate` **纯追加**两项装配期校验 —— ①**跨专家路由关键词撞车**（归一化 = `strip().lower()`，对齐路由消费方 `ib/routing/intent.py::_keyword_hits`）、②**`cn_label` 唯一性**（去首尾空白后比较）；违反即产出可定位的 `ValidationErrorItem`（`expert_keyword_collision` / `expert_cn_label_duplicate`），由既有 `admit` 聚合闸门在装配期 fail-fast 拒绝。**本文件沿用自身版本线 2.3.0 → 2.4.0**（R2=2.0.0 → R3=2.1.0 → R4=2.2.0 → R7=2.3.0 → R8=2.4.0），**与 GROUP_B 三份文档的 1.3.0/R7 属各自独立版本线，不互相覆盖**。**未新增模块（仍 26）/ 未改端口数（仍 14）/ 未改任何 IFC-IB 号或签名 / 未改模块边界 / 未改 `EXPERT_SPECS` 默认数据 / 未改 validate() 既有 9 项校验的语义与顺序（仅在其后追加）**，只追加（见 §16）。正文 §1~§15 为 R1~R7 的**历史记录，未改写**。
-    R10（v2.5.0，invocation INV-GROUP_C-INTELBASE-008）为**前端构建阻断修复增量**（输入 = PM 只读取证：CI 阶段9 在 `src/frontend` 执行 `npm ci` 因**锁文件与 `package.json` 失同步**而 EUSAGE 失败，`npm run build` 永不抵达）。修三处**交付管线阻断**：①**锁同步** —— `src/frontend/package-lock.json` 内**无** `@vue-flow/core` 任何条目（R7 引入该依赖时未随锁提交），重新 `npm install` 生成，纳入 `@vue-flow/core` **1.48.2** 及其 **14 个传递包**；②**未跟踪源文件** —— `src/frontend/src/views/ConfigPage.vue`（被已跟踪的 `App.vue` 导入）此前**未纳入 git**，CI checkout 后 `vue-tsc` 必因缺文件而失败，本轮 `git add` 纳入版本控制；③**类型错误** —— `ConfigPage.vue` 导入未使用的 `type ExpertSpecInput`，在 `noUnusedLocals: true` 下直接 `TS6133` 致 `vue-tsc --noEmit` 失败，删除该无用导入。另落地**前端冒烟测试最小入口**（`package.json` 新增 `test` = `node --test`，纯 Node 内建、**零新增依赖**；含「锁与 `package.json` 同步」回归闸）并据实登记传递依赖许可于 `tech_stack.md` §2.1。**本文件沿用自身版本线 2.4.0 → 2.5.0**，**与 GROUP_B 文档属各自独立版本线**。**未新增模块（仍 26）/ 未改端口数（仍 14）/ 未改任何 IFC-IB 号或签名 / 未改后端 `src/ib`·`src/ibweb`·`src/ib_embed` 任何行为 / 未改配置键名与默认值**，只追加（见 §17）。正文 §1~§16 为 R1~R8 的**历史记录，未改写**。R11（v2.6.0，invocation INV-GROUP_C-INTELBASE-010；协调者轮次口径亦记作 **REV-12**）为 **IB-20 流式交付 / 会话生命周期的实现增量**（输入 = `docs/module_design.md` **1.4.0/R8** §2.1 / §2.2.3 / §3 + `docs/architecture_design.md` **1.4.0/R8** **ADR-17**；上一轮 REV-11 第 1 项的遗留「4 项部分覆盖 + 2 项未覆盖 AC」正是因 `IFC-IB-298~308` 尚未实现，本轮闭合）。**命名口径声明**：GROUP_B 把该设计增量记为 **R8**（`module_design.md` 1.4.0/R8），而 GROUP_C 自身的版本线在 **v2.4.0** 已用掉「R8」这一标签（FND-R7-01 修复轮）—— 故本文件按协调者本轮口径记为 **R11**，并在本节内同时标注设计侧编号 **R8/ADR-17/IFC-IB-298~308**，避免两套版本线互相覆盖。**四件事**：①**REV-12-1** 落地 `IFC-IB-298~308`（会话状态与轮次 / 持久化策略与状态丢失结局 / 完成产物与引用 / 确认中间态三件套 + `StreamEventKind` **追加** `confirmation_required` / 终态单发 `completion_event` / 可见性白名单 `is_user_visible` / 三个键名登记与 `IB_SESSION_BACKEND` 值域扩展 / 类型化恢复载荷 `ResumePayload` / 纯函数 `can_resume` / `POST /api/chat/resume` 端点 / 前端确认区呈递与决策回传约束）；②**REV-12-2** 使 `ExpertSpec.is_delegating` / `delegating_experts()` 不再是死字段（G2 专家单跳交接落地，默认关闭；**三护栏口径按 R11 补丁轮 MAJOR-2 精确改写**——护栏①③**已实现**、护栏② = 机制就绪但**组合根未接线 → 不可经配置触发**（**OPEN：GAP-R11-07**），详见 §18.3 / §18.8）；③**REV-12-3** 修 **FND-R11-01**（`chat_stream_endpoint` 缺会话标识**不得**静默回退字面量 `"default"` → 显式 4xx）；④**REV-12-4** 落地 **BLK-R8-02**（`validate()` 追加第 3 子项：**同专家内**关键词空 / 重复，**先归一化再比较**）。**本文件沿用自身版本线 2.5.0 → 2.6.0**（R2=2.0.0 → R3=2.1.0 → R4=2.2.0 → R7=2.3.0 → R8=2.4.0 → R10=2.5.0 → R11=2.6.0），**与 GROUP_B 文档的 1.4.0/R8 属各自独立版本线**。**未新增模块（仍 26）/ 未改端口数（仍 14）/ 未改任何既有 IFC-IB 号或签名文本（`IFC-IB-221~225` / `231~233` / `247` 一字未改）/ 未改模块边界 / 未改依赖边（DAG 不变）/ 未改既有配置键名与默认值（`IB_SESSION_BACKEND` **仅扩展值域**）/ 未新增第三方依赖**，只追加（见 §18）。正文 §1~§17 为 R1~R10 的**历史记录，未改写**（受保护行在 §18.7 复核）。</revision_note>
+    R10（v2.5.0，invocation INV-GROUP_C-INTELBASE-008）为**前端构建阻断修复增量**（输入 = PM 只读取证：CI 阶段9 在 `src/frontend` 执行 `npm ci` 因**锁文件与 `package.json` 失同步**而 EUSAGE 失败，`npm run build` 永不抵达）。修三处**交付管线阻断**：①**锁同步** —— `src/frontend/package-lock.json` 内**无** `@vue-flow/core` 任何条目（R7 引入该依赖时未随锁提交），重新 `npm install` 生成，纳入 `@vue-flow/core` **1.48.2** 及其 **14 个传递包**；②**未跟踪源文件** —— `src/frontend/src/views/ConfigPage.vue`（被已跟踪的 `App.vue` 导入）此前**未纳入 git**，CI checkout 后 `vue-tsc` 必因缺文件而失败，本轮 `git add` 纳入版本控制；③**类型错误** —— `ConfigPage.vue` 导入未使用的 `type ExpertSpecInput`，在 `noUnusedLocals: true` 下直接 `TS6133` 致 `vue-tsc --noEmit` 失败，删除该无用导入。另落地**前端冒烟测试最小入口**（`package.json` 新增 `test` = `node --test`，纯 Node 内建、**零新增依赖**；含「锁与 `package.json` 同步」回归闸）并据实登记传递依赖许可于 `tech_stack.md` §2.1。**本文件沿用自身版本线 2.4.0 → 2.5.0**，**与 GROUP_B 文档属各自独立版本线**。**未新增模块（仍 26）/ 未改端口数（仍 14）/ 未改任何 IFC-IB 号或签名 / 未改后端 `src/ib`·`src/ibweb`·`src/ib_embed` 任何行为 / 未改配置键名与默认值**，只追加（见 §17）。正文 §1~§16 为 R1~R8 的**历史记录，未改写**。R11（v2.6.0，invocation INV-GROUP_C-INTELBASE-010；协调者轮次口径亦记作 **REV-12**）为 **IB-20 流式交付 / 会话生命周期的实现增量**（输入 = `docs/module_design.md` **1.4.0/R8** §2.1 / §2.2.3 / §3 + `docs/architecture_design.md` **1.4.0/R8** **ADR-17**；上一轮 REV-11 第 1 项的遗留「4 项部分覆盖 + 2 项未覆盖 AC」正是因 `IFC-IB-298~308` 尚未实现，本轮闭合）。**命名口径声明**：GROUP_B 把该设计增量记为 **R8**（`module_design.md` 1.4.0/R8），而 GROUP_C 自身的版本线在 **v2.4.0** 已用掉「R8」这一标签（FND-R7-01 修复轮）—— 故本文件按协调者本轮口径记为 **R11**，并在本节内同时标注设计侧编号 **R8/ADR-17/IFC-IB-298~308**，避免两套版本线互相覆盖。**四件事**：①**REV-12-1** 落地 `IFC-IB-298~308`（会话状态与轮次 / 持久化策略与状态丢失结局 / 完成产物与引用 / 确认中间态三件套 + `StreamEventKind` **追加** `confirmation_required` / 终态单发 `completion_event` / 可见性白名单 `is_user_visible` / 三个键名登记与 `IB_SESSION_BACKEND` 值域扩展 / 类型化恢复载荷 `ResumePayload` / 纯函数 `can_resume` / `POST /api/chat/resume` 端点 / 前端确认区呈递与决策回传约束）；②**REV-12-2** 使 `ExpertSpec.is_delegating` / `delegating_experts()` 不再是死字段（G2 专家单跳交接落地，默认关闭；**三护栏口径按 R11 补丁轮 MAJOR-2 精确改写**——护栏①③**已实现**、护栏② = 机制就绪但**组合根未接线 → 不可经配置触发**（**OPEN：GAP-R11-07**），详见 §18.3 / §18.8）；③**REV-12-3** 修 **FND-R11-01**（`chat_stream_endpoint` 缺会话标识**不得**静默回退字面量 `"default"` → 显式 4xx）；④**REV-12-4** 落地 **BLK-R8-02**（`validate()` 追加第 3 子项：**同专家内**关键词空 / 重复，**先归一化再比较**）。**本文件沿用自身版本线 2.5.0 → 2.6.0**（R2=2.0.0 → R3=2.1.0 → R4=2.2.0 → R7=2.3.0 → R8=2.4.0 → R10=2.5.0 → R11=2.6.0），**与 GROUP_B 文档的 1.4.0/R8 属各自独立版本线**。**未新增模块（仍 26）/ 未改端口数（仍 14）/ 未改任何既有 IFC-IB 号或签名文本（`IFC-IB-221~225` / `231~233` / `247` 一字未改）/ 未改模块边界 / 未改依赖边（DAG 不变）/ 未改既有配置键名与默认值（`IB_SESSION_BACKEND` **仅扩展值域**）/ 未新增第三方依赖**，只追加（见 §18）。正文 §1~§17 为 R1~R10 的**历史记录，未改写**（受保护行在 §18.7 复核）。
+    R13（v2.7.0，invocation INV-GROUP_C-INTELBASE-012；设计侧口径 **REV-13**）为**账户 / 会话 / 商用界面重构增量**（输入 = `docs/module_design.md` **1.5.0/REV-13** §2.1 / §2.2 / §2.2.4 / §3 + `docs/architecture_design.md` **1.5.0/REV-13** ADR-18~ADR-27 + `docs/tech_stack.md` 1.4.0/REV-13 + `docs/requirements_spec.md` 1.4.0/REV-13（REQ-FUNC-IB-28~36 / REQ-NFR-IB-15~18 / C-IB-09 / DR-09~DR-17）；上游 GR-B-006 = PASS_WITH_CONDITIONS）。**五件事**：①**账户与会话契约 + 第 15 个端口** `AccountStore`（MOD-IB-01，IFC-IB-309~311：类型化数据结构 / 13 方法 `Protocol` / 令牌原语 `new_session_token`·`token_digest`·`token_digest_matches`）；②**键名登记**（MOD-IB-02，IFC-IB-312，**仅登记键名不含值**）；③**SQL 适配器 / bcrypt / 幂等种子 / 离线替身**（MOD-IB-11，IFC-IB-313~315：`SqliteAccountStore` 与 `MemoryAccountStore` 共用同一 SQLite 台账与同一手写 scoped 迁移机制）；④**端点 / 解析器 / 可注入策略 / 中间件扩展 / 组合根装配 / 条件性限速审计**（MOD-IB-23，IFC-IB-316~326：登录·登出·主体查询·改密·续期 + 账户 CRUD + 内置 `SessionTokenResolver` 与 `ibweb.accounts.policy` + 改密态受限会话 + `?token=` 全端点 4xx + `LoginThrottle`）；⑤**前端商用界面重构**（MOD-IB-24，IFC-IB-327~329：登录页 + 首登强制改密 + 运维控制台外壳 + `vue-router`(hash) 鉴权守卫 + 类型化 API 客户端扩展；Element Plus 与 vue-router 经 **npm 本地打包**，**禁运行期 CDN**）与**部署落点**（MOD-IB-25，IFC-IB-330~332：手写迁移 `003_accounts.sql` + nginx TLS 终止模板 + 清单 B15~B20）。**"粘贴服务令牌"入口前后端彻底移除、无旁路**；**零 Cookie**（不透明令牌仅经 `Authorization: Bearer`）；**既有可注入 `AuthzPolicy` 端口仍是唯一授权真源**（账户模块只提供 `PrincipalResolver`）；**首登强制改密为服务端受限会话（结构性不可绕过）**；**默认管理员初始口令只从 `IB_DEFAULT_ADMIN_PASSWORD` 读**（仓库 / 日志 / 响应零字面量）。**本文件沿用自身版本线 2.6.0 → 2.7.0**（R2=2.0.0 → … → R11=2.6.0 → R13=2.7.0），**与 GROUP_B 文档的 1.5.0/REV-13 属各自独立版本线**。**未新增模块（仍 26）/ 端口 14 → 15（纯追加）/ 未改任何既有 IFC-IB 号或签名文本（`IFC-IB-001~308` 一字未改）/ 未改模块边界 / 未改依赖边（DAG 不变；`module_design.md` §4.2.4 再声明）**；后端唯一新增第三方依赖 `bcrypt>=4,<5`（Apache-2.0，已登记），前端新增 Element Plus（MIT）与 vue-router（MIT）**按 DR-13 登记且本地打包**，只追加（见 §19）。**5 条架构偏差**（D-R13-01~05）在 §19.5 逐条登记。正文 §1~§18 为 R1~R11 的**历史记录，未改写**。
+    R13.1（v2.8.0，invocation INV-GROUP_C-INTELBASE-013）为 **GROUP_C 回修增量**（缺陷由 GROUP_D 门控 `condition_1` 登记并路由：**DEFECT-R13-01**（MEDIUM），可执行证据 = `tests/integration/test_accounts_int_r13.py::TC-INT-119`）。**只修一个缺陷、零新增能力**：来源 IP 维度的登录限速未生效（429 分支不可达）—— 根因是 `src/ibweb/views.py::auth_login_endpoint` **每请求** `build_throttle()` 新建一个空 `LoginThrottle`，其滑动窗口 `_hits` 为**实例态**，计数永不跨请求累积。修复：把限速器提升为**应用级单例** —— 组合根 `_assemble()` 装配期构建一次并存入 `Deps.login_throttle`（= 每应用实例一份，测试 `build_deps(force=True)` 天然隔离），登录端点经 `_login_throttle()` 取用；同时把「取账户 + 判锁定」前置于 429 判定，使**已锁定账户仍返回统一 401**（AC-IB-29-01），避免 IP 维度的 429 遮蔽账户维度锁定（否则 TC-INT-118 契约破裂）。**本文件沿用自身版本线 2.7.0 → 2.8.0**（R2=2.0.0 → … → R13=2.7.0 → R13.1=2.8.0），**与 GROUP_B 文档的 1.5.0/REV-13 属各自独立版本线**。**未新增模块（仍 26）/ 未改端口数（仍 15）/ 未改任何 IFC-IB 号或签名文本 / 未改模块边界 / 未改依赖边（DAG 不变）/ 未改配置键名与默认值 / 未新增第三方依赖 / 未改任何测试用例（`tests/**` 未触碰）**，只追加（见 §20）。正文 §1~§19 为 R1~R13 的**历史记录，未改写**。</revision_note>
   <inputs>
     <input path="docs/architecture_design.md" version="1.2.0" revision="R2" status="APPROVED (GROUP_B gate_decision=PASS / GR-B-003；文件头 status 字段仍为 DRAFT_FOR_GATE_REVIEW，以 phase_status.md 为权威 —— 见 §8 偏差 D-01)"/>
     <input path="docs/module_design.md" version="1.2.0" revision="R2" status="APPROVED（同上；R2 增补 MOD-IB-26 与 IFC-IB-266~286）"/>
@@ -1096,3 +1098,197 @@ MOD-IB-24（frontend：确认区独立呈递 + 决策回传 + 会话标识纪律
 - **未削弱既有断言**：GROUP_D 基线 **184 passed** 原样通过；selfcheck 既有 **39 例全部保留**（含 401/400/403/409 反向断言）；**未使用 skip / xfail**。
 - **只读约束**：未改 `tests/**`（GROUP_D）、`docs/phase_status.md`（PM）、设计真源四文档；未执行 `git add` / `git commit`。
 - **受保护行复核（补丁轮）**：本轮对 L37 `revision_note`、L997 §18.3 REV-12-2 行均为**同一物理行原地改写**（行数不变），并在文件末尾**追加 §18.8** → §18.7 四处「24/24 PASS」保护行当前行号**仍为 L483 / L615 / L633 / L744**（未位移）。取证：`grep -n "24/24 PASS" docs/implementation_plan.md`。
+
+## 19. R13 增量实现（账户 / 会话 / 商用界面重构：IFC-IB-309~332 + REQ-FUNC-IB-28~36；追加，不改写 §1~§18）
+
+> **依据**：`docs/module_design.md` **1.5.0/REV-13** §2.1（数据结构行）/ §2.2（端口行：第 15 个 `AccountStore`）/ §2.2.4（IFC-IB-309~332 段号索引）/ §3（MOD-IB-01 / 02 / 11 / 23 / 24 / 25 的 R13 增补）；`docs/architecture_design.md` **1.5.0/REV-13** **ADR-18~ADR-27**（账户体系归属 / 令牌摘要 / 零 Cookie / 策略单一真源 / 前端组件库 / TLS 终止 / 限速条件性）；`docs/tech_stack.md` **1.4.0/REV-13**（§1 三新行：Element Plus / vue-router / bcrypt；§1.4 客户端键登记；§4.5 第 13~18 项）；`docs/requirements_spec.md` **1.4.0/REV-13**（REQ-FUNC-IB-28~36、REQ-NFR-IB-15~18、C-IB-09、DR-09~DR-17）；`docs/user_stories.md` 1.4.0（US-IB-21~29）；上游门控 **GR-B-006 = PASS_WITH_CONDITIONS**。
+> **性质**：**只追加、不改写**。**未新增模块**（仍 **MOD-IB-01~26**，26 个）、**端口 14 → 15**（`AccountStore`，纯追加）、**依赖边零新增**（DAG 不变）、**既有 `IFC-IB-001~308` 的号 / 名 / 签名 / 字段集一字未改**。§1~§18 为 R1~R11 的历史记录，**逐字未改**。
+> **命名口径**：设计侧记为 **REV-13**（`module_design.md` 1.5.0/REV-13、`IFC-IB-309~332`），本文件自身版本线记为 **R13 / v2.7.0**（v2.6.0 已占用「R11」标签）。两套口径指向**同一批**改动。
+
+### 19.1 实现顺序（拓扑排序；被依赖模块先实现）
+
+DAG 未变（R13 **零新增依赖边**），本轮触及的模块按既有编号序执行（编号即拓扑序）：
+
+```
+MOD-IB-01（core：账户 / 会话 / 令牌类型 + 第 15 个端口 AccountStore，纯 stdlib·framework-free）
+   ↓
+MOD-IB-02（config：IFC-IB-312 键名登记，**只登记键名不含值**）
+   ↓
+MOD-IB-11（ledger：users / sessions 表 + bcrypt + SqliteAccountStore + MemoryAccountStore 替身 + 幂等种子）
+   ↓
+MOD-IB-23（ibweb：8 个端点 + SessionTokenResolver + 可注入策略模块 + AuthMiddleware 扩展 + 组合根装配）
+   ↓
+MOD-IB-24（frontend：登录页 / 首登改密 / 控制台外壳 / hash 路由守卫 / 类型化 API 客户端扩展）
+   ↓
+MOD-IB-25（deploy：手写迁移 003 + nginx TLS 模板 + 检查清单 B15~B20）
+```
+
+> 每层只 import 其前置（`ib/core` **零 Django import**，自检 `core_framework_free` 持续守护；MOD-IB-11 的 `bcrypt` 为**惰性导入**，见 `ib/ledger/__init__.py::__getattr__`，故未启用账户体系时零代价）。**无环**：本轮**零新增依赖边**（再声明见 `module_design.md` §4.2.4）。
+
+### 19.2 模块实现计划（按拓扑顺序）
+
+| 序号 | MOD-ID | 模块名 | 文件路径 | 依赖前置模块 | 复杂度 | 状态 |
+|------|--------|--------|---------|------------|--------|------|
+| 1 | MOD-IB-01 | core（账户 / 会话 / 令牌契约 + 第 15 个端口） | `src/ib/core/accounts.py`（新）、`src/ib/core/ports.py`、`src/ib/core/types.py`、`src/ib/core/__init__.py` | — | H | DONE |
+| 2 | MOD-IB-02 | config（键名登记） | `src/ib/config/__init__.py` | MOD-IB-01 | L | DONE |
+| 3 | MOD-IB-11 | ledger（SQL 适配器 / bcrypt / 种子 / 离线替身） | `src/ib/ledger/accounts.py`（新）、`src/ib/ledger/schema.py`、`src/ib/ledger/__init__.py` | MOD-IB-01 | H | DONE |
+| 4 | MOD-IB-23 | ibweb（端点 / 解析器 / 策略 / 中间件 / 装配） | `src/ibweb/accounts/__init__.py`（新）、`src/ibweb/accounts/policy.py`（新）、`src/ibweb/accounts/throttle.py`（新）、`src/ibweb/authz.py`、`src/ibweb/views.py`、`src/ibweb/urls.py`、`src/ibweb/composition.py` | 01 / 11 | H | DONE |
+| 5 | MOD-IB-24 | frontend（登录 / 控制台 / 路由 / 客户端） | `src/frontend/src/{app/env.ts,router/index.ts,layouts/ConsoleLayout.vue,stores/session.ts,stores/theme.ts,styles/theme.css,views/LoginPage.vue,views/ChangePasswordPage.vue,views/AccountsPage.vue}`（新）、`api/client.ts`、`main.ts`、`App.vue`、`env.d.ts`、`vite.config.ts`、`package.json`、`package-lock.json` | 23 | H | DONE |
+| 6 | MOD-IB-25 | deploy（迁移 / TLS 模板 / 检查清单 / 键模板） | `src/deploy/migrations/003_accounts.sql`（新）、`src/deploy/nginx/intelligentbase.conf.example`（新）、`src/deploy/env.example`、`src/deploy/checklists.txt`、`src/requirements.txt`、`src/requirements-offline.txt` | 24 | M | DONE |
+
+> **非模块交付物**：`src/scripts/selfcheck.py`（新增 5 例 R13 自检，见 §19.6）。自检脚本不是 runtime 模块，登记于此以避免与 MOD 表混淆（沿用 R2/R10 先例）。
+
+### 19.3 逐任务落点与设计依据（映射 REQ-FUNC-IB-28 ~ IB-36）
+
+| REQ / 任务 | 落点（IFC / 文件） | 实现要点 |
+|-----------|------------------|---------|
+| **REQ-FUNC-IB-28 / IB-33**（用户名密码登录，替代并移除粘贴令牌入口，无旁路；与既有 AuthzPolicy 端口协作） | `ibweb/views.py::auth_login_endpoint`（IFC-IB-316）、`ibweb/accounts/__init__.py::SessionTokenResolver`（IFC-IB-322）、`ibweb/accounts/policy.py`（IFC-IB-323）、`ibweb/authz.py`、`frontend/src/views/LoginPage.vue`（IFC-IB-327） | 登录**唯一**入口：`get_user_by_username` → `verify_password`（bcrypt） → 状态 / 锁定校验 → `issue_session(user_id, token_digest(token), expires_at=…)`；**响应体与日志零口令 / 零令牌原文**。前端**彻底删除**粘贴令牌入口（`App.vue` 改为纯 `<router-view/>`；`main.ts` 删除 `?token=` URL 迁移；`client.ts` 不再从查询串取令牌）——**删除而非隐藏**。既有注入式 `AuthzPolicy`（IFC-IB-032/033）**仍是唯一授权真源**：账户模块只提供 `PrincipalResolver`（把请求解成 `AuthzContext(actor_id, project_id, roles)`），**不做**第二套鉴权判断 |
+| **REQ-FUNC-IB-29**（不透明会话令牌 / 仅 Authorization 头 / 过期与续期 / 无 Cookie） | `ib/core/accounts.py::new_session_token / token_digest / token_digest_matches`（IFC-IB-311）、`ib/ledger/accounts.py`（sessions 表：只存 `token_digest`）、`ibweb/views.py::auth_session_renew_endpoint`（IFC-IB-320）、`ibweb/authz.py`（`?token=` 4xx） | 令牌 = `secrets.token_urlsafe(32)`（256-bit）；**库里只存 SHA-256 摘要**（读到库 ≠ 拿到可用令牌）；比较用 `hmac.compare_digest`（常量时间）。**零 Cookie**：全端点**不发** `Set-Cookie`（自检 `r13_account_http_contract` 断言全响应零 `Set-Cookie`）。续期**只补窗口不延长绝对寿命**：仅当剩余有效期 < `IB_SESSION_RENEW_WINDOW_SECONDS` 时才延长 |
+| **REQ-FUNC-IB-30**（默认管理员 + 首登强制改密；初始口令经 `IB_DEFAULT_ADMIN_PASSWORD` 注入，不落盘 / 不回显） | `ib/ledger/accounts.py::seed_default_admin`（IFC-IB-314）、`ibweb/composition.py::_seed_accounts`（IFC-IB-325）、`ibweb/authz.py::_CHANGE_PASSWORD_ALLOWLIST`、`frontend/src/views/ChangePasswordPage.vue` | 种子**幂等**（重放不覆盖既有口令）；`role=admin` / `project_id=None` / **`must_change_password=True`**。首登强制改密为**服务端受限会话**（结构性不可绕过）：改密态下中间件只放行 `GET /api/auth/me`、`POST /api/auth/change-password`、`POST /api/auth/logout`，**其余一律 `403 password_change_required`**（自检断言 `/api/accounts`、`/api/files` 均 403）。初始口令**只**从环境变量读（仓库内零字面量，见 §19.6 凭据扫描） |
+| **REQ-FUNC-IB-31 / IB-32**（管理员管理运维账户；账户:项目 = 1:1；admin 全局 / ops 全功能 + 项目边界隔离） | `ibweb/views.py::accounts_endpoint / account_disable_endpoint / account_reset_password_endpoint`（IFC-IB-321）、`ibweb/accounts/__init__.py::effective_roles / GLOBAL_PROJECT`、`ib/ledger/accounts.py`（DDL `CHECK (role='admin' OR project_id IS NOT NULL)`）、`frontend/src/views/AccountsPage.vue` | **账户 CRUD 仅管理员**：`_require_admin` 要求 `is_global(authz)` **且** `policy.can_manage(ctx)`，否则 `ScopeViolationError`（403）。`ops` 账户**必须**带 `project_id`（存储层 CHECK + 视图层 400 双保险）；**越权取消**：`disable` 清 status + **撤销该账户全部会话**；`reset-password` 置 `must_change=True` + 撤销全部会话。ops 的**功能不削减**（等同 manager 全功能），隔离**只**由项目边界实现（`X-IB-Project` 声明他项目 → 403） |
+| **REQ-FUNC-IB-34 / IB-35**（Claude 风格商用界面：左导航 + 右内容 / 暗亮主题 / 中文为主；组件库本地打包禁 CDN） | `frontend/src/layouts/ConsoleLayout.vue`、`styles/theme.css`、`stores/theme.ts`、`router/index.ts`（IFC-IB-328）、`package.json` / `package-lock.json`（IFC-IB-329）、`vite.config.ts` | **Element Plus ^2.8**（MIT）+ **vue-router ^4.4**（MIT，`createWebHashHistory`）经 **npm 本地打包**（`manualChunks` 拆分 vendor），**构建产物零外网引用**（自检 `r13_frontend_auth_discipline` 断言 index.html / main.ts / router 无 http(s) 外链）。自定义主题：`:root` 亮色令牌 + `:root[data-theme='dark']` 暗色令牌 + Element Plus 变量覆盖；字体栈含 `PingFang SC` / `Microsoft YaHei`，**无 `@font-face`**（不引外部字体）。界面文案**中文为主**。路由守卫：未登录 → `/login`；改密态 → 强制 `/change-password`；非管理员进 `requiresAdmin` 路由被拦截 |
+| **REQ-FUNC-IB-36**（登录失败限速，`[INFERRED]`） | `ibweb/accounts/throttle.py::LoginThrottle / build_throttle / audit`（IFC-IB-326） | **条件性**（ADR-27 / OQ-IB-12 未裁决）：**未设置 `IB_LOGIN_MAX_FAILURES` 即不启用**（`build_throttle()` 返回 `None`）。启用后按 `client_ip` 滑动窗口计数（防「挑用户名爆破」）；账户维度计数由 `AccountStore.record_login_failure` 承载。审计经 `ib.observability.log_event`，**只记枚举 / 状态 / 项目 id**，**函数签名本身不接受** username / user_id / 口令 / 令牌 |
+| **REQ-NFR-IB-15**（凭据存储与呈现纪律） | `ib/ledger/accounts.py::hash_password / verify_password`（IFC-IB-313）、`deploy/env.example`、`deploy/checklists.txt` [B19] | bcrypt（`$2b$` 前缀，每次 `gensalt` 随机盐）；仓库 / 日志 / 响应**零口令字面量**；初始口令**仅**经 0600 EnvironmentFile |
+| **REQ-NFR-IB-16**（传输安全 HTTPS） | `deploy/nginx/intelligentbase.conf.example`（IFC-IB-331）、`deploy/checklists.txt` [B15] | TLS 终止在 nginx；`ib-web` 仍绑 `127.0.0.1:18080`（**明文只存在于回环**）；证书 / 私钥**不进仓库**（路径为 `<REPLACE_ME…>` 占位符）；HSTS **仅以注释给出**（自签证书下启用会封死降级排障路径） |
+| **REQ-NFR-IB-17**（前端自包含 / 数据不出本机） | `frontend/package.json`、`vite.config.ts`、`styles/theme.css` | 依赖全部本地打包；**禁运行期 CDN**；**无 `@font-face` 外部字体**；`vite build` 产物自包含 |
+| **REQ-NFR-IB-18**（审计留痕，`[INFERRED]`） | `ibweb/accounts/throttle.py::audit`、`ib/ledger/accounts.py`（会话表 `revoked_at` / `last_seen_at`） | 认证事件**只记枚举与计数**（白名单字段）；会话签发 / 撤销 / 续期在台账留痕 |
+| **迁移与清单**（支撑全部上述） | `deploy/migrations/003_accounts.sql`（IFC-IB-330）、`deploy/checklists.txt` [B15]~[B20]（IFC-IB-332） | 003 为**纯追加**（只建 `users` / `sessions` 两表 + 3 索引，`CREATE … IF NOT EXISTS` 幂等，不动任何既有表 / 列）；回滚策略 = **代码回滚**（旧代码不引用新表即可启动）。新增 B15（HTTPS 生效）/ B16（零 `Set-Cookie`）/ B17（`?token=` 全端点 4xx，含 `/api/auth/*`）/ B18（首登强制改密，403 `password_change_required`）/ B19（EnvironmentFile 0600 + `IB_DEFAULT_ADMIN_PASSWORD` 唯一落点 + bcrypt `$2b$` 核对）/ B20（迁移前向 / 回滚） |
+
+### 19.4 R13 变更文件清单（`git status` 口径）
+
+**新增（21 个，全部为 R13 产出）**
+
+| 类别 | 文件 |
+|------|------|
+| core 契约 | `src/ib/core/accounts.py`（63 行） |
+| ledger 适配器 | `src/ib/ledger/accounts.py`（815 行：`hash_password` / `verify_password` / `SqliteAccountStore` / `MemoryAccountStore` / `seed_default_admin` / `build_account_store`） |
+| ibweb 账户 | `src/ibweb/accounts/__init__.py`（201 行）、`src/ibweb/accounts/policy.py`（74 行）、`src/ibweb/accounts/throttle.py`（133 行） |
+| 前端 | `src/frontend/src/app/env.ts`、`router/index.ts`、`layouts/ConsoleLayout.vue`、`stores/session.ts`、`stores/theme.ts`、`styles/theme.css`、`views/LoginPage.vue`、`views/ChangePasswordPage.vue`、`views/AccountsPage.vue`（合计 1,539 行） |
+| 部署 | `src/deploy/migrations/003_accounts.sql`（60 行）、`src/deploy/nginx/intelligentbase.conf.example`（144 行） |
+
+**修改（21 个 tracked 文件；`git diff --stat -- src` = +2,090 / −204）**
+
+`src/ib/core/{__init__,ports,types}.py`（+247）、`src/ib/config/__init__.py`（IFC-IB-312 键名登记）、`src/ib/ledger/{__init__,schema}.py`（+127）、`src/ibweb/{authz,composition,urls,views}.py`（+553）、`src/scripts/selfcheck.py`（+565，5 例 R13 自检）、`src/deploy/{env.example,checklists.txt}`（+113）、`src/requirements{,-offline}.txt`（+13，`bcrypt>=4,<5`）、`src/frontend/{package.json,package-lock.json,vite.config.ts,src/main.ts,src/App.vue,src/api/client.ts,src/env.d.ts}`。
+
+> **未触碰**（只读约束）：`tests/**`（GROUP_D 领地）、`docs/phase_status.md`（PM 领地）、设计真源四文档（`architecture_design.md` / `module_design.md` / `requirements_spec.md` / `user_stories.md` —— 已由 GROUP_B 更新，本轮**只读**）。**未执行** `git add` / `git commit`（留给协调者）。
+
+### 19.5 架构偏差记录（R13）
+
+| 偏差 ID | 偏差描述 | 原设计决策 | 偏差原因与合规性 |
+|---------|---------|-----------|----------------|
+| **D-R13-01** | 全局主体的 `AuthzContext.project_id` 用哨兵值 `"*"`（`GLOBAL_PROJECT`）承载，而非 `None` / `""` | ADR-21：admin 的 `project_id=None`（全局） | `AuthzContext.project_id` 的类型（`str`）受「**IFC-IB-001~308 一字不动**」保护，不能改为可空。以 `"*"` 哨兵使全局语义在**不动机场字段**的前提下显式可读（`"*"` 在项目 id 值域中不可能出现，无碰撞风险）。`[DEVIATION — 为守「既有契约一字不动」的硬约束，以哨兵值显式化全局语义]`。已登记于 `ibweb/accounts/__init__.py` 模块头与 `policy.py` 判据处 |
+| **D-R13-02** | `SqliteAccountStore` 增加 `revoke_sessions_for_user(user_id, *, keep_digest=None)` 方法（`AccountStore` 端口 13 方法之外） | `module_design.md` §3 MOD-IB-01：端口 `AccountStore` **恰好 13 方法** | 改密后**必须**撤销该用户其它会话（否则旧令牌在改密后仍可用 = 安全缺陷），而标准 13 方法中的 `revoke_session(token_digest)` 需**逐个**摘要才能撤销，调用方无从枚举。故按 **`upsert_chunks` 先例（D-07）**在**同组存储实现**内扩展方法：**端口协议 `AccountStore` 一字未改（仍 13 方法）**，扩展只存在于 `ib/ledger/accounts.py` 的具体实现（`MemoryAccountStore` 同签名提供，保证替身一致）。`[DEVIATION — 端口契约不变，仅在实现侧扩展内部能力，避免「改密后旧会话仍有效」]` |
+| **D-R13-03** | 前端新增 **Element Plus** 与 **vue-router** 两项 npm 依赖 | R1~R12 的 `src/frontend/package.json` 旧约定：「**刻意不加 UI 组件库**」 | 该旧约定由用户在 **REV-13 明确变更**（`requirements_spec.md` REQ-FUNC-IB-35 约束② + 决策登记 **DR-13**：Element Plus + 自定义 Claude 主题）。`package.json` 的 `_comment` 已就地改写，**留痕该决策反转**（引 DR-13），并非静默引入。**许可合规**：Element Plus（MIT）/ vue-router（MIT），`tech_stack.md` §1 / §2 已登记（§2.2 传递依赖暂标 `[待核实]`，属 GROUP_B 的许可核实动作，非本代理主张）。`[DEVIATION — 用户于 REV-13 明确变更旧约定；已按 DR-13 留痕]` |
+| **D-R13-04** | 前端构建期配置键经 `import.meta.env.VITE_IB_AUTH_LOGIN_PATH` / `VITE_IB_AUTH_SESSION_STORAGE_KEY` 读取，代码内默认值与 `tech_stack.md` §1.4 登记的键名一一对应 | `tech_stack.md` §1.4（R13 新增）：只登记键名 `IB_AUTH_LOGIN_PATH` / `IB_AUTH_SESSION_STORAGE_KEY` | Vite 的客户端注入前缀固定为 `VITE_`，故登记名需以 `VITE_IB_AUTH_*` 形式引用；**键名与语义与 §1.4 一一对应，未新增任何未登记键**（默认值 `/api/auth/login` 与 `ib_token` 与 §1.4 语义一致）。`[DEVIATION — 前缀由 Vite 机制决定，键名语义与 §1.4 登记一致]` |
+| **D-R13-05** | 主题偏好（暗 / 亮）**不持久化**（会话内有效，每次加载回到 `prefers-color-scheme`） | REQ-FUNC-IB-34：**必须**支持暗 / 亮主题切换（未规定是否跨会话记忆） | 若持久化需新增客户端存储键 → 而 `tech_stack.md` §1.4 只登记了两个键名，新增键属「悄悄扩大对外契约」；且 `scripts/selfcheck.py::frontend_config_discipline` 对前端源码有「**视图侧零持久化**（ADR-14）」的全仓断言，为 UI 偏好放宽该断言会把「哪些持久化允许」变成需逐案判断的问题。**切换功能完整可用**，仅不跨会话记忆 —— 对「系统偏好即用户偏好」的多数场景正是期望行为。**已登记为遗留 MINOR**（见 `code_review_report.md` §16），建议路径：先回设计登记键名，再持久化。`[DEVIATION — 为守 ADR-14 与「不新增未登记键」，主动缩小实现范围，并登记补救路径]` |
+
+> 除上述 5 条外，**无其他架构偏差**。特别地：**未引入** Cookie 会话 / JWT / 独立鉴权服务 / Django ORM / `contrib.auth` / 运行期 CDN / Docker / Redis / PyMuPDF（ADR-18~27 逐条遵守）。
+
+### 19.6 R13 自验证据（离线；命令可被第三方重跑）
+
+| # | 命令（cwd） | 结果 | EXIT |
+|---|------------|------|------|
+| 1 | `python -X utf8 -m compileall -q .`（`src/`） | 无语法错误（`ib/config` 与全部 R13 新文件一并纳入） | **0** |
+| 2 | `python -X utf8 scripts/selfcheck.py`（`src/`） | **45/45 通过**（R13 新增 **5 例**，见下） | **0** |
+| 3 | `python -X utf8 -m pytest tests -q`（仓库根） | **207 passed**（**无回归**） | **0** |
+| 4 | `npx vue-tsc --noEmit`（`src/frontend`） | 类型检查通过（`strict` / `noUnusedLocals`） | **0** |
+| 5 | `npx vite build`（`src/frontend`） | 构建成功（`index` 44.97 kB / gzip 17.96；`vendor-vue` 110.22；`vendor-flow` 157.24；`vendor-element` 938.89 / gzip 301.82；`css` 382.72 / gzip 52.81） | **0** |
+| 6 | `node --test`（`src/frontend`） | `tests 6 / pass 6 / fail 0`（含「锁 ↔ `package.json` 同步」回归闸） | **0** |
+| 7 | 凭据扫描（见下） | **零命中**（真凭据形态 / 口令字面量 / 部署模板内摘要或证书材料） | **0** |
+
+**R13 新增自检用例（5 例，全部离线；InMemory / 临时 SQLite + Django 进程内测试客户端，零外部网络）**
+
+| 用例 | 覆盖 | 断言要点 |
+|------|------|---------|
+| `r13_token_primitives` | IFC-IB-311 / 313 | 令牌熵与唯一性；`token_digest` 确定性；`token_digest_matches` 常量时间比较；bcrypt `gensalt` 每次不同、`checkpw` 正确；**明文不出现在摘要中** |
+| `r13_account_store_parity` | IFC-IB-310 / 313 / 315 | **断言 `AccountStore` 恰好 13 方法**；同一段行为体分别跑 `MemoryAccountStore` 与 `SqliteAccountStore` **要求语义一致**：幂等种子 / ops 1:1 项目绑定与其冲突 / list 过滤 / 会话签发·解析·过期·撤销·续期 / `revoke_sessions_for_user(keep_digest=)` / 失败计数与重置 / `set_status` / purge / `set_password` 清 `must_change`；**扫 main/-wal/-shm 三件套确认零明文且 `$2` 摘要存在** |
+| `r13_account_http_contract` | IFC-IB-316~321 | 走**完整生产鉴权路径**（`IB_AUTHZ_POLICY_MODULE=ibweb.accounts.policy`，`build_deps(force=True)`）：无令牌 401；`?token=` / `?access_token=` 400（**含 `/api/auth/login`**）；**全响应零 `Set-Cookie`**；错口令 / 未知账户**同一 401 文案**（防枚举）；登录 200 形状；改密态 403 `password_change_required`（`/api/accounts` 与 `/api/files`）；弱口令 / 与旧同口令被拒；改密成功后旧会话**被撤销**；账户列表**无 `password_hash`**；create 201 / 重名 409 / 缺 `project_id` 400 / 非 ops 角色 400；项目过滤；ops 登录 → 既有改密 200 → `/api/files` 200 → `/api/accounts` **403 scope_violation**；续期 200；登出 204 后再用 401；reset-password 200；disable 200 后登录 401（同文案）；未知账户 disable / reset 404 |
+| `r13_frontend_auth_discipline` | IFC-IB-327~329 | Element Plus / vue-router 已声明；**无 axios**；index.html / main.ts / router **无外部 http(s)**；`App.vue` **结构性无**令牌输入（无 `<input` / `setToken(` / `type="password"`）；main.ts **无** `location.search` / URL 令牌迁移；router 用 hash history + `beforeEach` + `bootstrap` + `mustChangePassword`；`client.ts` 含全部端点 + `Authorization`/`Bearer` + **无** `?token=`（**先剥离注释**再断言）+ 无 localStorage 存令牌；`theme.css` 含暗色令牌 + **无 `@font-face`** + CJK 字体栈 |
+| `r13_deploy_discipline` | IFC-IB-330~332 | 003 幂等 DDL + 必需列 + `002` 存在；nginx 模板含 `ssl_certificate`/`_key`、`127.0.0.1:18080`、`proxy_buffering off;`、Authorization 透传、`<REPLACE_ME`、**零证书 / 私钥材料**、**无生效的 HSTS 行**；env.example 含全部 R13 键名、`IB_DEFAULT_ADMIN_PASSWORD=<REPLACE_ME`、`ibweb.accounts.policy`；checklists 含 [B15]~[B20] 与签署行「B1–B20」；**新增**：R13 键名在**唯一真源** `ib.config.IB_RUNTIME_ENV_KEYS`（IFC-IB-312）内有登记，且**未**混入 `IB_ENV_KEYS` |
+
+**凭据扫描（#7 展开；命令可被第三方重跑）**
+
+| 扫描项 | 命令要点 | 结果 |
+|--------|---------|------|
+| 真凭据形态 | `grep -rInE 'sk-[A-Za-z0-9]{16,}\|ghp_[A-Za-z0-9]{20,}\|-----BEGIN [A-Z ]*PRIVATE KEY\|eyJ[A-Za-z0-9_-]{20,}\.' src` | **0 命中** |
+| 初始口令字面量 | `grep -rIn 'IB_DEFAULT_ADMIN_PASSWORD' src docs` | 仅**键名引用**（注释 / 校验命令 / `env.example:113` = `<REPLACE_ME_generated_random_password>`），**无任何值** |
+| 部署模板内摘要 / 证书材料 | `grep -rInE '\$2[aby]\$[0-9]{2}\$\|BEGIN CERTIFICATE\|PRIVATE KEY' src/deploy` | 唯一命中 = `checklists.txt` 中**校验命令自身的模式串**（元引用，非凭据） |
+
+### 19.7 冻结约束复核（R13）
+
+- **契约纪律**：**既有 `IFC-IB-001~308` 的号 / 名 / 签名 / 字段集一字未改**（含 R11 受保护的 `221~225` / `231~233` / `247` / `306`）；只**新增** `IFC-IB-309~332`；端口 **14 → 15**（纯追加）；模块 **26 不变**；**依赖边零新增**。
+- **未新增第三方运行时依赖（后端）**：唯一新增是 `bcrypt>=4,<5`（Apache-2.0，非 copyleft），经 `tech_stack.md` §1 / §2 登记；**未引入** Docker / Redis / PyMuPDF / Cookie 会话 / JWT / Django ORM / `contrib.auth`。**前端**新增 Element Plus（MIT）+ vue-router（MIT），按 DR-13 登记，**本地打包、禁运行期 CDN**。
+- **凭据纪律**：**代码 / 文档 / 日志 / 响应零口令字面量**；初始口令**只**从 `IB_DEFAULT_ADMIN_PASSWORD` 读（0600 EnvironmentFile）；令牌**仅**经 `Authorization: Bearer`；`?token=` / `?access_token=` 在**全部端点**（含 `/api/auth/*`）返回 4xx。
+- **未削弱既有断言**：`pytest` **207 passed**（无回归）；selfcheck 既有 **40 例全部保留**（含 401/400/403/409 反向断言）；**未使用** skip / xfail。
+- **fail-closed**：生产缺 `IB_AUTHZ_POLICY_MODULE` → `StartupError`（服务**不启动**）；改密态**服务端受限会话**（allowlist 之外一律 403），非前端遮挡。
+- **只读约束**：未改 `tests/**`（GROUP_D）、`docs/phase_status.md`（PM）、设计真源四文档；未执行 `git add` / `git commit`；**未部署**、未触碰任何生产目标。
+- **知识库/记忆**：本轮新增 5 条 R13 经验，写入 `.claude/agents/knowledge_base/software_developer/`（见 §19.8）。
+
+### 19.8 本轮知识蒸馏（KB）
+
+| 动作 | 条目 | 类型 | 置信度 | 来源 |
+|------|------|------|--------|------|
+| CREATE | KE-DEV-013「契约项有指定落点模块时，必须在**该模块**落地；只在消费点读取不算实现」 | heuristic | 0.8 | 本轮 §19 起草时发现 IFC-IB-312 未落到 MOD-IB-02，自查后补做 |
+| CREATE | KE-DEV-014「端口协议禁改时，用**实现侧扩展方法**满足新需求（`upsert_chunks` / `revoke_sessions_for_user` 先例），并登记 `[DEVIATION]`」 | pattern | 0.8 | D-R13-02 |
+| CREATE | KE-DEV-015「Windows 上自检用临时 SQLite 必须显式 close + `TemporaryDirectory(ignore_cleanup_errors=True)`，否则清理异常会**掩盖真实断言失败**」 | exception | 0.8 | `r13_account_store_parity` 修复过程 |
+| CREATE | KE-DEV-016「结构化日志 `log_event(stage, outcome, **extra)`：`outcome` 是**位置参数**，不可再放入 `**extra`（否则 `TypeError` 静默吞掉审计事件）」 | exception | 0.8 | `throttle.py::audit` 修复过程 |
+| CREATE | KE-DEV-017「源码纪律自检若断言『某字符串不得出现』，必须先**剥离注释**，否则解释性注释会造成假阳性」 | exception | 0.7 | `r13_frontend_auth_discipline` 修复过程 |
+
+## 20. R13.1 回修增量（DEFECT-R13-01：来源 IP 维度登录限速未生效；追加，不改写 §1~§19）
+
+> **依据**：GROUP_D 门控 `condition_1` 登记的 **DEFECT-R13-01**（MEDIUM；可执行证据 = `tests/integration/test_accounts_int_r13.py::TC-INT-119`，实测序列 `[401, 401, 401, 401]`）；缺陷路由 = software-developer（`src/ibweb/views.py` / 组合根接线）。关联 REQ-FUNC-IB-36（`[INFERRED]`，IP 维度登录限速）/ AC-IB-29-01。
+
+### 20.1 缺陷与根因
+
+| 项 | 内容 |
+|----|------|
+| 缺陷号 | DEFECT-R13-01（MEDIUM） |
+| 现象 | 配置来源 IP 维度失败阈值（`IB_LOGIN_MAX_FAILURES=3`）后，同一 IP 连续 4 次错误登录仍全部 401，**429 分支不可达**（TC-INT-119 FAIL） |
+| 根因 | `src/ibweb/views.py::auth_login_endpoint` 在**每个请求内**调用 `build_throttle()` 新建一个空 `LoginThrottle`；`LoginThrottle._hits`（`src/ibweb/accounts/throttle.py`）是**实例状态**，`record_failure()` 写入的对象随请求结束被 GC，故滑动窗口**永不跨请求累积**，`check()` 恒 `allow=True` |
+| 对照（为何 118 原已 PASS） | 账户维度锁定经 `AccountStore.record_login_failure` **持久化**于用户记录（`views.py` 读 `user.locked_until`），与 IP 维度无关 |
+
+### 20.2 修复方案（最小改动，零新增能力）
+
+1. **限速器提升为应用级单例（装配期构建一次、按请求复用）**：
+   - `src/ibweb/composition.py`：`Deps` 新增字段 `login_throttle: Any = None`；`_assemble()` 新增步骤 **4e**，装配期调用一次 `build_throttle()` 并存入该字段。
+   - `src/ibweb/views.py`：新增 `_login_throttle()`，从 `composition.get_deps()` 取 `Deps.login_throttle`；`auth_login_endpoint` 改用之，**不再每请求 `build_throttle()`**。
+   - **每应用实例一份**（非进程级全局）：生产装配幂等故等价单例；测试每次 `build_deps(force=True)` 得到全新空窗口 → **用例隔离**，无跨用例状态泄漏。
+   - 未配置 `IB_LOGIN_MAX_FAILURES` → `build_throttle()` 返回 `None` → 不启用（ADR-27 语义不变）。
+2. **账户锁定优先于 IP 限速（保持 TC-INT-118 契约）**：把「取账户 + 判锁定」前置于 429 判定，仅 `not locked` 才走 IP 滑动窗口。理由：账户维度锁定是**权威结论**，已锁定账户必须返回**统一 401**（AC-IB-29-01，不泄露「已锁定」）；若被 IP 维度的 429 遮蔽，会引入「账户是否已锁定」的侧信道，并使 TC-INT-118 回归失败。
+
+> **未修改测试**：本节方案以「同时满足 TC-INT-118 与 TC-INT-119」为约束求解，`tests/**` 零改动。
+
+### 20.3 影响文件与版本
+
+| 文件 | 改动 | 版本 |
+|------|------|------|
+| `src/ibweb/composition.py` | `Deps.login_throttle` 字段 + `_assemble()` 步骤 4e + 头部 `@implements` 补记 IFC-IB-326 装配 | — |
+| `src/ibweb/views.py` | 移除 `build_throttle` 导入；新增 `_login_throttle()`；登录端点改用应用级限速器 + 锁定优先的 429 判定 | — |
+| `docs/implementation_plan.md` | 本 §20 + 头部 2.7.0 → **2.8.0** + `latest_invocation_id` | v2.8.0 |
+| `docs/code_review_report.md` | 回修自查节（见该文件 §17） | — |
+| `tests/**` | **零改动**（未迎合实现改测试、未 skip/xfail） | — |
+
+### 20.4 架构偏差记录
+
+无新增架构偏差（D-R13-01~05 保持不变）。本次「账户锁定优先于 IP 限速」的判定顺序属既有 **AC-IB-29-01** 契约的**兑现**，非偏离任何 ADR。
+
+### 20.5 自验证据（离线；命令可被第三方重跑）
+
+| 命令 | 结果 | EXIT |
+|------|------|------|
+| `python -m pytest tests/integration/test_accounts_int_r13.py -q -k "TC_INT_118 or TC_INT_119"` | **2 passed**（118 与 119 同时绿） | 0 |
+| `python -m pytest tests/unit -q` | **95 passed** | 0 |
+| `python -m pytest tests/integration -q` | **123 passed** | 0 |
+| `python -m pytest tests/e2e -q` | **21 passed** | 0 |
+| `python -m pytest tests -q` | **239 passed**（基线 239/239 不回退） | 0 |
+| `python -m compileall -q src` | 无输出 | 0 |
+| `python src/scripts/selfcheck.py` | **45/45 通过** | 0 |
+| `cd src/frontend && node --test` | **13/13 pass**（未触碰前端） | 0 |
+
+### 20.6 冻结约束复核（R13.1）
+
+- **未改测试用例**：`tests/**` 与 `src/frontend/tests/**` 一字未动；未使用 skip / xfail / 削弱既有断言。
+- **未新增能力 / 未回退既有实现**：只把已有的 `LoginThrottle` 由「请求级临时对象」改为「应用级复用实例」+ 调整判定顺序；账户 CRUD / 会话 / 端点契约均未改。
+- **凭据纪律**：未引入 Cookie / session；令牌仍仅经 `Authorization: Bearer`；本次改动不涉及任何口令 / 令牌 / 密钥的读写或落盘。
+- **依赖纪律**：未新增任何第三方依赖；`langchain-openai<0.3` / `langchain-core>=0.3,<2.0` 未触碰；未引入 Docker / PyMuPDF。
+- **只读约束**：未 `git add` / `commit` / `push`；未部署；未触碰任何生产目标；未改设计真源四文档与 `docs/phase_status.md`。

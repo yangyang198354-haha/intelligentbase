@@ -119,6 +119,31 @@ IB_RUNTIME_ENV_KEYS: tuple[str, ...] = (
     "IB_CONFIRMATION_GATE_ENABLED",
     "IB_SESSION_PERSISTENCE_POLICY",
     "IB_REASONING_STREAM_ENABLED",
+    # R13（IFC-IB-312）：账户 / 会话 / 令牌的键名登记。**只登记键名，不含任何值**；
+    # 本条**不进入 `IB_ENV_KEYS`**（那是 MOD-IB-01 的核心装配开关集合，声明「不得新增 / 改名」），
+    # 账户后端的选择由 MOD-IB-23 组合根在装配期读取（`ib/ledger/accounts.py::build_account_store`）。
+    #   IB_ACCOUNT_BACKEND —— 账户存储后端，取值 `sqlite`（默认）或 `memory`（离线 / 测试替身）。
+    #   IB_SESSION_TTL_SECONDS —— 会话有效期（秒）。**默认值 TBD**（[ARCH-ASSUMPTION-A9] / OQ-IB-09 /
+    #                            [TBD-T22]）；实现取保守默认（见 ibweb/accounts/__init__.py），非安全开关。
+    #   IB_SESSION_RENEW_WINDOW_SECONDS —— 续期窗口（剩余有效期低于该值才允许 `renew`），
+    #                                     使会话**不能**被无限续期（每次续期只补足窗口，不延长绝对寿命）。
+    #   IB_DEFAULT_ADMIN_USERNAME —— 默认管理员用户名（**默认 `admin`；用户名非机密**，可入文档）。
+    #   IB_DEFAULT_ADMIN_PASSWORD —— 默认管理员**初始口令**：**值只允许经 0600 `EnvironmentFile` 注入**；
+    #                               **代码 / 文档 / 日志 / 响应中不得出现其字面量**（C-IB-09 / REQ-NFR-IB-15）。
+    #   IB_PASSWORD_MIN_LENGTH —— 口令最小长度（**策略细节 TBD**；OQ-IB-11）。
+    #   IB_LOGIN_MAX_FAILURES / IB_LOGIN_LOCK_SECONDS —— 登录失败阈值与锁定窗口（**条件性**：
+    #                               OQ-IB-12 未裁决前不启用；ADR-27；未设置即不限速）。
+    #   IB_AUTHZ_POLICY_MODULE —— **既有键，语义与默认不变**；其**可取值**新增内置账户模块路径
+    #                               `ibweb.accounts.policy`（沿用 R2「仅扩展值域；键名与默认值不变」先例）。
+    "IB_ACCOUNT_BACKEND",
+    "IB_SESSION_TTL_SECONDS",
+    "IB_SESSION_RENEW_WINDOW_SECONDS",
+    "IB_DEFAULT_ADMIN_USERNAME",
+    "IB_DEFAULT_ADMIN_PASSWORD",
+    "IB_PASSWORD_MIN_LENGTH",
+    "IB_LOGIN_MAX_FAILURES",
+    "IB_LOGIN_LOCK_SECONDS",
+    "IB_AUTHZ_POLICY_MODULE",
 )
 
 #: v1 支持的 4 种格式（**OQ-IB-02 默认值**：其余格式按扩展点预留，不实现）。

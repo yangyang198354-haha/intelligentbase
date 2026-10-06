@@ -64,10 +64,26 @@ from ib.core import (
     NotFoundError,
     ScopeViolationError,
     ValidationError,
+    new_session_token,
+    token_digest,
 )
+from ib.context import iso_plus_seconds, parse_iso, utc_now_iso
 from ib.observability import log_event
 from ibweb import composition
-from ibweb.authz import REQUEST_CTX_ATTR, get_policy
+from ibweb.accounts import (
+    GLOBAL_PROJECT,
+    is_global,
+    load_account_settings,
+    validate_password_strength,
+)
+from ibweb.accounts.throttle import audit
+from ibweb.authz import (
+    AUTHZ_ATTR,
+    REQUEST_CTX_ATTR,
+    get_authz,
+    get_policy,
+    parse_bearer,
+)
 from ibweb.serializers import (
     DefinitionConfigInputSerializer,
     DefinitionDocumentSerializer,
@@ -97,6 +113,15 @@ __all__ = [
     "healthz_endpoint",
     "healthz_deps_endpoint",
     "definition_config_endpoint",
+    # R13 账户 / 会话（IFC-IB-316~321）
+    "auth_login_endpoint",
+    "auth_logout_endpoint",
+    "auth_me_endpoint",
+    "auth_change_password_endpoint",
+    "auth_session_renew_endpoint",
+    "accounts_endpoint",
+    "account_disable_endpoint",
+    "account_reset_password_endpoint",
 ]
 
 #: 分页上限：**服务端硬上限**（不接受客户端指定更大的值）。
@@ -898,3 +923,409 @@ def _put_definition_config(request: Any) -> Any:
 
     log_event("definition_config", "saved", project_id=project_id)
     return _json(SaveResultSerializer().to_representation(result), status.HTTP_200_OK)
+
+
+# --------------------------------------------------------------------------- #
+# R13（IFC-IB-316 ~ 321）：账户 / 会话端点
+# --------------------------------------------------------------------------- #
+#
+# 全程**仅** `Authorization` 头鉴权（`/api/auth/login` 免鉴权是例外 —— 登录尚无令牌）；
+# **不接受** `?token=`（中间件的 `forbidden_token_in_query` 先于公共路径判断，新端点自动受约束）。
+#
+# 响应**不回显**任何口令 / 令牌 / bcrypt 摘要；`GET /api/auth/me` 与 `GET /api/accounts`
+# 只输出 `AccountSummary`（无 `password_hash`）。登录失败**统一** 401，不区分「不存在 / 口令错 / 停用」。
+
+
+def _account_summary(user: Any) -> dict[str, Any]:
+    """`AccountSummary` 的 JSON 形态（IFC-IB-309；**不含 password_hash**）。"""
+    return {
+        "user_id": user.user_id,
+        "username": user.username,
+        "role": user.role,
+        "project_id": user.project_id,
+        "status": user.status,
+        "must_change_password": bool(user.must_change_password),
+    }
+
+
+def _unauthenticated() -> Any:
+    """统一凭据错误（401；**不区分**失败原因，防存在性 / 状态探测预言机）。"""
+    return _json(
+        {"error": {"code": "unauthenticated", "message": "用户名或口令不正确"}},
+        status.HTTP_401_UNAUTHORIZED,
+    )
+
+
+def _no_content() -> Any:
+    from django.http import HttpResponse
+
+    return HttpResponse(status=204)
+
+
+def _json_body(request: Any) -> dict[str, Any]:
+    """解析 JSON 请求体；非法 → `ValidationError`（→ 400），**不回显原文**。"""
+    raw = request.body or b""
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        raise ValidationError("请求体不是合法 JSON") from exc
+    if not isinstance(data, dict):
+        raise ValidationError("请求体必须是 JSON 对象")
+    return data
+
+
+def _client_ip(request: Any) -> str:
+    """取客户端 IP（经 nginx 时优先 `X-Forwarded-For` 首跳）。仅用于限速，不作鉴权。"""
+    forwarded = (request.META.get("HTTP_X_FORWARDED_FOR") or "").strip()
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return (request.META.get("REMOTE_ADDR") or "").strip()
+
+
+def _require_admin(request: Any) -> Any:
+    """账户 CRUD 的权限前置：必须是**全局主体**（admin）且策略允许管理（→ 否则 403）。
+
+    项目绑定账户（ops）的 `project_id` 非哨兵，故被拦在门外；授权判定仍经注入的
+    `AuthzPolicy`（ADR-22），「全局」是主体属性而非第二套授权逻辑。
+    """
+    ctx = _ctx_of(request)
+    authz = get_authz(request)
+    if authz is None or not is_global(authz) or not get_policy(request).can_manage(ctx.authz):
+        raise ScopeViolationError("该操作仅限管理员账户")
+    return ctx
+
+
+def _account_store() -> Any:
+    deps = composition.get_deps()
+    store = getattr(deps, "account_store", None)
+    if store is None:
+        raise DependencyUnavailableError("账户存储不可用", dependency="ledger")
+    return store
+
+
+def _login_throttle() -> Any:
+    """取**应用级**登录限速器（IFC-IB-326）。
+
+    ## 为什么取装配期的那个实例，而不是每请求 `build_throttle()`
+
+    `LoginThrottle` 的滑动窗口计数器 `_hits` 是**实例状态**：每请求新建一个实例，
+    就等于每次都拿到一个空窗口 —— `record_failure()` 写进的对象在请求结束时被丢弃，
+    计数**永不跨请求累积**，`check()` 恒 `allow=True`，429 分支不可达（DEFECT-R13-01）。
+
+    正确用法是在**组合根装配期**构建一次（`Deps.login_throttle`）并跨请求复用。
+    挂在 `Deps` 上即「每应用实例一份」：生产装配幂等故为单例；测试每次 `force` 装配
+    得到全新空窗口，用例之间不互相泄漏计数。
+
+    未配置 `IB_LOGIN_MAX_FAILURES` 时 `Deps.login_throttle` 为 `None` → 不启用限速
+    （ADR-27 / OQ-IB-12 未裁决前不纳入默认施工）。
+    """
+    deps = composition.get_deps(required=False)
+    return getattr(deps, "login_throttle", None) if deps is not None else None
+
+
+def auth_login_endpoint(request: Any) -> Any:
+    """`POST /api/auth/login`（IFC-IB-316）。
+
+    `200 {token, expires_at, must_change_password, user}` | `401`（统一凭据错误）|
+    `429`（条件性限速，OQ-IB-12）| `400`（缺参）。令牌**只在此处一次性返回**，不落库不落日志。
+    """
+    if request.method != "POST":
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+    try:
+        payload = _json_body(request)
+        username = str(payload.get("username") or "").strip()
+        password = str(payload.get("password") or "")
+        if not username or not password:
+            raise ValidationError("缺少用户名或口令")
+        store = _account_store()
+        now = utc_now_iso()
+        user = store.get_user_by_username(username)
+        locked = bool(user is not None and user.locked_until and user.locked_until > now)
+
+        # 来源 IP 维度限速（IFC-IB-326）：对**未锁定账户**的尝试生效。
+        # 为什么把「取账户 + 判锁定」放在限速判定之前：账户维度锁定是**权威结论**，
+        # 已锁定账户必须返回统一 401（AC-IB-29-01：不泄露「已锁定」）；若先按 IP 返回 429，
+        # 就会用 429 遮蔽 401，使「账户是否已锁定」可被侧信道区分（TC-INT-118 契约破裂）。
+        # 未锁定 / 未知账户仍走 IP 滑动窗口 —— 第 N 次失败后 429（TC-INT-119）。
+        throttle = _login_throttle()
+        client_ip = _client_ip(request)
+        if throttle is not None and not locked and not throttle.check(username, client_ip).allow:
+            audit("login", outcome="login_throttled", status="throttled")
+            return _json(
+                {
+                    "error": {
+                        "code": "too_many_requests",
+                        "message": "登录尝试过于频繁，请稍后再试",
+                    }
+                },
+                status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        verified = False
+        if user is not None and not locked:
+            from ib.ledger import verify_password
+
+            verified = verify_password(password, user.password_hash)
+
+        if user is None or not verified:
+            if user is not None and not locked:
+                store.record_login_failure(user.user_id, now=now)
+            if throttle is not None:
+                throttle.record_failure(client_ip)
+            audit("login", outcome="login_failed", status="rejected")
+            return _unauthenticated()
+
+        if user.status != "active":
+            audit("login", outcome="login_failed", status="disabled")
+            return _unauthenticated()
+
+        store.reset_login_failures(user.user_id)
+        if throttle is not None:
+            throttle.record_success(client_ip)
+
+        settings = load_account_settings()
+        token = new_session_token()
+        expires_at = iso_plus_seconds(settings.session_ttl_seconds)
+        store.issue_session(user.user_id, token_digest(token), expires_at=expires_at)
+        audit("login", outcome="login_success", status="ok")
+        return _json(
+            {
+                "token": token,
+                "expires_at": expires_at,
+                "must_change_password": bool(user.must_change_password),
+                "user": _account_summary(user),
+            },
+            status.HTTP_200_OK,
+        )
+    except IbError as exc:
+        return error_response(exc)
+
+
+def auth_logout_endpoint(request: Any) -> Any:
+    """`POST /api/auth/logout`（IFC-IB-317）→ `204`（撤销当前会话）| `401`。"""
+    if request.method != "POST":
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+    token = parse_bearer(request.META.get("HTTP_AUTHORIZATION", ""))
+    if not token:
+        return _unauthenticated()
+    try:
+        _account_store().revoke_session(token_digest(token), now=utc_now_iso())
+        audit("logout", outcome="logout", status="ok")
+        return _no_content()
+    except IbError as exc:
+        return error_response(exc)
+
+
+def auth_me_endpoint(request: Any) -> Any:
+    """`GET /api/auth/me`（IFC-IB-318）→ `200 {user_id, username, role, project_id, must_change_password}`。"""
+    if request.method != "GET":
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+    try:
+        ctx = _ctx_of(request)
+        user = _account_store().get_user(ctx.authz.actor_id)
+        if user is None:
+            return _unauthenticated()
+        return _json(
+            {
+                "user_id": user.user_id,
+                "username": user.username,
+                "role": user.role,
+                "project_id": user.project_id,
+                "must_change_password": bool(user.must_change_password),
+            },
+            status.HTTP_200_OK,
+        )
+    except IbError as exc:
+        return error_response(exc)
+
+
+def auth_change_password_endpoint(request: Any) -> Any:
+    """`POST /api/auth/change-password`（IFC-IB-319）。
+
+    `{old_password, new_password}` → `200`（成功后撤销**其他**会话并清除改密态）|
+    `400`（强度不满足 / 原口令不正确，**不回显口令**）| `401` | `403`（改密态下仅此端点等）。
+    """
+    if request.method != "POST":
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+    try:
+        ctx = _ctx_of(request)
+        payload = _json_body(request)
+        old_password = str(payload.get("old_password") or "")
+        new_password = str(payload.get("new_password") or "")
+        store = _account_store()
+        user = store.get_user(ctx.authz.actor_id)
+        if user is None:
+            return _unauthenticated()
+        from ib.ledger import hash_password, verify_password
+
+        if not verify_password(old_password, user.password_hash):
+            audit("change_password", outcome="bad_old_password", status="rejected")
+            return _json(
+                {"error": {"code": "bad_old_password", "message": "原口令不正确"}},
+                status.HTTP_400_BAD_REQUEST,
+            )
+        problem = validate_password_strength(new_password)
+        if problem:
+            return _json(
+                {"error": {"code": "weak_password", "message": problem}},
+                status.HTTP_400_BAD_REQUEST,
+            )
+        if new_password == old_password:
+            return _json(
+                {"error": {"code": "weak_password", "message": "新口令不得与原口令相同"}},
+                status.HTTP_400_BAD_REQUEST,
+            )
+        store.set_password(user.user_id, hash_password(new_password), must_change=False)
+        token = parse_bearer(request.META.get("HTTP_AUTHORIZATION", ""))
+        keep = token_digest(token) if token else None
+        store.revoke_sessions_for_user(user.user_id, now=utc_now_iso(), keep_digest=keep)
+        audit("change_password", outcome="password_changed", status="ok")
+        return _json({"ok": True, "must_change_password": False}, status.HTTP_200_OK)
+    except IbError as exc:
+        return error_response(exc)
+
+
+def auth_session_renew_endpoint(request: Any) -> Any:
+    """`POST /api/auth/session/renew`（IFC-IB-320）→ `200 {expires_at}` | `401`（fail-closed）。
+
+    仅当剩余有效期低于 `IB_SESSION_RENEW_WINDOW_SECONDS` 时才真正延长（避免会话无限续期）。
+    """
+    if request.method != "POST":
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+    token = parse_bearer(request.META.get("HTTP_AUTHORIZATION", ""))
+    if not token:
+        return _unauthenticated()
+    try:
+        now = utc_now_iso()
+        store = _account_store()
+        digest = token_digest(token)
+        session = store.resolve_session(digest, now=now)
+        if session is None:
+            return _unauthenticated()
+        settings = load_account_settings()
+        remaining = (parse_iso(session.expires_at) - parse_iso(now)).total_seconds()
+        if remaining > settings.renew_window_seconds:
+            return _json({"expires_at": session.expires_at}, status.HTTP_200_OK)
+        new_expires = iso_plus_seconds(settings.session_ttl_seconds)
+        renewed = store.renew_session(digest, new_expires_at=new_expires, now=now)
+        if renewed is None:
+            return _unauthenticated()
+        audit("session", outcome="renewed", status="ok")
+        return _json({"expires_at": renewed.expires_at}, status.HTTP_200_OK)
+    except IbError as exc:
+        return error_response(exc)
+
+
+def accounts_endpoint(request: Any) -> Any:
+    """`GET|POST /api/accounts`（IFC-IB-321，**仅 admin**）。
+
+    GET → `200 {items: [AccountSummary]}`（`?project_id=` 可选过滤，缺省 = 全量）；
+    POST → `201 AccountSummary` | `409`（用户名冲突）| `400`（强度 / 绑定缺失）| `403`。
+    """
+    try:
+        _require_admin(request)
+        store = _account_store()
+        if request.method == "GET":
+            raw_project = (request.GET.get("project_id") or "").strip()
+            users = store.list_users(raw_project or None)
+            return _json({"items": [_account_summary(u) for u in users]}, status.HTTP_200_OK)
+        if request.method == "POST":
+            payload = _json_body(request)
+            username = str(payload.get("username") or "").strip()
+            password = str(payload.get("password") or "")
+            project_id = str(payload.get("project_id") or "").strip()
+            role = str(payload.get("role") or "ops").strip() or "ops"
+            if not username or not password:
+                raise ValidationError("缺少用户名或口令")
+            if role != "ops":
+                raise ValidationError("账户角色只能为 ops（管理员由种子产生）")
+            if not project_id:
+                raise ValidationError("ops 账户必须绑定 project_id")
+            problem = validate_password_strength(password)
+            if problem:
+                return _json(
+                    {"error": {"code": "weak_password", "message": problem}},
+                    status.HTTP_400_BAD_REQUEST,
+                )
+            from ib.ledger import hash_password
+
+            user = store.create_user(username, hash_password(password), "ops", project_id)
+            audit("account", outcome="created", status="ok", project_id=project_id)
+            return _json(_account_summary(user), status.HTTP_201_CREATED)
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+    except IbError as exc:
+        return error_response(exc)
+
+
+def account_disable_endpoint(request: Any, user_id: str) -> Any:
+    """`POST /api/accounts/{user_id}/disable`（IFC-IB-321）→ `200 AccountSummary`（并撤销其全部会话）。"""
+    if request.method != "POST":
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+    try:
+        _require_admin(request)
+        store = _account_store()
+        if store.get_user(user_id) is None:
+            raise NotFoundError("账户不存在或不在可见范围内")
+        updated = store.set_status(user_id, "disabled")
+        store.revoke_sessions_for_user(user_id, now=utc_now_iso())
+        audit("account", outcome="disabled", status="ok")
+        return _json(_account_summary(updated), status.HTTP_200_OK)
+    except IbError as exc:
+        return error_response(exc)
+
+
+def account_reset_password_endpoint(request: Any, user_id: str) -> Any:
+    """`POST /api/accounts/{user_id}/reset-password`（IFC-IB-321，**条件性** OQ-IB-14）。
+
+    `{new_password}` → `200 {user_id, must_change_password: true}`。新口令**不落日志**；
+    重置后撤销其全部会话，并强制其下次登录改密。
+    """
+    if request.method != "POST":
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+    try:
+        _require_admin(request)
+        payload = _json_body(request)
+        new_password = str(payload.get("new_password") or "")
+        store = _account_store()
+        if store.get_user(user_id) is None:
+            raise NotFoundError("账户不存在或不在可见范围内")
+        problem = validate_password_strength(new_password)
+        if problem:
+            return _json(
+                {"error": {"code": "weak_password", "message": problem}},
+                status.HTTP_400_BAD_REQUEST,
+            )
+        from ib.ledger import hash_password
+
+        store.set_password(user_id, hash_password(new_password), must_change=True)
+        store.revoke_sessions_for_user(user_id, now=utc_now_iso())
+        audit("account", outcome="password_reset", status="ok")
+        return _json({"user_id": user_id, "must_change_password": True}, status.HTTP_200_OK)
+    except IbError as exc:
+        return error_response(exc)

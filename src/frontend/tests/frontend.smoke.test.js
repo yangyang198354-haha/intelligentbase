@@ -141,3 +141,106 @@ describe('R10 前端冒烟：@vue-flow/core 打包与锁同步', () => {
     );
   });
 });
+
+// --------------------------------------------------------------------------- //
+// R13 前端冒烟：登录 / 会话 / 控制台外壳 / 零旁路（TC-FE-007 ~ TC-FE-013）
+//
+// 溯源：US-IB-21（登录 + 无粘贴令牌入口）、US-IB-22（首登改密）、US-IB-23（账户管理
+//       requiresAdmin）、US-IB-25（无 Cookie / 仅 Authorization）、US-IB-26（左导航 +
+//       右内容 / 主题 / 中文 / 无 CDN）、US-IB-27（会话态）。
+// 说明：本项目无组件测试框架，此处做**源码结构**断言（与既有 R10 层同一策略）；
+//       对 App.vue 的断言刻意采用**结构性**判据（<input / setToken 等），避免被散文误触发。
+// --------------------------------------------------------------------------- //
+
+const r13 = {
+  app: join(root, 'src', 'App.vue'),
+  main: join(root, 'src', 'main.ts'),
+  client: join(root, 'src', 'api', 'client.ts'),
+  session: join(root, 'src', 'stores', 'session.ts'),
+  theme: join(root, 'src', 'stores', 'theme.ts'),
+  router: join(root, 'src', 'router', 'index.ts'),
+  login: join(root, 'src', 'views', 'LoginPage.vue'),
+  changePw: join(root, 'src', 'views', 'ChangePasswordPage.vue'),
+  accounts: join(root, 'src', 'views', 'AccountsPage.vue'),
+  layout: join(root, 'src', 'layouts', 'ConsoleLayout.vue'),
+};
+
+/** 去掉 `/* … *​/` 与 `// …` 注释后再断言 —— 避免把文档里「我们不再做 X」的说明误判为 X。 */
+const stripComments = (text) =>
+  text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+describe('R13 前端冒烟：登录 / 会话 / 控制台外壳 / 零旁路', () => {
+  it('7. App.vue 不再有「粘贴访问令牌」入口（结构性判据，非散文）', () => {
+    const text = stripComments(readText(r13.app));
+    assert.match(text, /<router-view\s*\/>/, 'App.vue 应为路由出口');
+    assert.doesNotMatch(text, /<input\b/, 'App.vue 不得再出现任何输入框（含粘贴令牌入口）');
+    assert.doesNotMatch(text, /setToken\(|saveToken|v-model/, 'App.vue 不得保留令牌写入入口');
+    assert.doesNotMatch(text, /type="password"/, 'App.vue 不得内含口令输入（应在登录页）');
+  });
+
+  it('8. main.ts 不再从 URL 读令牌（零 `?token=` 迁移分支）', () => {
+    const text = stripComments(readText(r13.main));
+    assert.doesNotMatch(text, /searchParams|location\.search|access_token|setToken\(/,
+      'main.ts 不得保留从 URL 读取 / 写入令牌的逻辑');
+    assert.match(text, /setUnauthorizedHandler\(/, '全局 401 处理应接到会话层');
+    assert.match(text, /\.use\(router\)/, '应挂载路由');
+  });
+
+  it('9. 登录页结构（用户名 + 口令，统一错误文案防枚举）', () => {
+    const text = stripComments(readText(r13.login));
+    assert.match(text, /autocomplete="username"/, '缺少用户名输入');
+    assert.match(text, /type="password"/, '缺少口令输入');
+    assert.match(text, /autocomplete="current-password"/, '口令输入应声明 current-password');
+    assert.match(text, /session\.login\(/, '登录应经会话层');
+    assert.match(text, /用户名或口令不正确/, '登录失败应统一文案');
+    assert.doesNotMatch(text, /用户不存在|账户不存在|用户名已存在/, '登录页不得提示账户是否存在');
+  });
+
+  it('10. 路由守卫：hash 模式 + 未登录→登录 + 改密→改密页 + requiresAdmin', () => {
+    const text = stripComments(readText(r13.router));
+    assert.match(text, /createWebHashHistory/, '应使用 hash 路由（避免刷新深链接 404）');
+    assert.match(text, /beforeEach/, '缺少准入守卫');
+    assert.match(text, /session\.bootstrap\(\)/, '守卫应先经 /api/auth/me 确认身份');
+    assert.match(text, /name: 'login'/, '未登录应跳登录页');
+    assert.match(text, /change-password/, '改密态应跳改密页');
+    assert.match(text, /mustChangePassword/, '守卫应处理改密态');
+    assert.match(text, /requiresAdmin/, '账户管理页应标注 requiresAdmin');
+    assert.match(text, /session\.isAdmin/, 'requiresAdmin 应以会话角色判定');
+  });
+
+  it('11. 控制台外壳：左导航 + 右内容 + 主题切换 + 中文', () => {
+    const text = stripComments(readText(r13.layout));
+    assert.match(text, /<aside\b/, '缺少左侧导航');
+    assert.match(text, /<main\b/, '缺少右侧内容区');
+    assert.match(text, /toggleTheme/, '缺少主题切换');
+    assert.match(text, /requiresAdmin/, '导航应按 requiresAdmin 过滤');
+    assert.match(text, /管理员|运维/, '角色文案应为中文');
+  });
+
+  it('12. 会话令牌只经 sessionStorage + Authorization（无 Cookie / 无 localStorage）', () => {
+    const client = stripComments(readText(r13.client));
+    const others = [r13.session, r13.theme].map((p) => stripComments(readText(p))).join('\n');
+    assert.match(client, /sessionStorage/, '令牌应存 sessionStorage');
+    assert.match(client, /Authorization/, '每个请求应显式注入 Authorization');
+    assert.match(client, /Bearer/, '应使用 Bearer 方案');
+    for (const [name, text] of [['client.ts', client], ['session/theme.ts', others]]) {
+      assert.doesNotMatch(text, /document\.cookie/, `${name} 不得读写 Cookie`);
+      assert.doesNotMatch(text, /localStorage\.(get|set|remove)Item/, `${name} 不得持久化到 localStorage`);
+    }
+  });
+
+  it('13. R13 依赖本地打包 + 锁同步 + 源码零 CDN', () => {
+    const pkg = readJson(pkgPath);
+    const lock = readJson(lockPath);
+    for (const name of ['element-plus', 'vue-router']) {
+      assert.ok(pkg.dependencies[name], `package.json 缺少 R13 依赖 ${name}`);
+      assert.ok(lock.packages[`node_modules/${name}`], `package-lock.json 未解析 ${name}（npm ci 会 EUSAGE）`);
+    }
+    for (const p of [r13.app, r13.main, r13.client, r13.layout, r13.login, r13.router]) {
+      const text = readText(p);
+      for (const host of FORBIDDEN_CDN_HOSTS) {
+        assert.ok(!text.includes(host), `${p} 出现公网 CDN 引用：${host}`);
+      }
+    }
+  });
+});

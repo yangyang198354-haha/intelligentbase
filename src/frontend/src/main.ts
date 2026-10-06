@@ -1,29 +1,60 @@
 /**
  * @module MOD-IB-24
- * @implements IFC-IB-256/257/258 应用引导
+ * @implements IFC-IB-327 / 328 应用引导（路由 + 主题 + 会话）
  * @author software-developer
  *
- * 应用入口。
+ * 应用入口（R13 重写）。
  *
- * ## 令牌为什么从 `sessionStorage` 读，而不是从 URL 读
+ * ## 令牌不再从 URL 读
  *
- * 支持 `?token=` 会把令牌写进浏览器历史、Referer 头与 nginx 访问日志 ——
- * FreeArk 已经因为 WS 令牌出现在查询串而泄露过一次。因此前端**只在启动时**从
- * `sessionStorage` 取令牌；没有就引导用户经密码框输入（或由接入方的统一登录页写入）。
- * `sessionStorage` 而非 `localStorage`：关闭标签页即失效，减少共享设备上的长期暴露。
+ * R1~R12 在此处有一条「从 `?token=` 迁移旧令牌」的兼容分支。R13 **删除**了它：
+ * 登录改为用户名 + 口令（IFC-IB-316），令牌由 `POST /api/auth/login` 返回并由
+ * `ApiClient` 写入 `sessionStorage` —— URL 里**不存在**任何把令牌传进来的合法途径。
+ * 留着兼容分支等于保留一条「令牌可经 URL 进入系统」的通道（会被 nginx 访问日志完整
+ * 记录，FreeArk 已因此泄露过一次），与 R13 的纪律直接冲突。
+ *
+ * ## 401 的全局处理在这里接上
+ *
+ * `client.ts` 在**唯一**的 401 发生点回调一次，此处把它接到会话层：清态并跳登录页。
+ * 页面因此不再需要各自监听 `unauthorized`（R1~R12 的 `@unauthorized` 写法仍可用，
+ * 但新页面不必再接）。
  */
+
 import { createApp } from 'vue';
+import ElementPlus from 'element-plus';
+import zhCn from 'element-plus/es/locale/lang/zh-cn';
+// Element Plus 基础样式与**深色变量**（后者提供 html.dark 下的组件配色）
+import 'element-plus/dist/index.css';
+import 'element-plus/theme-chalk/dark/css-vars.css';
+
+import './styles/theme.css';
 
 import App from './App.vue';
-import { apiClient } from './api/client';
+import { client, session } from './app/env';
+import { router } from './router';
+import { initTheme } from './stores/theme';
+import { setUnauthorizedHandler } from './api/client';
 
-// 一次性迁移：若旧版把令牌放在 URL 上，取出来立刻从地址栏抹掉（避免继续被日志记录），
-// 且**不**保留在 history 里。
-const urlToken = new URLSearchParams(window.location.search).get('token');
-if (urlToken) {
-  sessionStorage.setItem('ib_token', urlToken);
-  const cleaned = window.location.pathname + window.location.hash;
-  window.history.replaceState(null, '', cleaned);
-}
+initTheme();
 
-createApp(App, { client: apiClient }).mount('#app');
+// 全局 401：清会话态 + 回登录页。用 `replace` 而非 `push`，避免用户按「后退」又回到
+// 一个必然 401 的页面（那会形成「后退 → 401 → 跳登录 → 后退」的死循环观感）。
+setUnauthorizedHandler(() => {
+  session.clear();
+  const current = router.currentRoute.value;
+  if (current.name !== 'login') {
+    void router.replace({ name: 'login', query: { next: current.fullPath } });
+  }
+});
+
+const app = createApp(App);
+app.use(ElementPlus, { locale: zhCn });
+app.use(router);
+app.mount('#app');
+
+// 会话续期（IFC-IB-320）：临近到期时静默延长，避免用户正打字时被踢回登录页。
+// 15 分钟一次是保守取值 —— 真正的「是否该延长」由服务端按 renew 窗口决定。
+const RENEW_INTERVAL_MS = 15 * 60 * 1000;
+window.setInterval(() => {
+  if (client.token) void session.renew();
+}, RENEW_INTERVAL_MS);

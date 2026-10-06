@@ -7,15 +7,15 @@
 | 文档 ID | DOC-IB-TP-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 测试计划 |
 | 产出代理 | test-engineer |
-| 调用 ID | INV-GROUP_D-INTELBASE-010（R12 增量；原 INV-GROUP_D-INTELBASE-001 ~ -009） |
+| 调用 ID | INV-GROUP_D-INTELBASE-010（R12 增量）；**R13 增量 = INV-GROUP_D-INTELBASE-012**（见 §18）；原 INV-GROUP_D-INTELBASE-001 ~ -009 |
 | 项目 | intelligentbase |
-| 阶段 | GROUP_D / PHASE_07（测试计划）+ R7 增量（US-IB-17 / US-IB-18「UI 可视化配置」纳入测试范围）+ **R8 增量（FND-R7-01 修复回归：装配期唯一性校验）** + **R9 增量（FLAKE-IB-01 测试侧稳定性治理：连接级有界重试）** + **R10 增量（前端冒烟测试层正式化：`src/frontend/tests/frontend.smoke.test.js` 6 例纳入测试计划）** + **R11 增量（REQ-FUNC-IB-20 测试补全：US-IB-19「流式交付最终答复」/ US-IB-20「会话生命周期」纳入测试范围，含 5 条既有用例重挂 + 13 条新增）** + **R12 增量（R8 实现到位后的补测轮 REV-12-5：闭合 AC-IB-19-02 / AC-IB-20-04，补全 19-03 / 20-02 / 20-03 / 20-05 与 FND-R11-01 / BLK-R8-02，新增 16 条）** |
-| 版本 | 1.7.0（**R12 增量（REV-12-5，补测轮）**：R8 设计（IFC-IB-298~308）**已落地于 `src/`**，本轮把 R11 登记的 2 项「未覆盖」AC（AC-IB-19-02 / AC-IB-20-04）**闭合**、4 项「部分覆盖」补全，并回补 **FND-R11-01**（`/api/chat/stream` 缺 `session_id` → 400）与 **BLK-R8-02**（专家**内部**关键词空/重复 → `expert_keyword_empty` / `expert_keyword_duplicate`）；**Python 三层用例数 184 → 200**（unit 70→76 / integration 96→105 / e2e 18→19，编号只增不改）；**前端冒烟层 6 例仍自立一层、不计入 200**）<br>1.6.1（R11 修复补丁：§3.2 主登记表 TC-INT-039 的归属列补齐为 US-IB-19 / AC-IB-19-01；用例数不变 184）<br>1.6.0（R11 增量：171 → 184；US-IB-19 / US-IB-20 纳入；5 条重挂 + 13 条新增）<br>R10 = 1.5.1（用例数不变 171；前端冒烟层 6 例独立计数）<br>R9 = 1.4.0（用例数不变 171；FLAKE-IB-01 → MITIGATED）<br>**版本线**：1.0.0(R1) → 1.1.0(R3) → 1.2.0(R7) → 1.3.0(R8) → 1.4.0(R9) → 1.5.0(R10) → 1.5.1(R10 修复) → 1.6.0(R11) → 1.6.1(R11 修复补丁) → **1.7.0(R12 补测)**；执行报告文件版本线另见 `docs/test_report.md` 1.8.0/R12） |
+| 阶段 | GROUP_D / PHASE_07（测试计划）+ R7 增量（US-IB-17 / US-IB-18「UI 可视化配置」纳入测试范围）+ **R8 增量（FND-R7-01 修复回归：装配期唯一性校验）** + **R9 增量（FLAKE-IB-01 测试侧稳定性治理：连接级有界重试）** + **R10 增量（前端冒烟测试层正式化：`src/frontend/tests/frontend.smoke.test.js` 6 例纳入测试计划）** + **R11 增量（REQ-FUNC-IB-20 测试补全：US-IB-19「流式交付最终答复」/ US-IB-20「会话生命周期」纳入测试范围，含 5 条既有用例重挂 + 13 条新增）** + **R12 增量（R8 实现到位后的补测轮 REV-12-5：闭合 AC-IB-19-02 / AC-IB-20-04，补全 19-03 / 20-02 / 20-03 / 20-05 与 FND-R11-01 / BLK-R8-02，新增 16 条）** + **R13 增量（REV-13：US-IB-21 ~ US-IB-29 账户体系 / 会话 / 前端商用界面纳入测试范围；新增 32 条 Python + 7 条前端；登记 DEFECT-R13-01）** |
+| 版本 | 1.8.0（**R13 增量（REV-13）**：US-IB-21 ~ US-IB-29 纳入测试范围；Python 三层用例数 **200 → 239**（unit 76→95 / integration 105→123 / e2e 19→21；其中 **+7 为基线对账项**，见 §18.6）；前端冒烟层 **6 → 13** 例、仍自立一层不计入 239；新增登记 **DEFECT-R13-01**（IP 维度限速未生效））<br>1.7.0（**R12 增量（REV-12-5，补测轮）**：R8 设计（IFC-IB-298~308）**已落地于 `src/`**，本轮把 R11 登记的 2 项「未覆盖」AC（AC-IB-19-02 / AC-IB-20-04）**闭合**、4 项「部分覆盖」补全，并回补 **FND-R11-01**（`/api/chat/stream` 缺 `session_id` → 400）与 **BLK-R8-02**（专家**内部**关键词空/重复 → `expert_keyword_empty` / `expert_keyword_duplicate`）；**Python 三层用例数 184 → 200**（unit 70→76 / integration 96→105 / e2e 18→19，编号只增不改）；**前端冒烟层 6 例仍自立一层、不计入 200**）<br>1.6.1（R11 修复补丁：§3.2 主登记表 TC-INT-039 的归属列补齐为 US-IB-19 / AC-IB-19-01；用例数不变 184）<br>1.6.0（R11 增量：171 → 184；US-IB-19 / US-IB-20 纳入；5 条重挂 + 13 条新增）<br>R10 = 1.5.1（用例数不变 171；前端冒烟层 6 例独立计数）<br>R9 = 1.4.0（用例数不变 171；FLAKE-IB-01 → MITIGATED）<br>**版本线**：1.0.0(R1) → 1.1.0(R3) → 1.2.0(R7) → 1.3.0(R8) → 1.4.0(R9) → 1.5.0(R10) → 1.5.1(R10 修复) → 1.6.0(R11) → 1.6.1(R11 修复补丁) → **1.7.0(R12 补测)**；执行报告文件版本线另见 `docs/test_report.md` 1.8.0/R12） |
 | status | DRAFT（待 PM 门控） |
 | 创建日期 | 2026-09-26 |
-| 更新日期 | 2026-09-28（R12 增量（REV-12-5）：闭合 AC-IB-19-02 / AC-IB-20-04 + 补测 + §16） |
-| 上游输入 | `docs/user_stories.md`（**1.3.0 / APPROVED，20 US / 101 AC**；R11 新增 US-IB-19 / US-IB-20，共 11 组 G/W/T）、`docs/requirements_spec.md`（**1.3.0 / APPROVED**，含 REQ-FUNC-IB-20 承接（US-IB-19/20）与 REQ-FUNC-IB-25/26/27）、`docs/implementation_plan.md`（**2.6.0 / R11–R12**，GROUP_C 门控 GR-C-005 = R7_PASS；其文件头 `<status>` 字段仍为 DRAFT，以 `docs/phase_status.md` 为权威）、`docs/architecture_design.md`（**1.4.0 / R8**，ADR-17 + IFC-IB-298~308）/ `docs/module_design.md`（**1.4.0 / R8**，§9.6 逐 AC 归属）/ `docs/tech_stack.md`（**1.3.0 / R7**）、`docs/code_review_report.md`（R7 增量 §12）、`docs/cicd_pipeline.md`（**1.1.1 / R10**，阶段9 定义）、`src/ib/**` + `src/ibweb/**` + `src/ib_embed/**` + `src/frontend/**`（只读） |
-| 下游产物 | `docs/test_report.md`（PHASE_08/09 执行报告；R7 增量见其 §12、R8 增量见其 §13、R9 增量见其 §14、R10 增量见其 §15、R11 增量见其 §16、R12 增量见其 §17） |
+| 更新日期 | 2026-10-06（R13 增量（REV-13）：US-IB-21 ~ US-IB-29 纳入 + §18） |
+| 上游输入 | `docs/user_stories.md`（**1.4.0 / APPROVED，29 US**；R11 新增 US-IB-19 / US-IB-20，**R13 新增 US-IB-21 ~ US-IB-29，29 组 AC-IB-21-* ~ AC-IB-29-***；GROUP_C R13 实现门控 **GR-C-009 = PASS_WITH_CONDITIONS**）、`docs/requirements_spec.md`（**1.3.0 / APPROVED**，含 REQ-FUNC-IB-20 承接（US-IB-19/20）与 REQ-FUNC-IB-25/26/27）、`docs/implementation_plan.md`（**2.6.0 / R11–R12**，GROUP_C 门控 GR-C-005 = R7_PASS；其文件头 `<status>` 字段仍为 DRAFT，以 `docs/phase_status.md` 为权威）、`docs/architecture_design.md`（**1.4.0 / R8**，ADR-17 + IFC-IB-298~308）/ `docs/module_design.md`（**1.4.0 / R8**，§9.6 逐 AC 归属）/ `docs/tech_stack.md`（**1.3.0 / R7**）、`docs/code_review_report.md`（R7 增量 §12）、`docs/cicd_pipeline.md`（**1.1.1 / R10**，阶段9 定义）、`src/ib/**` + `src/ibweb/**` + `src/ib_embed/**` + `src/frontend/**`（只读） |
+| 下游产物 | `docs/test_report.md`（PHASE_08/09 执行报告；R7 增量见其 §12、R8 增量见其 §13、R9 增量见其 §14、R10 增量见其 §15、R11 增量见其 §16、R12 增量见其 §17、**R13 增量见其 §18**） |
 | 环境约束 | 全部测试离线可跑：SQLite/内存替身/临时文件系统；**严禁**连接生产库 / 真实 Qdrant / DeepSeek / bge-m3 真实服务 / 任何外部网络 |
 | 凭据纪律 | 任何 secret 只经环境变量注入，测试代码与夹具中不含真实 token/key/密码 |
 ---
@@ -1037,3 +1037,147 @@ selfcheck 31/31；含抖动靶点复跑）见 `docs/test_report.md` **§14**。
 - **前端冒烟层**（独立）：沿用 R10，**6/6**。
 - **命令与原始输出**见 `docs/test_report.md` §17 与 `docs/evidence/groupd_r12_*.log`。
 - **门控结论（本代理自评）**：三层全绿、算术一致、编号只增不改、2 项未覆盖 AC 闭合 → 建议 **PASS**；残余 3 项（§16.5）**不阻塞**通过率，仅登记待后续轮（前端运行期 / 部署面 / 端到端装配来源）。
+
+---
+
+## §18 R13 增量（REV-13：账户体系 / 会话 / 前端商用界面纳入测试范围）
+
+> 触发：**REV-13（Task REV-13-4）**。上游 GROUP_C R13 实现门控 **GR-C-009 = PASS_WITH_CONDITIONS**（42 文件，CRITICAL 0）。
+> 调用 ID：**INV-GROUP_D-INTELBASE-012**。本轮把 `user_stories.md` **1.4.0** 新增的 **US-IB-21 ~ US-IB-29**（29 组 AC）纳入测试范围，
+> 新增 **32 条 Python 用例**（unit 12 / integration 18 / e2e 2）与 **7 条前端冒烟用例**（TC-FE-007 ~ TC-FE-013，计入前端独立层）。
+> 硬约束：**未改 `src/**`**、**未改 `docs/phase_status.md`**、**未 commit / 未 push / 未部署**；测试代码内**无任何真实凭据**（口令占位符仅经 `IB_DEFAULT_ADMIN_PASSWORD` 注入）。
+> **编号只增不改**：既有最高编号为 TC-UNIT-082 / TC-INT-104 / TC-E2E-019 / TC-FE-006；本轮新增一律紧接其后续编，既有用例**未改一行**。
+
+### 18.1 测试策略与范围（R13）
+
+- **范围（in-scope）**：US-IB-21 用户名/口令登录与「零粘贴令牌入口」；US-IB-22 首登强制改密；US-IB-23 账户 CRUD + 1:1 项目绑定 + ops 403；US-IB-24 项目内全功能 / 跨项目 403 / admin 全局；US-IB-25 会话携带·过期·续期·无 Cookie；US-IB-26 前端商用界面（源码结构层）；US-IB-27 与既有 `AuthzPolicy` 端口协作（**零第二授权真源** / fail-closed）；US-IB-28 HTTPS 部署**静态可验证面**；US-IB-29 登录失败限速与审计（`[INFERRED]`）。
+- **范围（out-of-scope）**：生产 TLS **运行期握手**、真实浏览器**渲染与交互**、外部网络 / 真实 Qdrant / DeepSeek / bge-m3（离线约束）。
+- **测试环境**：Python 3.14.6 / pytest 9.1.1 / Django 6.0.6 / bcrypt 5.0.0；内存账户存储 + `SqliteAccountStore`（临时文件）；Django test Client（进程内）；前端 `node --test`（Node 内建，**零新增依赖**）。
+- **夹具（`tests/conftest.py` 新增）**：
+  - `accounts_app` —— **生产形态**装配（显式 `IB_AUTHZ_POLICY_MODULE=ibweb.accounts.policy`，使 `build_authz` 走 `SessionTokenResolver` + `AccountsPolicy`）、内存账户后端、TTL 3600s / 续期窗口 600s；
+  - `locked_accounts_app` —— 同上并启用**账户级锁定阈值 = 3**（AC-IB-29-01 锁定回归）；
+  - 环境变量经 `monkeypatch` **全程保持**（`load_account_settings()` 在**请求期**读取；若装配后即还原，请求期将回落默认值、测试失真 —— 此为本轮修正的一个夹具缺陷，见报告 §18.6）；
+  - 助手 `login` / `bearer` / `change_password`（**只**经 `Authorization: Bearer` 头，绝不进查询串）。
+- **覆盖率目标（沿用 §6）**：单元 ≥ 80%、集成 ≥ 90%、E2E 关键路径 100%。
+
+### 18.2 测试用例清单（新增）
+
+**（A）单元层（UNIT）—— `tests/unit/test_accounts_unit_r13.py`（12 条）**
+
+| TC-ID | 所属 US | 关联 AC | 级别 | 描述 |
+|-------|--------|--------|------|------|
+| TC-UNIT-083 | US-IB-25 | AC-IB-25-01 | UNIT | 令牌原语：不透明、唯一、服务端只存 sha256 摘要（原文不入库） |
+| TC-UNIT-084 | US-IB-22/23 | AC-IB-22-01、AC-IB-23-01、AC-IB-23-02 | UNIT | `MemoryAccountStore` 建户语义 + 1:1 绑定（ops 无项目即拒） |
+| TC-UNIT-085 | US-IB-22 | AC-IB-22-03 | UNIT | 口令只落 bcrypt 摘要（`$2…`），永不落明文 |
+| TC-UNIT-086 | US-IB-25 | AC-IB-25-01、AC-IB-25-02 | UNIT | 会话签发 / 解析 / 过期 / 撤销语义 |
+| TC-UNIT-087 | US-IB-25 | AC-IB-25-03 | UNIT | 续期：`expires_at` 前滑、**`issued_at` 不变**（滑动窗口，不延长绝对寿命） |
+| TC-UNIT-088 | US-IB-22/23 | AC-IB-23-03 | UNIT | `revoke_sessions_for_user`：全撤 / 保留当前（改密撤其余会话） |
+| TC-UNIT-089 | US-IB-22 | AC-IB-22-01 | UNIT | `seed_default_admin` 幂等且不覆盖既有口令；首登置 `must_change_password` |
+| TC-UNIT-090 | US-IB-27/24/23 | AC-IB-27-01、AC-IB-24-03、AC-IB-23-03、AC-IB-27-03 | UNIT | `SessionTokenResolver` fail-closed + 角色 + 全局哨兵 `"*"` + **无授权方法**（零第二真源） |
+| TC-UNIT-091 | US-IB-22 | AC-IB-22-02 | UNIT | 口令强度策略边界 |
+| TC-UNIT-092 | US-IB-27/29 | AC-IB-27-01、AC-IB-29-01、AC-IB-29-02 | UNIT | `AccountsPolicy` / `LoginThrottle` / `build_throttle` / `audit` 签名（审计不含凭据字段） |
+| TC-UNIT-093 | US-IB-23/25 | AC-IB-23-01、AC-IB-23-02、AC-IB-25-01 | UNIT | `SqliteAccountStore` 真实往返 + CHECK 约束（1:1 绑定） |
+| TC-UNIT-094 | US-IB-27 | AC-IB-27-02、AC-IB-27-03 | UNIT | `build_authz` 缺策略 → `StartupError`（fail-closed）+ 策略模块加载 |
+
+**（B）集成层（INT）—— `tests/integration/test_accounts_int_r13.py`（15 条）+ `tests/integration/test_accounts_deploy_int_r13.py`（3 条）**
+
+| TC-ID | 所属 US | 关联 AC | 级别 | 描述 |
+|-------|--------|--------|------|------|
+| TC-INT-105 | US-IB-21/25 | AC-IB-21-01、AC-IB-25-04 | INT | 登录成功签发令牌、响应**不回显凭据** |
+| TC-INT-106 | US-IB-21 | AC-IB-21-02 | INT | 未知账户与错口令返回**逐字相同** 401（防枚举），不签发令牌 |
+| TC-INT-107 | US-IB-22 | AC-IB-22-01、AC-IB-22-02 | INT | 首登受限会话：仅白名单（me / change-password / logout）放行，其余端点 403 `password_change_required` |
+| TC-INT-108 | US-IB-22/25 | AC-IB-22-02、AC-IB-25-01 | INT | 改密强度校验 + 改密后**撤销其余会话** |
+| TC-INT-109 | US-IB-25 | AC-IB-25-01、AC-IB-25-03 | INT | 有效令牌校验 / 登出撤销 / 临近过期续期 |
+| TC-INT-110 | US-IB-25 | AC-IB-25-02 | INT | 过期令牌访问受保护接口 → 401 |
+| TC-INT-111 | US-IB-23 | AC-IB-23-01、AC-IB-23-02、AC-IB-23-03 | INT | 账户 CRUD（仅 admin）+ 绑定 + 停用后不得登录 |
+| TC-INT-112 | US-IB-23 | AC-IB-23-04 | INT | ops（非 admin）执行账户管理 → 403 |
+| TC-INT-113 | US-IB-24 | AC-IB-24-01、AC-IB-24-02、AC-IB-24-03 | INT | 项目内全功能（上传）/ 跨项目 403 / admin 全局放行 |
+| TC-INT-114 | US-IB-23 | AC-IB-23-03 | INT | 已停用账户登录 → 统一 401 |
+| TC-INT-115 | US-IB-21 | AC-IB-21-04 | INT | `?token=` / `?access_token=` 在**所有**端点 → 400 `token_in_query_forbidden` |
+| TC-INT-116 | US-IB-25 | AC-IB-25-04 | INT | 登录 / me / accounts / files 响应**零 `Set-Cookie`** |
+| TC-INT-117 | US-IB-21/27 | AC-IB-21-03、AC-IB-27-01 | INT | 离线令牌（`EnvTokenResolver`）**不得**触达账户管理面 → 403 |
+| TC-INT-118 | US-IB-29 | AC-IB-29-01 | INT | **账户维度**锁定：连续失败达阈值后即使口令正确亦拒 |
+| TC-INT-119 | US-IB-29 | AC-IB-29-01 | INT | **来源 IP 维度**限速 → 期望 429。**本用例暴露实现缺陷 DEFECT-R13-01（当前恒 401，429 分支不可达）** → 见报告 §18.6 |
+| TC-INT-120 | US-IB-28 | AC-IB-28-01、AC-IB-28-02 | INT | nginx TLS 模板：`listen 443 ssl` + 证书占位符 + 回环 `127.0.0.1:18080` + `Authorization` 透传 + `proxy_buffering off` + **零证书材料**；HTTP 块仅跳转 |
+| TC-INT-121 | US-IB-28/27 | REQ-NFR-IB-15、AC-IB-27-02 | INT | R13 九键登记于唯一真源 `IB_RUNTIME_ENV_KEYS` 且不混入冻结的 `IB_ENV_KEYS`；`env.example` 仅占位符；迁移 003 摘要列 + CHECK；检查清单 [B15]~[B20] |
+| TC-INT-122 | US-IB-28 | REQ-FUNC-IB-30 | INT | 迁移 003 与运行时 `ensure_schema()` **列级单源一致**（`PRAGMA table_info` 比对） |
+
+**（C）E2E 层（关键路径）—— `tests/e2e/test_accounts_journeys_r13.py`（2 条）**
+
+| TC-ID | 所属 US | 关联 AC | 级别 | 描述 |
+|-------|--------|--------|------|------|
+| TC-E2E-020 | US-IB-21 + 22 + 23 + 24 + 25 | AC-IB-21-01、AC-IB-22-01/02、AC-IB-23-01/03、AC-IB-24-01/02 | E2E | 完整旅程：admin 首登 → 改密前 403 → 改密 → 建 ops(p_alpha) → ops 首登改密 → 项目内上传 201 → 跨项目 403 → 登出 401 → 停用后拒登 |
+| TC-E2E-021 | US-IB-21 | AC-IB-21-03、AC-IB-21-04 | E2E | 无粘贴令牌旁路旅程：各视图端点 `?token=` 一律 400、登录仅 JSON 体、全响应零 Cookie |
+
+**（D）前端冒烟层（FE，独立层）—— `src/frontend/tests/frontend.smoke.test.js` 追加（7 条，层内合计 13）**
+
+| TC-ID | 所属 US | 关联 AC | 级别 | 描述 |
+|-------|--------|--------|------|------|
+| TC-FE-007 | US-IB-21 | AC-IB-21-03 | FE | `App.vue` 不再有「粘贴访问令牌」入口（结构性判据：无 `<input>` / 无 `setToken` / 无 `v-model`） |
+| TC-FE-008 | US-IB-21 | AC-IB-21-03 | FE | `main.ts` 不再从 URL 读令牌；全局 401 接会话层；挂载路由 |
+| TC-FE-009 | US-IB-21 | AC-IB-21-01、AC-IB-21-02 | FE | 登录页结构（用户名 + 口令）+ **统一失败文案**，不提示账户是否存在 |
+| TC-FE-010 | US-IB-22/23 | AC-IB-22-01、AC-IB-23-04 | FE | 路由守卫：hash 模式 + 未登录→登录 + 改密态→改密页 + `requiresAdmin` 以 `isAdmin` 判定 |
+| TC-FE-011 | US-IB-26 | AC-IB-26-01、AC-IB-26-02、AC-IB-26-03 | FE | 控制台外壳：左 `<aside>` + 右 `<main>` + 主题切换 + `requiresAdmin` 过滤导航 + 中文角色文案 |
+| TC-FE-012 | US-IB-25 | AC-IB-25-04 | FE | 令牌只经 `sessionStorage` + `Authorization: Bearer`；**无** `document.cookie` / `localStorage` |
+| TC-FE-013 | US-IB-26 | AC-IB-26-04 | FE | R13 依赖（element-plus / vue-router）本地打包 + 锁同步 + 源码零 CDN |
+
+### 18.3 AC ↔ TC 覆盖矩阵（US-IB-21 ~ US-IB-29）
+
+| AC-ID | 覆盖 TC | 结论 |
+|-------|---------|------|
+| AC-IB-21-01 | TC-INT-105、TC-E2E-020、TC-FE-009 | 覆盖 |
+| AC-IB-21-02 | TC-INT-106、TC-FE-009 | 覆盖（时延侧信道见 §18.4） |
+| AC-IB-21-03 | TC-INT-117、TC-E2E-021、TC-FE-007、TC-FE-008 | 覆盖 |
+| AC-IB-21-04 | TC-INT-115、TC-E2E-021 | 覆盖 |
+| AC-IB-22-01 | TC-UNIT-084、TC-UNIT-089、TC-INT-107、TC-E2E-020、TC-FE-010 | 覆盖 |
+| AC-IB-22-02 | TC-UNIT-091、TC-INT-107、TC-INT-108 | 覆盖 |
+| AC-IB-22-03 | TC-UNIT-085 | 覆盖（接口/存储面；日志文件面见 §18.4） |
+| AC-IB-23-01 | TC-UNIT-084、TC-INT-111、TC-E2E-020 | 覆盖 |
+| AC-IB-23-02 | TC-UNIT-084、TC-UNIT-093、TC-INT-111 | 覆盖 |
+| AC-IB-23-03 | TC-UNIT-088、TC-INT-111、TC-INT-114、TC-E2E-020 | 覆盖 |
+| AC-IB-23-04 | TC-INT-112、TC-FE-010 | 覆盖 |
+| AC-IB-24-01 | TC-INT-113、TC-E2E-020 | 覆盖 |
+| AC-IB-24-02 | TC-INT-113、TC-E2E-020 | 覆盖 |
+| AC-IB-24-03 | TC-UNIT-090、TC-INT-113 | 覆盖 |
+| AC-IB-25-01 | TC-UNIT-083、TC-UNIT-086、TC-UNIT-093、TC-INT-105、TC-INT-109 | 覆盖 |
+| AC-IB-25-02 | TC-UNIT-086、TC-INT-110 | 覆盖 |
+| AC-IB-25-03 | TC-UNIT-087、TC-INT-109 | 覆盖 |
+| AC-IB-25-04 | TC-INT-105、TC-INT-116、TC-FE-012 | 覆盖 |
+| AC-IB-26-01 | TC-FE-011 | 覆盖（源码结构层；运行期呈递见 §18.4） |
+| AC-IB-26-02 | TC-FE-011 | 覆盖（源码结构层） |
+| AC-IB-26-03 | TC-FE-011 | 覆盖（源码结构层） |
+| AC-IB-26-04 | TC-FE-013（+ 既有 TC-FE-005） | 覆盖 |
+| AC-IB-27-01 | TC-UNIT-090、TC-UNIT-092、TC-INT-117 | 覆盖 |
+| AC-IB-27-02 | TC-UNIT-094 | 覆盖 |
+| AC-IB-27-03 | TC-UNIT-090、TC-UNIT-094 | 覆盖 |
+| AC-IB-28-01 | TC-INT-120 | 覆盖（静态模板；运行期握手见 §18.4） |
+| AC-IB-28-02 | TC-INT-120 | 覆盖（静态模板） |
+| AC-IB-29-01 | TC-UNIT-092、TC-INT-118、**TC-INT-119（FAIL）** | 部分覆盖：**账户维度 PASS；来源 IP 维度 FAIL → DEFECT-R13-01** |
+| AC-IB-29-02 | TC-UNIT-092 | 覆盖（签名层不含凭据字段） |
+
+- **US 级覆盖**：US-IB-21 ~ US-IB-29 **9/9 每故事均有 ≥1 用例**。
+
+### 18.4 不可测试项与残余（如实登记）
+
+| AC-ID / 项 | 已覆盖部分 | **残余（未断言）子句** | 理由 / 去向 |
+|-----------|-----------|----------------------|------------|
+| AC-IB-26-01/02/03 | 布局 / 主题切换 / 中文的**源码结构**判据（TC-FE-011） | 浏览器内**运行期渲染与交互**（真实点击切换、视觉排版） | 离线无自动化浏览器环境（沿用 §5/§16.5 口径）；属前端运行期，登记待前端轮（报告 §18.6） |
+| AC-IB-28-01 | nginx TLS **模板**静态断言（TC-INT-120） | **运行期**真实 TLS 握手 / 证书链校验 | 离线无 nginx / 无证书；属部署面运行期（GROUP_E），本轮不阻塞 |
+| AC-IB-22-03（日志面） | 存储层无明文（TC-UNIT-085）+ 接口响应无凭据回显（TC-INT-105） | **日志文件**级明文扫描 | 属证据流程（`groupd_credscan`）而非 pytest 用例；日志纪律另由凭据扫描证据留档 |
+| AC-IB-21-02（时延侧信道） | 统一**文案**已断言（TC-INT-106） | 响应**时延**是否泄露账户存在性 | 离线 / 单机无法确定性断言 → 记为**残余风险**，不臆造 PASS |
+| REQ-FUNC-IB-30（单源一致性，语句级） | 列级一致已断言（TC-INT-122） | 迁移 003 与运行时 DDL 的**语句级字节**一致 | 机器可断言的列级已覆盖；语句级字节一致留待后续轮 |
+
+### 18.5 门控与度量口径（R13）
+
+- **度量定义**：`total = pass + fail + skip + blocked`（精确等式）；`通过率 = pass / (pass + fail)`（skip / blocked **不计入分母**）。
+- **门控**：unit **≥ 80%** → 才可执行 integration；integration **≥ 90%** → 才可执行 e2e；E2E **关键路径 100%**。
+- **零 masking 纪律**：**0 skip / 0 xfail**；未执行不得记 PASS；`TC-INT-119` 为**真实执行后失败**，作为缺陷证据保留为 **FAIL**，**不以 skip / xfail 掩蔽**。
+- **结论数值**（详见 `docs/test_report.md` §18.1）：unit **95/95 = 100%**、integration **122/123 = 99.19%**、e2e **21/21 = 100%**（关键路径 100%）。
+
+### 18.6 计数基线与 +7 对账（如实登记）
+
+- **R13 前基线**：`python -m pytest tests -q` = **207 passed**（EXIT 0）；分层 unit **83** / integration **105** / e2e **19**。
+- **R12 门控（GR-D-009）登记基线**：**200**（unit 76 / integration 105 / e2e 19）。
+- **+7 差值来源（对账结论）**：**非集合计数错误**，全部落在**单元层**，来自 `tests/unit/test_llm_tool_loop.py` 新增的 **7 条用例**（TC-UNIT-076 ~ TC-UNIT-082），由 commit **`fa0a7a4`（"fix(llm): 实现完整工具调用循环，修复聊天检索不落地的根因"）**引入 —— 属**基线记录之后**由 developer 侧提交新增，未被 R12 门控登记。
+- **`tests/**` 归属观察**：`git status --short tests/` 在 R13 起始快照为空，即 **GROUP_C 的 R13 增量未新增 / 未改动任何 `tests/**` 文件**（`tests/` 全程为 GROUP_D 领地）；但历史上 developer 提交（`fa0a7a4`、`9b04b20`）曾**直接增改 `tests/**`**（即上述 +7 来源）—— 建议 PM 在流程上明确 `tests/**` 的写权边界。
+- **R13 后目标基线**：**239**（unit **95** / integration **123** / e2e **21**），较 207 增 32（本轮新增：unit 12 + integration 18 + e2e 2 = 32）；前端冒烟层 6 → **13**，**仍自立一层、不计入 239**。

@@ -23,7 +23,9 @@ from __future__ import annotations
 from typing import BinaryIO, Protocol, Sequence, runtime_checkable
 
 from .enums import DocStatus
+from .errors import ConflictError, NotFoundError
 from .types import (
+    AccountStatus,
     AuthzContext,
     BlobRef,
     ChunkImageRecord,
@@ -48,8 +50,11 @@ from .types import (
     SaveResult,
     Scope,
     ScoredPoint,
+    SessionRecord,
     SessionState,
     UpsertResult,
+    UserRecord,
+    UserRole,
     ValidationReport,
     Vector,
     VectorPoint,
@@ -70,6 +75,7 @@ __all__ = [
     "LlmProvider",
     "SessionStore",
     "DefinitionDocumentStore",
+    "AccountStore",
 ]
 
 
@@ -608,4 +614,114 @@ class DefinitionDocumentStore(Protocol):
 
     def editable_field_whitelist(self) -> frozenset[str]:
         """可编辑字段白名单（IFC-IB-292）。白名单外字段界面**不得写入**。"""
+        ...
+
+
+# =========================================================================== #
+# MOD-IB-01 R13 增量（第 15 个端口，IFC-IB-310）
+# =========================================================================== #
+#
+# 与 `LedgerRepository`（IFC-IB-120~131，第 4 个端口）的**区别是工件不同**：
+#   * `LedgerRepository` 管**项目 / 知识库 / 文档 / 块**的元数据与状态机；
+#   * `AccountStore` 管**账户与会话**（用户记录 + 会话摘要）。
+# 二者共用同一 SQLite 文件与同一手写 scoped 迁移机制（ADR-18 / ADR-26），
+# 但**只存凭据摘要**：口令 bcrypt 摘要、令牌 sha256 摘要（绝不存原文）。
+#
+# 所有需要「按会话令牌取主体」的路径**不得**各自校验，一律经组合根装配的
+# `PrincipalResolver`（`SessionTokenResolver`，IFC-IB-322）唯一入口（ADR-22）。
+
+
+@runtime_checkable
+class AccountStore(Protocol):
+    """账户与会话存储端口（IFC-IB-310，**恰好 13 个方法**，module_design.md §3 MOD-IB-01）。
+
+    签名纪律（与基座既有端口一致）：
+      * 时间一律以**定长 UTC 字符串**（`YYYY-MM-DDTHH:MM:SSZ`）传入，比较用字符串序；
+        「当前时间」由调用方显式注入（`now=`），使时间成为**可测输入**而非环境副作用。
+      * 阈值 / 窗口 / TTL 等策略参数由**调用方**计算，端口只做持久化的机械动作
+        （例如 `record_login_failure` 只自增计数并回写 `locked_until`，不判阈值）。
+      * 凭据摘要只进不出：本端口**没有**任何返回令牌原文或口令明文的方法。
+
+    **fail-closed 语义**（REQ-NFR-IB-18）：`resolve_session` 对「已撤销 / 已过期 /
+    不存在」的令牌一律返回 `None`；调用方据此拒绝，不得退化为「放行」。
+    """
+
+    def get_user_by_username(self, username: str) -> UserRecord | None:
+        """按用户名取账户；不存在返回 `None`。"""
+        ...
+
+    def get_user(self, user_id: str) -> UserRecord | None:
+        """按 `user_id` 取账户；不存在返回 `None`。"""
+        ...
+
+    def create_user(
+        self,
+        username: str,
+        password_hash: str,
+        role: UserRole,
+        project_id: str | None,
+    ) -> UserRecord:
+        """新建账户；用户名已存在抛 `ConflictError`（→ HTTP 409）。
+
+        `password_hash` 必须是 **bcrypt 摘要**；本方法**不接收**也不回显口令明文。
+        """
+        ...
+
+    def set_status(self, user_id: str, status: AccountStatus) -> UserRecord:
+        """改账户状态（`active` / `disabled`）；不存在抛 `NotFoundError`。
+
+        停用时**调用方**须同时 `revoke_session` 撤销该账户全部会话（IFC-IB-321）。
+        """
+        ...
+
+    def set_password(
+        self, user_id: str, password_hash: str, *, must_change: bool
+    ) -> UserRecord:
+        """改口令摘要（bcrypt）；不存在抛 `NotFoundError`。
+
+        `must_change` 为 `True` 即置改密态（首登强制改密，ADR-20）。
+        本方法**不接收**也不回显口令明文。
+        """
+        ...
+
+    def list_users(self, project_id: str | None) -> list[UserRecord]:
+        """列账户；`project_id=None` 表示 **admin 视角全量**，否则只列该项目绑定账户。"""
+        ...
+
+    def record_login_failure(self, user_id: str, *, now: str) -> UserRecord:
+        """登录失败：自增 `failed_login_count` 并回写 `locked_until`（由调用方计算），返回更新后记录。
+
+        **阈值与锁定窗口由调用方计算**（OQ-IB-12 未裁决前不启用，ADR-27）。
+        """
+        ...
+
+    def reset_login_failures(self, user_id: str) -> None:
+        """登录成功：清零失败计数与锁定态。"""
+        ...
+
+    def issue_session(
+        self, user_id: str, token_digest: str, *, expires_at: str
+    ) -> SessionRecord:
+        """签发会话：写入**令牌摘要**（非原文）与到期时间，返回会话记录。"""
+        ...
+
+    def resolve_session(self, token_digest: str, *, now: str) -> SessionRecord | None:
+        """按令牌摘要解析会话；**已撤销 / 已过期 / 不存在 → `None`**（fail-closed）。
+
+        解析成功时（可选地）刷新 `last_seen_at`；刷新失败**不得**改变「有效」结论。
+        """
+        ...
+
+    def renew_session(
+        self, token_digest: str, *, new_expires_at: str, now: str
+    ) -> SessionRecord | None:
+        """续期：仅对「未撤销且未过期」的会话生效，返回更新后记录；否则 `None`（fail-closed）。"""
+        ...
+
+    def revoke_session(self, token_digest: str, *, now: str) -> None:
+        """撤销单个会话（登出 / 改密 / 停用时按需批量调用）。幂等。"""
+        ...
+
+    def purge_expired_sessions(self, *, now: str) -> int:
+        """清理已过期 / 已撤销的会话行，返回清理条数（维护任务用）。"""
         ...

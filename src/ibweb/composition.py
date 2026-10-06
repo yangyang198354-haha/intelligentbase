@@ -4,6 +4,8 @@
             R2：`related_images` 提供者（命中 → 页面图）在 `orchestrator_for` 内闭包注入
             R7：装配期 fail-fast 准入闸门 admit（IFC-IB-293）；定义文档读写端点
                 （IFC-IB-294/295，落在 `ibweb/views.py`）
+            IFC-IB-326（R13）：登录限速器的**应用级装配** —— 装配期构建一次存入
+                `Deps.login_throttle`，登录端点复用（DEFECT-R13-01 修复）
 @depends MOD-IB-01 ~ MOD-IB-22
 @author software-developer
 
@@ -125,6 +127,14 @@ class Deps:
     definition_store: Any = None
     definitions: dict[str, Any] = field(default_factory=dict)
     derived_views: dict[str, Any] = field(default_factory=dict)
+    # R13 账户 / 会话存储（第 15 个端口的装配实例；IFC-IB-325）。
+    account_store: Any = None
+    # R13 登录限速器（IFC-IB-326）：**每应用实例**一份、装配期构建一次并复用。
+    # 为什么挂在 Deps 而不是每请求 `build_throttle()`：`LoginThrottle._hits` 是**实例态**，
+    # 每请求新建会让来源 IP 的滑动窗口永不累积（DEFECT-R13-01，429 分支不可达）。
+    # 为什么不是**进程级全局**：挂在 Deps 上即「每装配实例一份」——每个测试夹具
+    # `build_deps(force=True)` 得到全新空窗口，天然保持用例隔离、无跨用例状态泄漏。
+    login_throttle: Any = None
 
     def __post_init__(self) -> None:
         self._lock = threading.Lock()
@@ -471,6 +481,26 @@ def _assemble() -> Deps:
         batch_limit=cfg.worker.batch_limit,
     )
 
+    # 4d) R13 账户 / 会话（IFC-IB-325）：构造 AccountStore → 幂等种子 → 注入策略模块。
+    from ib.ledger import build_account_store
+    from ibweb.accounts import load_account_settings
+
+    account_settings = load_account_settings()
+    account_store = build_account_store(
+        cfg, ledger_path=str(getattr(cfg, "ledger_path", "") or ":memory:")
+    )
+    _seed_accounts(account_store, account_settings, offline=bool(cfg.offline_mode))
+
+    # 4e) R13 登录限速（IFC-IB-326 / DEFECT-R13-01）：**装配期构建一次、按请求复用**。
+    #     为什么必须在组合根构建：`LoginThrottle` 的滑动窗口计数器 `_hits` 是**实例状态**，
+    #     若在每个请求内 `build_throttle()` 新建，则每次都得到空窗口、计数永不累积，
+    #     429 分支不可达（来源 IP 维度限速失效）。构建结果存入 `Deps.login_throttle`
+    #     （= 每应用实例一份），登录端点经 `_login_throttle()` 取用。
+    #     未配置 `IB_LOGIN_MAX_FAILURES` 时 `build_throttle()` 返回 `None` → 不启用（ADR-27）。
+    from ibweb.accounts.throttle import build_throttle
+
+    login_throttle = build_throttle()
+
     # 5) 鉴权（未注入即启动失败）
     from ibweb.authz import build_authz
 
@@ -525,6 +555,8 @@ def _assemble() -> Deps:
         definition_store=definition_store,
         definitions=definitions,
         derived_views=derived_views,
+        account_store=account_store,
+        login_throttle=login_throttle,
     )
     log_event(
         "startup",
@@ -581,6 +613,39 @@ def _seed_projects(cfg: Any, ledger: Any) -> dict[str, ProjectRecord]:
             ledger.upsert_kb(KbRecord(kb_id=kb_id, project_id=project_id, name=kb_id, created_at=""))
         out[project_id] = record
     return out
+
+
+def _seed_accounts(store: Any, settings: Any, *, offline: bool) -> None:
+    """幂等播种默认管理员（IFC-IB-314 / IFC-IB-325）。
+
+    口令 hash 由 `IB_DEFAULT_ADMIN_PASSWORD`（0600 EnvironmentFile）经 bcrypt 产生；
+    **口令值只在此处短暂存在，绝不写入日志 / 响应 / 返回值**。
+
+    fail-closed 口径：
+      * 生产：账户体系已启用但**既无管理员、又未提供初始口令** → `StartupError`
+        （否则「配了登录页却没人能登录」是比启动失败更难排障的形态）；
+      * 离线：允许缺席（离线自测走 `EnvTokenResolver`，不需要真实账户）；
+      * 已有管理员：缺席初始口令不报错（幂等播种本就不覆盖既有口令）。
+    """
+    password = os.environ.get("IB_DEFAULT_ADMIN_PASSWORD", "")
+    try:
+        has_admin = any(getattr(user, "role", "") == "admin" for user in store.list_users(None))
+    except Exception:  # noqa: BLE001 - 探测失败按「无管理员」处理，交由下面的分支决定
+        has_admin = False
+    if not password:
+        if offline or has_admin:
+            return
+        raise StartupError(
+            "缺少必填环境变量 IB_DEFAULT_ADMIN_PASSWORD（账户体系已启用但尚无管理员账户）。"
+            "该值只允许经 0600 EnvironmentFile 注入；只登记键名，不回显值。"
+        )
+    from ib.ledger import hash_password, seed_default_admin
+
+    seed_default_admin(
+        store,
+        username=settings.default_admin_username,
+        password_hash=hash_password(password),
+    )
 
 
 def _ensure_collections(vectors: Any, collections: Any, projects: dict[str, ProjectRecord]) -> None:

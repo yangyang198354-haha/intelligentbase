@@ -200,6 +200,45 @@ export type DefinitionConfigEnvelope = {
   config_key_names: string[];
 };
 
+// --------------------------------------------------------------------------- //
+// R13（IFC-IB-316 ~ 321）：账户 / 会话
+// --------------------------------------------------------------------------- //
+
+/** 账户记录（与后端 `AccountSummary` **逐字段对齐**；**不含** `password_hash`）。 */
+export type AccountSummary = {
+  user_id: string;
+  username: string;
+  /** `admin` = 全局账户；`ops` = 绑定单项目（等价既有 `manager` 语义）。 */
+  role: 'admin' | 'ops';
+  project_id: string | null;
+  status: 'active' | 'disabled';
+  must_change_password: boolean;
+};
+
+/**
+ * `POST /api/auth/login` 的成功体（IFC-IB-316）。
+ *
+ * `token` **只在这一处**出现：写进 `sessionStorage` 后立即丢弃，绝不进 URL / Cookie /
+ * `localStorage`（令牌进 URL 会被 nginx 访问日志完整记录，FreeArk 已泄露过一次）。
+ */
+export type LoginResult = {
+  token: string;
+  expires_at: string;
+  must_change_password: boolean;
+  user: AccountSummary;
+};
+
+/** `GET /api/auth/me`（IFC-IB-318）。 */
+export type CurrentUser = {
+  user_id: string;
+  username: string;
+  role: 'admin' | 'ops';
+  project_id: string | null;
+  must_change_password: boolean;
+};
+
+export type AccountListEnvelope = { items: AccountSummary[] };
+
 /**
  * 页面图端点的站内相对路径（IFC-IB-283）。
  *
@@ -213,7 +252,29 @@ export function fileImageUrl(docId: string, imageId: string): string {
 
 export type ApiError = { status: number; code: string; message: string };
 
-const TOKEN_KEY = 'ib_token';
+/**
+ * 客户端配置键（tech_stack §1.4 登记的键名；**只登记键名，不含任何值**）。
+ *
+ * Vite 只把 `VITE_` 前缀的环境变量暴露给客户端代码，因此登记的 `IB_AUTH_*` 在构建期
+ * 对应 `VITE_IB_AUTH_*`（前缀是打包器的暴露机制，不是键名漂移）。未设置时用默认值 ——
+ * 这两个键是**可选**的接缝（供接入方改登录路径 / 令牌存储键），不是必填配置。
+ */
+const LOGIN_PATH = import.meta.env.VITE_IB_AUTH_LOGIN_PATH ?? '/api/auth/login';
+const TOKEN_KEY = import.meta.env.VITE_IB_AUTH_SESSION_STORAGE_KEY ?? 'ib_token';
+
+/**
+ * 401 全局回调（R13）：令牌失效时由 `decode()` 触发，交给会话层跳登录页。
+ *
+ * 为什么用回调而不是让每个页面各自处理：R1~R12 由 `App.vue` 向每个页面传
+ * `@unauthorized` 监听器，**每一个**新页面都要记得接上，漏一个就表现为「这个页面 401 后
+ * 白屏」。R13 改为在 `decode()` 这个**唯一**的 401 发生地点回调一次 —— 页面不再负责
+ * 「登录态」这件事（页面只负责自己的业务错误）。
+ */
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  unauthorizedHandler = handler;
+}
 
 export class ApiClientError extends Error {
   readonly status: number;
@@ -305,6 +366,13 @@ export class ApiClient {
       if (response.status === 401) {
         // 令牌失效即清除，避免界面持续以无效令牌重试
         this.clearToken();
+        // R13：唯一 401 发生点 → 通知会话层（跳登录页）。登录端点自身的 401 也不例外：
+        // 会话层据此清态即可，**不得**在登录页面上再跳转（由会话层判断当前路由）。
+        try {
+          unauthorizedHandler?.();
+        } catch {
+          /* 回调失败不得掩盖原始错误 */
+        }
       }
       throw new ApiClientError({ status: response.status, code, message }, details);
     }
@@ -519,6 +587,100 @@ export class ApiClient {
       onEvent(frame);
       if (frame.kind === 'done') return;
     }
+  }
+
+  // ------------------------------------------------------------------ //
+  // R13（IFC-IB-316 ~ 321）：账户 / 会话
+  // ------------------------------------------------------------------ //
+  //
+  // 这一组方法**不需要** `Authorization` 头（`login` 尚无令牌），其余方法由 `headers()`
+  // 统一注入 —— 页面上**不存在**第二处拼令牌的代码（IC-IB-01 的落点不变）。
+
+  /**
+   * 用户名 + 口令登录（IFC-IB-316）。
+   *
+   * 失败统一 `401`（后端**不区分**「不存在 / 口令错 / 停用」，防存在性探测预言机），
+   * UI 据此只提示「用户名或口令不正确」。`429` 为条件性限速（OQ-IB-12）。
+   * 成功即写入 `sessionStorage`（与 R1 的令牌位置一致，非 Cookie）。
+   */
+  async login(username: string, password: string): Promise<LoginResult> {
+    const result = await this.request<LoginResult>(LOGIN_PATH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    this.setToken(result.token);
+    return result;
+  }
+
+  /** 注销当前会话（IFC-IB-317）→ `204`。无论成功与否都清除本地令牌。 */
+  async logout(): Promise<void> {
+    try {
+      await this.request<null>('/api/auth/logout', { method: 'POST' });
+    } finally {
+      this.clearToken();
+    }
+  }
+
+  /** 当前用户（IFC-IB-318）。用于刷新页面后恢复身份 / 判定改密态。 */
+  me(): Promise<CurrentUser> {
+    return this.request<CurrentUser>('/api/auth/me');
+  }
+
+  /**
+   * 修改口令（IFC-IB-319）。成功后服务端会撤销**其他**会话并清除改密态。
+   *
+   * 首次登录强制改密走的**就是本方法** —— 服务端在改密态下只放行
+   * `/api/auth/me`、`/api/auth/change-password`、`/api/auth/logout`（ADR-20），
+   * 前端不承担「强制」职责（前端只是把限制可视化，绕过前端也无效）。
+   */
+  changePassword(oldPassword: string, newPassword: string): Promise<{ ok: boolean; must_change_password: boolean }> {
+    return this.request('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+    });
+  }
+
+  /** 续期当前会话（IFC-IB-320）→ 新的 `expires_at`。仅临近到期时服务端才真正延长。 */
+  renewSession(): Promise<{ expires_at: string }> {
+    return this.request('/api/auth/session/renew', { method: 'POST' });
+  }
+
+  /** 账户列表（IFC-IB-321，**仅 admin**；非 admin 后端 403）。 */
+  listAccounts(projectId?: string): Promise<AccountListEnvelope> {
+    const suffix = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+    return this.request<AccountListEnvelope>(`/api/accounts${suffix}`);
+  }
+
+  /** 新建 ops 账户（IFC-IB-321，仅 admin；必须绑定 `project_id`）。 */
+  createAccount(input: {
+    username: string;
+    password: string;
+    project_id: string;
+    role?: 'ops';
+  }): Promise<AccountSummary> {
+    return this.request<AccountSummary>('/api/accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'ops', ...input }),
+    });
+  }
+
+  /** 停用账户（IFC-IB-321，仅 admin）；服务端同时撤销其全部会话。 */
+  disableAccount(userId: string): Promise<AccountSummary> {
+    return this.request<AccountSummary>(`/api/accounts/${encodeURIComponent(userId)}/disable`, {
+      method: 'POST',
+    });
+  }
+
+  /** 重置他人口令（IFC-IB-321，仅 admin，条件性 OQ-IB-14）；被重置者下次登录须改密。 */
+  resetAccountPassword(userId: string, newPassword: string): Promise<{ user_id: string; must_change_password: boolean }> {
+    return this.request(`/api/accounts/${encodeURIComponent(userId)}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ new_password: newPassword }),
+    });
   }
 }
 

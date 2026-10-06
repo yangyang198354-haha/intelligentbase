@@ -13,7 +13,12 @@
 
 from __future__ import annotations
 
-from . import enums, errors, ports, types
+from . import accounts, enums, errors, ports, types
+from .accounts import (
+    new_session_token,
+    token_digest,
+    token_digest_matches,
+)
 from .enums import (
     DegradeReason,
     DocStatus,
@@ -33,6 +38,7 @@ from .errors import (
     ValidationError,
 )
 from .ports import (
+    AccountStore,
     AuthzPolicy,
     BlobStore,
     Chunker,
@@ -51,6 +57,8 @@ from .ports import (
 from .types import (
     DEFAULT_SESSION_PERSISTENCE_POLICY,
     SESSION_STATE_LOSS_OUTCOME,
+    AccountStatus,
+    AccountSummary,
     AuthzContext,
     BlobRef,
     BoundTool,
@@ -79,6 +87,7 @@ from .types import (
     HnswParams,
     KbRecord,
     LlmRole,
+    LoginOutcome,
     Message,
     OcrDescriptor,
     OrchestrationSpecInput,
@@ -87,6 +96,7 @@ from .types import (
     PageImageSourceKindLiteral,
     ParsedChunk,
     ParsedDocument,
+    PasswordPolicy,
     PointFilter,
     PointPayload,
     ProcessReport,
@@ -107,6 +117,7 @@ from .types import (
     ScoredPoint,
     Scope,
     SessionPersistencePolicy,
+    SessionRecord,
     SessionState,
     SessionStateLossOutcome,
     SessionTurn,
@@ -115,6 +126,8 @@ from .types import (
     ToolResult,
     ToolSpec,
     UpsertResult,
+    UserRecord,
+    UserRole,
     ValidatedUpload,
     ValidationErrorItem,
     ValidationReport,
@@ -128,6 +141,7 @@ __all__ = [
     "errors",
     "types",
     "ports",
+    "accounts",
     # 枚举
     "DocStatus",
     "SourceKind",
@@ -174,6 +188,14 @@ __all__ = [
     "ProjectRecord",
     "AuthzContext",
     "RequestContext",
+    # R13 账户 / 会话（IFC-IB-309）
+    "UserRole",
+    "AccountStatus",
+    "LoginOutcome",
+    "UserRecord",
+    "SessionRecord",
+    "PasswordPolicy",
+    "AccountSummary",
     "RawConfig",
     "BlobRef",
     "ValidatedUpload",
@@ -233,4 +255,9 @@ __all__ = [
     "LlmProvider",
     "SessionStore",
     "DefinitionDocumentStore",
+    # R13 第 15 个端口 + 令牌原语（IFC-IB-310 / 311）
+    "AccountStore",
+    "new_session_token",
+    "token_digest",
+    "token_digest_matches",
 ]

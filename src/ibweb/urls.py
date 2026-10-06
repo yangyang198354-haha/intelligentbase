@@ -4,6 +4,7 @@
             IFC-IB-283（R2）`/api/files/{doc_id}/images/{image_id}` 路由
             IFC-IB-294/295（R7）`/api/config/definition` 路由
             IFC-IB-307（R8）`/api/chat/resume` 路由
+            IFC-IB-316 ~ IFC-IB-321（R13）账户 / 会话路由
 @depends MOD-IB-23（views）
 @author software-developer
 
@@ -55,4 +56,19 @@ urlpatterns = [
     path("api/chat/resume", views.chat_resume_endpoint, name="ib-chat-resume"),
     # R7（IFC-IB-294/295）：定义文档读写。**单一真源**端点（GET 读 / PUT 原子写回）。
     path("api/config/definition", views.definition_config_endpoint, name="ib-config-definition"),
+    # R13（IFC-IB-316~321）：账户 / 会话。
+    # 登录是**唯一**免鉴权端点（尚无令牌），但它**仍**受 `?token=` 4xx 纪律约束；
+    # 其余端点一律只认 `Authorization: Bearer`（不接受 `?token=`，中间件先于路由拒绝）。
+    path("api/auth/login", views.auth_login_endpoint, name="ib-auth-login"),
+    path("api/auth/logout", views.auth_logout_endpoint, name="ib-auth-logout"),
+    path("api/auth/me", views.auth_me_endpoint, name="ib-auth-me"),
+    path("api/auth/change-password", views.auth_change_password_endpoint, name="ib-auth-change-password"),
+    path("api/auth/session/renew", views.auth_session_renew_endpoint, name="ib-auth-session-renew"),
+    path("api/accounts", views.accounts_endpoint, name="ib-accounts"),
+    path("api/accounts/<str:user_id>/disable", views.account_disable_endpoint, name="ib-account-disable"),
+    path(
+        "api/accounts/<str:user_id>/reset-password",
+        views.account_reset_password_endpoint,
+        name="ib-account-reset-password",
+    ),
 ]

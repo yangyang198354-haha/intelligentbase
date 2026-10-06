@@ -3,12 +3,12 @@
   <artifact>module_design</artifact>
   <path>docs/module_design.md</path>
   <doc_id>MOD-INTELBASE-001</doc_id>
-  <version>1.4.0</version>
-  <revision>R8</revision>
+  <version>1.5.0</version>
+  <revision>REV-13</revision>
   <status>DRAFT_FOR_GATE_REVIEW</status>
   <phase>GROUP_B / PHASE_04 模块详细设计</phase>
   <author>system-architect</author>
-  <invocation_id>INV-GROUP_B-INTELBASE-006</invocation_id>
+  <invocation_id>INV-GROUP_B-INTELBASE-007</invocation_id>
   <created_at>2026-09-25</created_at>
   <revision_history>
     <rev no="R1" date="2026-09-25" by="system-architect" basis="REV-01（框架切换 FastAPI→Django）">
@@ -23,11 +23,14 @@
     <rev no="R8" date="2026-09-27" by="system-architect" invocation_id="INV-GROUP_B-INTELBASE-006" basis="GROUP_A REV-11-1 下游贯通（REQ-FUNC-IB-20 补入 US-IB-19 / US-IB-20 与 11 组 AC 后的设计覆盖闭环）">
       **不新增模块、不新增端口、不新增依赖边**：会话状态 / 持久化策略 / 完成产物 / 确认中间态的类型化契约并入 **MOD-IB-01**；键名登记与值域显式化并入 **MOD-IB-02**；流式终态与可见性判据并入 **MOD-IB-21**；恢复判定与确认门装配语义并入 **MOD-IB-22**；会话恢复端点与 fail-closed 准入并入 **MOD-IB-23**；确认中间态的呈递与决策回传渲染约束并入 **MOD-IB-24**。新增 IFC 编号 **298~308**（11 条，全部类型化、frozen dataclass / Protocol、零第三方依赖）；**IFC-IB-285 仍预留未分配**。`IFC-IB-221/222` 的**签名文本不改**（仅补齐其悬置引用的 `SessionState` 定义）、`IFC-IB-233` 的 `payload: dict` **签名文本不改**（仅新增其载荷类型 `ResumePayload`）；`IB_SESSION_BACKEND` 键名与默认值不变（**仅扩展值域**，沿用 R2 先例）。既有 MOD-IB-01~26、`IFC-IB-001~297`、14 个端口名、§4.1 依赖边清单与 DAG 拓扑**一字不动**（纯追加；零新增边的再声明见 §4.2.3）。增补位置：R8 性质段、§2.1 五组数据结构与 R8 说明、§2.2 R8 增记与 §2.2.3 R8 IFC 段号索引、§3 的 MOD-IB-01/02/21/22/23/24 增补、§4.2.3 R8 无环性再声明、§7.3 四条规范化补充、§7.4 两行降级、§8 R8 离线可测单元、§9.1 IB-20 行与 R8 覆盖闭环段、§9.6 R8 覆盖率再声明、§11 R8 自检。需求侧文档（v1.3.0）只读；未修改 FreeArk 任何文件；未写入任何凭据或配置值（只登记键名：`IB_CONFIRMATION_GATE_ENABLED` / `IB_SESSION_PERSISTENCE_POLICY` / `IB_REASONING_STREAM_ENABLED`）。
     </rev>
+    <rev no="REV-13" date="2026-10-06" by="system-architect" invocation_id="INV-GROUP_B-INTELBASE-007" basis="GROUP_A REV-13 下游贯通（认证与商用界面重构：REQ-FUNC-IB-28~36 / REQ-NFR-IB-15~18 / C-IB-09 / DR-09~DR-17）">
+      **不新增模块、不新增依赖边**：账户 / 会话 / 令牌的**类型化契约与第 15 个端口** `AccountStore`（IFC-IB-310）并入 **MOD-IB-01**；配置键名登记（IFC-IB-312）并入 **MOD-IB-02**；SQL 适配器 / bcrypt / 默认管理员幂等种子 / `MemoryAccountStore` 替身（IFC-IB-313~315）并入 **MOD-IB-11**（**同一 SQLite 台账与同一手写迁移机制**）；登录/登出/主体查询/改密/续期、账户 CRUD、内置 `SessionTokenResolver` 与可注入策略模块 `ibweb.accounts.policy`、`AuthMiddleware` 扩展（改密态 + `?token=` 4xx）、组合根装配扩展、条件性限速与审计（IFC-IB-316~326）并入 **MOD-IB-23**；登录页与首登改密、运维控制台与 `vue-router`(hash) 鉴权守卫、类型化 API 客户端扩展（IFC-IB-327~329）并入 **MOD-IB-24**；手写迁移 `003_accounts.sql`、nginx TLS 终止模板、部署检查清单 B15~B20（IFC-IB-330~332）并入 **MOD-IB-25**。新增 IFC 编号 **309~332**（24 条，全部类型化、frozen dataclass / Protocol / 纯 stdlib 函数、零第三方依赖；**IFC-IB-285 仍预留未分配**；既有重号 IFC-IB-131 登记不修）。**端口 14 → 15**（纯追加）。既有 MOD-IB-01~26、`IFC-IB-001~308`、§4.1 依赖边清单与 DAG 拓扑**一字不动**（纯追加；零新增边的再声明见 §4.2.4）。**计数同步**：REQ-FUNC 27/27 → **36/36**（新增 IB-28~36，§9.1）、NFR 14 → **18**（新增 NFR-15~18，§9.2）。增补位置：§1 R13 性质段、§2.2 端口行与 R13 增记、§2.2.4 R13 IFC 段号索引、§3 的 MOD-IB-01/02/11/23/24/25 增补、§4.2.4 R13 无环性再声明与 §4.3 R13 注、§5 装配表行与 R13 说明、§7.4 两行降级、§8 替身行与离线可测单元、§9.1 九行 + §9.2 四行 + §9.7 R13 覆盖率再声明、§11 R13 自检。**OQ-IB-11 / 12 / 13 / 14 保持开放**（限速与审计为条件性 ADR-27）。需求侧文档只读；未修改 FreeArk 任何文件；未写入任何口令 / 令牌 / 密钥字面量（只登记键名）。
+    </rev>
   </revision_history>
   <inputs>
-    <input path="docs/requirements_spec.md" version="1.3.0" status="APPROVED"/>
-    <input path="docs/user_stories.md" version="1.3.0" status="APPROVED"/>
-    <input path="docs/architecture_design.md" version="1.4.0" revision="R8" status="DRAFT_FOR_GATE_REVIEW"/>
+    <input path="docs/requirements_spec.md" version="1.4.0" status="APPROVED"/>
+    <input path="docs/user_stories.md" version="1.4.0" status="APPROVED"/>
+    <input path="docs/architecture_design.md" version="1.5.0" revision="REV-13" status="DRAFT_FOR_GATE_REVIEW"/>
     <readonly_reference path="FreeArk 仓库" note="只读参考；未修改任何文件"/>
     <input path="docs/ib_embed_service_contract.md" version="1.0.0" revision="R2" status="DRAFT_FOR_GATE_REVIEW" note="MOD-IB-26 契约唯一落点；本文件 §3 MOD-IB-26 为摘要视图，冲突时以其为准"/>
   </inputs>
@@ -36,7 +39,7 @@
 
 # 模块详细设计 — intelligentbase
 
-**版本**: 1.4.0 (R8) | **状态**: DRAFT_FOR_GATE_REVIEW | **日期**: 2026-09-27
+**版本**: 1.5.0 (REV-13) | **状态**: DRAFT_FOR_GATE_REVIEW | **日期**: 2026-10-06
 **R7 性质**: 本修订为**追加式增量**（GROUP_A REV-06 裁决：诉求③「UI 可视化配置」纳入 v1，新增 REQ-FUNC-IB-25 / IB-26 / IB-27），**只追加、不改写**：**不新增模块、不新增依赖边**。定义文档的**数据层**（装载 `IFC-IB-288` / 完备性校验 `IFC-IB-290` / 原子写回 `IFC-IB-289` / 装配期派生 `IFC-IB-291` / 白名单 `IFC-IB-292` / 新增键名 `IFC-IB-297`）并入 **MOD-IB-02**；契约（端口 + 数据结构）并入 **MOD-IB-01**；可视化端点与**装配期准入闸门**（`IFC-IB-293~295`）并入 **MOD-IB-23**；可视化视图约束（`IFC-IB-296`）并入 **MOD-IB-24**。新增 `IFC-IB-287 ~ 297`（**IFC-IB-285 仍预留未分配**）。既有 MOD-IB-01~26、`IFC-IB-001~286`、13 个既有端口名、§4.1 依赖边清单与 DAG 拓扑**一字不动**（零新增边的再声明见 §4.2.2）。**REV-07-6 施工前置判定 = (a) 可登记的前置条件 / 风险，本轮继续**（见 §9.5；另见 `architecture_design.md` [ARCH-ASSUMPTION-A7]）。
 
 **R8 性质**: 本修订为**追加式增量**（GROUP_A REV-11-1：REQ-FUNC-IB-20「流式输出契约与会话生命周期」补入 US-IB-19 / US-IB-20 与 11 组 AC 后的**设计覆盖闭环**），**只追加、不改写**：**不新增模块、不新增端口、不新增依赖边**。会话状态（`SessionState` / `SessionTurn`）、持久化策略枚举、完成产物（`CompletionPayload` / `CitationItem`）与确认中间态（`ConfirmationPrompt` / `ConfirmationDecision` / `ConfirmationGateState`）的类型化契约并入 **MOD-IB-01**（`IFC-IB-298~301`，其中 **IFC-IB-298 补齐 `IFC-IB-221/222` 的既有悬置引用，不改其签名文本**）；键名登记与值域显式化并入 **MOD-IB-02**（`IFC-IB-304`）；流式终态单发与可见性判据并入 **MOD-IB-21**（`IFC-IB-302/303`）；恢复判定与确认门装配语义并入 **MOD-IB-22**（`IFC-IB-305/306`，其中 **IFC-IB-305 类型化 `IFC-IB-233` 的 `payload: dict`，不改其签名文本**）；会话恢复端点与 fail-closed 准入并入 **MOD-IB-23**（`IFC-IB-307`）；确认中间态的呈递与决策回传渲染约束并入 **MOD-IB-24**（`IFC-IB-308`）。新增 `IFC-IB-298 ~ 308`（**IFC-IB-285 仍预留未分配**）。既有 MOD-IB-01~26、`IFC-IB-001~297`、14 个端口名、§4.1 依赖边清单与 DAG 拓扑**一字不动**（零新增边的再声明见 §4.2.3）。**OQ-IB-07 / OQ-IB-08 保持开放**（架构默认取值见 `architecture_design.md` §10.1 R8 行与 ADR-17）。
@@ -45,7 +48,7 @@
 **配套**: 架构决策与背景见 `docs/architecture_design.md`；技术选型见 `docs/tech_stack.md`。
 **R1 性质**: 本修订为**载体替换**（Web 框架 FastAPI→Django），**非契约变更**——模块划分、类型化接口、依赖图拓扑与需求覆盖率均不变，只在「谁承载这些契约」这一层做了等价映射（见 §2.1.1）。所有编号（MOD-IB-*、IFC-IB-*、端口名）保持稳定以便追溯。
 
-**本文承担四项目门控标准的可验证证据**：① REQ→MOD 覆盖率矩阵（§9，**27/27 REQ-FUNC 全覆盖**；R7 同步计数，v1.2.0 需求总数）；② 依赖图 DAG 无环（§4，构造性证明）；③ 类型化接口契约（§2、§3）；④ 各 ADR 的候选方案已在架构文档中给出。
+**本文承担四项目门控标准的可验证证据**：① REQ→MOD 覆盖率矩阵（§9，**36/36 REQ-FUNC 全覆盖**；R13 同步计数，v1.4.0 需求总数）；② 依赖图 DAG 无环（§4，构造性证明）；③ 类型化接口契约（§2、§3）；④ 各 ADR 的候选方案已在架构文档中给出。
 
 **契约记法**：`IFC-IB-NNN: name(param: Type, *, kw: Type) -> ReturnType | ErrorType`。`T | None` 表示可空；`scope` 无 `= 默认值` 即表示**必填**。
 
@@ -87,6 +90,8 @@
 | MOD-IB-24 | Web 前端 | L5 | 上传/列表/删除/重试/重建页 + 问答页 + 类型化 API 客户端；**R7**：可视化配置页（编排图只读渲染 + 白名单表单；**视图侧零持久化**） | 23（仅 HTTP/SSE 契约） |
 | MOD-IB-25 | 部署运维 | L5 | 四个 systemd 单元、EnvironmentFile 模板、启动校验、检查清单 | 01,02,04 |
 | MOD-IB-26 | ib-embed 服务端 | L2（服务端进程；不被任何模块 import） | bge-m3 常驻推理服务的**线协议实现与模块归属**；单模型、CPU-only、有界并发 + 有界队列 | 01,02,04 |
+
+**R13 补充纪律与性质（账户 / 会话 / 商用界面增量）**：R13 **零新增模块**（仍 **MOD-IB-01 ~ MOD-IB-26**，共 26 个），沿用 §1 既有「编号即拓扑序的边界情形」纪律与 §4.2.2 的固化表述：账户与会话**必然被组合根 MOD-IB-23 依赖**，若新开模块只能取 **≥27** 编号 → 产生 `23 → 27` 边，**违反 `w(A) > w(B)`，构造性无环证明失效**（该先例 R7 已就 `MOD-IB-27` 否决）。故按 ADR-18 **并入既有模块**：契约 → MOD-IB-01；键名 → MOD-IB-02；SQL 适配器 / bcrypt / 种子 → MOD-IB-11（**同一 SQLite 台账与同一手写迁移机制**）；端点 / 解析器 / 可注入策略模块 / 装配 / 中间件扩展 → MOD-IB-23；前端 → MOD-IB-24；迁移 / nginx TLS / 检查清单 → MOD-IB-25。**端口 14 → 15**（`AccountStore`），**依赖边零新增**。
 
 ---
 
@@ -170,12 +175,17 @@
 | `LlmProvider` | 5 | IFC-IB-211~215 | §3 MOD-IB-20 |
 | `SessionStore` | 3 | IFC-IB-221~223 | §3 MOD-IB-21 |
 | `DefinitionDocumentStore`（**R7 新增**） | 5 | IFC-IB-287（端口）+ IFC-IB-288~292（方法） | §3 MOD-IB-01（端口与结构）/ §3 MOD-IB-02（装载·校验·写回·派生·白名单） |
+| `AccountStore`（**R13 新增**） | 13 | IFC-IB-310（端口）+ IFC-IB-309（结构） | §3 MOD-IB-01（端口与结构）/ §3 MOD-IB-11（生产实现）/ §3 MOD-IB-23（装配与解析） |
 
 `CollectionResolver` 归入 MOD-IB-09 所在层（L2，无外部依赖，仅依赖 MOD-IB-01/02）：它是**唯一**把 `Scope` 映射为 collection 名的地方（ADR-04 可升级性设计），因此必须由所有需要 collection 名的上层模块共用，而非各自拼接字符串。
 
 **R7 增记（第 14 个端口）**：`DefinitionDocumentStore`（IFC-IB-287）为**第 14 个端口**（13 → 14，**纯追加**）。它与 `ConfigurationSource` 的区别是**工件不同**：后者装载进程级配置（凭据只登记键名），前者装载**项目级定义文档**（专家 / 路由 / 编排 / 工具授权）并保证 round-trip 一致性（乐观并发 + 原子写）。所有需要「按项目取定义文档 / 派生结果」的上层模块（MOD-IB-16 / 17 / 19 / 22）**不得**各自读文件或各自解析，一律由组合根在**装配期**经该端口取得派生物后构造注入（同 `CollectionResolver` 的「唯一入口」精神；ADR-15）。
 
 **R8 增记（不新增端口；类型化既有载荷）**：端口数仍为 **14**（`SessionStore` 仍为 **3 方法** `IFC-IB-221~223`，**方法数与签名一字不改**）。R8 的两处「类型化既有载荷」遵循 **IFC-IB-282 先例**（只定义载荷类型、不改父签名）：① **IFC-IB-298** 补齐 `IFC-IB-221/222` 悬置引用的 `SessionState` 定义；② **IFC-IB-305** 类型化 `IFC-IB-233` 的 `payload: dict`（改为语义等价的类型化载荷），**`IFC-IB-233` 的签名文本与参数个数不变**。另：装配表键 `IB_SESSION_BACKEND` 的**值域**由 `memory` 扩展为 `memory 或 external`，**键名与默认值（`memory`）不变** —— 沿用 R2 对 `IB_EMBED_BACKEND` 的「**仅扩展值域；键名与默认值不变**」先例（§5）。
+
+**R13 增记（第 15 个端口）**：`AccountStore`（IFC-IB-310）为**第 15 个端口**（14 → 15，**纯追加**）。它与 `LedgerRepository`（IFC-IB-120~131）的区别是**工件不同**：后者管**项目 / 知识库 / 文档 / 块**的元数据与状态机；前者管**账户与会话**（用户记录 + 会话摘要），且**只存凭据摘要（bcrypt hash / token sha256 摘要），绝不存任何口令或令牌原文**。二者**共用同一 SQLite 文件与同一手写 scoped 迁移机制**（ADR-18 / ADR-26）。所有需要「按会话令牌取主体」的路径**不得**各自校验，一律经**组合根**装配的 `PrincipalResolver`（ADR-22；`SessionTokenResolver`，IFC-IB-322）**唯一入口**。**离线替身** `MemoryAccountStore`（IFC-IB-315）经 `IB_ACCOUNT_BACKEND=memory` 装配。
+
+> **方法数订正说明**：来源修订包 `docs/rev13_auth_ui_architecture_apply_package.md` §2.4 概览行曾将 IFC-IB-310 写作「12 方法」；**权威为本件 §2.2.4 的 13 方法**（`get_user_by_username` / `get_user` / `create_user` / `set_status` / `set_password` / `list_users` / `record_login_failure` / `reset_login_failures` / `issue_session` / `resolve_session` / `renew_session` / `revoke_session` / `purge_expired_sessions`）。落盘以 **13** 为准。
 
 ### 2.2.1 R2 新增 IFC 段号索引（追加式编号；IFC-IB-001~265 一字不动）
 
@@ -231,6 +241,24 @@
 
 ---
 
+### 2.2.4 R13 新增 IFC 段号索引（追加式编号；IFC-IB-001~308 一字不动）
+
+| IFC 段 | 归属模块 | 内容 | 权威落点 |
+|--------|----------|------|----------|
+| IFC-IB-309 | MOD-IB-01 | 数据结构 `UserRecord` / `UserRole` / `AccountStatus` / `SessionRecord` / `PasswordPolicy` / `LoginOutcome` / `AccountSummary` 字段级定义 | §3 MOD-IB-01（本件） |
+| IFC-IB-310 | MOD-IB-01 | 端口 `AccountStore`（Protocol，**13 方法**） | §3 MOD-IB-01（本件） |
+| IFC-IB-311 | MOD-IB-01 | 令牌原语（纯函数，stdlib）：`new_session_token` / `token_digest` / `token_digest_matches` | §3 MOD-IB-01（本件） |
+| IFC-IB-312 | MOD-IB-02 | 配置键名登记（仅键名，不含值）：`IB_ACCOUNT_BACKEND` / `IB_SESSION_TTL_SECONDS` / `IB_SESSION_RENEW_WINDOW_SECONDS` / `IB_DEFAULT_ADMIN_USERNAME` / `IB_DEFAULT_ADMIN_PASSWORD` / `IB_PASSWORD_MIN_LENGTH` / `IB_LOGIN_MAX_FAILURES` / `IB_LOGIN_LOCK_SECONDS`（后二条件性） | §3 MOD-IB-02（本件） |
+| IFC-IB-313 ~ 315 | MOD-IB-11 | `SqliteAccountStore` 适配器 + `users` / `sessions` DDL 单源 + bcrypt 哈希/校验；默认管理员**幂等种子**；`MemoryAccountStore` 替身 | §3 MOD-IB-11（本件） |
+| IFC-IB-316 ~ 321 | MOD-IB-23 | `/api/auth/login`、`/logout`、`/me`、`/change-password`、`/session/renew`；`/api/accounts*`（list / create / disable / reset-password） | §3 MOD-IB-23（本件） |
+| IFC-IB-322 ~ 326 | MOD-IB-23 | `SessionTokenResolver`（内置 `PrincipalResolver`）；内置可注入策略模块 `ibweb.accounts.policy`；`AuthMiddleware` 扩展（改密态 + `?token=` 4xx）；组合根装配扩展；`LoginThrottle` + 审计（**条件性**） | §3 MOD-IB-23（本件） |
+| IFC-IB-327 ~ 329 | MOD-IB-24 | 登录页 + 首登强制改密流程；运维控制台外壳 + `vue-router`（hash）+ 鉴权守卫；类型化 API 客户端扩展 | §3 MOD-IB-24（本件） |
+| IFC-IB-330 ~ 332 | MOD-IB-25 | 手写迁移 `003_accounts.sql`；nginx TLS 终止模板；部署检查清单 B15~B20 | §3 MOD-IB-25（本件） |
+
+**R13 编号规范（强制，延续 R2 / R7 / R8）**：新增号只许**追加**（本轮取 **309 ~ 332**）；`IFC-IB-001 ~ 308` 的号 / 名 / 签名 / 字段集**一字不动**；**`IFC-IB-285` 仍预留未分配**（不得被本轮占用或改义）；既有重号（`IFC-IB-131`）**登记不修**（残余项 R-9）。以上 24 条 IFC 全部为**类型化契约**（`name: type` + 可空性），**不含任何实现体**；**不含任何口令 / 令牌 / 密钥字面量**（只登记键名与类型）。
+
+---
+
 ## 3. 模块详情
 
 > 每个模块含：职责 / 覆盖需求 / 公开接口契约（类型化）/ 依赖模块 / 外部依赖。
@@ -238,7 +266,7 @@
 ### MOD-IB-01 核心契约 (L0)
 
 - **职责**: 定义全部端口 Protocol、枚举与不可变数据结构；**不 import 任何第三方框架**（仅 stdlib）。
-- **覆盖需求**: REQ-NFR-IB-01、IB-11、IB-14（可替换性与可测性的结构基础）；**REQ-FUNC-IB-25 / IB-26 / IB-27（R7，辅：只承载新增契约与第 14 个端口，见 IFC-IB-287）**；**REQ-FUNC-IB-20（R8，辅：会话状态 / 持久化策略 / 完成产物 / 确认中间态的类型化契约落点，见 IFC-IB-298~301）**
+- **覆盖需求**: REQ-NFR-IB-01、IB-11、IB-14（可替换性与可测性的结构基础）；**REQ-FUNC-IB-25 / IB-26 / IB-27（R7，辅：只承载新增契约与第 14 个端口，见 IFC-IB-287）**；**REQ-FUNC-IB-20（R8，辅：会话状态 / 持久化策略 / 完成产物 / 确认中间态的类型化契约落点，见 IFC-IB-298~301）**；**REQ-FUNC-IB-30 ~ IB-33（R13，辅：账户 / 会话 / 令牌的类型化契约与第 15 个端口落点，见 IFC-IB-309~311）**
 - **公开接口契约（数据结构定义，非行为）**:
   - IFC-IB-001: `Scope(project_id: str, kb_ids: tuple[str, ...] | None)`
   - IFC-IB-002: `CollectionSpec(collection: str, dim: int, distance: Literal["cosine"], on_disk_vectors: bool, hnsw: HnswParams)`
@@ -257,13 +285,39 @@
   - **IFC-IB-299（R8 新增）**: 枚举 `SessionPersistencePolicy` = `Literal["in_process","external"]`（默认 `in_process`，**须显式声明**）；`SessionStateLossOutcome` = `Literal["fail_closed_restart_required"]`（**唯一取值**，使「状态丢失 = 安全失败」成为类型层事实，AC-IB-20-05）。
   - **IFC-IB-300（R8 新增）**: 数据结构 `CompletionPayload`（`citations: tuple[CitationItem, ...]` **可为空元组**；`had_content: bool`）与 `CitationItem`（`doc_id` / `doc_name` / `page_or_section` / `locator` / `score`，**均为定位信息，不内联字节、不含正文全文**）。供 `IFC-IB-302` 的单发完成事件使用（AC-IB-19-02 / 19-05）。
   - **IFC-IB-301（R8 新增）**: 数据结构 `ConfirmationPrompt`（`gate_id` / `expert_name` / `summary: str` **由接入方构造**）/ `ConfirmationDecision`（`gate_id` / `approved: bool`）/ `ConfirmationGateState`（`gate_id` / `prompt` / `decision: ConfirmationDecision 或 None`）；`StreamEventKind` **值域追加**成员 `confirmation_required`（**既有 6 个成员一字不动**）。**骨架只承载通道，不判定业务语义、不生成确认话术**（ADR-09 / ADR-17）。
+  - **IFC-IB-309（R13 新增）**: 数据结构字段级定义（**frozen dataclass / Literal，纯 stdlib，零第三方依赖；无实现体**）：
+    - `UserRecord(user_id: str, username: str, password_hash: str, role: UserRole, project_id: str | None, status: AccountStatus, must_change_password: bool, failed_login_count: int, locked_until: str | None, created_at: str, updated_at: str)` —— `password_hash` **只承载 bcrypt 摘要**（**不得**承载任何口令明文）；`project_id is None` 仅对 `admin` 成立。
+    - `UserRole = Literal["admin","ops"]`（`admin` = 全局；`ops` = 绑定单项目、等价既有 `manager` 语义，ADR-21）。
+    - `AccountStatus = Literal["active","disabled"]`。
+    - `SessionRecord(token_digest: str, user_id: str, project_id: str | None, issued_at: str, expires_at: str, last_seen_at: str, revoked_at: str | None)` —— **只承载 `token_digest`（sha256 摘要），绝不承载令牌原文**（ADR-19）。
+    - `PasswordPolicy(min_length: int, require_classes: int)`（策略细节 TBD：OQ-IB-11）。
+    - `LoginOutcome = Literal["ok","bad_credentials","disabled","locked"]`（**对内**分词；**对外一律折叠为 `401`，不区分**，防存在性/状态探测预言机，ADR-13 精神）。
+    - `AccountSummary(user_id: str, username: str, role: UserRole, project_id: str | None, status: AccountStatus, must_change_password: bool)`（**不含 `password_hash`**，供 `GET /api/accounts` 输出）。
+  - **IFC-IB-310（R13 新增）**: 端口 `AccountStore`（`Protocol`，**13 方法**，定义于 MOD-IB-01 零依赖层）：
+    - `get_user_by_username(username: str) -> UserRecord | None`
+    - `get_user(user_id: str) -> UserRecord | None`
+    - `create_user(username: str, password_hash: str, role: UserRole, project_id: str | None) -> UserRecord | ConflictError`
+    - `set_status(user_id: str, status: AccountStatus) -> UserRecord | NotFoundError`
+    - `set_password(user_id: str, password_hash: str, *, must_change: bool) -> UserRecord | NotFoundError`
+    - `list_users(project_id: str | None) -> list[UserRecord]`（`None` = admin 视角全量）
+    - `record_login_failure(user_id: str, *, now: str) -> UserRecord`（返回更新后的计数/锁定态；**阈值与锁定窗口由调用方计算**，OQ-IB-12）
+    - `reset_login_failures(user_id: str) -> None`
+    - `issue_session(user_id: str, token_digest: str, *, expires_at: str) -> SessionRecord`
+    - `resolve_session(token_digest: str, *, now: str) -> SessionRecord | None`（**已撤销 / 已过期返回 `None`**，fail-closed）
+    - `renew_session(token_digest: str, *, new_expires_at: str, now: str) -> SessionRecord | None`
+    - `revoke_session(token_digest: str, *, now: str) -> None`（停用 / 改密 / 登出时批量撤销）
+    - `purge_expired_sessions(*, now: str) -> int`
+  - **IFC-IB-311（R13 新增）**: 令牌原语（**纯函数，stdlib `secrets` / `hashlib` / `hmac`，零第三方依赖**）：
+    - `new_session_token() -> str`（`secrets.token_urlsafe(32)`；**256-bit 熵**）。
+    - `token_digest(token: str) -> str`（SHA-256 hex；**服务端只存此摘要**，使「读到库 ≠ 拿到可用令牌」）。
+    - `token_digest_matches(token: str, digest: str) -> bool`（`hmac.compare_digest`，**常量时间比较**，防时序侧信道）。
 - **依赖模块**: 无
 - **外部依赖**: 无
 
 ### MOD-IB-02 配置 (L0)
 
 - **职责**: 装载全局配置与**项目级**配置；凭据仅从环境变量读取；启动期校验必填项并给出可读错误；**R7 追加**：装载**定义文档**（项目级）、完备性校验、原子写回与**装配期派生**（framework-free 纯数据层，见 IFC-IB-288~292、IFC-IB-297）。
-- **覆盖需求**: REQ-FUNC-IB-01、IB-02、IB-05（上限可配）、IB-22（配置模板）、IB-23（项目级配置）、**IB-25 / IB-26 / IB-27（R7 新增：定义文档的装载 / 白名单 / 完备性校验与派生）**、**IB-20（R8 辅：会话持久化策略与确认门开关的键名登记与值域显式化，见 IFC-IB-304）**；REQ-NFR-IB-02、IB-07
+- **覆盖需求**: REQ-FUNC-IB-01、IB-02、IB-05（上限可配）、IB-22（配置模板）、IB-23（项目级配置）、**IB-25 / IB-26 / IB-27（R7 新增：定义文档的装载 / 白名单 / 完备性校验与派生）**、**IB-20（R8 辅：会话持久化策略与确认门开关的键名登记与值域显式化，见 IFC-IB-304）**；**IB-28 ~ IB-33（R13 辅：账户 / 会话 / 令牌的键名登记与值域，见 IFC-IB-312）**；REQ-NFR-IB-15、IB-16
 - **公开接口契约**:
   - IFC-IB-021: `ConfigurationSource.load() -> RawConfig`（文件 + 环境变量合并）
   - IFC-IB-022: `resolve_project_config(project_id: str) -> ProjectConfig | ConfigError`
@@ -280,6 +334,15 @@
     - `IB_SESSION_PERSISTENCE_POLICY`：会话持久化策略，取值 `in_process`（默认）或 `external`；**须显式声明**（未声明即启动期报错，AC-IB-20-02）；v1 不提供 `external` 适配器（[ARCH-ASSUMPTION-A8]）。
     - `IB_REASONING_STREAM_ENABLED`：思考分区流式开关，**默认 `false`**（AC-IB-19-03）。
     - `IB_SESSION_BACKEND`：**值域扩展**为 `memory`（默认）或 `external`；**键名与默认值不变**（沿用 R2 对 `IB_EMBED_BACKEND` 的「仅扩展值域」先例）。
+  - **IFC-IB-312（R13 新增）**: 配置**键名登记与语义**（**仅登记键名，不含任何值**）：
+    - `IB_ACCOUNT_BACKEND`：账户存储后端，取值 `sqlite`（默认）或 `memory`（离线/测试替身）。
+    - `IB_SESSION_TTL_SECONDS`：会话有效期（秒）；**默认值 TBD**（[ARCH-ASSUMPTION-A9]；OQ-IB-09；[TBD-T22]）。
+    - `IB_SESSION_RENEW_WINDOW_SECONDS`：续期窗口（剩余有效期低于该值即允许 `renew`）。
+    - `IB_DEFAULT_ADMIN_USERNAME`：默认管理员用户名（**默认 `admin`；用户名非机密**）。
+    - `IB_DEFAULT_ADMIN_PASSWORD`：默认管理员**初始口令** —— **值只允许经 0600 `EnvironmentFile` 注入**；**代码 / 文档 / 日志 / 响应中不得出现其字面量**（C-IB-09 / REQ-NFR-IB-15）。
+    - `IB_PASSWORD_MIN_LENGTH`：口令最小长度（**策略细节 TBD**；OQ-IB-11）。
+    - `IB_LOGIN_MAX_FAILURES` / `IB_LOGIN_LOCK_SECONDS`：登录失败阈值与锁定窗口（**条件性**：OQ-IB-12 未裁决前不启用；ADR-27）。
+    - `IB_AUTHZ_POLICY_MODULE`：**既有键，语义与默认不变**；其**可取值**新增内置账户模块路径 `ibweb.accounts.policy`（沿用 R2「仅扩展值域；键名与默认值不变」先例）。
 - **依赖模块**: MOD-IB-01
 - **外部依赖**: 配置文件解析库（YAML/JSON）；**凭据仅走环境变量**（C-IB-02 / REQ-NFR-IB-07）
 
@@ -402,8 +465,8 @@
 
 ### MOD-IB-11 台账 (L3)
 
-- **职责**: 项目/知识库/文档/块元数据、入库状态机、任务租约、归属断言；**可见性的唯一权威**。
-- **覆盖需求**: REQ-FUNC-IB-04、IB-06、IB-08、IB-16、IB-23；REQ-NFR-IB-13
+- **职责**: 项目/知识库/文档/块元数据、入库状态机、任务租约、归属断言；**可见性的唯一权威**；**R13 追加**：账户与会话的持久化与凭据校验（**同一 SQLite 台账**；`users` / `sessions` 表；bcrypt 哈希/校验；默认管理员**幂等种子**）。
+- **覆盖需求**: REQ-FUNC-IB-04、IB-06、IB-08、IB-16、IB-23；REQ-NFR-IB-13；**REQ-FUNC-IB-30、IB-31、IB-32（R13 新增；见 IFC-IB-313~315）**；REQ-NFR-IB-15、IB-18
 - **公开接口契约**:
   - IFC-IB-120: `LedgerRepository.create_document(scope: Scope, doc_name: str, ext: str, size_bytes: int, content_sha256: str, blob_ref: str | None) -> DocumentRecord`
   - IFC-IB-121: `LedgerRepository.get_document(scope: Scope, doc_id: str) -> DocumentRecord | None`
@@ -417,8 +480,15 @@
   - IFC-IB-129: `LedgerRepository.active_collection_version(project_id: str) -> str` / `activate_collection_version(project_id: str, version: str) -> None`
   - IFC-IB-130: `LedgerRepository.assert_kb_in_project(project_id: str, kb_id: str) -> None`（失败抛 `ScopeViolationError` → HTTP 403）
   - IFC-IB-131: `LedgerRepository.list_chunks(scope: Scope, doc_id: str) -> list[ChunkRecord]` / `list_orphan_doc_ids(project_id: str, existing: Sequence[str]) -> list[str]`（删除重放对账）
+  - **IFC-IB-313（R13 新增）**: `SqliteAccountStore`（实现 `AccountStore`，IFC-IB-310）：
+    - **schema 单源**（= 迁移 `003_accounts.sql`，IFC-IB-330）：`users(user_id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT NOT NULL, project_id TEXT NULL, status TEXT NOT NULL, must_change_password INTEGER NOT NULL, failed_login_count INTEGER NOT NULL DEFAULT 0, locked_until TEXT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`；`sessions(token_digest TEXT PRIMARY KEY, user_id TEXT NOT NULL, project_id TEXT NULL, issued_at TEXT NOT NULL, expires_at TEXT NOT NULL, last_seen_at TEXT NOT NULL, revoked_at TEXT NULL)` + 索引 `sessions(user_id)` / `sessions(expires_at)`。
+    - **凭据**：口令经 **bcrypt** 哈希/校验（`bcrypt` 库，Apache-2.0）；`password_hash` **只存摘要**。
+    - **纪律**：**WAL + `busy_timeout` 必开**（沿用 MOD-IB-11 既有约束）；**绝不写入任何口令或令牌原文**；`username` 与 `user_id` **不写入日志**（字段白名单）。
+    - **advisory（非强制）**：账户存储与文档台账**逻辑分区**（表名前缀 / 仓库内分文件），避免单文件内职责混杂。
+  - **IFC-IB-314（R13 新增）**: 默认管理员**种子**（**幂等**）：`seed_default_admin(*, username: str, password_hash: str) -> UserRecord` —— `INSERT … ON CONFLICT(username) DO NOTHING`；`role="admin"`、`project_id=None`、`must_change_password=True`；**幂等**（重复启动不覆盖既有口令，AC 由「首登强制改密」保证）。口令 hash 由 `IB_DEFAULT_ADMIN_PASSWORD`（0600 EnvironmentFile）经 bcrypt 产生；**种子函数不接收也不回显明文口令的日志**。
+  - **IFC-IB-315（R13 新增）**: `MemoryAccountStore`（`AccountStore` 的**离线替身**）：内存字典实现，**与 IFC-IB-313 通过同一套端口一致性测试**（同 `InMemoryLedgerRepository` 精神）；可注入「过期 / 已撤销 / 停用 / 须改密」四态用于离线验证 REQ-NFR-IB-18。
 - **依赖模块**: MOD-IB-01、MOD-IB-02、MOD-IB-04
-- **外部依赖**: SQLite（stdlib `sqlite3`；**WAL + busy_timeout 必开**）
+- **外部依赖**: SQLite（stdlib `sqlite3`；**WAL + busy_timeout 必开**）；**bcrypt**（`bcrypt` 库，Apache-2.0，R13 新增；口令哈希）
 
 ### MOD-IB-12 原文件 BlobStore (L3)
 
@@ -570,7 +640,7 @@
 ### MOD-IB-23 HTTP API 与组合根 (L5)
 
 - **职责**: **唯一装配点**；REST + SSE 端点；鉴权注入与 `project_id` 解析（不信请求体）；健康检查。
-- **覆盖需求**: REQ-FUNC-IB-05、IB-06、IB-09、IB-17、IB-21、IB-23、**IB-25 / IB-27（R7 新增：定义文档的读写端点与装配期准入闸门）**、**IB-20（R8 新增：会话恢复端点与 fail-closed 准入；US-IB-20 / AC-IB-20-04 ~ 20-06）**；REQ-NFR-IB-09
+- **覆盖需求**: REQ-FUNC-IB-05、IB-06、IB-09、IB-17、IB-21、IB-23、**IB-25 / IB-27（R7 新增：定义文档的读写端点与装配期准入闸门）**、**IB-20（R8 新增：会话恢复端点与 fail-closed 准入；US-IB-20 / AC-IB-20-04 ~ 20-06）**；**REQ-FUNC-IB-28 ~ IB-33（R13 新增：登录/登出/主体查询/改密/续期、账户 CRUD、内置会话令牌解析与可注入策略模块、fail-closed 装配；见 IFC-IB-316~326）**；REQ-NFR-IB-15、IB-16
 - **公开接口契约（HTTP 契约）**:
   - IFC-IB-241: `build_application(deps: CompositionRoot) -> WSGIApplication`（**组合根**：装配全部适配器与替身，见 §5；**R1**：返回类型由 v1.0.0 的 `ASGIApp` 改为 `WSGIApplication`，装配语义不变）
   - IFC-IB-242: `POST /api/files`（multipart）→ `201 DocumentRecord`；`400` 校验失败；`403` 归属断言失败；`5xx` **fail-closed**（台账/Blob 不可用）
@@ -601,10 +671,25 @@
   - **准入顺序（强制，R8）**: `鉴权（Authorization 头）→ 归属断言（session_key 前缀，FM-7）→ SessionStore.load（IFC-IB-221）→ can_resume（IFC-IB-306）→ 续跑（IFC-IB-233）`。**任一前置不满足即 fail-closed**，**不得**退化为「新建会话后重跑」。
   - **R8 配置声明（强制）**: `IB_SESSION_PERSISTENCE_POLICY` 须在 `ib-web` 单元的 `EnvironmentFile` 模板（`IFC-IB-262`）中**显式声明**（AC-IB-20-02）；**只登记键名，不写入任何值**。
 
+- **R13 新增端点与契约（账户 / 会话；全程仅 `Authorization` 头，**不接受 `?token=`**）**:
+  - IFC-IB-316: `POST /api/auth/login`（请求 `{username, password}`）→ `200 {token, expires_at, must_change_password: bool, user: AccountSummary}` | `401`（**统一凭据错误**：不存在 / 口令错 / 停用 —— **不区分**，防探测；`LoginOutcome` 只用于内部日志字段白名单）| `429`（**条件性**：限速触发，OQ-IB-12 / ADR-27）| `400`（缺参）。**响应体只在此处一次性返回令牌，不落库不落日志**。
+  - IFC-IB-317: `POST /api/auth/logout` → `204`（撤销当前会话，`revoke_session`）| `401`。
+  - IFC-IB-318: `GET /api/auth/me` → `200 {user_id, username, role, project_id, must_change_password}` | `401`。
+  - IFC-IB-319: `POST /api/auth/change-password`（`{old_password, new_password}`）→ `200`（成功后**撤销该用户的其他会话**并清除改密态）| `400`（强度不满足，**不回显口令**）| `401` | `403`。
+  - IFC-IB-320: `POST /api/auth/session/renew` → `200 {expires_at}` | `401`（过期 / 无效 / 已撤销 → **fail-closed**）。**续期窗口**由 `IB_SESSION_RENEW_WINDOW_SECONDS` 判定。
+  - IFC-IB-321: 账户 CRUD（**仅 `admin`**，其余 `403`）：`GET /api/accounts?project_id=` → `200 {items: list[AccountSummary]}`（**不含 `password_hash`**）；`POST /api/accounts`（`{username, password, project_id, role:"ops"}`）→ `201 AccountSummary` | `409`（用户名冲突）| `400`（强度 / 绑定缺失）| `403`；`POST /api/accounts/{user_id}/disable` → `200 AccountSummary`（**同时撤销其全部会话**）| `404` | `403`；`POST /api/accounts/{user_id}/reset-password` → `200 {must_change_password: true}`（**条件性**，OQ-IB-14；复用种子口令纪律：新口令**不落日志**）。
+  - IFC-IB-322: `SessionTokenResolver.resolve(token: str) -> AuthzContext | None`（`PrincipalResolver` 的**内置实现**，definition 落在 MOD-IB-23）：`token_digest_matches` → `resolve_session`（未过期未撤销）→ 反查 `UserRecord`（`status="active"`）→ 构造 `AuthzContext(actor_id=user_id, project_id=record.project_id, roles=("admin",) 或 ("manager",))`；**任一不满足返回 `None`（fail-closed）**。**不新增授权判定** —— 判定仍只经 `AuthzPolicy`（IFC-IB-032/033）。
+  - IFC-IB-323: 内置**可注入策略模块** `ibweb.accounts.policy`（暴露 `POLICY` + `resolve_principal`）—— 生产经 `IB_AUTHZ_POLICY_MODULE=ibweb.accounts.policy` 指向它；**未配置即 `StartupError`**（fail-closed，沿用 `build_authz` 既有语义与 checklists [B9]）。**不得**在 `build_authz` 内硬编码自动启用（第二授权真源，ADR-22；REQ-FUNC-IB-33）。
+  - IFC-IB-324: `AuthMiddleware` **扩展**（**不新增中间件**，继续 `MIDDLEWARE = ["ibweb.authz.AuthMiddleware"]`）：① **改密态限制** —— 会话标记 `must_change_password=True` 时**只放行** `GET /api/auth/me` / `POST /api/auth/change-password` / `POST /api/auth/logout`，其余端点一律 `403 {"code":"password_change_required"}`（**服务端强制，不可绕过**，ADR-20）；② `?token=` / `?access_token=` / `?api_key=` 等 **4xx 纪律扩展至全部新端点**（沿用 `forbidden_token_in_query`，`?token=` 一律 4xx）。
+  - IFC-IB-325: 组合根装配扩展（`build_deps` / `_assemble`）：按 `IB_ACCOUNT_BACKEND` 构造 `SqliteAccountStore`（默认）或 `MemoryAccountStore`；**装配期执行幂等种子**（`IB_DEFAULT_ADMIN_USERNAME` / `IB_DEFAULT_ADMIN_PASSWORD`，口令值取自 0600 EnvironmentFile）；装配 `AuthzPolicy` 与 `PrincipalResolver`（生产经 `IB_AUTHZ_POLICY_MODULE`）；**任一步失败即拒绝装配、服务不启动**（沿用既有一装配点语义）。
+  - IFC-IB-326（**条件性 / 待确认**）: `LoginThrottle.check(username: str, client_ip: str, *, now: str) -> ThrottleDecision`（`allow` / `throttle`）+ 账户认证审计事件（`event=login_failed|login_success|account_disabled`，**字段白名单：不含口令、不含令牌、`username` 不作为自由文本字段** —— 只记布尔/枚举与计数）。落点为 MOD-IB-04 的结构化日志（**不新增表**）。**OQ-IB-12 / OQ-IB-13 未裁决前不纳入默认施工**（ADR-27）。
+- **R13 装配序列（显式化，任一步失败即启动失败）**: `装载配置（IFC-IB-312）→ 构造 AccountStore（313 / 315）→ 幂等种子（314）→ 构造可注入策略模块 + PrincipalResolver（322 / 323）→ 注入中间件（324）`。**账户装配不改变既有 §3 MOD-IB-23 的 R7 定义文档准入门序列**（二者并列，互不短路）。
+- **R13 鉴权与凭据纪律（强制）**: 沿用 IFC-IB-247 口径，**仅允许 `Authorization` 头鉴权**；`/api/auth/*` 与 `/api/accounts*` **全部不接受** `?token=`；错误体**不回显任何口令 / 令牌**（含掩码 / 前缀）；账户相关端点**不设**「粘贴令牌」旁路（ADR-24）。**授权真源仍唯一**（注入的 `AuthzPolicy`，ADR-22）。
+
 ### MOD-IB-24 Web 前端 (L5)
 
 - **职责**: 上传/列表/删除/重试/重建页 + 问答页 + **可视化配置页（R7）**；仅通过类型化 HTTP/SSE 契约与后端交互。
-- **覆盖需求**: REQ-FUNC-IB-09、IB-17、**IB-25（主）、IB-26（并列主，与 MOD-IB-22）、IB-27（辅）**；**IB-20（R8 新增：问答页对确认中间态与恢复的呈递、流式交付渲染；US-IB-20 / AC-IB-20-04、US-IB-19 / AC-IB-19-01、AC-IB-19-03）**
+- **覆盖需求**: REQ-FUNC-IB-09、IB-17、**IB-25（主）、IB-26（并列主，与 MOD-IB-22）、IB-27（辅）**；**IB-20（R8 新增：问答页对确认中间态与恢复的呈递、流式交付渲染；US-IB-20 / AC-IB-20-04、US-IB-19 / AC-IB-19-01、AC-IB-19-03）**；**REQ-FUNC-IB-34、IB-35（R13 新增：商用化界面重构、登录页与首登改密、运维控制台、暗/亮主题、中文优先）**、**REQ-FUNC-IB-28（R13 主：登录页取代粘贴令牌入口）**；REQ-NFR-IB-17
 - **公开接口契约（TS 类型与后端契约一一对应）**:
   - IFC-IB-256: `UploadPage`（消费 242/243/244/245）
   - IFC-IB-257: `ChatPage`（消费 247；渲染 `content`/`degraded`；`degraded` 时展示「当前未接入知识资料库」）
@@ -632,10 +717,17 @@
   - **恢复失败可读回执**：`404` / `409` / `403` 时给出可读提示（如「会话已失效，请重新发起或重新确认」），**不静默丢弃、不自动重跑**（AC-IB-20-05 / 20-06）。
   - **凭据不回显**：只显示**键名**，不显示任何值 / 掩码 / 前缀（延续 IFC-IB-296 口径）。
 
+- **R13 界面与路由约束**:
+  - IFC-IB-327: **登录页 + 首登强制改密流程**：移除既有 token-paste 门（`App.vue` 的 `tokenSet` / `saveToken`）与 `?token=` 迁移逻辑（`main.ts`）；登录成功后若 `must_change_password=true`，**界面只呈现改密页**（仅可调 `change-password` / `me` / `logout`，与服务端 `403 password_change_required` 一致）。**前端改密态仅为体验优化；服务端中间件为唯一裁决者。**
+  - IFC-IB-328: **运维控制台外壳**：左侧导航 + 右侧内容；**暗 / 亮主题**可切；**中文优先**（文案以中文为主，其余语言不回退为乱码）；组件库 = **Element Plus**（DR-13）+ 自定义 Claude 主题（设计令牌覆写）；**`vue-router`（hash 模式）** 承载路由与**鉴权守卫**（未登录 → 登录页；须改密 → 改密页）。**hash 模式之选择**：不需 nginx `try_files` 回退，减部署面（ADR-23）。
+  - IFC-IB-329: **类型化 API 客户端扩展**（`api/client.ts`）：新增 `login` / `logout` / `me` / `changePassword` / `renewSession` / `listAccounts` / `createAccount` / `disableAccount`；**令牌仅经 `Authorization` 头**（沿用既有 `headers()` 注入）；`401` → 清除会话态并回登录页；`403 password_change_required` → 跳改密页。**移除 `TOKEN_KEY` 的粘贴来源**（保留会话态存储但**不再由用户输入**）。
+- **R13 离线与数据本地化（强制，延续 IFC-IB-296）**: Element Plus / vue-router 及**全部**前端依赖**随构建产物本地打包**；**禁止运行期 CDN** 与任何外发请求（REQ-NFR-IB-17）；产物内公网 URL 扫描须零命中。
+- **R13 凭据不回显（强制）**: 界面只显示**键名**，不显示口令 / 令牌 / 任何值或掩码；登录失败统一文案（**不提示「用户不存在」或「口令错误」的区分**）。
+
 ### MOD-IB-25 部署运维 (L5)
 
 - **职责**: 四个 systemd 单元、EnvironmentFile 模板、启动期必填校验、依赖真机验证清单、Qdrant 安装检查清单。
-- **覆盖需求**: REQ-FUNC-IB-22（DR-03）；REQ-NFR-IB-07、IB-10
+- **覆盖需求**: REQ-FUNC-IB-22（DR-03）；REQ-NFR-IB-07、IB-10；**REQ-FUNC-IB-36（R13 新增：HTTPS 落点）**、**REQ-FUNC-IB-30（R13 辅：默认管理员种子与迁移交付）**；REQ-NFR-IB-15、IB-16
 - **公开接口契约（交付物清单，非代码）**:
   - IFC-IB-261: 四个 systemd 单元定义（`qdrant` / `ib-embed` / `ib-web` / `ib-worker`）
   - IFC-IB-262: `.env.example` 模板（**无真实值**）
@@ -646,6 +738,18 @@
   - R2 重申：IFC-IB-261 的**单元清单不变**（`ib-embed` 单元**早已存在**；L-03 缺的是**模块归属与契约**，不是单元文件）；IFC-IB-263 的「只报键名、不回显值、非零码退出」纪律对第二份模板同样生效。
 - **依赖模块**: MOD-IB-01、IB-02、IB-04
 - **外部依赖**: `systemd`
+
+- **R13 交付物（迁移 / TLS / 检查清单）**:
+  - IFC-IB-330: 手写迁移 **`003_accounts.sql`**（前向、幂等：`CREATE TABLE IF NOT EXISTS users …` / `sessions …` + 索引；**`002` 已被 `chunk_image` 占用**）。经既有 `ibweb.bootstrap --ensure-schema`（`ExecStartPre`）应用。**回滚策略**：新表为**纯追加**，回滚 = **代码回滚**（旧代码忽略新表，**无需破坏性 DDL**）；仅在**未投产**且确需清空时方可 `DROP TABLE`（注明**丢数据**）。
+  - IFC-IB-331: **nginx TLS 终止配置模板**（HTTPS 落点，ADR-25）：`ssl_certificate` / `ssl_certificate_key`（**证书策略**：内网自签或内网 CA；证书与私钥路径经 0600 权限，**不进仓库**）；`ib-web` 仍绑 `127.0.0.1:18080`（明文仅在回环）；**SSE 不缓冲**沿用 `proxy_buffering off` 与 `X-Accel-Buffering: no`。**HSTS 仅在内网 CA / 受信证书下启用**（自签下慎重）。
+  - IFC-IB-332: 部署检查清单**新增项 B15 ~ B20**（与 `src/deploy/checklists.txt` 同步）：
+    - **B15** HTTPS 生效（外部经 `https://` 可达，`http://` 重定向或拒绝）。
+    - **B16** **零 Cookie 设置**：任意响应**不含** `Set-Cookie`（DR-10；`grep -i 'set-cookie'` 零命中）。
+    - **B17** **`?token=` / `?access_token=` 全端点 4xx**（含 `/api/auth/*`、`/api/accounts*`）。
+    - **B18** 默认管理员**首登强制改密**：首登后未改密前访问业务端点返回 `403 password_change_required`。
+    - **B19** `EnvironmentFile` 权限 **0600**；`IB_DEFAULT_ADMIN_PASSWORD` **仅**在该文件出现；仓库与日志零命中（沿用 B14 纪律：`grep -c -iE 'Bearer |token=|password|api[_-]?key'` 为 0）。
+    - **B20** 迁移**可前向可回滚**：`003_accounts.sql` 幂等重放无副作用；代码回滚后旧版本可正常启动（忽略新表）。
+  - R13 重申：IFC-IB-261 的**单元清单不变**（**四单元**；账户体系内建，**不新增 systemd 单元**，DR-09 / ADR-18/ADR-03）；IFC-IB-263 的「只报键名、不回显值、非零码退出」纪律对新键名同样生效。
 
 ### MOD-IB-26 ib-embed 服务端 (L2；服务端进程)
 
@@ -745,6 +849,16 @@ MOD-IB-26 → 01, 02, 04（**本模块不被任何模块 import**；只走线协
 - **单一入口纪律未被绕开**：会话状态仍**只**经 `SessionStore`（MOD-IB-21 端口）读写，`session_key` 前缀断言（FM-7）沿用；前端仍**只**经 HTTP/SSE 契约（MOD-IB-24 → MOD-IB-23）取数，**不新增任何绕过路径**。
 - 因此「编号即拓扑序」继续适用于 GROUP_C；R8 的**边界纪律同 §4.2.2 末句**：新增工件若被低编号模块（尤其组合根）依赖，**不得新开编号更高的模块**。
 
+### 4.2.4 R13 无环性再声明（零新增依赖边）
+
+**结论：DAG 拓扑在 R13 下不变，无环证明（§4.2）继续成立。**
+
+- **零新增依赖边**：R13 新增全部落在 **MOD-IB-01 / 02 / 11 / 23 / 24 / 25** 内部（账户 / 会话的类型化契约与第 15 个端口 / 键名登记 / SQL 适配器与种子 / 端点与解析器与策略模块与中间件扩展与装配 / 前端登录与路由 / 迁移与 TLS 与清单），**§4.1 依赖边清单逐行未改**；`w(MOD-IB-n) = n` 严格递减证明不受影响。
+- **不新增模块**：账户与会话**必然被组合根 MOD-IB-23 依赖**，若新开模块只能取 **≥27** 编号 → 产生 `23 → 27` 边，**违反 `w(A) > w(B)`**；故并入既有模块（§4.2.2 / §1 R13 性质段；ADR-18）。
+- **既有边被复用而非新增**：`AccountStore` 端口在 **MOD-IB-01**（L0）；其适配器在 **MOD-IB-11**（既有边 `11 → 01`，不新增）；端点 / 解析器 / 策略模块在 **MOD-IB-23**（既有边 `23 → 01/02/03/04/11`）；前端 **MOD-IB-24 → 23**（既有）；部署 **MOD-IB-25 → 01/02/04**（既有）。
+- **单一入口纪律未被绕开**：授权判定仍只经注入的 `AuthzPolicy`（IFC-IB-032/033）；会话令牌解析只有 `SessionTokenResolver` 一个入口（IFC-IB-322）；前端仍只经 HTTP 契约（MOD-IB-24 → MOD-IB-23）取数，**不新增绕过路径**（ADR-22 / ADR-24）。
+- 「编号即拓扑序」继续适用于 GROUP_C；R13 的**边界纪律同 §4.2.2 末句**：新增工件若被低编号模块（尤其组合根）依赖，**不得新开编号更高的模块**。
+
 ### 4.3 分层视图
 
 ```
@@ -762,6 +876,8 @@ L0  MOD-IB-01  02  03  04
 ```
 
 **单向铁律**：箭头只向上（依赖只向下层）。**跨层反向依赖一律通过端口注入解决**（如 MOD-IB-13 → MOD-IB-05/07 是向下依赖，合规；MOD-IB-05 需要 OCR 但以**参数注入**而非静态依赖 MOD-IB-06，避免横向耦合）。
+
+**R13 注**：账户 / 会话适配器仍属 **L3 MOD-IB-11**（依赖 L0 的 MOD-IB-01/02/04），端点 / 解析器仍在 **L5 MOD-IB-23**；**未新增层、未跨层反向依赖、未新增横向耦合**。（§4.3 图体与「单向铁律」段**一字不动**。）
 
 ---
 
@@ -782,12 +898,14 @@ L0  MOD-IB-01  02  03  04
 | `AuthzPolicy` | 接入方注入 | `DenyAllPolicy` | **未注入即启动失败** |
 | `ConfigurationSource` | 文件 + 环境变量 | 测试用固定字典 | `IB_CONFIG_SOURCE=file\|dict` |
 | `DefinitionDocumentStore`（**R7 新增**） | `FileDefinitionDocumentStore`（本地文件；原子写 + 语义哈希乐观并发） | `InMemoryDefinitionDocumentStore`（内存字典 + 同一校验器） | `IB_DEFINITION_DOC_PATH`（路径）；`IB_VISUAL_CONFIG_ENABLED=true\|false` |
+| `AccountStore`（**R13 新增**） | `SqliteAccountStore`（落在 MOD-IB-11；bcrypt + 同一 SQLite 台账；装配期幂等种子默认管理员） | `MemoryAccountStore`（内存字典 + 同一端口一致性测试；可注入四态） | `IB_ACCOUNT_BACKEND=sqlite\|memory` |
 
 > **R2 形态可逆开关说明**：`inproc` = 进程内 `InProcessBgeM3Embedder`（位于 **MOD-IB-09 之内**，**不 import MOD-IB-26**）；切换代价 = 改一个配置值 +（可选）停用 `ib-embed` 单元，**不改任何上层模块、不改 IFC 签名、不改任何既有键名**。三形态须通过**同一套端口一致性测试**（见 §3 MOD-IB-09）。默认保持 `http`：进程内形态的模型内存 × worker 数风险与「与 onnxruntime 同进程」的内存叠加峰值（[TBD-T4']）仍未实测。
 > （R2 附：`IB_EMBED_BACKEND` 的**值域**扩展与 `IB_OFFLINE_MODE=1` 的一键离线语义**相容**——离线时仍取该表的「离线/测试」列。）
 
 **一键离线**：`IB_OFFLINE_MODE=1` 等价于把上表全部置为「离线/测试」列（AC-IB-15-01、附录 D）。
 > **R7 装配说明（定义文档）**：① 定义文档的**装配期装载 → 准入闸门 → 派生 → 注入**序列见 §3 MOD-IB-23；② 一键离线下 `DefinitionDocumentStore` 取「离线/测试」列（`InMemoryDefinitionDocumentStore`），**装配期闸门与校验器照常执行**（离线亦可验证 AC-IB-18-01/02/05）；③ 新增键 `IB_DEFINITION_DOC_PATH` / `IB_VISUAL_CONFIG_ENABLED` **只登记键名**，其取值（含路径中的任何敏感信息）一律不进文档、不进日志（凭据纪律）。
+> **R13 装配说明（账户 / 会话）**：① `IB_OFFLINE_MODE=1` 时 `AccountStore` 取「离线/测试」列（`MemoryAccountStore`），**装配期种子与端口一致性照常执行**（离线亦可验证登录 / 改密态 / 撤销）；② 新增键（IFC-IB-312）**只登记键名**，其取值（尤其 `IB_DEFAULT_ADMIN_PASSWORD`）**一律不进文档、不进日志、不回显**；③ **生产 `IB_AUTHZ_POLICY_MODULE` 必须显式配置**（`ibweb.accounts.policy` 或接入方模块），否则 `StartupError`（fail-closed；B9 / checklists）。
 
 ---
 
@@ -907,6 +1025,8 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 | **定义文档（运行期读）**（R7 新增） | 运行期文档不可读（被移走 / 权限变化） | `GET /api/config/definition` 返回 `503`（**不返回空文档**）；**问答主链路不受影响**（派生结果已于装配期常驻内存，不重新读文档） | 「配置暂时不可读，请稍后重试」 | ERROR | **fail-closed（配置读）**；对问答链路无影响 |
 | **会话状态（待确认中间态）**（R8 新增） | 状态丢失 / 未携决策 / 归属不符 / 会话不存在 | `POST /api/chat/resume`（IFC-IB-307）返回 `404` / `409` / `403`；**不新建会话、不重跑、不静默续跑**（`can_resume` = `False`） | 「会话已失效，请重新发起或重新确认」 | WARN | **fail-closed（会话状态）** |
 | **完成事件的结构化产物**（R8 新增） | 本轮无可交付引用（`citations` 为空）或无可交付正文 | **不臆造引用**（`citations=()`）、**不发空的 `content` 帧**；仅以完成事件收束（`had_content=false`），**不追加降级文案**（无引用 ≠ 降级） | 无感（无引用时不显示引用区） | INFO | **fail-open（增强项）**；对问答主链路无影响 |
+| **账户 / 会话表（R13 新增）** | 台账不可用 / 表缺失（迁移未应用） | 登录与全部 `/api/auth/*` 返回 `503`；**业务端点**因无法解析主体返回 `401`（**不静默放行**，`DenyAllPolicy` 兜底） | 「服务暂时不可用，请稍后重试」（登录页）/ 跳登录页 | ERROR | **fail-closed** |
+| **须改密态（`must_change_password`）（R13 新增）** | 会话处于改密态 | 中间件对**非** `me` / `change-password` / `logout` 端点一律 `403 password_change_required` | 强制停留在改密页 | INFO | **fail-closed（改密态）**；对已改密用户无影响 |
 
 ---
 
@@ -925,17 +1045,20 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 | `AuthzPolicy` | 接入方注入 | `DenyAllPolicy` | 401/403 而非静默（AC-IB-11-05） |
 | `ConfigurationSource` | 文件 + 环境变量 | 固定字典 | 必填校验与可读错误 |
 | `DefinitionDocumentStore`（**R7 新增**） | `FileDefinitionDocumentStore` | `InMemoryDefinitionDocumentStore` | 装载失败 / 原子写回 / 乐观并发冲突（`conflict=True`）/ 完备性校验拒绝 / 白名单边界 |
+| `AccountStore`（**R13 新增**） | `SqliteAccountStore` | `MemoryAccountStore` | 登录统一错误、改密态、令牌过期 / 续期、撤销（登出 / 停用 / 改密）、幂等种子、账户↔项目绑定（1:1） |
 
 **离线可测的纯逻辑单元**（无外部 IO，AC-IB-15-02）：MOD-IB-01（契约校验）、MOD-IB-02（配置合并与校验）、MOD-IB-07（切分）、MOD-IB-05（注册表分派）、MOD-IB-18（打分与判定）、MOD-IB-19（`parse_route_output` 脏输出）、MOD-IB-14（`fingerprint`）。
 **R7 追加的离线可测单元**（纯函数、无外部 IO）：**MOD-IB-02** 的 `validate`（IFC-IB-290）与 `derive`（IFC-IB-291）—— 前者对 **≥7 类**校验项逐条可测（AC-IB-18-01/02/05），后者对派生结果做结构等价断言；配合 `InMemoryDefinitionDocumentStore` 即可在**无任何外部服务**下完成装配期全链路离线验证（AC-IB-18-05）。
 
 **R8 追加的离线可测单元**（**纯函数、无外部 IO、无第三方依赖**）：**MOD-IB-21** 的 `is_user_visible`（IFC-IB-303，含「内部产物永不外流」与「默认不混帧」的判据）与 `completion_event`（IFC-IB-302，含「恰一次」「其后无 `content`」「不臆造」「不发空帧」）；**MOD-IB-22** 的 `can_resume`（IFC-IB-306，含「状态丢失 / 未携决策 / 归属不符 → `False`」的 fail-closed 三例）。配合 **`MemorySessionStore`**（§8 替身表既有行，**未改动**）即可在**无任何外部服务**下完成「会话 → 确认中间态 → 恢复」的**全链路离线验证**（AC-IB-19-01 ~ 05、AC-IB-20-02 ~ 06）。
 
+**R13 追加的离线可测单元**（**纯函数、无外部 IO、无第三方依赖**）：**MOD-IB-01** 的令牌原语 `new_session_token` / `token_digest` / `token_digest_matches`（IFC-IB-311，含「常量时间比较」与「只存摘要」的判据）。配合 **`MemoryAccountStore`**（§8 替身）即可在**无任何外部服务**下完成「登录 → 改密态 → 改密 → 续期 → 登出」的**全链路离线验证**（REQ-NFR-IB-18）。
+
 ---
 
 ## 9. REQ → MOD 覆盖率矩阵
 
-### 9.1 功能需求（REQ-FUNC-IB-01 ~ IB-27，**27/27 全覆盖**；R7 同步计数，v1.2.0 需求总数）
+### 9.1 功能需求（REQ-FUNC-IB-01 ~ IB-36，**36/36 全覆盖**；R13 同步计数）
 
 | REQ | 需求要点（摘要） | 覆盖模块（主 / 辅） |
 |-----|------------------|---------------------|
@@ -966,12 +1089,21 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 | IB-25 | 可视化配置界面（定义文档的图形视图；round-trip 回写；**无第二真源**；数据不出本地） | **MOD-IB-24** / 02, 01, 23 |
 | IB-26 | 可编辑范围（节点参数与专家集合；**不含**运行期改图；白名单制；条件边须显式分支映射） | **MOD-IB-24, MOD-IB-22** / 02, 01 |
 | IB-27 | 装配期完备性校验与 fail-fast 准入闸门（可读定位；**无**强制继续开关；界面与直改文档一视同仁；默认专家恰好一个） | **MOD-IB-23, MOD-IB-02** / 01, 24 |
+| IB-28 | 用户名口令登录取代粘贴令牌入口（**无旁路**） | **MOD-IB-24, MOD-IB-23** / 01, 02 |
+| IB-29 | 不透明服务端会话令牌 + 过期与续期（**仅 `Authorization`，无 Cookie**） | **MOD-IB-23** / 01, 02, 11 |
+| IB-30 | 默认管理员 + **首登强制改密** | **MOD-IB-23, MOD-IB-11** / 01, 02, 24, 25 |
+| IB-31 | 账户 CRUD（**管理员**） | **MOD-IB-23** / 01, 11, 24 |
+| IB-32 | 账户↔项目 **1:1** 绑定 + 停用/启用 | **MOD-IB-23, MOD-IB-11** / 01, 24 |
+| IB-33 | 单一授权真源 + 生产 **fail-closed**（`PrincipalResolver` 实现） | **MOD-IB-23** / 01, 02（既有 `AuthzPolicy` 端口不变） |
+| IB-34 | 前端商用化重构（Element Plus + Claude 主题，**本地打包**） | **MOD-IB-24** / 23 |
+| IB-35 | 左导航 + 右内容、暗/亮主题、**中文优先** | **MOD-IB-24** |
+| IB-36 | **HTTPS 落点**（TLS 终止与证书策略） | **MOD-IB-25** / 23 |
 
-**无缺口**：**27 条 REQ-FUNC**（R7 同步计数；R1 / R2 时点基线 24 条）每条至少一个「主」模块，且每条均可被至少一个 AC 验证（R7 新增 3 条见上三行，AC 落点分别为 AC-IB-17-01~06、AC-IB-17-04 / AC-IB-18-01、AC-IB-18-01~06）。
+**无缺口**：**36 条 REQ-FUNC**（R13 同步计数；R1 / R2 基线 24、R7 27）每条至少一个「主」模块，且每条均可被至少一个 AC 验证（R13 新增 9 条见上九行；AC 落点以 GROUP_A 包 §2 为权威，本矩阵的 AC 配对标 [INFERRED]）。
 
 **（R8）REQ-FUNC-IB-20 的设计覆盖闭环**：需求侧补入 **US-IB-19**（流式交付最终答复；AC-IB-19-01 ~ 05）与 **US-IB-20**（会话生命周期；AC-IB-20-01 ~ 06）后，本需求的设计覆盖由「仅登记 REQ 与模块归属」升级为「**US / AC → ADR / IFC 逐条可追溯**」（见 §9.6 的逐 AC 映射表）：`ADR-17`（承载方式与状态丢失语义）+ `IFC-IB-298 ~ 308`（11 条类型化契约）+ §7.3 / §7.4 / §8 的相应补充。**本轮不重写既有设计**（`IFC-IB-221 ~ 225` / `IFC-IB-231 ~ 233` / `IFC-IB-247` 一字不动）。
 
-### 9.2 非功能需求（REQ-NFR-IB-01 ~ IB-14）
+### 9.2 非功能需求（REQ-NFR-IB-01 ~ IB-18）
 
 | REQ | 需求要点 | 覆盖模块（主 / 辅） |
 |-----|----------|---------------------|
@@ -989,6 +1121,10 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 | NFR-12 | 许可合规 | **MOD-IB-05, MOD-IB-06, MOD-IB-08**（选型见 tech_stack.md） |
 | NFR-13 | 可靠性与降级 | **MOD-IB-04** / 15, 21 + §7.4 降级矩阵 |
 | NFR-14 | 可测试性 | **MOD-IB-01** / §8 替身清单 |
+| NFR-15 | 凭据 / 口令存储安全（bcrypt 摘要，**无明文**） | **MOD-IB-11** / 01, 02 |
+| NFR-16 | 会话安全（过期 / 续期 / **无 Cookie** / HTTPS） | **MOD-IB-23** / 01, 11, 25 |
+| NFR-17 | 前端可维护性与**自包含构建**（无 CDN） | **MOD-IB-24** / 25 |
+| NFR-18 | 可测试性（账户 / 会话离线替身齐备） | **MOD-IB-11** / §8 替身清单 |
 
 **R7 说明（NFR 覆盖不变）**：R7 **不新增 NFR 条目**，14 条 NFR 的主 / 辅归属**一行未改**。新增结构对 NFR 的作用为**既有条目的加固**：`DefinitionDocumentStore`（IFC-IB-287）服务 **NFR-11（可维护性 / 模块边界）**；`validate` / `derive`（IFC-IB-290 / 291）为纯函数 + 替身齐备，服务 **NFR-14（可测试性）**；装配期闸门服务 **NFR-02（可配置性）**；「数据不出本地 + 前端禁止 CDN」服务 **NFR-08**。
 
@@ -1045,6 +1181,16 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 - **OQ 处置**：**OQ-IB-07 / OQ-IB-08 均保持开放**；R8 只落地「默认关闭 / 会话内隔离」的**安全默认**，**不裁决业务语义**（ADR-17；`architecture_design.md` §10.1 R8 行）。
 - **架构侧对应**：`architecture_design.md` 1.4.0（R8）的 **ADR-17**、**§2.0.3 R8 影响复核表**、§1.3 R8 注、§6 四条规范化补充、[ARCH-ASSUMPTION-A8]、[TBD-T21]。
 
+### 9.7 R13 覆盖率再声明（认证与商用界面增量）
+
+**结论：36/36 REQ-FUNC + 18 REQ-NFR 覆盖达成，无新增缺口。**
+
+- **REQ-FUNC-IB-28 ~ IB-36**：全部有**主**模块（见 §9.1 R13 九行）；设计落点为 **ADR-18 ~ ADR-27** + **IFC-IB-309 ~ 332**。
+- **REQ-NFR-IB-15 ~ IB-18**：全部归属**主**模块（见 §9.2 R13 四行）；离线替身见 §8（`MemoryAccountStore` + 令牌原语纯函数）。
+- **模块与依赖不变**：模块数仍 **26**、端口 14 → **15**（纯追加）、**§4.1 依赖边逐行未改**（§4.2.4）。
+- **OQ 处置**：**OQ-IB-11 / 12 / 13 / 14 保持开放**；R13 只落地「服务端强制 / 可配置 / 可注入」的安全默认，**不裁决业务策略值**（ADR-20 / ADR-22 / ADR-27；`architecture_design.md` §10.1 R13 行）。
+- **架构侧对应**：`architecture_design.md` 1.5.0（REV-13）的 **ADR-18 ~ ADR-27**、**§2.0.4 R13 影响复核表**、§1.3 R13 注、[ARCH-ASSUMPTION-A9]、[TBD-T22] / [TBD-T23]；`tech_stack.md` 1.4.0（REV-13）。
+
 ## 10. FreeArk 参考模块映射（只读对照，说明复用与改写边界）
 
 | FreeArk 现有资产 | 本基座对应 | 复用方式 |
@@ -1067,9 +1213,9 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 
 ## 11. 自检声明
 
-- **门控标准 1（REQ → MOD 全覆盖）**：§9.1 逐条列出 **27 条 REQ-FUNC**（R7 同步计数：新增 IB-25 / IB-26 / IB-27 三行，各有主模块），**每条均有主模块**，无缺口；§9.2 覆盖 14 条 REQ-NFR（R7 未变）。
+- **门控标准 1（REQ → MOD 全覆盖）**：§9.1 逐条列出 **36 条 REQ-FUNC**（R13 同步计数：R7 的 27 行 + R13 新增 IB-28 ~ IB-36 九行，各有主模块），**每条均有主模块**，无缺口；§9.2 覆盖 18 条 REQ-NFR（R13 同步：R7 的 14 条 + R13 新增 IB-15 ~ IB-18 四条）。
 - **门控标准 2（无循环依赖）**：§4.2 给出**构造性无环证明**（依赖边权值严格递减 ⇒ 无环），并列出三处「看似会成环」的化解方式。
-- **门控标准 3（ADR ≥2 方案）**：13 条 ADR 见 `architecture_design.md` §2，每条含 ≥2 候选方案（含已评估未采纳项）、选择理由与负向后果。
+- **门控标准 3（ADR ≥2 方案）**：27 条 ADR 见 `architecture_design.md` §2，每条含 ≥2 候选方案（含已评估未采纳项）、选择理由与负向后果。
 - **门控标准 4（接口全部类型化）**：§2.1 给出全部数据结构的**字段名 + 类型 + 可空性**；§3 给出全部公开接口的类型化签名（含参数类型与返回类型）；§2.2 汇总端口与 IFC 段。
 - **边界合规**：本文**不含实现代码**（无函数体、无伪代码实现）；**未修改 FreeArk 任何文件**；**未写入任何凭据/密钥/令牌**；本阶段**止于 GROUP_B**。
 - **R1 自检（框架切换）**：
@@ -1099,3 +1245,12 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
       - **既有设计未被改写**：`IFC-IB-221 ~ 225`、`IFC-IB-231 ~ 233`、`IFC-IB-247`、§5 装配表既有行、§6 状态机、§7.1 / §7.2 表、§10 FreeArk 映射表**均未改动**；`IB_SESSION_BACKEND` **键名与默认值不变**（仅扩展值域，沿用 R2 先例）。
       - **OQ 未越权**：**OQ-IB-07 / OQ-IB-08 保持开放**；R8 只落地「默认关闭 / 会话内隔离」的安全默认，**不裁决**「是否应默认启用确认门」「历史是否跨会话」；架构层不自行扩围或缩围。
       - **边界合规**：R8 增量**不含实现代码**（无函数体、无伪代码）；**未修改 FreeArk 任何文件**；需求侧文档（`requirements_spec.md` v1.3.0 / `user_stories.md` v1.3.0）**只读未改**；`implementation_plan.md`（GROUP_C）**未改**；`tech_stack.md` **未改**（无新第三方依赖）；**未写入任何凭据或配置值**（只登记键名：`IB_CONFIRMATION_GATE_ENABLED` / `IB_SESSION_PERSISTENCE_POLICY` / `IB_REASONING_STREAM_ENABLED`）；本阶段**止于 GROUP_B**。
+    - **R13 自检（认证 / 会话 / 商用界面增量，GROUP_A REV-13 下游贯通）**：
+      - **覆盖同步**：§9.1 由 27/27 同步为 **36/36 REQ-FUNC**（新增 IB-28 ~ IB-36，各有主模块），§9.2 NFR 由 14 同步为 **18**（NFR-15 ~ 18）；**§9.7 给出 R13 再声明**。
+      - **零新增模块 / 零新增依赖边**：模块数仍 **26**；**§4.1 依赖边清单逐行未改**；新增工件并入 MOD-IB-01 / 02 / 11 / 23 / 24 / 25（§1 R13 性质段给出「为何不新增 MOD-IB-27」的编号论证；§4.2.4 给出无环性再声明）。
+      - **类型化未降级**：新增 `IFC-IB-309 ~ 332`（24 条）全部为 `name: type` + 可空性的**类型化契约**；`IFC-IB-309 / 310 / 311` 为 frozen dataclass / Protocol / 纯 stdlib 函数，**零第三方依赖**；`AccountSummary` 与 `SessionRecord` 在**结构上不含** `password_hash` 原文以外的凭据、`SessionRecord` **只含摘要**（「只存摘要」= 类型层事实）。
+      - **单一授权真源为事实**：授权判定仍只经注入的 `AuthzPolicy`（`IFC-IB-032/033` 未改）；生产未配置 `IB_AUTHZ_POLICY_MODULE` 即 `StartupError`（`IFC-IB-323`，沿用 `build_authz` 既有语义）；**首登强制改密由服务端中间件在结构上保证**（`IFC-IB-324`）。
+      - **编号纪律未破**：`IFC-IB-001 ~ 308` 的号 / 名 / 签名 / 字段集**一字不动**；新增 309 ~ 332 为**纯追加**；**`IFC-IB-285` 仍预留未分配**；既有重号 `IFC-IB-131` **登记不修**（残余项 R-9）。
+      - **OQ 未越权**：**OQ-IB-11 / 12 / 13 / 14 保持开放**；限速与审计为**条件性**（ADR-27），默认施工不含；架构层不自行扩围或缩围。
+      - **凭据纪律**：全文只登记**键名**；**默认初始口令的字面量不在本文件出现**；令牌仅经 `Authorization` 头；`?token=` 纪律扩展至全部新端点；`?token=` / `password` 类在日志中的扫描须零命中（沿用 [B14]）。
+      - **边界合规**：R13 增量**不含实现代码**（无函数体、无伪代码）；**未修改 FreeArk 任何文件**；需求侧文档只读未改；`tech_stack.md` **已同步（R13 有新第三方依赖）**；**未写入任何口令 / 令牌 / 密钥字面量**；本阶段**止于 GROUP_B**。

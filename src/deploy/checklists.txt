@@ -253,9 +253,84 @@
     或更糟「以为过滤了、其实漏了」。
 
 ##############################################################################
+# B.5 R13 增量验收（账户 / 会话 / 传输层；IFC-IB-332）
+##############################################################################
+
+[B15] HTTPS 生效（IFC-IB-331 / ADR-25）
+    $ curl -sS -o /dev/null -w '%{http_code}\n' http://<host>/healthz        # 期望 301（或 444）
+    $ curl -sS -o /dev/null -w '%{http_code}\n' https://<host>/healthz      # 期望 200
+    $ curl -sSI https://<host>/ | grep -i 'strict-transport-security'       # 自签下**应无**输出
+    $ ss -ltnp | grep 18080                                                 # 期望仅 127.0.0.1:18080
+    [ ] http:// 被重定向或拒绝（外部只能经 https:// 访问）
+    [ ] https:// 可达且证书链与预期一致（自签：客户端已预置根证书，**不是**「点继续访问」）
+    [ ] `ib-web` 仍只监听 127.0.0.1:18080（明文仅回环）
+    [ ] HSTS 的启用与否与证书策略一致（自签下**未**启用 —— 否则证书出问题时无法降级排障）
+    [ ] 证书与私钥在目标机上的权限为 0600，且**不在**仓库中（`git ls-files | grep -iE 'crt|key|pem'` 无命中）
+
+[B16] 零 Cookie 设置（DR-10）
+    $ for p in /healthz /api/files /api/auth/login; do \
+        curl -sS -D - -o /dev/null -k "https://<host>$p" | grep -i '^set-cookie:' && echo "HIT $p"; \
+      done
+    $ grep -c -i 'set-cookie' <(curl -sSI -k https://<host>/api/auth/login)
+    [ ] 上述命令对**任意**端点均无 `Set-Cookie`（命中数为 0）
+    [ ] 登录成功响应头中也无 `Set-Cookie`（会话令牌只出现在响应体，由前端存 sessionStorage）
+    说明：本项目不使用 Cookie 会话。一旦出现 Cookie，就意味着多了一条浏览器**自动携带**的
+    凭据通道（CSRF 面随之出现），与 DR-10 直接冲突。
+
+[B17] `?token=` / `?access_token=` 全端点 4xx（含 R13 新增端点）
+    $ for p in /api/files /api/chat/stream /api/auth/me /api/auth/logout \
+               /api/auth/session/renew /api/accounts; do \
+        printf '%s -> ' "$p"; \
+        curl -sS -o /dev/null -w '%{http_code}\n' -k "https://<host>$p?token=whatever"; \
+      done
+    $ curl -sS -o /dev/null -w '%{http_code}\n' -k -X POST \
+        'https://<host>/api/auth/login?access_token=whatever'
+    [ ] 全部返回 400（**包括**免鉴权的 `/api/auth/login`）
+    [ ] 返回体中**不回显**查询串原文（提示语只说明「不得出现在查询串中」）
+    说明：查询串会被 nginx / Waitress 访问日志完整记录（FreeArk 已因 WS 令牌进查询串实际泄露过一次），
+    因此「能用但违规」的写法必须**当场失败**，否则它会一直扩散。
+
+[B18] 默认管理员首登强制改密（ADR-20；服务端受限会话）
+    $ TOKEN=$(curl -sS -k -X POST https://<host>/api/auth/login \
+        -H 'Content-Type: application/json' \
+        -d '{"username":"admin","password":"<初始口令>"}' | python -c 'import sys,json;print(json.load(sys.stdin)["token"])')
+    $ curl -sS -o /dev/null -w '%{http_code}\n' -k https://<host>/api/accounts -H "Authorization: Bearer $TOKEN"
+    $ curl -sS -k https://<host>/api/auth/me -H "Authorization: Bearer $TOKEN"
+    [ ] 登录响应 `must_change_password` 为 `true`
+    [ ] 改密前访问业务端点返回 **403**，且 `error.code == "password_change_required"`
+    [ ] 改密前 `/api/auth/me` 仍可用（200）
+    [ ] 改密成功后 `must_change_password` 变为 `false`，且业务端点恢复可用
+    [ ] **绕过前端直接调接口**同样被 403 挡住（前端只是把限制可视化，服务端才是强制者）
+    另：改密成功后，该账户的**其他**会话应被撤销（旧令牌再用 → 401）。
+
+[B19] EnvironmentFile 权限与口令键的唯一落点（凭据纪律）
+    $ stat -c '%a %U:%G %n' /etc/intelligentbase/ib-web.env          # 期望 600 <运行用户>:<组>
+    $ grep -c 'IB_DEFAULT_ADMIN_PASSWORD' /etc/intelligentbase/ib-web.env
+    $ git grep -n 'IB_DEFAULT_ADMIN_PASSWORD=' -- . | grep -v 'REPLACE_ME' ; echo "exit=$?"
+    $ grep -c -iE 'Bearer |token=|password|api[_-]?key' <(journalctl -u ib-web -n 5000 --no-pager)
+    [ ] EnvironmentFile 权限为 **600** 且属主为运行用户
+    [ ] `IB_DEFAULT_ADMIN_PASSWORD` **仅**出现在该 0600 文件里（仓库、日志、systemd unit 均零命中）
+    [ ] 日志扫描命中数为 0（沿用 [B14] 纪律）
+    [ ] 核对：库中 `users.password_hash` 以 `$2b$` 开头（bcrypt），**不存在**任何明文口令列
+    警告：本仓库**不得**出现任何真实口令值（含示例 / 注释 / 测试 / 提交历史）。
+    若曾误提交，改口令**不足以**消除影响 —— 必须同时认定该口令已泄露并轮换处置。
+
+[B20] 迁移可前向、可回滚（IFC-IB-330）
+    $ python -m ibweb.bootstrap --ensure-schema       # 期望：可重复执行，无报错
+    $ python -m ibweb.bootstrap --ensure-schema       # 再跑一次（幂等重放，无副作用）
+    $ sqlite3 /var/lib/intelligentbase/ledger/ledger.sqlite3 ".tables" | tr ' ' '\n' | grep -E '^(users|sessions)$'
+    $ sqlite3 /var/lib/intelligentbase/ledger/ledger.sqlite3 ".schema sessions" | grep -i expires_at
+    [ ] `003_accounts.sql` 幂等重放无副作用（`CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS`）
+    [ ] `users` / `sessions` 两表与索引 `idx_sessions_expires` 均存在
+    [ ] 回滚策略确认：新表为**纯追加** → 回滚 = **代码回滚**（旧代码忽略新表，**不需要**破坏性 DDL）
+    [ ] 除非**未投产**且确需清空，**不执行** `DROP TABLE`（该操作丢数据，须单独审批并留痕）
+    说明：三个迁移文件（001/002/003）由既有的 `ExecStartPre` 统一应用；
+    本增量**不新增** systemd 单元（仍为四单元，DR-09），也未引入 Django ORM / makemigrations。
+
+##############################################################################
 # C. 验收签署
 ##############################################################################
 [ ] A1–A8 全部勾选，证据归档（命令原文 + 时间戳）
-[ ] B1–B14 全部勾选，证据归档
+[ ] B1–B20 全部勾选，证据归档
 [ ] 本文件不含任何真实凭据（自检：grep -nE 'sk-|ghp_|BEGIN .*PRIVATE KEY' 本文件应无命中）
 执行人：____________  复核人：____________  日期：____________

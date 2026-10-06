@@ -1045,6 +1045,100 @@ class SaveResult:
     errors: tuple[ValidationErrorItem, ...] = ()
 
 
+# --------------------------------------------------------------------------- #
+# R13（IFC-IB-309）：账户 / 会话 / 令牌的数据结构
+# --------------------------------------------------------------------------- #
+#
+# 为什么把凭据相关结构放进 framework-free 的 `ib.core`：它们是**端口 AccountStore
+# （IFC-IB-310）签名的一部分**，而端口必须与实现（SQLite / 内存）解耦。若把它们放进
+# `ib.ledger`，`ibweb` 就会反向依赖具体存储模块，端口倒置随之失效。
+#
+# 凭据纪律（C-IB-09 / REQ-NFR-IB-15，硬约束）：
+#   * `UserRecord.password_hash` **只承载 bcrypt 摘要**，绝不承载任何口令明文；
+#   * `SessionRecord.token_digest` **只承载 sha256 摘要**，绝不承载令牌原文
+#     （「读到库 ≠ 拿到可用令牌」，ADR-19）；
+#   * 本层**不提供任何**把口令 / 令牌写成日志或响应的字段。
+
+#: 账户角色（IFC-IB-309）。`admin` = 全局（`project_id is None`）；`ops` = 绑定单项目、
+#: 语义等价既有 `manager`（ADR-21）。**新增取值只许追加**，既有取值不得改义。
+UserRole: TypeAlias = Literal["admin", "ops"]
+
+#: 账户状态（IFC-IB-309）。`disabled` 的账户即使携带有效会话也必须 fail-closed。
+AccountStatus: TypeAlias = Literal["active", "disabled"]
+
+#: 登录结果分词（IFC-IB-309）。**仅用于内部判定 / 审计字段**（IFC-IB-326）；
+#: **对外一律折叠为 `401`、不区分** —— 区分等于给攻击者一个账号/状态探测预言机（ADR-13 精神）。
+LoginOutcome: TypeAlias = Literal["ok", "bad_credentials", "disabled", "locked"]
+
+
+@dataclass(frozen=True, slots=True)
+class UserRecord:
+    """账户记录（IFC-IB-309）。
+
+    `password_hash` 只承载 **bcrypt 摘要**；`project_id is None` **仅对 `admin` 成立**
+    （全局账户，ADR-21）。`staff`（管理动作）与 `viewer` 的区分由 `role` 承载，
+    而「能不能管 / 能不能问」的最终判定**只**经注入的 `AuthzPolicy`（ADR-22）——
+    本结构不含任何授权结论。
+    """
+
+    user_id: str
+    username: str
+    password_hash: str
+    role: UserRole
+    project_id: str | None
+    status: AccountStatus
+    must_change_password: bool
+    failed_login_count: int
+    locked_until: str | None
+    created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class SessionRecord:
+    """会话记录（IFC-IB-309）。
+
+    **只承载 `token_digest`（sha256 摘要）**，绝不承载令牌原文（ADR-19）。
+    `revoked_at` / `expires_at` 任一已过即视为无效（`resolve_session` 返回 `None`，fail-closed）。
+    """
+
+    token_digest: str
+    user_id: str
+    project_id: str | None
+    issued_at: str
+    expires_at: str
+    last_seen_at: str
+    revoked_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class PasswordPolicy:
+    """口令强度策略（IFC-IB-309；细节 OQ-IB-11 保持开放）。
+
+    `require_classes` = 必须命中的字符类别数（小写 / 大写 / 数字 / 符号，≥2 类即 2）。
+    策略**只在服务端生效**；前端预校验仅为体验优化（服务端为唯一裁决者）。
+    """
+
+    min_length: int
+    require_classes: int
+
+
+@dataclass(frozen=True, slots=True)
+class AccountSummary:
+    """账户的**对外**可序列化视图（IFC-IB-309）。
+
+    **不含 `password_hash`**（也不含 `failed_login_count` / `locked_until` 等内部态）——
+    供 `GET /api/accounts` 与 `GET /api/auth/me` 输出，避免任何摘要外泄。
+    """
+
+    user_id: str
+    username: str
+    role: UserRole
+    project_id: str | None
+    status: AccountStatus
+    must_change_password: bool
+
+
 __all__ = [
     "Vector",
     "DistanceLiteral",
@@ -1112,4 +1206,12 @@ __all__ = [
     "ValidationErrorItem",
     "ValidationReport",
     "SaveResult",
+    # R13 账户 / 会话（IFC-IB-309）
+    "UserRole",
+    "AccountStatus",
+    "LoginOutcome",
+    "UserRecord",
+    "SessionRecord",
+    "PasswordPolicy",
+    "AccountSummary",
 ]

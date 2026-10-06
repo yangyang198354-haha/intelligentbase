@@ -40,5 +40,23 @@ export default defineConfig({
     outDir: 'dist',
     // 关闭 sourcemap：产物会被 `ib-web` 静态托管，sourcemap 会把源码结构一并公开。
     sourcemap: false,
+    // R13：把「几乎不变的」框架与组件库拆成独立 chunk。
+    //
+    // 两个理由：
+    //   1. **缓存**：业务代码改动只失效业务 chunk，用户不必重新下载 400+ KB 的 gzip 组件库；
+    //   2. **可解释的体积**：不拆分时单个 1.2 MB 的 JS 只给一句「chunk 过大」的警告，
+    //      拆开后能一眼看出体积来自谁（Element Plus 全量导入而非业务代码）。
+    //
+    // 只拆到「库 / 业务」一层，不做按路由懒加载：本应用页面少且都在登录后立即需要，
+    // 懒加载只会增加首屏交互时的等待（每次切页一次网络往返）。
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-element': ['element-plus', '@element-plus/icons-vue'],
+          'vendor-vue': ['vue', 'vue-router'],
+          'vendor-flow': ['@vue-flow/core'],
+        },
+      },
+    },
   },
 });

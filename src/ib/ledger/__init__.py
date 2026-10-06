@@ -55,6 +55,13 @@ __all__ = [
     "build_ledger",
     "load_project_record",
     "assert_no_half_state",
+    # R13（IFC-IB-313~315）：账户 / 会话存储
+    "SqliteAccountStore",
+    "MemoryAccountStore",
+    "seed_default_admin",
+    "build_account_store",
+    "hash_password",
+    "verify_password",
 ]
 
 
@@ -652,9 +659,24 @@ def __getattr__(name: str) -> Any:
     为什么不用顶层 import：`sqlite_repo` 反向 import 本模块的 `RebuildJobRow` /
     `_assert_transition` / `assert_no_half_state`，顶层互导会在「先导入 sqlite_repo」
     的路径上命中**部分初始化的模块**。惰性属性访问消除该导入顺序依赖。
+
+    R13：账户 / 会话存储（`ib.ledger.accounts`）同样惰性导出 —— 其 `bcrypt` 依赖为
+    **可选**（缺失时只在真正调用哈希时给可读错误），顶层导入会把「缺 bcrypt」提前
+    变成「import ib.ledger 就炸」。
     """
     if name == "SqliteLedgerRepository":
         from ib.ledger.sqlite_repo import SqliteLedgerRepository as _impl
 
         return _impl
+    if name in {
+        "SqliteAccountStore",
+        "MemoryAccountStore",
+        "seed_default_admin",
+        "build_account_store",
+        "hash_password",
+        "verify_password",
+    }:
+        from ib.ledger import accounts as _accounts
+
+        return getattr(_accounts, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

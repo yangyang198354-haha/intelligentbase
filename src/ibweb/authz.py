@@ -59,6 +59,8 @@ from ib.context import (
     make_request_context,
 )
 
+from ibweb.accounts import GLOBAL_PROJECT
+
 __all__ = [
     "PrincipalResolver",
     "EnvTokenResolver",
@@ -68,13 +70,29 @@ __all__ = [
     "forbidden_token_in_query",
     "PUBLIC_PATHS",
     "REQUEST_CTX_ATTR",
+    "get_authz",
 ]
 
 #: 请求对象上挂载 `RequestContext` 的属性名（视图只用 `get_request_context(request)` 取）。
 REQUEST_CTX_ATTR = "ib_ctx"
 
+#: 原始（未替换有效项目前）的鉴权主体挂载点。全局主体（admin）据此判定「可操作任意项目」。
+AUTHZ_ATTR = "ib_authz"
+
 #: 免鉴权路径（见模块文档「公共端点」）。
-PUBLIC_PATHS = ("/healthz", "/healthz/deps")
+#: R13：`/api/auth/login` 必须免鉴权（登录本身还没有令牌）；但**仍**受 `?token=` 4xx 纪律约束
+#: （`forbidden_token_in_query` 在本检查**之前**执行）。
+PUBLIC_PATHS = ("/healthz", "/healthz/deps", "/api/auth/login")
+
+#: 改密态（`must_change_password=True`）下**唯一**放行的端点（方法, 路径）。
+#: 其余一律 403 `password_change_required`（服务端强制，不可绕过，ADR-20）。
+_CHANGE_PASSWORD_ALLOWLIST = frozenset(
+    {
+        ("GET", "/api/auth/me"),
+        ("POST", "/api/auth/change-password"),
+        ("POST", "/api/auth/logout"),
+    }
+)
 
 #: 命中即拒绝的查询串键名（小写比较）。
 _FORBIDDEN_QUERY_KEYS = ("token", "access_token", "api_key", "apikey", "authorization", "secret")
@@ -220,6 +238,7 @@ class AuthMiddleware:
         self.get_response = get_response
         self._policy = None
         self._resolver: PrincipalResolver | None = None
+        self._deps_obj = None
 
     # --- Django middleware 协议 --- #
 
@@ -250,19 +269,36 @@ class AuthMiddleware:
             # 不区分「令牌不存在」与「令牌过期」：区分等于给攻击者一个探测预言机
             return _problem(401, "unauthenticated", "令牌无效或已过期")
 
-        # project_id 只认服务端结论（module_design：不信请求体/查询串）
+        # project_id 只认服务端结论（module_design：不信请求体/查询串）。
+        # R13：全局主体（admin）可操作任意项目 —— 由 `X-IB-Project` 选定「当前项目」，
+        # 未选定时沿用全局哨兵（此时项目级端点会因「无匹配项目」而 fail-closed，不泄露数据）。
         claimed = (request.META.get("HTTP_X_IB_PROJECT") or "").strip()
-        if claimed and claimed != authz.project_id:
+        if authz.project_id == GLOBAL_PROJECT:
+            effective_project = claimed or GLOBAL_PROJECT
+        elif claimed and claimed != authz.project_id:
             return _problem(
                 403,
                 "project_mismatch",
                 "请求声明的项目与令牌所属项目不一致（project_id 只以令牌为准）",
             )
+        else:
+            effective_project = authz.project_id
+
+        # R13（IFC-IB-324①）：改密态限制 —— 服务端强制，不可绕过（ADR-20）。
+        # 仅当主体对应**真实账户记录**且标记改密态时才生效（离线共享令牌无账户记录，不受影响）。
+        if self._password_change_required(authz):
+            if ((request.method or "").upper(), path) not in _CHANGE_PASSWORD_ALLOWLIST:
+                return _problem(
+                    403,
+                    "password_change_required",
+                    "首次登录须先修改口令；在此之前仅可访问 /api/auth/me、"
+                    "/api/auth/change-password、/api/auth/logout。",
+                )
 
         session_id = _session_id_of(request)
         try:
             ctx = make_request_context(
-                project_id=authz.project_id,
+                project_id=effective_project,
                 actor_id=authz.actor_id,
                 session_id=session_id,
                 roles=tuple(authz.roles),
@@ -271,21 +307,44 @@ class AuthMiddleware:
             return _problem(400, "invalid_session_id", str(exc))
 
         request.__dict__[REQUEST_CTX_ATTR] = ctx
-        # 策略附在请求上供视图做动作级判定（can_manage / can_query）
+        # 原始主体（含全局哨兵）供账户端点判定「是否全局 / 改密态」；策略供动作级判定。
+        request.__dict__[AUTHZ_ATTR] = authz
         request.__dict__["ib_policy"] = policy
         return self.get_response(request)
+
+    def _password_change_required(self, authz: AuthzContext) -> bool:
+        """该主体对应的账户是否处于「首登强制改密」态。
+
+        查账户存储失败 / 无对应账户记录 → `False`（不误伤离线共享令牌路径）。
+        这是**唯一**的改密态裁决点；视图不重复判断（避免两处判定分叉）。
+        """
+        try:
+            deps = self._deps_object()
+            store = getattr(deps, "account_store", None)
+            if store is None:
+                return False
+            user = store.get_user(authz.actor_id)
+            return bool(user is not None and user.must_change_password)
+        except Exception:  # noqa: BLE001 — 存储不可用时不得把「改密态检查」变成 500
+            return False
 
     # --- 内部 --- #
 
     def _deps(self) -> tuple[Any, PrincipalResolver]:
         """从已装配的组合根取 `(policy, resolver)`（延迟取，保证中间件在装配前可被实例化）。"""
+        deps = self._deps_object()
         if self._policy is None or self._resolver is None:
-            from ibweb.composition import get_deps
-
-            deps = get_deps()
             self._policy = deps.policy
             self._resolver = deps.principal_resolver
         return self._policy, self._resolver
+
+    def _deps_object(self) -> Any:
+        """取组合根 `Deps`（延迟取 + 缓存）。改密态检查需要访问 `account_store`。"""
+        if self._deps_obj is None:
+            from ibweb.composition import get_deps
+
+            self._deps_obj = get_deps()
+        return self._deps_obj
 
 
 def _session_id_of(request: Any) -> str:
@@ -311,3 +370,11 @@ def _problem(status: int, code: str, message: str) -> Any:
 def get_policy(request: Any) -> Any:
     """从请求取策略（视图用）。未鉴权路径返回 `DenyAllPolicy`（最保守）。"""
     return request.__dict__.get("ib_policy") or DenyAllPolicy()
+
+
+def get_authz(request: Any) -> AuthzContext | None:
+    """从请求取**原始**鉴权主体（含全局哨兵）。账户端点据此判定「是否全局（admin）」。
+
+    未鉴权 / 免鉴权路径返回 `None`（调用方据此 403，不静默构造主体）。
+    """
+    return request.__dict__.get(AUTHZ_ATTR)

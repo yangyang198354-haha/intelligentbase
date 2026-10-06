@@ -3,19 +3,19 @@
   <artifact>tech_stack</artifact>
   <path>docs/tech_stack.md</path>
   <doc_id>TECH-INTELBASE-001</doc_id>
-  <version>1.3.1</version>
-  <revision>R7（+ R10 传递依赖许可登记）</revision>
+  <version>1.4.0</version>
+  <revision>REV-13</revision>
   <status>DRAFT_FOR_GATE_REVIEW</status>
   <phase>GROUP_B / PHASE_04b 技术选型</phase>
   <author>system-architect</author>
-  <invocation_id>INV-GROUP_B-INTELBASE-002</invocation_id>
+  <invocation_id>INV-GROUP_B-INTELBASE-007</invocation_id>
   <created_at>2026-09-25</created_at>
-  <updated_at>2026-09-27</updated_at>
+  <updated_at>2026-10-06</updated_at>
   <inputs>
-    <input path="docs/requirements_spec.md" version="1.2.0" status="APPROVED"/>
-    <input path="docs/user_stories.md" version="1.2.0" status="APPROVED" note="R7 新增登记：可视化配置的 AC 落点（AC-IB-17-01~06 / AC-IB-18-01~06）为 §4.5 新增项与 §1.3 凭据纪律的直接依据"/>
-    <input path="docs/architecture_design.md" version="1.3.0" revision="R7" status="DRAFT_FOR_GATE_REVIEW"/>
-    <input path="docs/module_design.md" version="1.3.0" revision="R7" status="DRAFT_FOR_GATE_REVIEW"/>
+    <input path="docs/requirements_spec.md" version="1.4.0" status="APPROVED"/>
+    <input path="docs/user_stories.md" version="1.4.0" status="APPROVED" note="R7 新增登记：可视化配置的 AC 落点（AC-IB-17-01~06 / AC-IB-18-01~06）为 §4.5 新增项与 §1.3 凭据纪律的直接依据"/>
+    <input path="docs/architecture_design.md" version="1.5.0" revision="REV-13" status="DRAFT_FOR_GATE_REVIEW"/>
+    <input path="docs/module_design.md" version="1.5.0" revision="REV-13" status="DRAFT_FOR_GATE_REVIEW"/>
     <input path="docs/ib_embed_service_contract.md" version="1.0.0" revision="R2" status="DRAFT_FOR_GATE_REVIEW" note="MOD-IB-26 契约唯一落点；本文件 §1.2 的键名清单以其 §9 为准"/>
     <readonly_reference path="FreeArk 仓库" note="只读参考；未修改任何文件"/>
   </inputs>
@@ -27,12 +27,13 @@
     <rev version="1.2.0" revision="R2" date="2026-09-26" invocation_id="INV-GROUP_B-INTELBASE-004" note="R2 补交（L-03）：① 「Embedding 推理运行时」行改写为三候选（FlagEmbedding / sentence-transformers / 直接 onnxruntime 载 bge-m3 的 ONNX 导出），补记许可、CPU-only 可用性、传递依赖与指令集基线风险；② §2 许可台账补登传递依赖 torch（BSD-3-Clause）与 transformers（Apache-2.0），均标条件性采纳；③ 新增 §1.2「服务端配置键登记」（只登记键名与语义，不含任何值，覆盖 IFC-IB-286 的第二份 EnvironmentFile）；④ §5.2 新增一行中风险：目标机 CPU 缺 AVX2 致预编译 wheel 触发 SIGILL（同时命中既有 OCR 链路与 R2 的 embedding 推理运行时），缓解与判定指向 [TBD-T18]；⑤ 编号稳定：既有条目类别/行序尽量沿用，被改写者标「（R2 改写）」；未引入 PyMuPDF、未引入 Docker（DR-03）。需求侧文档与 FreeArk 仓库未改动。"/>
     <rev version="1.3.0" revision="R7" date="2026-09-27" invocation_id="INV-GROUP_B-INTELBASE-005" note="R7 增量贯通（GROUP_A REV-06 裁决：诉求③「UI 可视化配置」纳入 v1，新增 REQ-FUNC-IB-25/26/27）：① 新增「前端图可视化库」行 = Vue Flow（@vue-flow/core，MIT，R7 经外部核实：包内 LICENSE 为标准 MIT 文本，© webkid GmbH 2019–2024 / Burak Cakmakoglu 2021–2024），要求随构建产物本地打包、禁止运行期 CDN；② §1.1 留痕 5 项已评估未采纳（AntV X6 / LogicFlow / React Flow / 自绘 SVG-D3 / 运行期 CDN 加载）；③ 新增 §1.3 客户端配置键登记（只登记键名 IB_DEFINITION_DOC_PATH / IB_VISUAL_CONFIG_ENABLED，不含任何值）；④ §2 台账登记 Vue Flow（MIT，采纳）与传递依赖（条件性采纳 + [待核实]，须锁定版本后逐包复核）；⑤ §4.5 新增第 10~12 项（前端产物零外发依赖、装配期 fail-fast 实测、定义文档凭据明文扫描）；⑥ §5.3 新增两行低风险（定义文档被写入凭据明文 / 图库传递依赖的许可与体积，以 [TBD-T20] 实测为准）；⑦ 硬约束未松动：未引入 Docker / Redis / PyMuPDF，端口契约仍 framework-free。需求侧文档与 FreeArk 仓库未改动；未写入任何凭据或配置值（只登记键名）。"/>
     <rev version="1.3.1" revision="R10" date="2026-09-27" invocation_id="INV-GROUP_C-INTELBASE-008" author="software-developer" note="R10 传递依赖许可登记（GROUP_C 前端构建阻断修复轮）：① 新增 §2.1「前端依赖许可登记」—— 在 src/frontend 执行 npm install 后逐包实测，登记 @vue-flow/core 1.48.2 与 14 个传递包（@vueuse/core·shared·metadata 10.11.1 / vue-demi 0.14.10 / @types/web-bluetooth 0.0.20 / d3-color·dispatch·drag·interpolate·selection·timer·transition·zoom + d3-ease）的精确版本与许可，全部 MIT / ISC / BSD-3-Clause，**无 copyleft / AGPL 面** → 不触发 §1 重选型（REQ-NFR-IB-12 合规）；② §2 台账「Vue Flow 的传递依赖」行由 [待核实] 改为**已核实（R10）**；③ §1「前端图可视化库」行与 §5.3 风险行同步收敛；④ 补记 R10 实测产物体积（JS 252.35 kB / gzip 89.20 kB）供 [TBD-T20] 引用。**仅登记事实，未改任何选型决策 / 未改键名 / 未写入任何凭据值**；证据 = docs/evidence/groupc_r10_license.log。**性质：登记型修订，选型未变**（GROUP_B 可复核）。"/>
+    <rev version="1.4.0" revision="REV-13" date="2026-10-06" invocation_id="INV-GROUP_B-INTELBASE-007" author="system-architect" note="REV-13 认证与商用界面重构增量（GROUP_A REV-13 下游贯通：REQ-FUNC-IB-28~36 / REQ-NFR-IB-15~18 / C-IB-09 / DR-09~DR-17）：① §1 新增三行 —— 前端 UI 组件库 Element Plus（MIT，DR-13）、前端路由 vue-router（MIT，hash 模式）、口令哈希库 bcrypt（Apache-2.0，DR-11）；② §1.1 留痕 5 项已评估未采纳（Cookie 会话 / JWT 自包含令牌 / 独立鉴权服务 / Django contrib.auth+ORM 迁移 / 运行期 CDN 加载 Element Plus）；③ 新增 §1.4 客户端配置键登记（只登记键名 IB_AUTH_LOGIN_PATH / IB_AUTH_SESSION_STORAGE_KEY，不含任何值）；④ §2 台账新增三行（Element Plus / vue-router / bcrypt，均采纳）+ （R13）遗留合规动作追加；⑤ 新增 §2.2 前端依赖许可登记（方法同 R10，结论暂标 [待核实]）；⑥ §4.5 新增第 13~18 项（默认管理员种子与首登强制改密 / 零 Cookie / token-query 全端点 4xx / IB_AUTHZ_POLICY_MODULE 未配置即启动失败 / HTTPS 生效 / 前端自包含与凭据不回显）；⑦ §5.2 新增一行中风险（bcrypt cost 与阈值标定，以 [TBD-T22] 为准）、§5.3 新增一行低风险（Element Plus 传递依赖许可与体积 + 口令/令牌泄露缓解）；⑧ 硬约束未松动：未引入 Docker / Redis / PyMuPDF / Cookie 会话 / Django ORM / contrib.auth；禁止运行期 CDN。仅登记键名，未写入任何凭据值。"/>
   </revision_history>
 </file_header>
 
 # 技术选型 — intelligentbase
 
-**版本**: 1.3.1（R7 增量 + R10 前端传递依赖许可登记） | **状态**: DRAFT_FOR_GATE_REVIEW | **日期**: 2026-09-27
+**版本**: 1.4.0（REV-13 增量） | **状态**: DRAFT_FOR_GATE_REVIEW | **日期**: 2026-10-06
 
 **R2 修订摘要（L-03：`ib-embed` 服务端无模块归属与契约）**：
 
@@ -108,6 +109,9 @@
 | 日志 | 标准库 `logging` + 结构化字段（JSON 行） | — | REQ-NFR-IB-06；级别经环境变量可调 | REQ-NFR-IB-06 | 低 | 字段白名单 + 脱敏（FM-8）；**禁止记录正文与凭据**；**（R1）不经 Django `LOGGING` 作为唯一配置源**（保持 `MOD-IB-04` 的单一落点） |
 | 测试框架 | 标准库 `unittest` / `pytest`（二选一，GROUP_D 定） | — | 离线替身驱动的测试（REQ-NFR-IB-14） | REQ-NFR-IB-14 | 低 | 全部测试须离线可跑（附录 D）；性能项须目标机证据；**（R1）测试须使用 SQLite（测试库），严禁连接生产/外部数据库** |
 | 版本控制 / 部署 | `git`（直接提交 `main`）+ `git pull` 部署 | — | 沿用 FreeArk 纪律；**禁止逐文件上传** | REQ-FUNC-IB-22 | 低 | 目标机凭据经环境变量，不入仓库 |
+| **前端 UI 组件库（R13 新增）** | **Element Plus** | `^2`（部署时锁定） | **DR-13 用户拍板**：Claude 风格商用界面对表单 / 表格 / 消息 / 弹窗 / 抽屉 / 主题变量覆盖有硬需求；Element Plus 提供**设计令牌级主题定制**与暗/亮主题（`dark/css-vars`），可在 Vue 3 生态内**随构建产物本地打包**（满足「数据不出本地」，AC-IB-17-06 精神） | REQ-FUNC-IB-34、IB-35；REQ-NFR-IB-17 | 中 | **MIT**（R13 经外部核实后登记）；**传递依赖须逐包核实**（§2.2，锁定 `package-lock.json` 后）；**禁止运行期 CDN**；体积增量以 **[TBD-T23]** 实测为准（R10 基线 JS 252.35 kB / gzip 89.20 kB） |
+| **前端路由（R13 新增）** | **`vue-router`** | `^4`（部署时锁定） | 登录页 / 首登改密 / 运维控制台 / 账户管理的**路由与鉴权守卫**（`beforeEach` 检查登录态与改密态）需一等结构；**hash 模式**不需 nginx `try_files` 回退，减部署面（ADR-23） | REQ-FUNC-IB-28、IB-34、IB-35 | 低 | **MIT**（R13 经外部核实后登记）；**hash 模式**（非 history）；**禁止运行期 CDN** |
+| **口令哈希库（R13 新增）** | **`bcrypt`**（pyca/bcrypt） | 部署时锁定（建议 `>=4,<5`） | **DR-11 用户拍板**：口令哈希须用 bcrypt（自带 salt 与 cost 旋钮，无自研密码学）；纯 stdlib 的 PBKDF2 须自管 salt / 编码 / 参数升级，风险更高 | REQ-FUNC-IB-30；REQ-NFR-IB-15 | 中 | **Apache-2.0**（R13 经外部核实后登记）；**CPU-only 目标机单次耗时须实测**（[TBD-T22]）；**只存摘要，绝不存口令明文**；随 `ib-web` venv 安装（**非** Django ORM / 非 contrib.auth） |
 
 ### 1.1 明确**不采纳**的选型（留痕）
 
@@ -131,6 +135,11 @@
 | **React Flow（R7 新增）** | 与 Vue Flow 同源、成熟度最高；但**要求 React 运行时**，与既有前端栈（Vue 3 + Vite）冲突，为单一页面引入第二前端框架不可接受。**已评估未采纳** | REQ-FUNC-IB-25；ADR-11 |
 | **自绘 SVG / 直接使用 D3（R7 新增）** | 零新依赖、产物体积最小；但需自实现节点布局、边路由、缩放平移与命中测试，**维护与回归成本显著高于引入成熟库**（D3 许可仍需登记）。**已评估未采纳**；**保留为回退路径**：若将来要求「零新增前端依赖」，可回退至此并在 §2 补登 D3 许可 | REQ-FUNC-IB-25；REQ-NFR-IB-11 |
 | **运行期 CDN 加载图库（R7 新增）** | 免打包、可远程热更；但**违反「数据不出本地 / 离线可用」**（AC-IB-17-06），并引入外部可用性与供应链风险。**已评估未采纳（并明令禁止）** | REQ-NFR-IB-08；AC-IB-17-06 |
+| **Cookie 会话（Django session / `contrib.sessions`）（R13 新增）** | **DR-10 明令禁止 Cookie 会话**；且会重开 CSRF 面并牵入第二凭据通道。令牌改为不透明服务端令牌 + **仅 `Authorization` 头**（ADR-19） | DR-10；REQ-FUNC-IB-29 |
+| **JWT / 自包含签名令牌（R13 新增）** | 撤销需另建黑名单（等价于又一张服务端表）；载荷可读；引入签名库与新密钥面；与「可撤销 + 过期/续期」无净收益。**已评估未采纳** | ADR-19 |
+| **独立鉴权服务 / 进程（R13 新增）** | 净增 systemd 单元与凭据面，与 C-IB-08（最小组成面）/ ADR-03（四单元）冲突；账户体系内建（DR-09）**更小更安全**。**已评估未采纳** | DR-09；ADR-18 |
+| **Django `contrib.auth` / `contrib.admin` / ORM 迁移（R13 新增）** | 与既有收窄配置（`DATABASES={}`、不经 ORM、手写 scoped 迁移，ADR-07-R1）冲突；会牵入自动迁移产物与会话框架（含 Cookie）。**已评估未采纳** | ADR-07-R1；ADR-18/26 |
+| **运行期 CDN 加载 Element Plus（R13 新增）** | **违反「数据不出本地 / 离线可用」**（REQ-NFR-IB-17），并引入外部可用性与供应链风险。**已评估未采纳（并明令禁止）** | REQ-NFR-IB-17；AC-IB-17-06 |
 
 ---
 
@@ -168,6 +177,12 @@
 
 ---
 
+### 1.4 客户端配置键登记（**R13 新增**；只登记键名与语义，**不含任何值**）
+
+**前端（Vite / 运行时）仅登记以下键名，不登记任何值**：`IB_AUTH_LOGIN_PATH`（登录端点路径，默认 `/api/auth/login`）、`IB_AUTH_SESSION_STORAGE_KEY`（会话令牌的**客户端存储键名**，**只登记键名**）。**纪律**：**不得**在前端源码 / 构建产物 / 文档中出现任何**令牌值或口令值**；令牌**仅**经 `Authorization` 头；**不接受 `?token=`**（`src/deploy/checklists.txt` [B14]/[B17]）。
+
+---
+
 ## 2. 许可合规台账（REQ-NFR-IB-12）
 
 > **强制约束**：REQ-NFR-IB-12 明确**禁止默认以「内部平台合规」豁免**。下表逐项登记许可与结论，作为可追溯的合规证据。
@@ -196,6 +211,9 @@
 | Vue 3 / Vite | MIT | 宽松 | 采纳 |
 | **Vue Flow（`@vue-flow/core`）（R7 新增）** | **MIT** | 宽松 | **采纳**（可视化配置页的编排图渲染）。**R7 经外部核实**：包内 `LICENSE` 为标准 MIT 文本（© webkid GmbH 2019–2024 / Burak Cakmakoglu 2021–2024） |
 | **Vue Flow 的传递依赖（R7 新增；R10 已逐包核实）** | **已核实（R10）**：`@vueuse/core` 10.11.1（MIT）、`@vueuse/shared` 10.11.1（MIT）、`@vueuse/metadata` 10.11.1（MIT）、`vue-demi` 0.14.10（MIT）、`@types/web-bluetooth` 0.0.20（MIT）、`d3-color` 3.1.0（ISC）、`d3-dispatch` 3.0.1（ISC）、`d3-drag` 3.0.0（ISC）、`d3-ease` 3.0.1（BSD-3-Clause）、`d3-interpolate` 3.0.1（ISC）、`d3-selection` 3.0.0（ISC）、`d3-timer` 3.0.1（ISC）、`d3-transition` 3.0.1（ISC）、`d3-zoom` 3.0.0（ISC）（版本随 `src/frontend/package-lock.json` 锁定） | **全部宽松（MIT / ISC / BSD-3-Clause）** | **采纳**（**R10 实地核实**：逐包读 `node_modules/<pkg>/package.json` 的 `version` / `license` 字段并确认包内 `LICENSE` 文件存在；**零 copyleft / AGPL 面**，满足 REQ-NFR-IB-12）。复核证据：`docs/evidence/groupc_r10_license.log`。**任一传递依赖出现 copyleft / AGPL 面即须回 §1 重新选型**（**不得**沿用「内部平台合规」豁免）；传递依赖的许可留痕规则见本节末段与 §2.1 |
+| **Element Plus（R13 新增）** | **MIT** | 宽松 | **采纳**（DR-13；本地打包，禁 CDN）。**R13 经外部核实后登记**；**传递依赖须逐包核实并登记于 §2.2**（`@element-plus/icons-vue` / `@floating-ui/dom` / `async-validator` / `lodash-es` 等——**清单以锁定后的 `package-lock.json` 为准**），未核实前标 `[待核实]` |
+| **vue-router（R13 新增）** | **MIT** | 宽松 | **采纳**（前端路由与守卫） |
+| **`bcrypt`（Python，R13 新增）** | **Apache-2.0** | 宽松 | **采纳**（口令哈希，DR-11；随 `ib-web` venv 安装，非 Django 组件） |
 | LangGraph / LangChain / `langchain-openai` | MIT | 宽松 | 采纳（**版本 pin 见风险表**） |
 | **PyMuPDF** | **AGPL-3.0** | **传染性，不兼容** | **不采纳** |
 | Poppler CLI | GPL-2.0 | 传染性 | **不采纳** |
@@ -205,6 +223,8 @@
 **AGPL 三条合规前置条件（逐条判定，用于留痕）**：① 购买 Artifex 商业授权 —— 成本不可接受；② 整个基座以 AGPL 开源 —— 与「内部多项目复用」目标冲突；③ 严格内部使用且不与外部网络交互 —— 与 REQ-FUNC-IB-23（多项目、多使用方）冲突。**三条均不成立，故不采纳 PyMuPDF。**
 
 **遗留合规动作（部署阶段）**：`pypdf` / `pdfminer.six` / `pdfplumber` / `pypdfium2` 的实际许可文本须在锁定版本后**从发行包内 `LICENSE` 文件复核**（发行方可能随版本调整），复核结果记入部署记录。**（R1 追加）** 同规则适用于 **Django / DRF / Waitress / Gunicorn**（及条件性引入的 Uvicorn）。**（R2 追加）** 同规则适用于**实际选中的 Embedding 推理运行时**及其**传递依赖**（若选 ① / ② 则含 `torch` / `transformers`；若选 ③ 则含 `onnxruntime` 与 bge-m3 的 ONNX 权重再分发条款）—— **传递依赖的许可亦须逐条留痕**，不得只登记直接依赖。
+
+**（R13）遗留合规动作追加**：Element Plus / vue-router 的**传递依赖**须在锁定版本后**逐包**读 `node_modules/<pkg>/package.json` 的 `version` / `license` 与包内 `LICENSE` 文件复核，结果记入 §2.2（沿用 R10 方法）。**任一传递依赖出现 copyleft / AGPL 面即须回 §1 重新选型**，**不得**沿用「内部平台合规」豁免（REQ-NFR-IB-12）。
 
 ### 2.1 前端依赖许可登记（**R10 新增**；NFR-12 可核验落点）
 
@@ -233,6 +253,26 @@
 **结论（R10）**：14 个传递包（15 个 `node_modules` 条目，`vue-demi` 因嵌套去重计两处）**全部为宽松许可（MIT / ISC / BSD-3-Clause）**，**无 copyleft / AGPL 面** → **不触发 §1 重选型**，REQ-NFR-IB-12 合规。`@vue-flow/core` 由 `^1.41.0` 区间解析并锁定为 **1.48.2**；该版本仍处 `^1` 主版本内，与 §1「主版本随实现锁定（建议 `^1`）」一致。**仍禁止运行期 CDN 加载**（AC-IB-17-06 / REQ-NFR-IB-08）：上述依赖全部经构建本地打包。
 
 **体积实测（R10，`npm run build` 产物）**：`dist/assets/index-*.js` **252.35 kB（gzip 89.20 kB）**、`index-*.css` **12.62 kB（gzip 2.74 kB）** —— 供 [TBD-T20] 引用；目标机（4GB 内存）首屏体积敏感，故仍**不引入** UI 组件库。
+
+---
+
+### 2.2 前端依赖许可登记（**R13 新增**；NFR-12 可核验落点）
+
+**落点与依据**：R13 引入 Element Plus / vue-router 后，须在 `src/frontend` 执行 `npm install` 并**逐包实测**，按 §2.1（R10）同一方法登记**精确版本与许可**（读 `node_modules/<pkg>/package.json` 的 `version` / `license` 并确认包内 `LICENSE` 存在）。
+
+| 包 | 版本（锁定后填） | 许可 | 性质 |
+|----|------------------|------|------|
+| `element-plus`（直接依赖，R13） | **待 `package-lock.json` 锁定** | **MIT**（R13 经外部核实） | 宽松 |
+| `@element-plus/icons-vue`（传递） | 待锁定 | [待核实] | — |
+| `@floating-ui/dom` / `@floating-ui/core`（传递） | 待锁定 | [待核实] | — |
+| `async-validator`（传递） | 待锁定 | [待核实] | — |
+| `lodash-es`（传递） | 待锁定 | [待核实] | — |
+| `memoize-one` / `normalize-wheel-es` / `dayjs`（传递） | 待锁定 | [待核实] | — |
+| `vue-router`（直接依赖，R13） | 待锁定 | **MIT**（R13 经外部核实） | 宽松 |
+
+**结论（R13，`[待核实]`）**：上表**传递依赖清单为预列**（依据 Element Plus 的已知直接依赖），**具体集合与版本以锁定后的 `package-lock.json` 为准**；须逐包复核后方可判「无 copyleft / AGPL 面」。**在逐包核实完成前，本项结论标 `[待核实]`，不得据此宣称合规已完成**（REQ-NFR-IB-12）。**仍禁止运行期 CDN**：全部依赖经构建本地打包。
+
+**体积实测（R13，`npm run build` 产物，待测）**：Element Plus + vue-router 引入后 `dist/assets/*.js` / `*.css` 体积与 gzip 值 —— 供 **[TBD-T23]** 引用；**建议按需引入**（`unplugin-vue-components` + `unplugin-auto-import`）以控体积；目标机（4GB 内存）首屏体积敏感。
 
 ---
 
@@ -334,6 +374,12 @@
 | **10** | **（R7）前端产物零外发依赖**：图可视化库及全部前端依赖**随构建产物本地打包**；产物体内**不得**出现指向公网 CDN / 字体 / 图床的引用 | 断网状态下可视化配置页可正常加载与渲染；构建产物内公网 URL 扫描**零命中**（AC-IB-17-06；REQ-NFR-IB-08） |
 | **11** | **（R7）装配期 fail-fast 实测**：故意提交一份非法定义文档（如条件边缺分支映射 / 默认专家为 0 个或 2 个 / 工具授权引用不存在的工具），观察装配行为 | **拒绝装配、服务不启动**；错误**逐条定位**到 `path` / `code` / `message` 且**不回显凭据值**；**不存在**「启动成功、首次提问才失败」的路径（AC-IB-18-01 / 02 / 03 / 04 / 06） |
 | **12** | **（R7）定义文档凭据明文扫描**：定义文档、`.env.example` 与全部响应体扫描 | **零命中**任何凭据型**值**（只允许出现**键名**）；`GET /api/config/definition` 的响应体内**无**任何凭据值或掩码残留（AC-IB-17-05 / AC-IB-18-04；§1.3 纪律） |
+| **13** | **（R13）默认管理员种子与首登强制改密**：迁移 `003_accounts.sql` 应用后首登 | `ensure-schema` 幂等重放无副作用；默认管理员首登后被强制改密（未改密前业务端点 `403 password_change_required`）；**日志 / 响应中不含初始口令字面量**（AC-IB-30，[B18]） |
+| **14** | **（R13）零 Cookie**：任意响应扫描 | **`Set-Cookie` 零命中**（DR-10，[B16]）；令牌**仅**经 `Authorization` 响应体一次性返回 |
+| **15** | **（R13）`?token=` 全端点 4xx** | `/api/auth/*`、`/api/accounts*`、既有端点上 `?token=` / `?access_token=` **一律 4xx**（[B17]） |
+| **16** | **（R13）`IB_AUTHZ_POLICY_MODULE` 未配置即启动失败** | 生产未设该键 → **服务拒绝启动**（fail-closed）；设为 `ibweb.accounts.policy` 后可正常启动与鉴权（[B9]） |
+| **17** | **（R13）HTTPS 生效** | 外部经 `https://` 可达；`http://` 重定向或拒绝；`ib-web` 仍绑 `127.0.0.1:18080`；SSE 仍不被缓冲（`X-Accel-Buffering: no`）（[B15]） |
+| **18** | **（R13）前端自包含 + 凭据不回显** | 断网状态登录页 / 运维控制台可加载；构建产物内公网 URL 扫描零命中；界面只显示**键名**，不显示口令 / 令牌 / 掩码；登录失败文案不区分「用户不存在 / 口令错误」 |
 
 ---
 
@@ -362,6 +408,7 @@
 | **（R1 新增）框架切换引入的集成面**（Django 收窄配置 / 不经 ORM 的台账 / 中间件鉴权） | 装配错误导致启动失败或鉴权静默放行 | 组合根为**唯一装配点**；`AuthzPolicy` 未注入即启动失败；§4.5 逐项目标机验证；台账端口一致性测试保证换载体不改语义 | REQ-NFR-IB-09/11 |
 | 云端 LLM 不可达/限流 | 问答不可用 | §7.4 降级矩阵：`error` 事件 + 可读文案；路由降级到关键词档位 | REQ-NFR-IB-13 |
 | **（R2 新增）目标机 CPU 缺 AVX2 → 预编译 wheel 触发 SIGILL** | **进程级崩溃（不可捕获），非降级**：`ib-embed` 与 OCR 链路**双双不可用**；且**开发机（新 CPU）可用掩盖问题**，只在目标机暴露 | ① **[TBD-T18] 目标机实测优先**：先跑「导入 + 一次真实推理」的最小探针，**不以 `pip list` 或开发机结果代替**；② 判定后三选一 —— **换用无 AVX2 依赖的构建**（如 CPU 版 wheel 的兼容包）/ **自源码编译并关闭 AVX2**（`-mno-avx2` 类开关）/ **降级到纯 Python 后备路径**；③ **两条链路须合并评估**（OCR 的 `onnxruntime` 与 R2 的推理运行时**同源**）：分别修会重复踩坑且排障归因错误；④ 若实测确有 SIGILL 且无可用构建，须**回 PM 裁决**是否放宽 DR-08 / 降级 OCR 能力（**不得**以引入 PyMuPDF 或 Docker 规避） | REQ-NFR-IB-10；AC-IB-07-05；ADR-02 / ADR-06 / ADR-12；[TBD-T18] |
+| **（R13 新增）bcrypt cost 在 CPU-only 目标机拖慢登录**；会话索引查询与限速阈值未标定 | 登录 P95 超标；阈值错配致误锁或形同虚设 | ① cost 与 TTL / 窗口 / 阈值**全部可配置**（IFC-IB-312）→ 改键值即调，**上层零改动**；② **[TBD-T22] 目标机实测**后再定默认值；③ 限速与审计为**条件性**（ADR-27，OQ-IB-12/13 未裁决前不启用，不留「半开」旋钮）；④ `sessions` 建 `(expires_at)` 索引 + 定期 purge | REQ-NFR-IB-15/16；[ARCH-ASSUMPTION-A9] |
 
 ### 5.3 低风险
 
@@ -372,6 +419,7 @@
 | 反向代理缓冲破坏 SSE | 部署检查项：禁用响应缓冲（`X-Accel-Buffering: no`） |
 | **（R7 新增）定义文档被写入凭据明文** | 缓解：定义文档**只允许出现键名**（§1.3）；界面与校验错误**不回显**凭据值（AC-IB-17-05 / AC-IB-18-04）；§4.5 第 12 项加入「定义文档凭据明文扫描」；仓库内**不得**出现除 `.env.example` 之外的任何真实值 |
 | **（R7 新增；R10 已收敛）图可视化库传递依赖的许可与体积** | 缓解：主体 `@vue-flow/core` 的 **MIT 已外部核实**；传递依赖（D3 系 / `@vueuse/core`）**已于 R10 锁定版本后逐包复核并登记**于 **§2.1**（14 包全部 MIT / ISC / BSD-3-Clause，**无 copyleft 面**，故**不**回 §1 重选）；体积与渲染规模上界以 **[TBD-T20]** 实测为准（R10 已测产物 JS 252.35 kB / gzip 89.20 kB）；**禁止 CDN**（AC-IB-17-06） |
+| **（R13 新增）Element Plus 传递依赖的许可与体积** | 缓解：主体 `element-plus` 的 **MIT 已外部核实**；**传递依赖须在锁定版本后逐包复核并登记于 §2.2**（未核实前 `[待核实]`；出现 copyleft / AGPL 面即回 §1 重选）；体积以 **[TBD-T23]** 实测，**建议按需引入**；**禁止 CDN**（REQ-NFR-IB-17）。另：**口令 / 令牌泄露风险** —— 缓解：只存摘要（bcrypt / sha256，IFC-IB-311/313）、令牌仅经 `Authorization`、`?token=` 全端点 4xx、`.env` 0600（[B19]）、日志字段白名单（[B14]） |
 
 ---
 
@@ -385,6 +433,11 @@
 - **（R1）两个 FreeArk 已知坑已同时落入 ADR 与实现约束**：`?token=` 入访问日志（§3，适用于任何通道）、`channels_redis` × `redis-py` 不兼容（§3，未来引入 Channels 时强制 pin `redis-py` 5.x 且须真 Redis 验证）。
 - 本文**不含实现代码与部署脚本**，**不含任何凭据/密钥/令牌**（仅登记配置键名），**未修改 FreeArk 任何文件**，**未修改需求侧文档**。
 - 本阶段**止于 GROUP_B**：产出后停止，等待 PM 门控评审，不进入 GROUP_C。
+- **（R13）认证 / 会话 / 商用界面的技术面结论**：① 新增 **前端 UI 组件库 = Element Plus（MIT，R13 经外部核实，DR-13）**、**前端路由 = `vue-router`（MIT，hash 模式）**、**口令哈希库 = `bcrypt`（Apache-2.0，DR-11）**（§1 三新行）；§1.1 留痕 **5 项**已评估未采纳（Cookie 会话 / JWT 自包含令牌 / 独立鉴权服务 / Django `contrib.auth`+ORM 迁移 / **运行期 CDN 加载 Element Plus**）；② §2 台账登记三新组件（**采纳**）+ **传递依赖（`[待核实]`）**，新增 **§2.2 前端依赖许可登记**（方法同 R10，**结论暂标 `[待核实]`**）；③ 新增 **§1.4 客户端配置键登记**（只登记键名，**不含任何值**）；④ §4.5 新增第 **13 ~ 18** 项（种子与首登改密 / 零 Cookie / `?token=` 全端点 4xx / `IB_AUTHZ_POLICY_MODULE` 未配即启动失败 / HTTPS 生效 / 前端自包含与凭据不回显）；⑤ §5.2 新增一行中风险（bcrypt cost 与阈值标定，以 [TBD-T22] 为准）、§5.3 新增一行低风险（Element Plus 传递依赖许可与体积 + 口令/令牌泄露缓解）。
+- **（R13）禁项与硬约束未松动**：**未引入 Docker / 容器化**（DR-03）、**未引入 Redis / RabbitMQ**（C-IB-08）、**未引入 PyMuPDF 或任何 AGPL / copyleft 组件**（REQ-NFR-IB-12）、**未引入 Cookie 会话**（DR-10）、**未引入 Django ORM / `contrib.auth`**（ADR-07-R1）、**未引入独立鉴权服务**（DR-09）；UI 组件库与路由**随构建产物本地打包、禁止运行期 CDN**（REQ-NFR-IB-17）；**端口契约仍 framework-free**（新增契约全部落在 MOD-IB-01，纯 stdlib）。
+- **（R13）凭据纪律**：§1.4 / IFC-IB-312 **只登记键名**；**默认初始口令的字面量不在本文件出现**；全文**不含任何键值**；`?token=` / `?key=` 纪律由 §3 **扩展至全部新端点**（`/api/auth/*`、`/api/accounts*`）；日志扫描须零命中（[B14]）。
+- **（R13）未改动他处**：`FreeArk` 仓库**任何文件未作修改**；需求侧文档**只读未改**；`architecture_design.md` / `module_design.md` 的 R1 / R2 / R7 / R8 结论**未改写**（R13 只追加）；`implementation_plan.md`（GROUP_C）**未改**；**未写入任何口令 / 令牌 / 密钥字面量**；本阶段**止于 GROUP_B**。
+- **（R13）版本订正说明**：任务文本称本文件由 1.3.0 升 1.4.0；**实际起版为 1.3.1**（R7 + R10 传递依赖许可登记，`author=software-developer`）→ 本提案为 **1.3.1 → 1.4.0 / REV-13**。
 - **（R2）L-03 补交已完成**：新增 **§1.2 服务端配置键登记**（`ib-embed` / MOD-IB-26 的配置**键名**清单，**只登记键名与语义、不含任何值**，对应 IFC-IB-286 的第二份 `EnvironmentFile`）；「Embedding 推理运行时」行改写为**三候选**并显式化**选择依据 / 许可 / CPU-only 可用性 / 传递依赖 / 指令集基线风险**；§2 台账补登传递依赖 `torch`（BSD-3-Clause）与 `transformers`（Apache-2.0）（**条件性采纳**）；§5.2 新增**目标机缺 AVX2 → SIGILL** 风险行（该风险**同时命中既有 OCR 链路**，须合并评估）。
 - **（R2）技术面硬约束未松动**：**未引入 PyMuPDF**（仍为 AGPL-3.0，不采纳）、**未引入 Docker/容器化**（DR-03）、**未引入 Redis/RabbitMQ**；新候选 ③（`onnxruntime` 直载）与既有 OCR 运行时**同组件**，**未净增组件面**。
 - **（R2）凭据纪律**：§1.2 **只登记键名**；`ib-embed` **不需要任何令牌**，其 `EnvironmentFile` **不得**写入任何凭据；全文**不含任何键值**。

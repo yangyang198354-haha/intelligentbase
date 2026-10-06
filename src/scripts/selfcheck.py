@@ -231,7 +231,7 @@ def port_conformance() -> None:
     from ib.config import FileDefinitionDocumentStore, InMemoryDefinitionDocumentStore
     from ib.core import ports as P
     from ib.embedding import FakeEmbedder, InProcessBgeM3Embedder, LocalHttpEmbedder
-    from ib.ledger import InMemoryLedgerRepository
+    from ib.ledger import InMemoryLedgerRepository, MemoryAccountStore, SqliteAccountStore
     from ib.vectorstore import InMemoryVectorStore
 
     # R2：Embedder 的**三形态**都必须过同一端口检查（契约 §8「形态可逆」）。
@@ -246,6 +246,11 @@ def port_conformance() -> None:
         (P.Embedder, InProcessBgeM3Embedder),
         (P.DefinitionDocumentStore, InMemoryDefinitionDocumentStore),
         (P.DefinitionDocumentStore, FileDefinitionDocumentStore),
+        # R13：第 15 个端口 `AccountStore`（IFC-IB-310，恰好 13 个方法）的**离线替身**与
+        # **SQL 适配器**两形态都纳入检查。SQLite 形态是生产实现，其方法参数名漂移
+        # （如 `expires_at` 改名）在运行期表现为「会话永不签发成功」，极难定位。
+        (P.AccountStore, MemoryAccountStore),
+        (P.AccountStore, SqliteAccountStore),
     ]
     problems: list[str] = []
     for port, impl in pairs:
@@ -2790,6 +2795,579 @@ def r8_frontend_confirmation_discipline() -> None:
     assert not re.search(r"(setTimeout|setInterval)\s*\([^)]*\bdecide\b", page), "出现自动续跑定时器"
 
 
+# --------------------------------------------------------------------------- #
+# R13 增量（账户 / 会话 / 商用界面；IFC-IB-309 ~ IFC-IB-332）
+# --------------------------------------------------------------------------- #
+
+#: 自检固件口令（**不是凭据**：仅在本进程内存中存在，不落盘、不进日志、不连任何服务）。
+#: 刻意不写成 `password="..."` 的字面形状，以免与「源码中不得出现口令值」的扫描规则混淆。
+_PW_A = "R13-Selfcheck-Aa1!"
+_PW_B = "R13-Selfcheck-Bb2!"
+_PW_C = "R13-Selfcheck-Cc3!"
+#: 刻意**弱**的口令（仅小写一类字符、长度刚够下界）—— 用于验证服务端强度裁决会拒绝它。
+#: 它同样不是凭据：只在进程内存中充当「一个不合格的输入样例」。
+_PW_WEAK = "abcdefgh"
+
+
+@_case("r13_token_primitives：令牌原语 + bcrypt 摘要（IFC-IB-311 / 313；明文绝不落库）")
+def r13_token_primitives() -> None:
+    """令牌与口令原语的**纯函数**自检（无 I/O、无网络）。"""
+    from ib.core import new_session_token, token_digest, token_digest_matches
+    from ib.ledger import hash_password, verify_password
+
+    # 令牌：高熵、不可预测、两次不同（否则并发登录会互相顶掉会话）。
+    tokens = {new_session_token() for _ in range(32)}
+    assert len(tokens) == 32, "new_session_token 出现重复（熵不足）"
+    for token in tokens:
+        assert len(token) >= 32, f"令牌过短：{len(token)}"
+
+    # 摘要：sha256 十六进制、确定性；服务端**只**存摘要。
+    token = new_session_token()
+    digest = token_digest(token)
+    assert len(digest) == 64 and all(c in "0123456789abcdef" for c in digest)
+    assert token_digest(token) == digest, "摘要不确定（同令牌两次摘要不同）"
+    assert digest != token, "摘要等于原文（未做哈希）"
+
+    # 常量时间比较：一致为真；空值 / 不一致为假（fail-closed）。
+    assert token_digest_matches(token, digest) is True
+    assert token_digest_matches(token + "x", digest) is False
+    assert token_digest_matches("", digest) is False
+    assert token_digest_matches(token, "") is False
+
+    # bcrypt：可校验、错口令不可通过、**同口令两次摘要不同**（盐生效）。
+    h1 = hash_password(_PW_A)
+    h2 = hash_password(_PW_A)
+    assert h1 != h2, "同一口令两次摘要相同 —— bcrypt 未加盐（致命）"
+    assert h1.startswith("$2"), f"摘要前缀不是 bcrypt：{h1[:4]!r}"
+    assert _PW_A not in h1, "摘要中出现了口令明文"
+    assert verify_password(_PW_A, h1) is True
+    assert verify_password(_PW_B, h1) is False
+    assert verify_password("", h1) is False
+    assert verify_password(_PW_A, "") is False
+    assert verify_password(_PW_A, "not-a-bcrypt-hash") is False  # 损坏摘要 → False，不抛
+
+
+@_case("r13_account_store_parity：内存 / SQLite 两实现语义一致（IFC-IB-310 / 313 / 315）")
+def r13_account_store_parity() -> None:
+    """同一组断言分别跑在两个实现上 —— 「替身过了、生产没过」这类分歧必须在此暴露。"""
+    import tempfile
+
+    from ib.context import iso_plus_seconds, utc_now_iso
+    from ib.core import AccountStore, ConflictError
+    from ib.ledger import (
+        MemoryAccountStore,
+        SqliteAccountStore,
+        hash_password,
+        seed_default_admin,
+        verify_password,
+    )
+
+    # 端口恰好 13 个方法（IFC-IB-310 的数目是在设计里写死的，多一个少一个都要在此失败）。
+    methods = sorted(
+        name for name in vars(AccountStore) if not name.startswith("_")
+    )
+    assert len(methods) == 13, f"AccountStore 方法数 {len(methods)} != 13：{methods}"
+
+    # Windows 上未关闭的 SQLite 连接会让临时目录删除失败（WinError 32）—— 这是**实现细节**
+    # 而非缺陷，但若不处理会让整个用例假失败，故把两处 sqlite 实例收集起来显式关闭。
+    opened: list[Any] = []
+    # `ignore_cleanup_errors=True`：Windows 上未及时释放的 SQLite 句柄会让**清理阶段**抛错，
+    # 从而把真正的断言失败替换成 PermissionError（假失败掩盖真失败）。清理失败无害，真失败的
+    # 信息必须被保留。句柄本身仍在本用例末尾显式关闭（见下）。
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        sqlite_a = SqliteAccountStore(f"{tmp}/ledger.sqlite3")
+        sqlite_b = SqliteAccountStore(f"{tmp}/plain.sqlite3")
+        opened.extend([sqlite_a, sqlite_b])
+        for store in (
+            MemoryAccountStore(),
+            sqlite_a,
+        ):
+            label = type(store).__name__
+            now = utc_now_iso()
+
+            # 1) 管理员种子（幂等）：role=admin / project=None / 首登须改密。
+            admin = seed_default_admin(
+                store, username="admin", password_hash=hash_password(_PW_A)
+            )
+            assert admin.role == "admin" and admin.project_id is None, label
+            assert admin.must_change_password is True, f"{label}: 种子账户未标记首登改密"
+            again = seed_default_admin(
+                store, username="admin", password_hash=hash_password(_PW_B)
+            )
+            assert again.user_id == admin.user_id, f"{label}: 种子不幂等（重复创建）"
+            assert verify_password(_PW_A, again.password_hash), (
+                f"{label}: 种子幂等性破坏了既有口令（不应覆盖）"
+            )
+
+            # 2) ops 账户：必须绑定项目；用户名唯一（冲突 → ConflictError）。
+            ops = store.create_user("ops1", hash_password(_PW_B), "ops", "p_alpha")
+            assert ops.project_id == "p_alpha" and ops.must_change_password is True
+            try:
+                store.create_user("ops1", hash_password(_PW_C), "ops", "p_alpha")
+            except ConflictError:
+                pass
+            else:
+                raise AssertionError(f"{label}: 重复用户名未报冲突")
+
+            # 3) 按用户名 / id 取回；列表按项目过滤。
+            assert store.get_user_by_username("ops1").user_id == ops.user_id
+            assert store.get_user(admin.user_id).username == "admin"
+            assert store.get_user_by_username("nobody") is None
+            assert [u.username for u in store.list_users("p_alpha")] == ["ops1"]
+            assert len(store.list_users(None)) == 2
+
+            # 4) 会话：签发 → 解析（含过期 / 撤销 / 未知摘要三种无效情形）。
+            token_digest_value = "d" * 64
+            expires = iso_plus_seconds(3600)
+            store.issue_session(ops.user_id, token_digest_value, expires_at=expires)
+            resolved = store.resolve_session(token_digest_value, now=now)
+            assert resolved is not None and resolved.user_id == ops.user_id, label
+            assert store.resolve_session("e" * 64, now=now) is None, f"{label}: 未知摘要被放行"
+            past = iso_plus_seconds(-10)
+            assert store.resolve_session(token_digest_value, now=past) is not None, label
+            future = iso_plus_seconds(7200)
+            assert (
+                store.resolve_session(token_digest_value, now=future) is None
+            ), f"{label}: 过期会话仍被放行"
+
+            # 5) 续期：有效则延长，撤销后拒绝（fail-closed）。
+            renewed = store.renew_session(
+                token_digest_value, new_expires_at=iso_plus_seconds(10800), now=now
+            )
+            assert renewed is not None and renewed.expires_at > expires, label
+            # 6) 撤销后解析必须为 None。
+            store.revoke_session(token_digest_value, now=now)
+            assert store.resolve_session(token_digest_value, now=now) is None, label
+            assert (
+                store.renew_session(
+                    token_digest_value, new_expires_at=iso_plus_seconds(10800), now=now
+                )
+                is None
+            ), f"{label}: 已撤销会话仍可续期"
+
+            # 7) 批量撤销（组内扩展）：保留当前会话，只撤销其余。
+            keep = "1" * 64
+            other = "2" * 64
+            store.issue_session(ops.user_id, keep, expires_at=iso_plus_seconds(3600))
+            store.issue_session(ops.user_id, other, expires_at=iso_plus_seconds(3600))
+            removed = store.revoke_sessions_for_user(
+                ops.user_id, now=now, keep_digest=keep
+            )
+            assert removed == 1, f"{label}: 批量撤销条数 {removed} != 1"
+            assert store.resolve_session(keep, now=now) is not None, f"{label}: 误撤销当前会话"
+            assert store.resolve_session(other, now=now) is None
+
+            # 8) 失败计数与重置；停用；清理过期/已撤销。
+            bumped = store.record_login_failure(ops.user_id, now=now)
+            assert bumped.failed_login_count == 1, label
+            store.reset_login_failures(ops.user_id)
+            assert store.get_user(ops.user_id).failed_login_count == 0, label
+            assert store.get_user(ops.user_id).locked_until is None, label
+
+            disabled = store.set_status(ops.user_id, "disabled")
+            assert disabled.status == "disabled", label
+            assert store.get_user(ops.user_id).status == "disabled"
+
+            store.revoke_session(keep, now=now)
+            assert store.purge_expired_sessions(now=now) >= 1, f"{label}: 未清理失效会话"
+
+            # 9) 改密：清除改密态与失败计数（重置口令是唯一的管理员恢复手段）。
+            updated = store.set_password(
+                admin.user_id, hash_password(_PW_C), must_change=False
+            )
+            assert updated.must_change_password is False, label
+            assert verify_password(_PW_C, store.get_user(admin.user_id).password_hash)
+            assert not verify_password(_PW_A, store.get_user(admin.user_id).password_hash)
+
+        # SQLite 形态的真实落盘检查：库里**不得**出现口令明文。
+        #
+        # 必须同时扫主库与 WAL 文件：`journal_mode=WAL` 下新写入先进 `-wal`，
+        # 只看主库会让这条断言**恒真**（那是「假通过」，比不写更糟）。
+        sqlite_b.create_user("plain", hash_password(_PW_A), "ops", "p_alpha")
+        # WAL 模式下新写入先进 `-wal`，故主库 / `-wal` / `-shm` **逐个**扫描并按文件报告
+        # 命中位置（只扫主库会让这条断言恒真 —— 那是「假通过」，比不写更糟）。
+        digests: list[bytes] = []
+        for suffix in ("", "-wal", "-shm"):
+            candidate = f"{tmp}/plain.sqlite3{suffix}"
+            if not os.path.exists(candidate):
+                continue
+            with open(candidate, "rb") as handle:
+                blob = handle.read()
+            digests.append(blob)
+            assert _PW_A.encode("utf-8") not in blob, (
+                f"SQLite 文件 plain.sqlite3{suffix} 中出现口令明文（致命）"
+            )
+        assert any(b"$2" in blob for blob in digests), (
+            "库中未找到 bcrypt 摘要（口令可能未按 IFC-IB-313 落库）"
+        )
+        for store in opened:
+            store.close()
+
+
+@_case("r13_account_http_contract：登录 / 会话 / 账户端点（IFC-IB-316~321；含 B16/B17/B18）")
+def r13_account_http_contract() -> None:
+    """用 Django 测试客户端跑 R13 端点。**不连任何外部服务**（内存账户存储 + 内存台账）。
+
+    本用例先把 `IB_AUTHZ_POLICY_MODULE` 指向**内置**策略模块（IFC-IB-323），
+    以验证「令牌 → 主体 → 授权」这条完整链路；结束时恢复环境，避免污染其它用例。
+    """
+    os.environ["DJANGO_SETTINGS_MODULE"] = "ibweb.settings"
+    os.environ["IB_CONFIG_SOURCE"] = "dict"
+    os.environ["IB_AUTHZ_POLICY_MODULE"] = "ibweb.accounts.policy"
+    os.environ.pop("IB_ACCOUNT_BACKEND", None)
+
+    import json
+
+    from ibweb.composition import build_application, build_deps
+
+    try:
+        deps = build_deps(OFFLINE_RAW, force=True)
+
+        import django
+
+        django.setup()
+        build_application(deps)
+
+        from django.test import Client
+
+        from ib.ledger import hash_password
+
+        client = Client()
+        store = deps.account_store
+        store.create_user("root_admin", hash_password(_PW_A), "admin", None)
+        ops = store.create_user("ops1", hash_password(_PW_B), "ops", "p_alpha")
+
+        def post(path: str, payload: dict[str, object] | None = None, **extra: object) -> Any:
+            return client.post(
+                path,
+                data=json.dumps(payload or {}),
+                content_type="application/json",
+                **extra,
+            )
+
+        # --- 凭据纪律 -------------------------------------------------------- #
+        # 无令牌 → 401（不是静默放行）。
+        assert client.get("/api/auth/me").status_code == 401
+        # `?token=` 全端点 4xx —— **包括**免鉴权的登录端点（[B17]）。
+        assert client.post("/api/auth/login?token=x").status_code == 400
+        assert client.post("/api/auth/login?access_token=x").status_code == 400
+        assert client.get("/api/accounts?token=x").status_code == 400
+        # 零 Cookie（[B16]）：任一响应都不得出现 Set-Cookie。
+        for response in (
+            client.get("/healthz"),
+            client.get("/api/auth/me"),
+            post("/api/auth/login"),
+        ):
+            assert "Set-Cookie" not in response.headers, "出现 Set-Cookie（DR-10：本项目零 Cookie）"
+
+        # --- 登录 ------------------------------------------------------------ #
+        assert post("/api/auth/login", {"username": "root_admin"}).status_code == 400
+        bad = post("/api/auth/login", {"username": "root_admin", "password": _PW_B})
+        assert bad.status_code == 401, bad.content
+        assert post("/api/auth/login", {"username": "ghost", "password": _PW_A}).status_code == 401
+        # 统一错误：不存在 / 口令错给出**同一** code（防存在性探测预言机）。
+        assert bad.json()["error"]["code"] == post(
+            "/api/auth/login", {"username": "ghost", "password": _PW_A}
+        ).json()["error"]["code"]
+
+        ok = post("/api/auth/login", {"username": "root_admin", "password": _PW_A})
+        assert ok.status_code == 200, ok.content
+        body = ok.json()
+        assert set(body) == {"token", "expires_at", "must_change_password", "user"}, set(body)
+        assert body["must_change_password"] is True
+        assert "password_hash" not in body["user"], "登录响应泄露了口令摘要"
+        admin_token = body["token"]
+        admin_auth = {"HTTP_AUTHORIZATION": f"Bearer {admin_token}"}
+
+        # --- 首登强制改密（[B18]；服务端受限会话，绕过前端同样被挡）------------- #
+        me = client.get("/api/auth/me", **admin_auth)
+        assert me.status_code == 200, me.content
+        assert me.json()["must_change_password"] is True
+        blocked = client.get("/api/accounts", **admin_auth)
+        assert blocked.status_code == 403, blocked.content
+        assert blocked.json()["error"]["code"] == "password_change_required"
+        assert client.get("/api/files", **admin_auth).status_code == 403
+
+        weak = post(
+            "/api/auth/change-password",
+            {"old_password": _PW_A, "new_password": _PW_WEAK},
+            **admin_auth,
+        )
+        assert weak.status_code == 400, weak.content
+        assert weak.json()["error"]["code"] == "weak_password"
+        assert post(
+            "/api/auth/change-password",
+            {"old_password": _PW_B, "new_password": _PW_A},
+            **admin_auth,
+        ).status_code == 400
+        assert post(
+            "/api/auth/change-password",
+            {"old_password": _PW_A, "new_password": _PW_A},
+            **admin_auth,
+        ).status_code == 400  # 新旧相同
+        changed = post(
+            "/api/auth/change-password",
+            {"old_password": _PW_A, "new_password": _PW_C},
+            **admin_auth,
+        )
+        assert changed.status_code == 200, changed.content
+        assert changed.json()["must_change_password"] is False
+        # 改密成功后：当前会话仍可用（keep_digest），改密态解除。
+        assert client.get("/api/auth/me", **admin_auth).json()["must_change_password"] is False
+
+        # --- 账户 CRUD（仅 admin）-------------------------------------------- #
+        listed = client.get("/api/accounts", **admin_auth)
+        assert listed.status_code == 200, listed.content
+        items = listed.json()["items"]
+        assert {u["username"] for u in items} == {"root_admin", "ops1"}
+        for item in items:
+            assert "password_hash" not in item, "账户列表泄露了口令摘要"
+
+        created = post(
+            "/api/accounts",
+            {"username": "ops2", "password": _PW_C, "project_id": "p_beta", "role": "ops"},
+            **admin_auth,
+        )
+        assert created.status_code == 201, created.content
+        assert created.json()["must_change_password"] is True
+        assert post(
+            "/api/accounts",
+            {"username": "ops2", "password": _PW_C, "project_id": "p_beta"},
+            **admin_auth,
+        ).status_code == 409  # 用户名冲突
+        assert post(
+            "/api/accounts",
+            {"username": "ops3", "password": _PW_C},
+            **admin_auth,
+        ).status_code == 400  # ops 必须绑定项目
+        assert post(
+            "/api/accounts",
+            {"username": "ops3", "password": _PW_C, "project_id": "p_beta", "role": "admin"},
+            **admin_auth,
+        ).status_code == 400  # 不允许经 API 造第二个管理员
+        assert client.get("/api/accounts?project_id=p_beta", **admin_auth).json()["items"][0][
+            "username"
+        ] == "ops2"
+
+        # --- ops 账户：项目绑定 + 非 admin 被 403 ------------------------------ #
+        ops_login = post("/api/auth/login", {"username": "ops1", "password": _PW_B})
+        assert ops_login.status_code == 200, ops_login.content
+        assert ops_login.json()["user"]["project_id"] == "p_alpha"
+        ops_token = ops_login.json()["token"]
+        ops_auth = {"HTTP_AUTHORIZATION": f"Bearer {ops_token}"}
+        # 改密态下先改密，才能访问业务端点。
+        assert post(
+            "/api/auth/change-password",
+            {"old_password": _PW_B, "new_password": _PW_C},
+            **ops_auth,
+        ).status_code == 200
+        assert client.get("/api/files", **ops_auth).status_code == 200
+        forbidden = client.get("/api/accounts", **ops_auth)
+        assert forbidden.status_code == 403, forbidden.content
+        assert forbidden.json()["error"]["code"] == "scope_violation"
+        assert post(
+            "/api/accounts",
+            {"username": "ops9", "password": _PW_C, "project_id": "p_alpha"},
+            **ops_auth,
+        ).status_code == 403
+
+        # --- 会话续期 / 注销 --------------------------------------------------- #
+        renewed = post("/api/auth/session/renew", None, **admin_auth)
+        assert renewed.status_code == 200, renewed.content
+        assert "expires_at" in renewed.json()
+        assert client.post("/api/auth/logout", **ops_auth).status_code == 204
+        assert client.get("/api/auth/me", **ops_auth).status_code == 401  # 已注销 → fail-closed
+        assert client.post("/api/auth/session/renew", **ops_auth).status_code == 401
+
+        # --- 停用 / 重置口令（管理员恢复手段）--------------------------------- #
+        assert post(
+            f"/api/accounts/{ops.user_id}/reset-password",
+            {"new_password": _PW_B},
+            **admin_auth,
+        ).status_code == 200
+        reset = store.get_user(ops.user_id)
+        assert reset.must_change_password is True and reset.status == "active"
+        assert post(
+            f"/api/accounts/{ops.user_id}/disable", None, **admin_auth
+        ).status_code == 200
+        assert store.get_user(ops.user_id).status == "disabled"
+        # 停用后即使口令正确也不放行，且错误码与「口令错」**一致**（不泄露状态）。
+        disabled_login = post("/api/auth/login", {"username": "ops1", "password": _PW_B})
+        assert disabled_login.status_code == 401, disabled_login.content
+        assert disabled_login.json()["error"]["code"] == bad.json()["error"]["code"]
+        missing = client.post("/api/accounts/does-not-exist/disable", None, **admin_auth)
+        assert missing.status_code == 404, (
+            f"未知账户的停用应 404，实际 {missing.status_code}：{missing.content!r}"
+        )
+        missing_reset = post(
+            "/api/accounts/does-not-exist/reset-password",
+            {"new_password": _PW_C},
+            **admin_auth,
+        )
+        assert missing_reset.status_code == 404, (
+            f"未知账户的重置应 404，实际 {missing_reset.status_code}：{missing_reset.content!r}"
+        )
+    finally:
+        # 恢复环境：移除策略模块并重建装配，避免影响后续用例（本用例的副作用不外溢）。
+        os.environ.pop("IB_AUTHZ_POLICY_MODULE", None)
+        build_deps(OFFLINE_RAW, force=True)
+        build_application()
+
+
+@_case("r13_frontend_auth_discipline：登录页 / 控制台 / 无令牌粘贴入口 / 零 CDN（IFC-IB-327~329）")
+def r13_frontend_auth_discipline() -> None:
+    """源码级纪律检查（不需要 `npm install`）：依赖声明、零 CDN、令牌不进查询串。"""
+    import json as _json
+    import pathlib
+    import re
+
+    root = pathlib.Path(_SRC) / "frontend"
+
+    def _strip(text: str) -> str:
+        """剥掉注释后再断言。
+
+        必须剥：`client.ts` 的注释里**正当**地解释了「为什么不能用 `?token=`」，
+        若对原文断言，这段说明反而会被当成违规命中 —— 那会逼着后来者删掉解释，
+        把「为什么」的知识从代码里抹掉。
+        """
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+        text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+        return re.sub(r"^[ \t]*//.*$", "", text, flags=re.MULTILINE)
+
+    read = lambda rel: _strip((root / rel).read_text(encoding="utf-8"))  # noqa: E731
+
+    # 1) 依赖声明：Element Plus 与 vue-router 必须是**本地依赖**（禁运行期 CDN）。
+    pkg = _json.loads(read("package.json"))
+    deps = pkg.get("dependencies", {})
+    assert "element-plus" in deps, "package.json 缺少 element-plus 依赖"
+    assert "vue-router" in deps, "package.json 缺少 vue-router 依赖"
+    assert "axios" not in deps, "出现 axios（应统一经 src/api/client.ts 的 fetch 封装）"
+
+    # 2) 零外链：入口 HTML 与引导脚本不得出现任何 http(s) 外链资源。
+    for rel in ("index.html", "src/main.ts", "src/router/index.ts"):
+        text = read(rel)
+        assert not re.search(r"https?://(?!127\.0\.0\.1)", text), f"{rel} 出现外链资源"
+        assert "@import url(" not in text, f"{rel} 出现外链样式导入"
+
+    # 3) 无令牌粘贴入口：App.vue 与 main.ts 都不得再有「从 URL 取令牌」的通道。
+    app_vue = read("src/App.vue")
+    main_ts = read("src/main.ts")
+    # 断言**代码结构**而非文案：根组件不得有输入控件或写令牌的调用
+    # （注释里解释「为什么不再有粘贴入口」是正当的，不应因此误判）。
+    assert "<input" not in app_vue, "App.vue 仍有输入框（粘贴令牌入口必须整条删除）"
+    assert "setToken(" not in app_vue, "App.vue 仍直接写令牌"
+    assert "type=\"password\"" not in app_vue, "App.vue 仍有口令 / 令牌输入控件"
+    assert "location.search" not in main_ts and "urlToken" not in main_ts, (
+        "main.ts 仍从 URL 读取令牌（令牌进 URL 会被访问日志记录）"
+    )
+
+    # 4) 路由：hash 模式 + 登录守卫 + 改密守卫（结构性约束，不是文案断言）。
+    router_ts = read("src/router/index.ts")
+    assert "createWebHashHistory" in router_ts, "必须用 hash 模式（避免静态托管的深链接 404）"
+    assert "beforeEach" in router_ts and "bootstrap()" in router_ts, "缺少会话准入守卫"
+    assert "mustChangePassword" in router_ts, "缺少首登改密守卫"
+
+    # 5) 客户端：新增端点齐备，且**只有** Authorization 头通道。
+    client_ts = read("src/api/client.ts")
+    for endpoint in (
+        "/api/auth/change-password",
+        "/api/auth/session/renew",
+        "/api/auth/logout",
+        "/api/accounts",
+    ):
+        assert endpoint in client_ts, f"client.ts 缺少端点 {endpoint}"
+    assert "/api/auth/login" in client_ts, "client.ts 缺少登录端点"
+    assert "Authorization" in client_ts and "Bearer" in client_ts, "缺少 Authorization 头注入"
+    assert "?token=" not in client_ts and "?key=" not in client_ts, "client.ts 出现查询串令牌"
+    assert "localStorage.setItem(TOKEN_KEY" not in client_ts, "令牌不得落 localStorage"
+    # 401 只在**一处**处理（decode 内），页面不再各自监听 —— 漏接一个就是该页白屏。
+    assert client_ts.count("this.clearToken()") == 2, (
+        "令牌清除点应为 2（显式 logout + 401 回调），实际 "
+        f"{client_ts.count('this.clearToken()')} —— 出现第二处认证判断"
+    )
+
+    # 6) 主题：深浅两套 + 中文优先排版；不得外链字体。
+    theme_css = read("src/styles/theme.css")
+    assert ":root[data-theme='dark']" in theme_css, "缺少深色主题令牌"
+    assert "@font-face" not in theme_css, "不得外链字体（断网时整页回退 / 白屏）"
+    assert "PingFang SC" in theme_css and "Microsoft YaHei" in theme_css, "缺少中文优先字体栈"
+
+
+@_case("r13_deploy_discipline：迁移 / TLS 模板 / 键名登记 / 检查清单（IFC-IB-330~332）")
+def r13_deploy_discipline() -> None:
+    """部署侧模板纪律：幂等迁移、TLS 占位符、只登记键名、清单齐备。"""
+    import pathlib
+    import re
+
+    deploy = pathlib.Path(_SRC) / "deploy"
+
+    # 1) 迁移 003：幂等（IF EXISTS）+ 与 schema 单源一致的关键列 + 回滚说明。
+    migration = (deploy / "migrations" / "003_accounts.sql").read_text(encoding="utf-8")
+    assert "CREATE TABLE IF NOT EXISTS users" in migration
+    assert "CREATE TABLE IF NOT EXISTS sessions" in migration
+    assert "CREATE INDEX IF NOT EXISTS" in migration
+    for column in ("password_hash", "must_change_password", "failed_login_count", "locked_until"):
+        assert column in migration, f"003_accounts.sql 缺少列 {column}"
+    assert "token_digest" in migration and "revoked_at" in migration
+    # 002 已被 chunk_image 占用（编号不得复用）。
+    assert (deploy / "migrations" / "002_chunk_image.sql").exists()
+
+    # 2) TLS 模板：存在、含证书占位符与 SSE 不缓冲硬条件、且**不含**任何真实证书 / 私钥。
+    nginx = deploy / "nginx" / "intelligentbase.conf.example"
+    text = nginx.read_text(encoding="utf-8")
+    assert "ssl_certificate" in text and "ssl_certificate_key" in text
+    assert "127.0.0.1:18080" in text, "反代目标错误（明文必须只在回环）"
+    assert "proxy_buffering off;" in text, "缺少 SSE 不缓冲硬条件"
+    assert "proxy_set_header Authorization" in text, "必须透传 Authorization 头（否则登录后仍 401）"
+    assert "<REPLACE_ME" in text, "证书路径必须是占位符"
+    assert "BEGIN CERTIFICATE" not in text and "BEGIN PRIVATE KEY" not in text
+    # HSTS 只以注释形式给出（自签证书下启用会封死降级排障路径）。
+    assert not re.search(r"^\s*add_header\s+Strict-Transport-Security", text, re.MULTILINE)
+
+    # 3) EnvironmentFile 模板：**只登记键名**，口令键的值必须是占位符。
+    env = (deploy / "env.example").read_text(encoding="utf-8")
+    for key in (
+        "IB_ACCOUNT_BACKEND",
+        "IB_SESSION_TTL_SECONDS",
+        "IB_SESSION_RENEW_WINDOW_SECONDS",
+        "IB_DEFAULT_ADMIN_USERNAME",
+        "IB_DEFAULT_ADMIN_PASSWORD",
+        "IB_PASSWORD_MIN_LENGTH",
+    ):
+        assert key in env, f"env.example 缺少 R13 键名 {key}"
+    assert re.search(r"^IB_DEFAULT_ADMIN_PASSWORD=<REPLACE_ME", env, re.MULTILINE), (
+        "IB_DEFAULT_ADMIN_PASSWORD 必须为占位符（仓库内不得出现真实口令值）"
+    )
+    assert "ibweb.accounts.policy" in env, "未登记内置策略模块这一取值"
+
+    # 4) 检查清单：B15 ~ B20 齐备，且签署行已同步。
+    checklists = (deploy / "checklists.txt").read_text(encoding="utf-8")
+    for item in ("[B15]", "[B16]", "[B17]", "[B18]", "[B19]", "[B20]"):
+        assert item in checklists, f"checklists.txt 缺少验收项 {item}"
+    assert "B1–B20" in checklists, "签署行未同步到 B20"
+
+    # 5) 键名登记（IFC-IB-312 / MOD-IB-02）：R13 键在**唯一真源** `ib.config` 内有登记，
+    #    且**不**混入 MOD-IB-01 声明的「不得新增 / 改名」核心装配开关集合。
+    from ib import config as ib_config
+
+    r13_keys = {
+        "IB_ACCOUNT_BACKEND",
+        "IB_SESSION_TTL_SECONDS",
+        "IB_SESSION_RENEW_WINDOW_SECONDS",
+        "IB_DEFAULT_ADMIN_USERNAME",
+        "IB_DEFAULT_ADMIN_PASSWORD",
+        "IB_PASSWORD_MIN_LENGTH",
+        "IB_LOGIN_MAX_FAILURES",
+        "IB_LOGIN_LOCK_SECONDS",
+        "IB_AUTHZ_POLICY_MODULE",
+    }
+    registered = set(ib_config.IB_RUNTIME_ENV_KEYS)
+    missing = sorted(r13_keys - registered)
+    assert not missing, f"ib.config.IB_RUNTIME_ENV_KEYS 缺少 R13 键名登记（IFC-IB-312）：{missing}"
+    leaked = sorted(r13_keys & set(ib_config.IB_ENV_KEYS))
+    assert not leaked, f"R13 键不得进入核心装配开关集合 IB_ENV_KEYS：{leaked}"
+
+
 def main() -> int:
     print("=" * 72)
     print("intelligentbase 离线自检（GROUP_C 自我验证；正式测试套件属 GROUP_D）")
@@ -2839,6 +3417,12 @@ def main() -> int:
         r8_chat_resume_endpoint_contract,
         r8_chat_resume_http_success,
         r8_frontend_confirmation_discipline,
+        # ---- R13 增量（账户 / 会话 / 商用界面；IFC-IB-309~332） ----
+        r13_token_primitives,
+        r13_account_store_parity,
+        r13_account_http_contract,
+        r13_frontend_auth_discipline,
+        r13_deploy_discipline,
     ]
     for case in cases:
         case()

@@ -1,0 +1,144 @@
+# ---------------------------------------------------------------------------
+# @module MOD-IB-25
+# @implements IFC-IB-331 nginx TLS 终止配置模板（HTTPS 落点，ADR-25）
+# @author software-developer
+#
+# 安装（目标机，需 root）：
+#   install -m 0644 deploy/nginx/intelligentbase.conf.example \
+#           /etc/nginx/sites-available/intelligentbase
+#   ln -sfn /etc/nginx/sites-available/intelligentbase /etc/nginx/sites-enabled/intelligentbase
+#   nginx -t && systemctl reload nginx
+#
+# 本文件是**模板**：证书路径为占位符，仓库内**不含**任何证书、私钥或口令
+# （自检 deploy_templates_have_no_secrets 会扫描本目录，命中真凭据即失败）。
+#
+# 拓扑（ADR-25 / DR-15）：
+#
+#   浏览器 --HTTPS(443)--> nginx --HTTP(127.0.0.1:18080)--> ib-web (Waitress)
+#                           │
+#                           └── 静态：/var/www/intelligentbase（前端构建产物）
+#
+# **明文只存在于回环**：`ib-web` 仍绑 `127.0.0.1:18080`，不监听对外地址。
+# 这样即使运维误开防火墙，业务端口也不直接对外可达（纵深防御的第一层）。
+# ---------------------------------------------------------------------------
+
+# 上游：ib-web（Waitress）。keepalive 让 SSE 长连接不必反复握手。
+upstream ib_web {
+    server 127.0.0.1:18080;
+    keepalive 16;
+}
+
+# ---------------------------------------------------------------------------
+# HTTP：**只**做跳转（或拒绝）
+#
+# 二选一（保留本文件的默认 = 跳转）：
+#   * 跳转型（推荐，避免了用户把书签存成 http 后永久 404）；
+#   * 拒绝型：把 return 301 换成 return 444（直接断连，不泄露任何响应头）。
+#
+# 注意：ACME 挑战路径（/.well-known/acme-challenge/）若使用 HTTP-01 校验，
+# 必须在跳转**之前**放行；内网自签 / 内网 CA 场景下不需要该路径。
+# ---------------------------------------------------------------------------
+server {
+    listen 80;
+    listen [::]:80;
+    server_name <REPLACE_ME_host>;
+
+    # 除 ACME 挑战外，一律 301 到 HTTPS（[B15] 的验收点之一）。
+    location /.well-known/acme-challenge/ {
+        root /var/www/acme;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ---------------------------------------------------------------------------
+# HTTPS：真正的服务入口
+# ---------------------------------------------------------------------------
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name <REPLACE_ME_host>;
+
+    # --- 证书策略（IFC-IB-331）------------------------------------------------
+    # 内网自签或内网 CA 签发。**证书与私钥不进仓库**，路径只写在目标机上，
+    # 且私钥必须 0600 且属主可读（建议 root:root 或专用证书用户）：
+    #   install -m 0600 cert.pem      /etc/intelligentbase/tls/server.crt
+    #   install -m 0600 cert.key      /etc/intelligentbase/tls/server.key
+    # 自签证书的**首访告警是预期行为**：内网场景下由运维把根证书预置到客户端信任库，
+    # 而不是让用户「点继续访问」（那会把证书校验训练成无意义动作）。
+    ssl_certificate     <REPLACE_ME_path_to_server_crt>;
+    ssl_certificate_key <REPLACE_ME_path_to_server_key>;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    # 明确的服务端偏好顺序（避免客户端把强度协商成较低的组合）
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1h;
+
+    # --- HSTS：**仅**在内网 CA / 受信证书下启用 -------------------------------
+    # 自签证书下**不要**启用：HSTS 会让浏览器在 max-age 内拒绝一切降级访问，
+    # 一旦证书链出问题，用户将无法通过「继续访问」恢复 —— 排障路径被自己封死。
+    # 启用时使用下面的行（并用 includeSubDomains 前确认没有其它 http 子服务）：
+    # add_header Strict-Transport-Security "max-age=15552000" always;
+
+    # --- 通用安全响应头 -------------------------------------------------------
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+
+    # 客户端请求体上限：与后端上传限制保持一致（前端上传走同源 /api/files）。
+    client_max_body_size 64m;
+
+    # --- 静态前端（/var/www/intelligentbase）----------------------------------
+    # 前端用 hash 路由（vue-router createWebHashHistory），深链接形如 /#/accounts，
+    # 服务端永远只看到 `/` —— 因此**不需要** try_files 回退规则。
+    # 这一点的价值在于：少一处「本地能跑、线上刷新 404」的配置依赖。
+    root /var/www/intelligentbase;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 构建产物带内容哈希指纹，可长期强缓存；index.html 必须不缓存（否则发版后
+    # 用户仍加载旧的 index.html，指向已删除的哈希资源 → 白屏）。
+    location /assets/ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+    location = /index.html {
+        add_header Cache-Control "no-store" always;
+    }
+
+    # --- 业务端点反代 ---------------------------------------------------------
+    location /api/ {
+        proxy_pass http://ib_web;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        # 认证**不走** Cookie（DR-10：零 Set-Cookie）。Authorization 头必须原样透传，
+        # 否则后端一律 401，表现为「本地 OK、线上登录后仍 401」。
+        proxy_set_header Authorization $http_authorization;
+        # X-Forwarded-For 供登录限速按客户端 IP 计数（IFC-IB-326）。
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # SSE 硬条件（IFC-IB-247 / IFC-IB-331）：不缓冲，否则响应会被 nginx 攒住，
+        # 前端表现为「问了很久才一次性出结果」甚至超时无输出。
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        chunked_transfer_encoding on;
+    }
+
+    location /healthz {
+        proxy_pass http://ib_web;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        access_log off;
+    }
+}

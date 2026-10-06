@@ -175,6 +175,90 @@ DDL_STATEMENTS: tuple[str, ...] = (
     """,
 )
 
+# --------------------------------------------------------------------------- #
+# R13 账户 / 会话 DDL（IFC-IB-313；单源 = 迁移 003_accounts.sql）
+# --------------------------------------------------------------------------- #
+#
+# 为什么**不**加外键到 `projects`：`admin` 是**全局账户**（`project_id IS NULL`），
+# 不对应任何项目；`ops` 的 `project_id` 只作**归属标签**（隔离由中间件 + 策略保证），
+# 且本表不参与「删除项目即级联清账户」的语义（项目登记在配置层）。
+# `sessions.user_id` 亦**不加外键**：停用 / 改密时的批量撤销由应用层显式调用
+# （IFC-IB-321 / IFC-IB-319），保留「先撤销会话、再改账户状态」的可审计顺序。
+#
+# 少量 CHECK 是**新增表自带**的完整性约束（不改任何既有表）：
+#   * `role` / `status` 取值域在**存储层**再兜一道 —— 与 `documents.status` 的既有做法一致；
+#   * `must_change_password` 限定 0/1，避免「真值被写成任意整数」；
+#   * `role='admin' OR project_id IS NOT NULL` 使 ADR-21「只有 admin 是全局」成为
+#     表结构层面的事实，杜绝「一个没有项目的 ops 账户」这种越权温床。
+
+ACCOUNT_DDL_STATEMENTS: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS users (
+        user_id              TEXT PRIMARY KEY,
+        username             TEXT NOT NULL UNIQUE,
+        password_hash        TEXT NOT NULL,
+        role                 TEXT NOT NULL,
+        project_id           TEXT,
+        status               TEXT NOT NULL,
+        must_change_password INTEGER NOT NULL,
+        failed_login_count   INTEGER NOT NULL DEFAULT 0,
+        locked_until         TEXT,
+        created_at           TEXT NOT NULL,
+        updated_at           TEXT NOT NULL,
+        CHECK (role IN ('admin', 'ops')),
+        CHECK (status IN ('active', 'disabled')),
+        CHECK (must_change_password IN (0, 1)),
+        CHECK (role = 'admin' OR project_id IS NOT NULL)
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_users_project ON users(project_id)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS sessions (
+        token_digest  TEXT PRIMARY KEY,
+        user_id       TEXT NOT NULL,
+        project_id    TEXT,
+        issued_at     TEXT NOT NULL,
+        expires_at    TEXT NOT NULL,
+        last_seen_at  TEXT NOT NULL,
+        revoked_at    TEXT
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)
+    """,
+)
+
+#: 账户 / 会话表的期望列（与 `missing_account_columns` 配套）。
+ACCOUNT_EXPECTED_COLUMNS: dict[str, tuple[str, ...]] = {
+    "users": (
+        "user_id",
+        "username",
+        "password_hash",
+        "role",
+        "project_id",
+        "status",
+        "must_change_password",
+        "failed_login_count",
+        "locked_until",
+        "created_at",
+        "updated_at",
+    ),
+    "sessions": (
+        "token_digest",
+        "user_id",
+        "project_id",
+        "issued_at",
+        "expires_at",
+        "last_seen_at",
+        "revoked_at",
+    ),
+}
+
 #: 期望存在的列（用于启动期/自测期的一致性校验，防止「老库缺列」导致的运行期 TypeError）。
 EXPECTED_COLUMNS: dict[str, tuple[str, ...]] = {
     "projects": (
@@ -253,18 +337,28 @@ def ddl_script() -> str:
     return ";\n".join(statement.strip() for statement in DDL_STATEMENTS) + ";\n"
 
 
+def account_ddl_script() -> str:
+    """把账户 / 会话 DDL 拼为单条脚本（供 `003_accounts.sql` 交付物与手工建库使用）。"""
+    return ";\n".join(statement.strip() for statement in ACCOUNT_DDL_STATEMENTS) + ";\n"
+
+
 def ensure_schema(connection) -> None:
     """幂等建表 + 开 PRAGMA（运行期自愈）。
 
     刻意**不**引入版本号表：DDL 全部为 `IF NOT EXISTS`，且新增列通过显式 ALTER 迁移脚本
     （`src/deploy/migrations/`）落地 —— 基座的表结构变更应当**显式且可审计**，
     而不是靠框架自动 diff。启动期由 `ibweb` 调用一次即可。
+
+    **R13**：同时幂等创建账户 / 会话表（`users` / `sessions`）—— 账户体系内建，
+    不新增 systemd 单元（DR-09 / ADR-18），故与台账共用同一次 `--ensure-schema`。
     """
     cursor = connection.cursor()
     try:
         for statement in PRAGMA_STATEMENTS:
             cursor.execute(statement)
         for statement in DDL_STATEMENTS:
+            cursor.execute(statement)
+        for statement in ACCOUNT_DDL_STATEMENTS:
             cursor.execute(statement)
         connection.commit()
     finally:
@@ -273,10 +367,19 @@ def ensure_schema(connection) -> None:
 
 def missing_columns(connection) -> dict[str, list[str]]:
     """返回缺失列（表 -> 列名列表）。空字典表示结构完整。"""
+    return _missing(connection, EXPECTED_COLUMNS)
+
+
+def missing_account_columns(connection) -> dict[str, list[str]]:
+    """账户 / 会话表的缺失列（R13，IFC-IB-313）。空字典表示结构完整。"""
+    return _missing(connection, ACCOUNT_EXPECTED_COLUMNS)
+
+
+def _missing(connection, expected_tables: dict[str, tuple[str, ...]]) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     cursor = connection.cursor()
     try:
-        for table, expected in EXPECTED_COLUMNS.items():
+        for table, expected in expected_tables.items():
             cursor.execute(f"PRAGMA table_info({table})")
             actual = {row[1] for row in cursor.fetchall()}
             if not actual:

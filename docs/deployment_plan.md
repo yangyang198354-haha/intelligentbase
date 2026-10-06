@@ -6,20 +6,26 @@
 | 文档 ID | DOC-IB-DP-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 生产部署计划 |
 | 产出代理 | devops-engineer (author_agent) |
-| 调用 ID | INV-GROUP_E-INTELBASE-002 |
+| 调用 ID | INV-GROUP_E-INTELBASE-004（REV-13 增量；前序 INV-GROUP_E-INTELBASE-002 / -003） |
 | 项目 | intelligentbase |
 | 阶段 | GROUP_E / **PHASE_10（部署计划，仅计划）**；PHASE_11（实际部署）**PENDING，禁止执行** |
-| 版本 | 1.1.0（R4 修订；闭合 P1 项 C-02~C-06，并反映 B-05 依赖清单已补） |
-| status | **REVISED_PENDING_REVIEW**（R4 修订；GR-E-001 对 R4 前版本有效，待 PM 重新门控 GR-E-002） |
+| revision | **REV-13**（认证 / 会话 / 多项目运维账户 / Claude 风格可商用前端 / HTTPS 增量） |
+| 版本 | **1.2.0**（REV-13 增量；在 1.1.0/R4 之上追加 R13 部署面，见 §13） |
+| status | **REVISED_PENDING_REVIEW**（REV-13 修订；GR-E-001 对 R4 前版本有效、GR-E-002 对 1.1.0 有效，本次待 PM 重新门控） |
 | 创建日期 | 2026-09-26 |
+| 更新日期 | 2026-10-06（REV-13 增量） |
 | 目标机 | `192.168.31.133`（Ubuntu 26.04 LTS / x86_64 / i7-3770S 4C8T / 11 GiB / 78 GiB 可用 / GTX 960 弃用） |
-| 上游输入 | `docs/architecture_design.md`(1.2.0/R2)、`docs/module_design.md`(1.2.0/R2)、`docs/tech_stack.md`(1.2.0/R2)、`docs/ib_embed_service_contract.md`(1.0.0/R2)、`docs/implementation_plan.md`、`docs/test_plan.md`、`docs/test_report.md`(1.1.0/R3)、`docs/code_review_report.md`、`src/deploy/**`、`src/requirements*.txt`（均**只读**） |
+| 上游输入 | `docs/architecture_design.md`(**1.5.0/REV-13**)、`docs/module_design.md`(**1.5.0/REV-13**)、`docs/tech_stack.md`(**1.4.0/REV-13**)、`docs/ib_embed_service_contract.md`(1.0.0/R2)、`docs/implementation_plan.md`(**2.7.0/REV-13**)、`docs/test_plan.md`(**1.8.0/R13**)、`docs/test_report.md`(**1.9.0/R13**)、`docs/code_review_report.md`、`src/deploy/**`（含 **`migrations/003_accounts.sql`**、**`nginx/intelligentbase.conf.example`**）、`src/requirements*.txt`（含 **`bcrypt>=4,<5`**）（均**只读**） |
 | 凭据纪律 | 本文件**不含任何真实凭据 / 口令 / 令牌**；凡涉及凭据一律写「经环境变量 / EnvironmentFile 注入」；目标机 SSH 口令**不记录** |
 | 执行门控 | 任何目标机写操作（SSH 写 / rsync / scp / apt / pip / systemctl / 服务启动）**在收到 PM 的 `PRODUCTION_DEPLOY_CONFIRM=true` 之前一律禁止**；本轮为纯文档产出，**未连接、未触碰目标机** |
 
 > **冻结决策遵循声明**：本计划的每一条都以下列已冻结决策为准，不拟改。① 后端 Django 5.x + DRF + Waitress/Gunicorn，流式用 Django 原生 `StreamingHttpResponse` 原生 SSE，**不引 Channels / 不引 Redis**；② Qdrant collection-per-project 硬隔离 + payload filter 软隔离，向量端口 11 方法、`scope` 必填；③ bge-m3 `dim=1024`，独立常驻服务 `ib-embed`（形态可逆），**CPU-only**；④ PDF 走 pypdf + pdfminer.six + pypdfium2 + rapidocr-onnxruntime，**严禁 PyMuPDF/fitz**；⑤ `langchain-openai>=0.2,<0.3` 且**装配期 fail-fast 断言**；⑥ 云端 LLM = DeepSeek，凭据只走环境变量；⑦ **禁 Docker**，物理机裸装 + systemd 直管；⑧ 代码交付 `git pull`，**禁 pscp 逐文件上传**。
 >
 > **本轮纪律**：本计划**不执行任何步骤**。所有命令均为**待 PM 确认后**由执行人（或 PHASE_11 的部署代理）在目标机上执行的**计划内容**，不是已执行记录。
+
+> **REV-13 增量声明（本轮，INV-GROUP_E-INTELBASE-004）**：本文件为 **PHASE_10 计划层增量**——**仅更新计划**。**未连接、未触碰目标机 `192.168.31.133`**；**未执行任何 SSH / 写操作 / `git clone` / `apt` / `pip` / `systemctl` / `nginx` 写 / 文件上传**；**未 commit / push**；**未改 `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md`**；**未触发 PHASE_11**（本代理**未**、也**不得**自赋 `PRODUCTION_DEPLOY_CONFIRM`）。R13 增量内容见 **§13**，**所有命令须 PM CONFIRM 后执行**。
+>
+> **门控前置备注（如实登记，待 PM 归口）**：本轮读取时，设计真源文件头 `status` 实测为 **`DRAFT_FOR_GATE_REVIEW`**（`architecture_design.md` 1.5.0/REV-13、`tech_stack.md` 1.4.0/REV-13）；而 `docs/phase_status.md`（权威控制文档）记载 **GROUP_B = APPROVED（GR-B-006）**、**GROUP_C = APPROVED（GR-C-009）**、**GROUP_D = APPROVED（GR-D-010，condition_1「DEFECT-R13-01 已修复并独立复跑闭合」）**。本代理据 phase_status 的**组级 APPROVED** 推进**计划层**；**文件头 status 一致性**登记为本轮 **P1 待澄清项**（不阻塞计划层，但 PHASE_11 执行前须由 PM 归口）。另：`test_report.md` §18 文件副本仍记 **238 pass / 1 fail**（DEFECT-R13-01），与 phase_status 的「已闭合」为**同源不同步**（tests/** 属 test-engineer 制品，本代理不改）——**测试基线以 phase_status 的闭合结论为准 = 239/239**。
 
 ---
 
@@ -48,6 +54,16 @@
 | C-04 | ✅ **已闭合（R4）**：以官方 `.deb` 实际落点 **`/usr/bin/qdrant`** 为唯一规范，已修正 `src/deploy/systemd/qdrant.service` 的 `ExecStart` **一行**；安装后以 `which qdrant` + `systemctl cat qdrant \| diff - <repo>/src/deploy/systemd/qdrant.service`（须为空）为核验门，见 **§3.5 / §7.1** | ADR-03 / tech_stack §4.1 vs unit 文件 |
 | C-05 | ✅ **已闭合（R4）**：单一确定方案 = 软链 `ln -s /opt/intelligentbase/src/ib_embed /opt/ib-embed/ib_embed`（**禁止复制第二份源码**）；创建 / 验证 / 回滚见 **§8.1** | `ib-embed.service`（`WorkingDirectory=/opt/ib-embed` + `-m ib_embed.server`）vs 仓库布局 |
 | C-06 | ✅ **方案已定（R4）**：§6.1 已细化为**有序决策树 + 目标机最小探针优先**，**OCR 与 embedding 两条链路合并评估**；wheel 具体选型仍须目标机实测锁定 | 契约 §10；tech_stack §5.2；`src/requirements-embed.txt` |
+
+### 1.3 REV-13 增量：部署前实测 / 确认项（不阻塞规划，执行前须确认）
+
+| # | 项 | 依据 / 实测要求 |
+|---|----|----------------|
+| **R13-D1** | **`bcrypt` 版本落地**：目标机须落 `bcrypt>=4,<5`（CI/开发机曾装到 **5.0.0**，与 pin 不符） | `phase_status` **MINOR-R13-03**：部署前须把目标机落到 **4.x**，或由 PM 裁决放宽 pin。**不得**以「API 兼容子集 `hashpw/gensalt/checkpw` 可用」代替版本门（checklists B21 / §13.2） |
+| **R13-D2** | **HTTPS 证书策略**：内网自签 / 内网 CA 二选一；证书与私钥**不进仓库**（私钥 **0600**）；**HSTS 仅在受信证书下启用** | `src/deploy/nginx/intelligentbase.conf.example` §证书策略；checklists **B15** |
+| **R13-D3** | **对外 80/443 端口与防火墙放行**（承 C-01）；Qdrant `6333` / ib-embed `8100` **仍仅回环** | ADR-25 / §7.5；checklists A3 / B15 |
+| **R13-D4** | **账户/会话后端确认为 `sqlite`**（非 `memory`）；`IB_AUTHZ_POLICY_MODULE` **显式**指向 `ibweb.accounts.policy`（内置）或接入方模块 | IFC-IB-312 / ADR-22；checklists B9 / B19 |
+| **R13-D5** | **默认管理员初始口令**：由用户生成，**仅**经 **0600 EnvironmentFile** 注入；仓库 / 文档 / 日志 / 测试**零命中** | C-IB-09 / REQ-NFR-IB-15；checklists B18 / B19 |
 
 ---
 
@@ -406,6 +422,23 @@ server {
 
 > **落盘纪律（PHASE_11）**：改站点文件后 **必须先 `nginx -t`（CI/CD 硬门 D-2）通过**，**再** `systemctl reload nginx`；语法错的重载会让对外服务直接不可用。回滚同样须 `nginx -t` 通过后方可 `reload`（见 §10.1 ROLLBACK-009）。
 
+#### 7.5.1 REV-13 增量：HTTPS/TLS 终止站点（**以仓库模板为准**）
+
+> **R13 变更**：用户已把 **HTTPS** 列为部署项（ADR-25 / DR-15）。仓库新增 **`src/deploy/nginx/intelligentbase.conf.example`（IFC-IB-331）** 作为**权威站点模板**，其上为 `80 → 301 https` + `443 ssl`（TLSv1.2/1.3）的 **TLS 终止**形态；上面 §7.5 的 HTTP 骨架降级为**最小示例**（若 PM 决定暂不启用 TLS，则以 §7.5 骨架为准，并**显式记录该决策**）。R13 模板相对 §7.5 骨架的**新增硬条件**：
+
+| # | R13 模板新增项 | 为何是硬条件 |
+|---|----------------|---------------|
+| 1 | `listen 443 ssl;` + `ssl_certificate` / `ssl_certificate_key`（**占位符**） | TLS 终止落点；**证书与私钥不进仓库**（私钥 0600，见 §13.4） |
+| 2 | `80 → return 301 https://$host$request_uri`（ACME 挑战路径先放行） | 明文只存在于回环；浏览器一律走 HTTPS |
+| 3 | `proxy_set_header Authorization $http_authorization;` | 认证**走 Authorization 头、非 Cookie**（DR-10）；缺此则后端一律 401（表现为「本地 OK、线上登录后仍 401」） |
+| 4 | `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` | 供**登录限速**按客户端 IP 计数（IFC-IB-326） |
+| 5 | `proxy_buffering off;`（**保留**，IFC-IB-331） | SSE 不缓冲——**功能正确性硬条件**，流式问答的唯一正确性依赖 |
+| 6 | 前端 **hash 路由**（`createWebHashHistory`）→ 服务端只需 `/` | 少一处「本地能跑、线上刷新 404」的配置依赖；`try_files` 回退仅为保险 |
+| 7 | 安全响应头（`X-Content-Type-Options` / `X-Frame-Options: DENY` / `Referrer-Policy`）；`client_max_body_size 64m` | 基线加固；上传体上限与后端一致 |
+| 8 | `location = /index.html { Cache-Control: no-store }`；`/assets/` 长缓存 | 防发版后加载旧 `index.html` 指向已删除哈希资源 → 白屏 |
+
+> **HSTS 纪律**：`Strict-Transport-Security` **仅在**内网 CA / 受信证书下启用；**自签证书下不得启用**——否则证书链出问题时浏览器在 `max-age` 内拒绝一切降级访问，用户无法通过「继续访问」恢复，**排障路径被自己封死**（B15 验收点）。
+
 ### 7.6 EnvironmentFile 注入方式（**凭据不落 git**）
 
 ```bash
@@ -539,8 +572,9 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 | **DEPLOY-008** | `ib-worker` 安装 unit、启动 | **ROLLBACK-008** | `systemctl disable --now ib-worker` |
 | **DEPLOY-009** | nginx 站点（`/etc/nginx/sites-available/intelligentbase`：静态 `dist/` 托管 + `/api`、`/healthz` 反代 `127.0.0.1:18080` + **SSE `proxy_buffering off`**，见 §7.5）+ 静态产物 `dist/` 就位 | **ROLLBACK-009** | 回滚 = 恢复**上一版**站点文件（离线备份）→ **`nginx -t` 必须通过** → `systemctl reload nginx`；恢复上一版 `dist/`。**回滚同样须 `nginx -t` 通过后方可 `reload`**（不得带语法错误重载，否则对外服务直接不可用） |
 | **DEPLOY-010** | 部署后验证（§11） + DeepSeek smoke（§9） | **ROLLBACK-010** | 若冒烟失败 → 按 §10.2 决策树整体回滚 |
+| **DEPLOY-011 ~ 016** | **REV-13 增量步骤**（bcrypt 依赖 / 003 迁移 / R13 环境变量 / 默认管理员播种 / nginx HTTPS / 令牌纪律校验）—— 正向定义见 **§13.6** | **ROLLBACK-011 ~ 016** | **R13 逆操作**（详见 **§13.7**；逆序执行，含 `[MANUAL_ROLLBACK_REQUIRED]` 项） |
 
-> **逆序纪律**：一旦某步失败，**立即停止后续步骤**，从该步向 DEPLOY-001 **逆序**回滚，并记录每一步结果。
+> **逆序纪律**：一旦某步失败，**立即停止后续步骤**，从该步向 DEPLOY-001 **逆序**回滚，并记录每一步结果。**R13 步骤（DEPLOY-011~016）同样适用**：失败即从该步逆序回滚（先 ROLLBACK-016 → … → ROLLBACK-011），**不跳步**。
 
 ### 10.2 按变更类型的回滚动作
 
@@ -591,6 +625,7 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 - **B12**：四自研单元 active + **nginx `nginx -t` 通过且站点含 `proxy_buffering off`（C-02）** + `/healthz`=200 + 前端产物就位。
 - **B13**：SSE 并发容量（[TBD-T15]）：**超出明确 503，不排队**。
 - **B14**：日志纪律抽查——**零命中** `Bearer /token= /password /api-key`；**无问句正文、无片段原文、无完整向量**。
+- **B15~B20（R13 增量；IFC-IB-332）**：**B15** HTTPS 生效（`http→301` / `https→200`；HSTS 与证书策略一致；证书/私钥 0600 且不在仓库）；**B16** 零 `Set-Cookie`（DR-10）；**B17** `?token=` / `?access_token=` 全端点（含 R13 新增）**4xx**；**B18** 默认管理员首登强制改密（服务端受限会话；绕过前端同被 403；改密撤销其它会话）；**B19** `EnvironmentFile` **0600** + `IB_DEFAULT_ADMIN_PASSWORD` **唯一落点**（仓库/日志零命中）；**B20** 迁移可前向可幂等（`--ensure-schema` 连跑无副作用）。—— 详细验收见 **§13.8（V13-1~V13-12）**。
 
 ### 11.3 签署
 
@@ -630,6 +665,193 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 
 ---
 
+## 13. REV-13 增量：账户 / 认证 / HTTPS / 前端商用界面 部署面
+
+> **本节为 REV-13 增量（INV-GROUP_E-INTELBASE-004），仅计划** —— **未连接、未触碰目标机**，**所有命令须 PM CONFIRM 后执行**。
+> 依据：`architecture_design.md` 1.5.0（**ADR-18~27**：账户/会话落点、不透明服务端会话令牌（无 Cookie）、bcrypt 口令存储与首登强制改密、账户↔项目 1:1 绑定、与 AuthzPolicy 端口协作、前端重构与路由、粘贴令牌入口废除、HTTPS 落点、迁移/种子/回滚、登录失败限速与审计）/ `module_design.md` 1.5.0（**IFC-IB-309~332**、AccountStore 第 15 端口 IFC-IB-310）/ `tech_stack.md` 1.4.0（§1.4 客户端键、§2.2 前端依赖许可、§4.5 第 13~18 项）/ `test_report.md` 1.9.0（§18）/ `src/deploy/**`。
+
+### 13.1 R13 交付物清单
+
+| 交付物 | 路径 | 性质 / 交付方式 |
+|--------|------|-----------------|
+| 账户与会话模块 | `src/ib/core/accounts.py`、`src/ib/ledger/accounts.py`、`src/ibweb/accounts/{policy,throttle}.py`、`src/ibweb/{authz,views,urls,composition}.py` | 代码（**`git pull`** 交付） |
+| 账户/会话 DDL 迁移 | `src/deploy/migrations/003_accounts.sql`（**IFC-IB-330**） | 迁移脚本（纯追加） |
+| nginx TLS 终止模板 | `src/deploy/nginx/intelligentbase.conf.example`（**IFC-IB-331**） | 配置模板（占位符） |
+| EnvironmentFile 模板（含 R13 键） | `src/deploy/env.example`、`src/deploy/ib-worker.env.example`（**键集逐键一致**） | 模板（纯占位符） |
+| 验收清单 R13 段 | `src/deploy/checklists.txt` **`[B15]`~`[B20]`** | 核对清单 |
+| 前端（Element Plus 本地打包 + vue-router + Claude 主题 + 中文） | `src/frontend/**` → `dist/` | **构建产物**（`dist/` 不入 git） |
+
+### 13.2 依赖与迁移（bcrypt / 003_accounts.sql）
+
+- **新依赖 `bcrypt>=4,<5`**（`src/requirements.txt` 已 pin，`src/requirements-offline.txt` 同 pin）。**只使用** `hashpw` / `gensalt` / `checkpw` 三个函数；**不用** Django `contrib.auth` / ORM。
+- **迁移 = 纯追加**：`003_accounts.sql` 只 `CREATE TABLE IF NOT EXISTS users / sessions` + 索引，**不动任何既有表 / 列**；`users.password_hash` 只承载 **bcrypt 摘要**、`sessions.token_digest` 只承载 **sha256 摘要** —— **绝不落口令 / 令牌原文**（C-IB-09 / ADR-19）。
+- **应用方式（正常部署无需手工执行）**：`ib-web.service` 的 `ExecStartPre`（`python -m ibweb.bootstrap --ensure-schema`）**幂等建表**（对既有 R1/R2 库同样生效）。手工核对（可选）：`sqlite3 /var/lib/intelligentbase/ledger/ledger.sqlite3 < 003_accounts.sql`。
+- **幂等（B20）**：全部 `CREATE ... IF NOT EXISTS`，**重复重放无副作用**（CI 亦以此作迁移门，见 `cicd_pipeline.md` §3.2）。
+- **部署前硬门 D-1（CI/CD）**：迁移脚本须与 `ib/ledger/schema.py::account_ddl_script()` **单源一致**（本文件为「可人工审阅的增量快照」）。
+
+### 13.3 新增环境变量（R13，共 9 键；**逐键登记，全部占位符**）
+
+> 键名权威：`module_design.md` **IFC-IB-312**（R13 增记）。**本表只登记键名与语义，不含任何值**。
+
+| # | 键名 | 语义 | 值 / 注入方式 |
+|---|------|------|---------------|
+| 1 | `IB_ACCOUNT_BACKEND` | 账户存储后端 | `sqlite`（**生产**）/ `memory`（仅离线替身；生产误设表现为「每次重启都要重建账户」而非报错） |
+| 2 | `IB_SESSION_TTL_SECONDS` | 会话有效期（秒） | 默认 `43200`（12h；[TBD-T22] 定稿前取保守值） |
+| 3 | `IB_SESSION_RENEW_WINDOW_SECONDS` | 续期窗口（秒） | 默认 `3600`（仅剩余有效期低于窗口时才真正延长，避免无限续期） |
+| 4 | `IB_PASSWORD_MIN_LENGTH` | 口令最小长度 | 默认 `8`（复杂度另要求大小写 / 数字 / 符号命中 ≥2 类，服务端裁决） |
+| 5 | `IB_DEFAULT_ADMIN_USERNAME` | 默认管理员**用户名** | 默认 `admin`（**用户名非机密**） |
+| 6 | `IB_DEFAULT_ADMIN_PASSWORD` | 默认管理员**初始口令** | **`<REPLACE_ME_generated_random_password>`** —— **仅**经 **0600 EnvironmentFile** 注入（见下） |
+| 7 | `IB_LOGIN_MAX_FAILURES` | 登录失败阈值 | **条件性**（ADR-27 / OQ-IB-12/13 未裁决前**不设置**，保持注释） |
+| 8 | `IB_LOGIN_LOCK_SECONDS` | 登录锁定窗口（秒） | **条件性**：#7 / #8 **必须成对**出现，否则组合根按未启用处理 |
+| 9 | `IB_AUTHZ_POLICY_MODULE`（**R13 语义变更**） | 鉴权策略模块 | 内置账户体系 → `ibweb.accounts.policy`；**必须显式指向**（内置模块**不会**自动启用），否则组合根启动期 `StartupError`（fail-closed） |
+
+**注入纪律（硬约束，对齐 C-IB-09 / REQ-NFR-IB-15 / checklists B19）**：
+
+- 全部经 **0600 `EnvironmentFile`** 注入（`install -m 0600 -o ib-web -g ib-web <repo>/src/deploy/env.example /etc/intelligentbase/ib-web.env`）；`ib-worker.env` 与 `ib-web.env` **键集逐键一致**（同一代码基座另一入口，读同一份配置 / 台账 / 向量库 / LLM / 鉴权键）。
+- **不落盘 / 不回显 / 不进 git**：模板被 git 跟踪，真实值**只在部署机的 0600 文件里**填入；`IB_DEFAULT_ADMIN_PASSWORD` 在仓库 / 文档 / 日志 / 测试（含示例与注释）中**零命中** —— 出现即视为**泄露事故**。
+- **启动期必填校验**：生产库中无管理员且本键为空 → 组合根**启动失败**（fail-closed，不允许「无管理员可登录」的僵死实例）；任一必填项缺失 → **非零码退出 + 只报键名、不回显值**。
+- **口令生成**：`python -c "import secrets;print(secrets.token_urlsafe(18))"`（在部署机执行，生成值不回显到日志 / 终端历史之外）。
+
+### 13.4 nginx HTTPS/TLS 接入（R13）
+
+- **以 `src/deploy/nginx/intelligentbase.conf.example` 为准**（IFC-IB-331，详见 **§7.5.1**）：`80 → 301 https` + `443 ssl`（TLSv1.2/1.3）；静态 `dist/` 于 `/var/www/intelligentbase`；`/api/`、`/healthz` 反代 `127.0.0.1:18080`（`upstream ib_web` + `keepalive 16`）。
+- **三条硬条件**（缺任一即功能静默失效或全站 401）：① **`proxy_buffering off`**（SSE 不缓冲）；② **`proxy_set_header Authorization $http_authorization`**（认证走头、非 Cookie）；③ **`X-Forwarded-For`**（登录限速按客户端 IP 计数）。
+- **证书策略**：内网自签 / 内网 CA；证书与私钥**不进仓库**，私钥 **0600**（建议 root 或专用证书用户）。**HSTS 仅在受信证书下启用**（自签下不启用）。
+- **前端 hash 路由**（`createWebHashHistory`）→ 服务端永远只看到 `/`；`try_files $uri $uri/ /index.html` 仅为保险。
+- **落盘纪律**：`install -m 0644 ... /etc/nginx/sites-available/intelligentbase` → `ln -sfn ... sites-enabled/` → **`nginx -t`（D-2 硬门）通过后**方可 `systemctl reload nginx`；回滚同样须 `nginx -t` 通过后方可 `reload`。
+
+### 13.5 令牌纪律的部署约束（DR-10 / ADR-19）
+
+- 会话令牌**仅经 `Authorization: Bearer <token>` 头**传递；**禁 Cookie / 禁服务端 session**（全站**零 `Set-Cookie`**）。
+- **`?token=` / `?access_token=` 一律 4xx**（含 R13 新增端点 `/api/auth/me`、`/api/auth/logout`、`/api/auth/session/renew`、`/api/accounts`）。理由：查询串会被 nginx / Waitress 访问日志**完整记录**（FreeArk 已因 WS 令牌进查询串**实际泄露过一次**）。
+- 前端令牌**只存 sessionStorage**（非 localStorage、非 Cookie）；登录页**已移除**粘贴访问令牌入口。
+- **日志纪律**：`Bearer `/`token=`/`password`/`api-key` **零命中**；**无问句正文、无片段原文、无完整向量**（checklists B14）。
+
+### 13.6 R13 正向部署步骤（DEPLOY-011 ~ DEPLOY-016）
+
+> 前置：DEPLOY-001~010 已按 §10.1 完成且全绿。**每步失败即从该步逆序回滚**（§13.7）。
+
+---
+**DEPLOY-011: 基座 venv 依赖增量（bcrypt）**
+- **组件**：`ib-web` / `ib-worker`（`src/requirements.txt`）
+- **操作**：`sudo PYTHONUTF8=1 /opt/intelligentbase/venv/bin/pip install -r /opt/intelligentbase/src/requirements.txt`；安装后核验 `pip show bcrypt` 版本**落在 `[4,5)`**。
+- **预期结果**：`bcrypt` 版本 ∈ `[4,5)`；`import bcrypt` 成功；**无** `+cuXXX` 变体被拖入（CPU-only）。
+- **对应回滚**：ROLLBACK-011
+- **备注**：**若目标机落不到 4.x → 暂停并上报 PM**（见 §1.3 R13-D1；不得以「API 子集可用」代替版本门）。
+
+---
+**DEPLOY-012: 账户 / 会话迁移应用（003_accounts.sql，幂等）**
+- **组件**：SQLite 台账（`IB_LEDGER_PATH`）
+- **操作**：`/opt/intelligentbase/venv/bin/python -m ibweb.bootstrap --ensure-schema`（**幂等**建表）；**连跑两次**确认重放无副作用。
+- **预期结果**：`users` / `sessions` 两表存在（`sqlite3 ... ".tables"` 命中）；两次执行均退出码 0；既有表 / 列未变。
+- **对应回滚**：ROLLBACK-012
+- **备注**：**纯追加**，正常路径**无需**破坏性 DDL。
+
+---
+**DEPLOY-013: R13 环境变量经 0600 EnvironmentFile 注入**
+- **组件**：`ib-web` / `ib-worker`（`/etc/intelligentbase/{ib-web,ib-worker}.env`）
+- **操作**：`install -m 0600 -o <run-user> -g <group> <repo>/src/deploy/env.example /etc/intelligentbase/ib-web.env`（并对 `ib-worker.env` 同法）；按 §13.3 填 9 个 R13 键（**占位符 → 真实值只在此处**）。
+- **预期结果**：`stat -c '%a %U:%G'` = `600 <run-user>:<group>`；`IB_ACCOUNT_BACKEND=sqlite`；`IB_AUTHZ_POLICY_MODULE` 已显式设置；`IB_DEFAULT_ADMIN_PASSWORD` **仅**在此文件出现。
+- **对应回滚**：ROLLBACK-013
+- **备注**：**含凭据**——文件须在版本控制之外**另存离线备份**。
+
+---
+**DEPLOY-014: 默认管理员播种 + 首登强制改密（校验）**
+- **组件**：组合根装配（IFC-IB-314 幂等种子）
+- **操作**：启动 `ib-web`（装配期执行幂等种子）；以默认管理员登录一次，确认返回**受限会话**且 `must_change_password=true`；**不在任何输出中记录初始口令**。
+- **预期结果**：模拟登录 → 200 + 令牌；受限会话调其它端点 → **403**；改密后受限解除；**种子幂等**（重启不覆盖既有口令）；库中无管理员且键为空 → **启动失败**（fail-closed）。
+- **对应回滚**：ROLLBACK-014
+- **备注**：口令值**绝不**出现在日志 / 文档 / 响应。
+
+---
+**DEPLOY-015: nginx HTTPS/TLS 站点接入 + 静态前端产物就位**
+- **组件**：系统 `nginx`（非自研 unit）
+- **操作**：`install -m 0644 <repo>/src/deploy/nginx/intelligentbase.conf.example /etc/nginx/sites-available/intelligentbase` → `ln -sfn ... sites-enabled/` → 部署证书（私钥 0600）→ **`nginx -t`（D-2）** → `systemctl reload nginx`；同步 `dist/` 至 `/var/www/intelligentbase/`。
+- **预期结果**：`nginx -t` **exit 0**；`http → 301 https`；`https://<host>/healthz` = **200**；站点含 **`proxy_buffering off`** 与 **`Authorization` 透传**；`index.html` 不缓存、`/assets/` 长缓存。
+- **对应回滚**：ROLLBACK-015
+- **备注**：**`nginx -t` 是 `reload` 的硬前置**——带语法错误重载会让对外服务**立即不可用**。
+
+---
+**DEPLOY-016: 令牌纪律与前端自包含校验**
+- **组件**：传输层 + 前端产物
+- **操作**：按 checklists **B16/B17** 全端点扫描：`Set-Cookie` 零命中；`?token=` / `?access_token=` **全 4xx（非 200）**；`Authorization` 头 SSE 返回 `text/event-stream`；前端产物**零运行时 CDN**（Element Plus 本地打包）。
+- **预期结果**：**零** `Set-Cookie`；`?token=` 全端点 4xx；SSE 经头认证可用；`dist/` 自包含、无外网引用。
+- **对应回滚**：ROLLBACK-016
+- **备注**：见 §13.5。
+
+---
+
+### 13.7 R13 回滚步骤（ROLLBACK-011 ~ ROLLBACK-016；**逆序执行**）
+
+> 逆操作是正向步骤的**严格逆操作**；**逆序**：最后一个部署的组件最先回滚（016 → 015 → … → 011）。
+
+---
+**ROLLBACK-011: 回退 bcrypt 依赖（逆 DEPLOY-011）**
+- **回滚操作**：按 `pip freeze` 备份重建 venv，或 `pip install "bcrypt<4"` / 移除增量；**依赖备份**：DEPLOY-011 前已 `pip freeze > requirements.lock.bak`。
+- **预期结果**：依赖恢复至 DEPLOY-011 前状态；`ib-web` 可起。
+
+---
+**ROLLBACK-012: 回退账户 / 会话迁移（逆 DEPLOY-012）**
+- **回滚操作**：**首选 = 代码回滚**（回退 `git checkout <上一版 commit>`；**旧代码不引用新表，可直接启动**，无需破坏性 DDL）。**仅在未投产且确需清空时**：`DROP TABLE users; DROP TABLE sessions;`。
+- **预期结果**：旧代码正常启动；新表不被引用。
+- **备注**：`[MANUAL_ROLLBACK_REQUIRED: DROP TABLE 属破坏性操作，丢数据，须人工确认 + 先备份当前台账]`。
+
+---
+**ROLLBACK-013: 恢复上一版 EnvironmentFile（逆 DEPLOY-013）**
+- **回滚操作**：恢复上一版 **0600** `ib-web.env` / `ib-worker.env` 的**离线备份**（必须在版本控制之外另存）。
+- **预期结果**：环境变量恢复至注入前状态；权限仍为 0600。
+- **备注**：**凭据文件不得进版本控制**。
+
+---
+**ROLLBACK-014: 回退默认管理员播种（逆 DEPLOY-014）**
+- **回滚操作**：恢复播种前台账**离线快照**；或将该账户 `status` 置 `disabled`（**保留审计**，不物理删除）。
+- **预期结果**：默认管理员回到播种前状态 / 被停用；不影响其它数据。
+- **备注**：种子为幂等 `INSERT ... DO NOTHING`，**无部分写入**；`[MANUAL_ROLLBACK_REQUIRED: 台账快照恢复属破坏性操作，须人工确认]`。
+
+---
+**ROLLBACK-015: 恢复上一版 nginx 站点与静态产物（逆 DEPLOY-015）**
+- **回滚操作**：恢复上一版 `/etc/nginx/sites-available/intelligentbase`（离线备份）→ **`nginx -t` 通过** → `systemctl reload nginx`；恢复上一版 `dist/`。
+- **预期结果**：站点恢复；对外服务可用；**SSE 段 `proxy_buffering off` 复验仍在**（缺此项 = 流式静默失效）。
+- **备注**：**`nginx -t` 是 `reload` 的硬前置**。
+
+---
+**ROLLBACK-016: 回退令牌纪律校验（逆 DEPLOY-016）**
+- **回滚操作**：**无独立副作用**——随 ROLLBACK-015（nginx 站点）或代码回滚（`git checkout`）一并回退；若为前端产物问题，恢复上一版 `dist/`。
+- **预期结果**：传输层与前端恢复至上一版行为。
+- **备注**：令牌纪律**不得**作为「对调参数」被放松（DR-10 为冻结决策）。
+
+---
+
+### 13.8 R13 部署后验证项（Post-deployment Verification，R13 增量）
+
+| # | 检查项 | 检查方法（命令 / URL / 工具） | 成功标准 | 对齐 |
+|---|--------|------------------------------|----------|------|
+| V13-1 | **HTTPS 生效** | `curl -o /dev/null -w '%{http_code}' http(s)://<host>/healthz` | http = **301**（或 444）、https = **200** | B15 |
+| V13-2 | **零 Cookie** | `curl -D - -o /dev/null -k https://<host>/api/auth/login`（及 /healthz、/api/files）| **零 `Set-Cookie`** | B16 / DR-10 |
+| V13-3 | **`?token=` 全 4xx** | 对 `/api/files`、`/api/chat/stream`、`/api/auth/me`、`/api/auth/logout`、`/api/auth/session/renew`、`/api/accounts` 附 `?token=x` | **全部 4xx（非 200）** | B17 |
+| V13-4 | **Authorization 头可用** | `curl -H "Authorization: Bearer <令牌>" https://<host>/api/auth/me` | 200；SSE 端点返回 `text/event-stream` | B17 / B10 |
+| V13-5 | **默认管理员首登强制改密** | 登录 → 受限会话调其它端点 | 受限态 **403**；**绕过前端直接调接口同样 403**（服务端为强制者） | B18 / ADR-20 |
+| V13-6 | **改密后撤销其它会话** | 改密成功后，旧令牌再请求 | 旧令牌 → **401** | B18 |
+| V13-7 | **运维账户项目隔离** | ops 账户访问非本 `project_id` 资源 | **403 / 404**（跨项目不可见） | checklist / REQ-FUNC-IB-32 |
+| V13-8 | **令牌过期与续期** | TTL 过期后请求；窗口内调 `/api/auth/session/renew` | 过期 → **401**；窗口内 → 续期成功；窗口外 → 不延长 | IFC-IB-312 / [TBD-T22] |
+| V13-9 | **迁移幂等** | `python -m ibweb.bootstrap --ensure-schema` 连跑两次 | 两次均 exit 0；`users`/`sessions` 存在且无重复 | B20 |
+| V13-10 | **前端商用界面可用** | 浏览器访问 `https://<host>/`：登录 → 运维台（左导航 + 右内容 + 暗/亮主题 + 中文） | 登录后进入控制台；**零粘贴令牌入口**；刷新无 404 | NV-07 / B12 |
+| V13-11 | **凭据纪律** | `git grep -n 'IB_DEFAULT_ADMIN_PASSWORD=' -- . \| grep -v REPLACE_ME`；`stat -c '%a' /etc/intelligentbase/ib-web.env` | 仓库零命中；env 文件 **600** | B19 |
+| V13-12 | **日志纪律** | 抽查 nginx / waitress 访问日志 | 零 `Bearer `/`token=`/`password`/`api-key`；无问句正文 / 片段原文 | B14 |
+
+### 13.9 R13 风险（增量）
+
+| # | 风险 | 影响 | 缓解 |
+|---|------|------|------|
+| **R13-R1** | **`bcrypt` pin 漂移**（本机装到 5.0.0 ≠ `>=4,<5`） | 版本门失效；CI/生产不一致 | DEPLOY-011 强制核验版本 ∈ `[4,5)`；落不到即暂停上报（§1.3 R13-D1） |
+| **R13-R2** | **HTTPS 证书链问题** | 浏览器拒访；HSTS 开启时无法降级排障 | 自签下**不启用 HSTS**；内网 CA 根证书预置到客户端信任库（§7.5.1 / B15） |
+| **R13-R3** | **nginx 遗漏 `Authorization` 透传 / `proxy_buffering off`** | 全站 401 / 流式静默失效 | D-2 / D-3 硬门 + V13-4 / V13-1 复验（§13.4） |
+| **R13-R4** | **默认管理员初始口令泄露**（误提交 / 误回显） | 高危凭据事故 | 仅 0600 注入；V13-11 / B19 零命中扫描；若曾误提交 → **改口令不足以消除影响，须认定泄露并轮换**（checklists B19 警告） |
+| **R13-R5** | **登录限速（IP 维度）条件性未启用**（OQ-IB-12/13 未裁决；DEFECT-R13-01 已修复但功能键仍注释） | 暴力破解面 | 保持两键**成对**；裁决后启用；checklists B18 的 429 分支（[TBD-T22]） |
+| **R13-R6** | **业务端口误对外** | 明文 / 未授权直连 | `ib-web` 仍绑 `127.0.0.1:18080`；Qdrant 6333 / ib-embed 8100 仅回环；nginx 为唯一对外入口（纵深防御第一层） |
+
+---
+
 ## 附：本轮的自我约束声明
 
 - 本文件为**计划**，**未执行任何目标机写操作**；**未连接** `192.168.31.133`；**未** SSH / rsync / scp / apt / pip / systemctl；**未触碰** `tests/`、`architecture/`、`requirements/`、`docs/phase_status.md`（PM 独占）、FreeArk 仓库（严格只读）。
@@ -637,6 +859,7 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 - 所有命令均为**计划内容**，标注「须 PM CONFIRM 后执行」。
 - 全文**不含任何真实凭据 / 口令 / 令牌**；SSH 口令以「日后经环境变量注入」表述；主机指纹为**非 secret** 的 host key 校验值，按任务要求登记。
 - **PHASE_11（实际生产部署）保持 PENDING，禁止执行**，直至收到 PM 的 `PRODUCTION_DEPLOY_CONFIRM=true`（且建议先闭合 `FND-GROUP-D-03`）。
+- **REV-13 增量边界（本轮，INV-GROUP_E-INTELBASE-004）**：本代理**未连接、未触碰** `192.168.31.133`；**未执行**任何 SSH / 写操作 / 安装 / 服务启停 / `nginx` 写；**未 commit / push**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md`；**未触发 PHASE_11**（**未**自赋 `PRODUCTION_DEPLOY_CONFIRM`）。本节（§13）**只登记计划与回滚**，全部命令须 PM CONFIRM 后执行。
 
 ---
 
@@ -646,5 +869,7 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 |------|------|------|---------|----------|----------|
 | 1.0.0 | PHASE_10 首版 | 2026-09-26 | INV-GROUP_E-INTELBASE-001 | 首版（GR-E-001 = PASS_WITH_CONDITIONS，**对该 R4 前版本有效**） | architecture / module_design / tech_stack / ib_embed 契约 / `src/deploy/**` |
 | 1.1.0 | GROUP_E / R4（REV-04-3） | 2026-09-26 | INV-GROUP_E-INTELBASE-002 | **C-02**：§7 改题 + 新增 §7.5 nginx（第 5 交付组件）；§10.1 DEPLOY-009 与 §10.2 补 nginx 行。**C-03**：§7.4 / §7.6 改用新增的 `ib-worker.env.example`。**C-04**：§7.1 / §3.2 / §3.5 统一 Qdrant 二进制路径。**C-05**：新增 §8.1 软链方案。**C-06**：§6.1 重写为有序决策树。**B-05**：§1.1 / §2.2 / §4.2 反映 `src/requirements-embed.txt`。§1.2 C-02~C-06 标状态；§11 / §12 更新；status → REVISED_PENDING_REVIEW | `settings.py` 无 `STATIC_ROOT`（已核验）；`vite.config.ts` 生产注释（反代 127.0.0.1:18080）；`ib-worker.service:42`；`qdrant.service:35`；`ib-embed.service`（WorkingDirectory/ExecStart）；`src/requirements-embed.txt` |
+| **1.2.0** | **GROUP_E / REV-13** | **2026-10-06** | **INV-GROUP_E-INTELBASE-004** | **REV-13 增量（认证 / 会话 / 多项目运维账户 / Claude 风格可商用前端 / HTTPS）**：① header 补 revision=REV-13、上游输入升 R13、新增「REV-13 增量声明 + 门控前置备注」；② 新增 **§1.3**（R13 部署前实测项 R13-D1~D5）；③ 新增 **§7.5.1**（HTTPS/TLS 终止站点，以 `src/deploy/nginx/intelligentbase.conf.example` 为准 + 8 项新增硬条件 + HSTS 纪律）；④ §10.1 补 DEPLOY-011~016 / ROLLBACK-011~016 行（明细见 §13）；⑤ 新增 **§13**「REV-13 增量部署面」（13.1 交付物 / 13.2 bcrypt+003 迁移 / 13.3 九键环境变量（0600 注入，含 `IB_DEFAULT_ADMIN_PASSWORD`）/ 13.4 nginx HTTPS / 13.5 令牌纪律 / 13.6 正向步骤 DEPLOY-011~016 / 13.7 回滚 ROLLBACK-011~016 / 13.8 验证 V13-1~12 / 13.9 风险 R13-R1~R6）；⑥ 附自检补 R13 边界；status → REVISED_PENDING_REVIEW | `architecture_design.md` 1.5.0/REV-13（ADR-18~27）；`module_design.md` 1.5.0/REV-13（IFC-IB-309~332）；`tech_stack.md` 1.4.0/REV-13（§1.4 / §2.2 / §4.5）；`test_report.md` 1.9.0/§18；`src/deploy/migrations/003_accounts.sql`；`src/deploy/nginx/intelligentbase.conf.example`；`src/deploy/env.example`（R13 键）；`src/deploy/checklists.txt` [B15]~[B20]；`src/requirements.txt`（`bcrypt>=4,<5`）；`docs/phase_status.md`（GR-B-006 / GR-C-009 / GR-D-010） |
 
-> 本修订为**纯文档 / 部署产物修订**：**未执行**任何部署步骤，**未连接、未触碰**目标机 `192.168.31.133`。`src/` 仅按授权改动上述两处。
+> 本修订为**纯文档 / 部署产物修订**：**未执行**任何部署步骤，**未连接、未触碰**目标机 `192.168.31.133`。
+> **1.2.0（REV-13）本轮边界**：**未连接、未触碰**目标机；**未 commit / push**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md`；**未触发 PHASE_11**。本轮**未改任何 `src/` 交付物**（R13 交付物由 GROUP_C 产出，本代理只读引用）。
