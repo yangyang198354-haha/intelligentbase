@@ -59,7 +59,10 @@ server {
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
-    http2 on;
+    # **不开 http2**（R15 根因）：nginx 的 HTTP/2 实现会破坏 SSE 流式传输 ——
+    # 响应体字节已发送并计入 access_log，但 END_STREAM 终止信号不送达浏览器，
+    # 前端 fetch 的 ReadableStream 永不结束 → 「生成中…」卡死。HTTP/1.1 下 SSE
+    # 才能正确收尾。禁用后 TLS 仍走 ALPN 协商，浏览器自动回退 HTTP/1.1，功能无损。
     server_name <REPLACE_ME_host>;
 
     # --- 证书策略（IFC-IB-331）------------------------------------------------
@@ -133,6 +136,13 @@ server {
         proxy_read_timeout 300s;
         proxy_send_timeout 300s;
         chunked_transfer_encoding on;
+        # HTTP/1.1 上游 keepalive：必须清空 Connection 头，否则 nginx 透传客户端的
+        # Connection 头，破坏 upstream keepalive 16 的复用（R15 一并修复）。
+        proxy_set_header Connection "";
+        # SSE 响应绝不压缩：gzip 会缓冲 chunked 流（即便 proxy_buffering off）。
+        # 当前全局 gzip_types 未含 text/event-stream 故未触发；此处显式关闭，
+        # 防止未来有人把 event-stream 加进 gzip_types 后复现「生成中…」卡死。
+        gzip off;
     }
 
     location /healthz {
