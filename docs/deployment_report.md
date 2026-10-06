@@ -346,3 +346,47 @@ fail-closed 503。**无数据泄露**（未选项目即不返回文档），但 
 - **「登录 → 项目选择器选 `demo` → 可视化配置页定义文档返回 200」点击式闭环延后到用户本人登录后执行**：
   admin 首登口令已由用户修改，部署方不持有当前口令，且读取生产账户/会话库被权限系统拦截（不触碰生产凭据）。
   用户登录后右上角项目选择器应可见全部项目，选定 `demo` 后原「定义文档当前不可读」页面应正常加载。
+
+---
+
+## 12. 资料管理 PDF 上传失败修复（`cold_batch_size` 配置调优，无代码改动）
+
+**执行时间**：2026-10-06。**代码变更**：无（纯生产配置调优，无 commit）。
+
+### 背景与根因
+
+用户在资料管理上传一个 PDF 后结果失败（`E_EMBED`）。排查确认两个事实叠加：
+
+1. **嵌入推理是硬件瓶颈**：bge-m3（XLM-RoBERTa-large，约 560M 参数）在目标机 i7-3770S
+   （2012 年、仅 AVX、4C/8T）上做稠密推理，实测单条 630 字文本约 **5.3s**，且批量耗时随条数
+   **严格线性**（1/2/4/8 条 = 5.3/10.1/20.2/39.9s）——说明 4 核早已吃满，加线程无益。
+2. **单批超时**：生产 `chunk_size=800`、`embedding.cold_batch_size=16`，一批 16 块 ≈ 100s，
+   远超 ib-embed 硬编码的单批推理预算 `INFERENCE_BUDGET_S=60`（`src/ib_embed/server.py`）→ 60s 时
+   返回 504 `inference_timeout` → 客户端 `cold_max_retries=3` 耗尽 → `E_EMBED`。
+
+### 修复内容
+
+- 将 `/etc/intelligentbase/config.json` 的 `embedding.cold_batch_size` 由 `16` 调为 `6`
+  （一批 6 块 ≈ 30s，稳定落在 60s 预算内）。因推理耗时线性，**改小批量不损失总吞吐**
+  （总时间 = 块数 × 5~6s，与批量无关），只是每批更早返回、不再撞超时。
+- **纯配置、可逆、无代码改动**；原文件已备份 `config.json.bak-<时间戳>`，可回滚。
+
+### 部署动作
+
+| 步骤 | 结果 |
+|------|------|
+| 备份 | ✅ `cp config.json config.json.bak-20261006151734` |
+| 改配置 | ✅ `cold_batch_size 16 → 6`（正则只改该键一行，保留其余格式），读回确认 `= 6` |
+| 服务重启 | ✅ `systemctl restart ib-web ib-worker` → 均 `active` |
+| 复验 | ✅ 直测 `/embed` 一批 6 条 → **30.1s 200 OK**（`elapsed_ms=30096`；对照原 16 条 ≈ 100s → 504） |
+
+### 未闭合 / 待用户复验
+
+- **用户对失败文档点「重试」的端到端闭环**：本次未代执行，留待用户本人重试上传
+  （文档 `365821c0f8c0453ea9ff084d485051b9`）。
+
+### 顺带发现（不阻塞，建议暂不动）
+
+- `IB_EMBED_THREADS` 配置键对生产实际使用的 FlagEmbedding 后端是**空操作**：`src/ib_embed/runtime.py`
+  中仅 `_OnnxRuntime` 读取 `cfg.threads`，`_FlagEmbeddingRuntime`（生产路径）从不读它。真要修复需改代码
+  （FlagEmbedding 路径 `torch.set_num_threads`）+ 走 git 交付重部署；且实测线程并非瓶颈，故本轮未改。
