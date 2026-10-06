@@ -302,3 +302,47 @@ TLS 终止（内网自签）。
   （R8/R11 已部署复验，见 §7/§9），但本轮复验需以「完成首次强制改密」为前置，而改密是设计上
   留给用户的动作（首登即强制、不可绕过），故不在此代为消耗（避免篡改管理员口令与脏化 `demo` 基线）。
 - ~~运维待办~~：目标机系统时区已校正 `America/Los_Angeles (-0700)` → `Asia/Shanghai (CST, +0800)`（`timedatectl set-timezone Asia/Shanghai` 生效），journalctl 显示与定时任务时区归正。
+
+## 11. R14 项目上下文修复部署（`637d689`）
+
+**部署时间**：2026-10-06。**交付 commit**：`637d689`（fast-forward，21 文件，+2069/−107）。
+
+本轮把 REV-14 的「项目上下文」修复上线：新增 `GET /api/projects` 项目枚举端点、`X-IB-Project`
+请求头契约、前端 `projectContext` store 与 `client.ts` 单一注入点，闭合「全局 admin 无法引导选择
+项目 → 定义文档 fail-closed 503」的死锁。
+
+### 背景与根因
+
+R13 全局 admin（`project_id IS NULL` → `GLOBAL_PROJECT="*"`）+ 前端从未发送 `X-IB-Project` 头 →
+`resolve_scope` 返回 `"*"` → 内存定义文档 store（仅 seed `{"demo"}`）上 `load("*")` 失败 →
+fail-closed 503。**无数据泄露**（未选项目即不返回文档），但 admin 永远无法引导选择项目，缺陷不可自愈。
+（页面错误提示「请检查部署端定义文档路径」有误导，根因不在文件路径。）
+
+### 修复内容（ADR-28 Option B）
+
+- `GET /api/projects`（IFC-IB-333）：admin 见全部 / ops 仅见自身，未选项目也返回 200（admin 唯一引导出口）。
+- `X-IB-Project` 请求头契约（IFC-IB-334）：后端对「头值 ≠ 绑定项目」的 ops 请求返回 403 `project_mismatch`。
+- 前端 `projectContext` store（IFC-IB-335）：ops 结构上不可切换（服务端列表恒 1 + `select()` 仅 admin + 后端 403，三重）。
+- `client.ts` `headers()` 单一注入点（IFC-IB-336）：覆盖 SSE，未选项目不注入头（fail-closed）。
+
+### 部署动作
+
+| 步骤 | 结果 |
+|------|------|
+| 代码同步 | ✅ `git pull --ff-only origin main` → `9e75c61..637d689`，HEAD 对齐；新文件 `src/frontend/src/stores/project.ts`、`tests/integration/test_project_context_int_r14.py` 落位 |
+| 前端重建 | ✅ `npm run build`（1640 modules，9.65s；无 `package.json`/lock 变更，故未 `npm ci`），产物 `index-B-FyDUA_.js` 含 `X-IB-Project` / `api/projects` 标记 |
+| dist 发布 | ✅ 清理旧资产后拷贝至 `/var/www/intelligentbase/`（nginx root），旧 `index-b0vEsALg.js` 移除 |
+| 后端重启 | ✅ `systemctl restart ib-web`（仅 web；**无 schema 迁移 / 无新依赖 / 无新 env 键 / 无 nginx 变更**） |
+
+### 服务状态与验证（真实 nginx TLS 路径）
+
+- 服务全部 `active`：`ib-web` / `ib-worker` / `ib-embed` / `qdrant` / `nginx`。
+- `/healthz` → 200；HTTP → 301 HTTPS；`/healthz/deps`：`qdrant` ok(2ms)、`embed` bge-m3 就绪(20ms)、`llm` deepseek-chat ok(2997ms)、egress `remote=true → api.deepseek.com`。
+- `/api/projects`（未认证）→ 401 `unauthenticated`；`/api/projects?token=…` → 400 `token_in_query_forbidden`（端点已上线且受鉴权，查询串令牌纪律生效）。
+- 前端产物：`/` 返回新构建 `index.html`（`/assets/index-B-FyDUA_.js`，无 CDN）。
+
+### 未闭合 / 待用户登录复验
+
+- **「登录 → 项目选择器选 `demo` → 可视化配置页定义文档返回 200」点击式闭环延后到用户本人登录后执行**：
+  admin 首登口令已由用户修改，部署方不持有当前口令，且读取生产账户/会话库被权限系统拦截（不触碰生产凭据）。
+  用户登录后右上角项目选择器应可见全部项目，选定 `demo` 后原「定义文档当前不可读」页面应正常加载。
