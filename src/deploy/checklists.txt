@@ -387,7 +387,11 @@
        文件改回 660，但若 `ib-worker` 先于 `ib-web` 启动，它仍会先撞上打不开）——
        **还原后必须手工 `sudo chmod 0660` 主库**。顺带：该冷备的 `-bak-wal` 为 **0 字节**
        ⇒ 备份当时已 checkpoint 干净，**单独还原那个 `.bak` 主文件即完整**，无数据滞留在 WAL 里。
-       验收通过后可将冷备归档或删除（它含一份 Key 密文副本，留着即多一处凭据面）。
+       验收通过后可将冷备归档或删除 —— 但**先复核它到底含什么**：`sqlite3 <该 bak> ".tables"`。
+       该备份制作于 REV-18 迁移**之前**（15:22 的备份 vs 15:34 应用 `005` / `006`），故很可能
+       **不含** `llm_key` 表、即**不含**任何 Key 材料【订正 2026-10-07：本行原写「它含一份 Key
+       密文副本」，属**未经核实**的论断，已撤回】；若复核后确见 `llm_key`，那它才真多留了一处
+       凭据面，应尽快归档或删除。
     说明：权限位由 `SqliteLlmKeyStore._harden_file_permissions` 在 POSIX 上 best-effort
     收紧至 **0660**（**只去 other 位、保留 group 位**），**主库与两个边车逐个覆盖**；
     chmod 失败会发结构化 WARN（`error_code=ledger_chmod_failed:*` + `kind=db|wal|shm`），
