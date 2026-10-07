@@ -158,15 +158,46 @@ def test_TC_INT_034_upload_validation_400(http_app):
     assert r.status_code == 400 and json.loads(r.content)["error"]["code"]
 
 
-def test_TC_INT_035_upload_to_foreign_kb_403(http_app):
-    """[TC-INT-035] kb_id 不属于本项目 → 403 且不留下痕迹（AC-IB-03-*）。"""
+def test_TC_INT_035_upload_kb_derived_from_subject(http_app):
+    """[TC-INT-035] REV-18（IFC-IB-375 / ADR-41）：**请求体 kb 字段被忽略**，`kb_id` 由主体推导。
+
+    ADR-41 把「kb_id 由客户端提交、服务端仅断言归属」改为「`kb_id ≡ project_id`，
+    请求体不再接收 kb 字段」——客户端**不可自证范围**。故本用例从「越权 kb → 403」改写为
+    「提交 `kb_id=kb_b`（属 p_beta）时该字段**被忽略**，落库 kb_id 为**主体项目** `p_alpha`」。
+    这既守住「范围只认服务端结论」，也让「上传到外项目 KB」在**结构上不可达**（比 403 更强）。
+
+    归属断言路径见 `test_TC_INT_035b_assert_kb_in_project_retained`（`assert_kb_in_project` 保留，
+    失败仍 403 —— 红线不削弱）。
+    """
     from django.core.files.uploadedfile import SimpleUploadedFile
 
     client = _client(http_app)
     up = SimpleUploadedFile("x.txt", "内容".encode("utf-8"))
-    r = client.post("/api/files", {"kb_id": "kb_b", "file": up}, **AUTH)  # kb_b 属 p_beta
-    assert r.status_code == 403, r.content
-    assert json.loads(r.content)["error"]["code"]
+    r = client.post("/api/files", {"kb_id": "kb_b", "file": up}, **AUTH)  # kb_b 属 p_beta → 应被忽略
+    assert r.status_code == 201, r.content
+    record = json.loads(r.content)
+    assert record["kb_id"] == "p_alpha", "kb_id 必须由主体 project_id 推导（kb_b 应被忽略）"
+
+
+def test_TC_INT_035b_assert_kb_in_project_retained(http_app):
+    """[TC-INT-035b] REV-18（C-IB-43）：`assert_kb_in_project` 归属断言**保留**且失败仍 403。
+
+    直测台账端口（HTTP 层因 `kb_id ≡ project_id` 已结构上不可达外项目 kb，故在端口层
+    证明断言未被削弱）：`assert_kb_in_project("p_alpha", "kb_b")`（kb_b 属 p_beta）
+    → 抛 `ScopeViolationError`（→ HTTP 403，非 404，反存在性探测）。
+    """
+    deps = http_app[0]
+    from ib.core import ScopeViolationError
+
+    # 归属合法（kb_id ≡ project_id）：p_alpha 的 kb 行由 _seed_projects 登记为 "p_alpha"。
+    deps.ledger.assert_kb_in_project("p_alpha", "p_alpha")
+    # 归属非法（跨项目 kb）：必须 fail-closed 抛 ScopeViolationError（→ 403）。
+    raised = False
+    try:
+        deps.ledger.assert_kb_in_project("p_alpha", "kb_b")
+    except ScopeViolationError:
+        raised = True
+    assert raised, "assert_kb_in_project 未对外项目 kb 抛 ScopeViolationError（红线被削弱？）"
 
 
 # --------------------------------------------------------------------------- #

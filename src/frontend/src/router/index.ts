@@ -1,6 +1,7 @@
 /**
  * @module MOD-IB-24
  * @implements IFC-IB-327 登录页路由 + IFC-IB-328 控制台外壳路由 + 路由守卫
+ *             IFC-IB-376（REV-18）父级「系统管理」节点 + 三子项（账户 / 项目 / LLM Key）+ 旧路由迁移
  * @depends MOD-IB-24（app/env 单例）
  * @author software-developer
  *
@@ -33,6 +34,10 @@ import UploadPage from '../views/UploadPage.vue';
 import RebuildPage from '../views/RebuildPage.vue';
 import ConfigPage from '../views/ConfigPage.vue';
 import AccountsPage from '../views/AccountsPage.vue';
+// REV-18（IFC-IB-376 / ADR-42）：系统管理三分 IA 的父级容器与新页面。
+import SystemSection from '../views/SystemSection.vue';
+import ProjectsPage from '../views/ProjectsPage.vue';
+import LlmKeyPage from '../views/LlmKeyPage.vue';
 
 /** 公共路由（不需要登录）。 */
 const PUBLIC_ROUTES = new Set(['login']);
@@ -87,13 +92,38 @@ const routes: RouteRecordRaw[] = [
         props: () => ({ client }),
         meta: { title: '可视化配置' },
       },
+      // REV-18（IFC-IB-376 / ADR-42）：父级「系统管理」节点，下挂三子项。
+      // **授权与导航解耦（强制）**：父 / 子路由的 `requiresAdmin` 只是体验优化；
+      // 授权唯一经服务端（注入的 `AuthzPolicy`）—— 非 admin 一律服务端 403。
+      // 父级是**路由结构**上的分组（透传 `<router-view>`），视觉外壳仍由 ConsoleLayout 提供。
       {
-        path: 'accounts',
-        name: 'accounts',
-        component: AccountsPage,
-        // 仅 admin 可见（服务端同样强制 403；此处只是不把入口摆给无权者）。
-        meta: { title: '账户管理', requiresAdmin: true },
+        path: 'system',
+        component: SystemSection,
+        meta: { requiresAdmin: true },
+        children: [
+          {
+            path: 'accounts',
+            name: 'accounts',
+            component: AccountsPage,
+            meta: { title: '账户管理', requiresAdmin: true },
+          },
+          {
+            path: 'projects',
+            name: 'projects',
+            component: ProjectsPage,
+            meta: { title: '项目管理', requiresAdmin: true },
+          },
+          {
+            path: 'llm-key',
+            name: 'llm-key',
+            component: LlmKeyPage,
+            meta: { title: 'LLM Key 管理', requiresAdmin: true },
+          },
+        ],
       },
+      // 既有深链 `#/accounts` 的**迁移**（ADR-42 ③：保留 hash，不引入 `try_files`）：
+      // 旧路径重定向到新的三分 IA 路由，避免书签 / 深链失效。
+      { path: 'accounts', redirect: { name: 'accounts' } },
     ],
   },
   // 未匹配：回首页（由首页守卫再决定去登录还是去控制台）。

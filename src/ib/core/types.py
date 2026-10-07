@@ -1402,6 +1402,76 @@ class StorageState:
     prompt_store_configured: bool
 
 
+# --------------------------------------------------------------------------- #
+# REV-18（IFC-IB-367 / 368）：项目注册表 / LLM Key 的数据结构
+# --------------------------------------------------------------------------- #
+#
+# 两件事放在 framework-free 的 `ib.core`：
+#   * `ProjectRegistryEntry` 是端口 `ProjectRegistryStore`（IFC-IB-367）签名的一部分；
+#   * `LlmKeyStatus` / `LlmKeyRecord` 是端口 `LlmKeyStore`（IFC-IB-368）签名的一部分。
+# 二者必须与实现（SQLite / 内存）解耦，否则 `ibweb` 会反向依赖 `ib.ledger`（端口倒置失效）。
+#
+# 凭据纪律（C-IB-42，硬约束）：
+#   * `LlmKeyStatus` **不含任何明文字段** —— 「不回显明文」是**类型层事实**；
+#   * `masked` 为**不含明文任何前 / 后缀字符的固定占位掩码**（避免长度 / 前缀侧信道）；
+#   * `LlmKeyRecord.secret` **仅用于装配期解析**（组合根唯一读点），
+#     **绝不进入任何 HTTP 响应类型**。
+
+#: 项目状态（IFC-IB-367）：`disabled` = 软删 / 停用（**数据保留、可恢复**，不物理级联）。
+#: 取值只许追加，不得改义。
+ProjectStatus: TypeAlias = Literal["active", "disabled"]
+
+#: LLM Key 的**固定占位掩码**（IFC-IB-368）。**不含明文任何前 / 后缀字符**，
+#: 与明文长度无关 —— 避免长度 / 前缀侧信道（ADR-38 §10.1 OI-3）。
+LLM_KEY_MASK: str = "********"
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectRegistryEntry:
+    """项目注册表条目（IFC-IB-367，module_design.md §3 MOD-IB-01）。
+
+    运行期可变状态（项目 CRUD + 软删 / 停用）的**对外**视图；表内**只承载项目标识 /
+    名称 / 状态 / 时间戳，不承载任何凭据 / 配置取值**（ADR-37）。
+
+    字段：`project_id` / `name` / `status ∈ {active, disabled}` / `created_at` / `updated_at`
+    （时间一律为定长 UTC 字符串 `YYYY-MM-DDTHH:MM:SSZ`，比较用字符串序）。
+    """
+
+    project_id: str
+    name: str
+    status: ProjectStatus
+    created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class LlmKeyStatus:
+    """LLM Key 的**对外**状态视图（IFC-IB-368）。
+
+    **不含明文字段** —— 「HTTP 不回显明文」由此成为**类型层事实**。
+    `configured=False` 即「LLM 未配置态」（ADR-39 Option C）：服务正常启动，
+    LLM 依赖路径在**调用期** fail-closed。
+
+    `masked` 为固定占位掩码（见 `LLM_KEY_MASK`），不含明文任何前 / 后缀字符。
+    """
+
+    configured: bool
+    masked: str
+    updated_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class LlmKeyRecord:
+    """LLM Key 的**装配期读取记录**（IFC-IB-368）。
+
+    `secret` **仅用于组合根装配期解析**（`resolve_secret()`，唯一读点），
+    **绝不进入任何 HTTP 响应类型**；本结构**不得**被任何序列化器 / 日志消费。
+    """
+
+    secret: str
+    updated_at: str
+
+
 __all__ = [
     "Vector",
     "DistanceLiteral",
@@ -1494,4 +1564,10 @@ __all__ = [
     "StoreMode",
     "ConfigAuditEntry",
     "StorageState",
+    # REV-18 项目注册表 / LLM Key（IFC-IB-367 / 368）
+    "ProjectStatus",
+    "LLM_KEY_MASK",
+    "ProjectRegistryEntry",
+    "LlmKeyStatus",
+    "LlmKeyRecord",
 ]

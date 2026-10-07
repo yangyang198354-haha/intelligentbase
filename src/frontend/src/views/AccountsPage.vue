@@ -2,7 +2,9 @@
 /**
  * @module MOD-IB-24
  * @implements IFC-IB-329 账户管理页（列表 / 新建 / 停用 / 重置口令；**仅 admin**）
- * @depends MOD-IB-24（app/env 单例）, MOD-IB-23（IFC-IB-321）
+ *             IFC-IB-373（REV-18）账户**编辑**（`project_id` 重绑 / `username` / `status`）
+ *             与**删除**（软删 + 二次确认 + 禁删 admin 与最后管理员）
+ * @depends MOD-IB-24（app/env 单例）, MOD-IB-23（IFC-IB-321 / IFC-IB-373）
  * @author software-developer
  *
  * 账户管理（管理员）。
@@ -13,24 +15,26 @@
  * 非 admin 一律 403。前端隐藏入口 + 禁用按钮只是体验。**禁止**出现「前端已判断为管理员，
  * 因此可以跳过服务端校验」这类思路。
  *
- * ## 新建账户必须绑定项目
+ * ## 账户与项目 **N:1**（ADR-21-R1）
  *
- * `ops` 账户与项目是 **1:1**（REQ-FUNC-IB-30）：没有项目绑定的账户无处落数据，服务端
- * 会 400 拒绝。因此本页把「项目标识」设为**必填**，而不是先建后绑（那会留下一批
- * 「半配置账户」，登录后所有操作都 fail-closed，排障成本极高）。
+ * 每个运维账户**恰绑定一个项目**（一个项目可有多个账户）。新建账户**必须**绑定项目；
+ * 且目标项目须在**项目注册表**存在且 `active`，否则服务端 `422`（**顺序依赖：先建项目、
+ * 后建账号**，REQ-FUNC-IB-45）。因此本页把「绑定项目」设为**下拉选择**（数据源 =
+ * `GET /api/projects`），而不是自由文本 —— 从界面层避免「半配置账户」。
  *
  * ## 口令输入一次性，不回显
  *
  * 新建 / 重置口令都用 `type="password"`，提交后立即清空输入框；列表**从不**展示口令或
- * 其哈希（后端返回的 `AccountSummary` 里根本没有该字段）。管理员看到的也只有账户摘要。
+ * 其哈希（后端返回的 `AccountSummary` 里根本没有该字段）。编辑 / 删除**同样**不回显任何凭据。
  */
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 
 import { client } from '../app/env';
-import { ApiClientError, type AccountSummary } from '../api/client';
+import { ApiClientError, type AccountSummary, type ProjectSummary } from '../api/client';
 
 const accounts = ref<AccountSummary[]>([]);
+const projects = ref<ProjectSummary[]>([]);
 const loading = ref(false);
 const loadError = ref('');
 
@@ -43,12 +47,21 @@ const resetSubmitting = ref(false);
 const resetTarget = ref<AccountSummary | null>(null);
 const resetPassword = ref('');
 
+// REV-18（IFC-IB-373）：编辑与删除（软删）。
+const editVisible = ref(false);
+const editSubmitting = ref(false);
+const editTarget = ref<AccountSummary | null>(null);
+const editForm = reactive({ username: '', project_id: '', status: 'active' as 'active' | 'disabled' });
+
+const deletingId = ref('');
+
 const activeCount = computed(() => accounts.value.filter((a) => a.status === 'active').length);
 
 function messageOf(err: unknown, fallback: string): string {
   if (err instanceof ApiClientError) {
     if (err.status === 403) return '当前账户无权管理账户（仅管理员可操作）。';
-    if (err.status === 409) return '该用户名已存在，请换一个。';
+    if (err.status === 409) return err.message || '操作被拒绝（可能是用户名冲突或管理员保护）。';
+    if (err.status === 422) return err.message || '目标项目不存在或未启用，请先创建项目。';
     return err.message || fallback;
   }
   return '无法连接服务，请确认服务已启动。';
@@ -58,8 +71,13 @@ async function load(): Promise<void> {
   loading.value = true;
   loadError.value = '';
   try {
-    const envelope = await client.listAccounts();
+    const [envelope, projectList] = await Promise.all([
+      client.listAccounts(),
+      client.listProjects().catch(() => [] as ProjectSummary[]),
+    ]);
     accounts.value = envelope.items;
+    // 账户可绑定的项目 = 注册表**活动**项目（admin 可见全部；用于顺序依赖的下拉）。
+    projects.value = projectList;
   } catch (err) {
     loadError.value = messageOf(err, '加载账户列表失败。');
   } finally {
@@ -70,13 +88,13 @@ async function load(): Promise<void> {
 function openCreate(): void {
   createForm.username = '';
   createForm.password = '';
-  createForm.project_id = '';
+  createForm.project_id = projects.value[0]?.project_id ?? '';
   createVisible.value = true;
 }
 
 async function submitCreate(): Promise<void> {
   if (!createForm.username.trim() || !createForm.password || !createForm.project_id.trim()) {
-    ElMessage.warning('用户名、口令、项目标识均为必填');
+    ElMessage.warning('用户名、口令、绑定项目均为必填');
     return;
   }
   createSubmitting.value = true;
@@ -142,6 +160,75 @@ async function submitReset(): Promise<void> {
   }
 }
 
+// ---- REV-18（IFC-IB-373）：编辑（project_id 重绑 / username / status） ---- //
+
+function openEdit(row: AccountSummary): void {
+  editTarget.value = row;
+  editForm.username = row.username;
+  editForm.project_id = row.project_id ?? '';
+  editForm.status = row.status;
+  editVisible.value = true;
+}
+
+async function submitEdit(): Promise<void> {
+  const target = editTarget.value;
+  if (!target) return;
+  const payload: { username?: string; project_id?: string; status?: 'active' | 'disabled' } = {};
+  if (editForm.username.trim() && editForm.username.trim() !== target.username) {
+    payload.username = editForm.username.trim();
+  }
+  if (editForm.project_id && editForm.project_id !== target.project_id) {
+    payload.project_id = editForm.project_id;
+  }
+  if (editForm.status !== target.status) {
+    payload.status = editForm.status;
+  }
+  if (Object.keys(payload).length === 0) {
+    ElMessage.info('没有需要保存的修改');
+    return;
+  }
+  editSubmitting.value = true;
+  try {
+    await client.updateAccount(target.user_id, payload);
+    editVisible.value = false;
+    ElMessage.success('账户已更新');
+    await load();
+  } catch (err) {
+    ElMessage.error(messageOf(err, '更新账户失败。'));
+  } finally {
+    editSubmitting.value = false;
+  }
+}
+
+// ---- REV-18（IFC-IB-373）：删除（软删 + 二次确认 + 禁删 admin） ---- //
+
+async function deleteAccount(row: AccountSummary): Promise<void> {
+  if (row.role === 'admin') {
+    ElMessage.warning('管理员账户不可删除（禁止删除 admin 或最后一个有效管理员）。');
+    return;
+  }
+  // 二次确认：输入用户名与目标一致（服务端同样校验 confirm_username，否则 400）。
+  try {
+    await ElMessageBox.confirm(
+      `确定删除账户「${row.username}」？该操作为**软删**（停用，可恢复），并立即撤销其全部会话。`,
+      '删除账户',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' },
+    );
+  } catch {
+    return; // 用户取消
+  }
+  deletingId.value = row.user_id;
+  try {
+    await client.deleteAccount(row.user_id, row.username);
+    ElMessage.success('账户已删除（停用）');
+    await load();
+  } catch (err) {
+    ElMessage.error(messageOf(err, '删除账户失败。'));
+  } finally {
+    deletingId.value = '';
+  }
+}
+
 onMounted(load);
 </script>
 
@@ -151,7 +238,7 @@ onMounted(load);
       <div>
         <h2 class="ib-page-title">账户管理</h2>
         <p class="ib-page-sub">
-          共 {{ accounts.length }} 个账户（启用 {{ activeCount }} 个）。账户与项目一一绑定；管理员为全局账户。
+          共 {{ accounts.length }} 个账户（启用 {{ activeCount }} 个）。每个运维账户绑定一个项目（一个项目可有多个账户）；管理员为全局账户。
         </p>
       </div>
       <el-button type="primary" @click="openCreate">新建账户</el-button>
@@ -194,16 +281,25 @@ onMounted(load);
           <span v-else class="ib-muted">正常</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
+          <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
           <el-button link type="primary" @click="openReset(row)">重置口令</el-button>
           <el-button
             link
-            type="danger"
+            type="warning"
             :disabled="row.status !== 'active' || row.role === 'admin'"
             @click="disableAccount(row)"
           >
             停用
+          </el-button>
+          <el-button
+            link
+            type="danger"
+            :disabled="row.role === 'admin' || deletingId === row.user_id"
+            @click="deleteAccount(row)"
+          >
+            删除
           </el-button>
         </template>
       </el-table-column>
@@ -223,11 +319,19 @@ onMounted(load);
             placeholder="至少 8 位，含大小写 / 数字 / 符号中 2 类"
           />
         </el-form-item>
-        <el-form-item label="绑定项目标识">
-          <el-input v-model="createForm.project_id" placeholder="例如 p_alpha" />
+        <el-form-item label="绑定项目">
+          <el-select v-model="createForm.project_id" placeholder="选择项目" style="width: 100%">
+            <el-option
+              v-for="p in projects"
+              :key="p.project_id"
+              :label="`${p.name}（${p.project_id}）`"
+              :value="p.project_id"
+            />
+          </el-select>
         </el-form-item>
         <p class="ib-muted form-hint">
-          新账户首次登录必须修改口令；在修改完成前，除改密页外的功能均不可用。
+          目标项目须已存在且启用（**先建项目、后建账号**）；新账户首次登录必须修改口令，
+          在修改完成前，除改密页外的功能均不可用。
         </p>
       </el-form>
       <template #footer>
@@ -251,6 +355,38 @@ onMounted(load);
       <template #footer>
         <el-button @click="resetVisible = false">取消</el-button>
         <el-button type="primary" :loading="resetSubmitting" @click="submitReset">确认重置</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- REV-18（IFC-IB-373）：编辑账户（project_id 重绑 / username / status；不回显任何凭据） -->
+    <el-dialog v-model="editVisible" title="编辑账户" width="440px">
+      <el-form label-position="top">
+        <el-form-item label="用户名">
+          <el-input v-model="editForm.username" autocomplete="off" />
+        </el-form-item>
+        <el-form-item label="绑定项目">
+          <el-select v-model="editForm.project_id" placeholder="选择项目" style="width: 100%">
+            <el-option
+              v-for="p in projects"
+              :key="p.project_id"
+              :label="`${p.name}（${p.project_id}）`"
+              :value="p.project_id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="editForm.status" style="width: 100%">
+            <el-option label="启用" value="active" />
+            <el-option label="停用" value="disabled" />
+          </el-select>
+        </el-form-item>
+        <p class="ib-muted form-hint">
+          重绑项目时，目标项目须存在且启用，否则服务端拒绝。
+        </p>
+      </el-form>
+      <template #footer>
+        <el-button @click="editVisible = false">取消</el-button>
+        <el-button type="primary" :loading="editSubmitting" @click="submitEdit">保存</el-button>
       </template>
     </el-dialog>
   </section>

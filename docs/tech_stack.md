@@ -3,24 +3,24 @@
   <artifact>tech_stack</artifact>
   <path>docs/tech_stack.md</path>
   <doc_id>TECH-INTELBASE-001</doc_id>
-  <version>1.4.0</version>
-  <revision>REV-13</revision>
+  <version>1.4.1</version>
+  <revision>REV-18</revision>
   <status>DRAFT_FOR_GATE_REVIEW</status>
   <phase>GROUP_B / PHASE_04b 技术选型</phase>
   <author>system-architect</author>
-  <invocation_id>INV-GROUP_B-INTELBASE-007</invocation_id>
+  <invocation_id>INV-GROUP_B-INTELBASE-012</invocation_id>
   <created_at>2026-09-25</created_at>
-  <updated_at>2026-10-06</updated_at>
+  <updated_at>2026-10-07</updated_at>
   <inputs>
-    <input path="docs/requirements_spec.md" version="1.4.0" status="APPROVED"/>
-    <input path="docs/user_stories.md" version="1.4.0" status="APPROVED" note="R7 新增登记：可视化配置的 AC 落点（AC-IB-17-01~06 / AC-IB-18-01~06）为 §4.5 新增项与 §1.3 凭据纪律的直接依据"/>
-    <input path="docs/architecture_design.md" version="1.5.0" revision="REV-13" status="DRAFT_FOR_GATE_REVIEW"/>
-    <input path="docs/module_design.md" version="1.5.0" revision="REV-13" status="DRAFT_FOR_GATE_REVIEW"/>
+    <input path="docs/requirements_spec.md" version="1.10.0" revision="REV-18-2" status="APPROVED"/>
+    <input path="docs/user_stories.md" version="1.10.0" revision="REV-18-2" status="APPROVED" note="REV-18 新增登记：系统管理三分 / 项目 CRUD / LLM Key / 项目域资料的 AC 落点为 §1 凭据口径与 §6 自检的直接依据"/>
+    <input path="docs/architecture_design.md" version="1.10.0" revision="REV-18" status="DRAFT_FOR_GATE_REVIEW"/>
+    <input path="docs/module_design.md" version="1.10.0" revision="REV-18" status="DRAFT_FOR_GATE_REVIEW"/>
     <input path="docs/ib_embed_service_contract.md" version="1.0.0" revision="R2" status="DRAFT_FOR_GATE_REVIEW" note="MOD-IB-26 契约唯一落点；本文件 §1.2 的键名清单以其 §9 为准"/>
     <readonly_reference path="FreeArk 仓库" note="只读参考；未修改任何文件"/>
   </inputs>
   <scope_boundary>技术选型、许可合规台账、目标机依赖验证清单、风险汇总。**不含实现代码与部署脚本**。</scope_boundary>
-  <credential_policy>本文档不记录任何密钥、令牌、口令或证书。目标机凭据**一律经环境变量注入**（REQ-NFR-IB-07 / C-IB-02）。所有条目仅登记「配置键名」，不登记值。</credential_policy>
+  <credential_policy>本文档不记录任何密钥、令牌、口令或证书。目标机凭据**除 LLM Key 外**均经环境变量注入（REQ-NFR-IB-07 / C-IB-02）；**LLM Key 属唯一例外**：其载体为**数据库**（同一 SQLite 台账，库文件 **0600** 且属主对齐服务账号；REQ-FUNC-IB-47 / REQ-NFR-IB-20 / C-IB-42 / ADR-38），**不入 `.env`**，唯一写入口为管理端点。所有条目仅登记「配置键名」，不登记值。</credential_policy>
   <revision_history>
     <rev version="1.0.0" date="2026-09-25" note="初稿（GROUP_B 首次提交，PM 门控前）"/>
     <rev version="1.1.0" revision="R1" date="2026-09-25" note="按 PM 架构复核反馈 REV-01 修订：① Web 框架 FastAPI→Django（用户明确指定，非建议），前端 Vue 3 + Vite 不变；② Uvicorn 作为 ASGI 应用服务器的条目改写为 Waitress/Gunicorn（WSGI），Pydantic 退出 Web/校验层选型（仅作可选独立校验库）；③ §2 许可台账补登 Django（BSD-3-Clause）/ DRF（BSD-3-Clause）/ Waitress（ZPL-2.1）/ Gunicorn（MIT），经外部核实后登记；④ 新增 §4.5 Web 层（Django）与服务承载验证清单、§5.2 SSE 并发风险项、[TBD-T15]；⑤ 编号稳定优先：类别与条目名尽量沿用 1.0.0，被替换者移入 §1.1 留痕；所有改动带 -R1 标记。需求侧文档未改动。"/>
@@ -28,6 +28,7 @@
     <rev version="1.3.0" revision="R7" date="2026-09-27" invocation_id="INV-GROUP_B-INTELBASE-005" note="R7 增量贯通（GROUP_A REV-06 裁决：诉求③「UI 可视化配置」纳入 v1，新增 REQ-FUNC-IB-25/26/27）：① 新增「前端图可视化库」行 = Vue Flow（@vue-flow/core，MIT，R7 经外部核实：包内 LICENSE 为标准 MIT 文本，© webkid GmbH 2019–2024 / Burak Cakmakoglu 2021–2024），要求随构建产物本地打包、禁止运行期 CDN；② §1.1 留痕 5 项已评估未采纳（AntV X6 / LogicFlow / React Flow / 自绘 SVG-D3 / 运行期 CDN 加载）；③ 新增 §1.3 客户端配置键登记（只登记键名 IB_DEFINITION_DOC_PATH / IB_VISUAL_CONFIG_ENABLED，不含任何值）；④ §2 台账登记 Vue Flow（MIT，采纳）与传递依赖（条件性采纳 + [待核实]，须锁定版本后逐包复核）；⑤ §4.5 新增第 10~12 项（前端产物零外发依赖、装配期 fail-fast 实测、定义文档凭据明文扫描）；⑥ §5.3 新增两行低风险（定义文档被写入凭据明文 / 图库传递依赖的许可与体积，以 [TBD-T20] 实测为准）；⑦ 硬约束未松动：未引入 Docker / Redis / PyMuPDF，端口契约仍 framework-free。需求侧文档与 FreeArk 仓库未改动；未写入任何凭据或配置值（只登记键名）。"/>
     <rev version="1.3.1" revision="R10" date="2026-09-27" invocation_id="INV-GROUP_C-INTELBASE-008" author="software-developer" note="R10 传递依赖许可登记（GROUP_C 前端构建阻断修复轮）：① 新增 §2.1「前端依赖许可登记」—— 在 src/frontend 执行 npm install 后逐包实测，登记 @vue-flow/core 1.48.2 与 14 个传递包（@vueuse/core·shared·metadata 10.11.1 / vue-demi 0.14.10 / @types/web-bluetooth 0.0.20 / d3-color·dispatch·drag·interpolate·selection·timer·transition·zoom + d3-ease）的精确版本与许可，全部 MIT / ISC / BSD-3-Clause，**无 copyleft / AGPL 面** → 不触发 §1 重选型（REQ-NFR-IB-12 合规）；② §2 台账「Vue Flow 的传递依赖」行由 [待核实] 改为**已核实（R10）**；③ §1「前端图可视化库」行与 §5.3 风险行同步收敛；④ 补记 R10 实测产物体积（JS 252.35 kB / gzip 89.20 kB）供 [TBD-T20] 引用。**仅登记事实，未改任何选型决策 / 未改键名 / 未写入任何凭据值**；证据 = docs/evidence/groupc_r10_license.log。**性质：登记型修订，选型未变**（GROUP_B 可复核）。"/>
     <rev version="1.4.0" revision="REV-13" date="2026-10-06" invocation_id="INV-GROUP_B-INTELBASE-007" author="system-architect" note="REV-13 认证与商用界面重构增量（GROUP_A REV-13 下游贯通：REQ-FUNC-IB-28~36 / REQ-NFR-IB-15~18 / C-IB-09 / DR-09~DR-17）：① §1 新增三行 —— 前端 UI 组件库 Element Plus（MIT，DR-13）、前端路由 vue-router（MIT，hash 模式）、口令哈希库 bcrypt（Apache-2.0，DR-11）；② §1.1 留痕 5 项已评估未采纳（Cookie 会话 / JWT 自包含令牌 / 独立鉴权服务 / Django contrib.auth+ORM 迁移 / 运行期 CDN 加载 Element Plus）；③ 新增 §1.4 客户端配置键登记（只登记键名 IB_AUTH_LOGIN_PATH / IB_AUTH_SESSION_STORAGE_KEY，不含任何值）；④ §2 台账新增三行（Element Plus / vue-router / bcrypt，均采纳）+ （R13）遗留合规动作追加；⑤ 新增 §2.2 前端依赖许可登记（方法同 R10，结论暂标 [待核实]）；⑥ §4.5 新增第 13~18 项（默认管理员种子与首登强制改密 / 零 Cookie / token-query 全端点 4xx / IB_AUTHZ_POLICY_MODULE 未配置即启动失败 / HTTPS 生效 / 前端自包含与凭据不回显）；⑦ §5.2 新增一行中风险（bcrypt cost 与阈值标定，以 [TBD-T22] 为准）、§5.3 新增一行低风险（Element Plus 传递依赖许可与体积 + 口令/令牌泄露缓解）；⑧ 硬约束未松动：未引入 Docker / Redis / PyMuPDF / Cookie 会话 / Django ORM / contrib.auth；禁止运行期 CDN。仅登记键名，未写入任何凭据值。"/>
+    <rev version="1.4.1" revision="REV-18" date="2026-10-07" invocation_id="INV-GROUP_B-INTELBASE-012" author="system-architect" note="REV-18 **登记型补丁修订**（GROUP_A REV-18-2 下游贯通：系统管理三分 + 项目 CRUD + 唯一运维账号 + LLM Key 管理 + 项目域资料上传）：**无新第三方依赖、无新选型、无键名改名**（LLM Key 载体 = 既有 SQLite / stdlib sqlite3，复用既有手写 scoped 迁移机制；项目注册表同）。唯一实质订正 = **凭据载体口径**：`<credential_policy>`（第 23 行）与 §1「配置载体」行的「**一律经环境变量注入**」收窄为「**除外 LLM Key**：LLM Key 经 DB（库文件 0600 且属主对齐服务账号）；其余密钥仍经环境变量」—— **消除与 ADR-38 口径的不一致（不产生假陈述）**；新增键名 `IB_PROJECT_REGISTRY_BACKEND` / `IB_LLM_KEY_BACKEND` **只在 `module_design.md` §2.2.9 / §5 登记，本文档不重复登记值**。§1 选型表**未新增行**；§1.1 **未新增留痕**；§2 许可台账**未新增条目**（无新组件，REQ-NFR-IB-12 合规）。硬约束未松动：未引入 Docker / Redis / Redis / PyMuPDF / Cookie 会话 / Django ORM / contrib.auth；未引入第三方密钥管理服务。仅登记键名，未写入任何凭据值。**性质 = 登记型修订，选型未变**（同 R10 先例；GROUP_B 可复核）。"/>
   </revision_history>
 </file_header>
 
@@ -105,7 +106,7 @@
 | 流式通道 | SSE（`text/event-stream`） | — | ADR-11；**凭据不进 URL**（消除 FreeArk `?token=` 泄漏类别） | REQ-FUNC-IB-21 | 低 | 须禁用反向代理缓冲；**（R1）由 Django `StreamingHttpResponse` 承载（原生 SSE，不引 Channels）** — ADR-11-R1 |
 | 鉴权 | 可注入 `AuthzPolicy` 端口（默认 `DenyAllPolicy`） | — | 基座不带业务鉴权模型；接入方注入；**未注入即启动失败** | REQ-NFR-IB-09；AC-IB-11-05 | 低 | 未授权返回 401/403，不得静默；**（R1）Django 侧落点：中间件（解析已认证主体 + 构造 `RequestContext`/`AuthzContext`）+ 视图装饰器（调用 `can_manage` / `can_query`）**；默认拒绝且未注入即启动失败 |
 | 服务编排 | systemd（4 个单元） | 系统自带 | DR-03 禁 Docker；与既有运维心智一致 | REQ-FUNC-IB-22；DR-03 | 中 | 单元清单见 `architecture_design.md` ADR-03；**（R1）`ib-web` 单元以 Waitress/Gunicorn 启动 Django 应用，凭据仍经 `EnvironmentFile` 注入** |
-| 配置载体 | 配置文件（YAML/JSON）+ 环境变量覆盖（凭据仅环境变量） | — | REQ-FUNC-IB-01/02；[ARCH-ASSUMPTION-A1] | REQ-NFR-IB-02/07 | 低 | 仓库仅含 `.env.example`（无真实值）；启动期校验必填项；**（R1）配置装载不依赖 Django settings 机制**（保持 `ConfigurationSource` 端口的独立性，便于离线单测与跨项目复用） |
+| 配置载体 | 配置文件（YAML/JSON）+ 环境变量覆盖（**凭据：除 LLM Key 外**经环境变量；**LLM Key 载体内 DB**） | — | REQ-FUNC-IB-01/02；[ARCH-ASSUMPTION-A1]；**（REV-18）REQ-FUNC-IB-47 / REQ-NFR-IB-20 / C-IB-42 / ADR-38** | REQ-NFR-IB-02/07 | 低 | 仓库仅含 `.env.example`（无真实值）；启动期校验必填项（**（REV-18）LLM Key 未配置非致命，fail-closed 于调用期**，ADR-39）；**（R1）配置装载不依赖 Django settings 机制**（保持 `ConfigurationSource` 端口的独立性，便于离线单测与跨项目复用）；**（REV-18）LLM Key 的载体 = 同一 SQLite 台账（库文件 0600 且属主对齐服务账号），唯一写入口为管理端点，不入 `.env`** |
 | 日志 | 标准库 `logging` + 结构化字段（JSON 行） | — | REQ-NFR-IB-06；级别经环境变量可调 | REQ-NFR-IB-06 | 低 | 字段白名单 + 脱敏（FM-8）；**禁止记录正文与凭据**；**（R1）不经 Django `LOGGING` 作为唯一配置源**（保持 `MOD-IB-04` 的单一落点） |
 | 测试框架 | 标准库 `unittest` / `pytest`（二选一，GROUP_D 定） | — | 离线替身驱动的测试（REQ-NFR-IB-14） | REQ-NFR-IB-14 | 低 | 全部测试须离线可跑（附录 D）；性能项须目标机证据；**（R1）测试须使用 SQLite（测试库），严禁连接生产/外部数据库** |
 | 版本控制 / 部署 | `git`（直接提交 `main`）+ `git pull` 部署 | — | 沿用 FreeArk 纪律；**禁止逐文件上传** | REQ-FUNC-IB-22 | 低 | 目标机凭据经环境变量，不入仓库 |
@@ -438,6 +439,11 @@
 - **（R13）凭据纪律**：§1.4 / IFC-IB-312 **只登记键名**；**默认初始口令的字面量不在本文件出现**；全文**不含任何键值**；`?token=` / `?key=` 纪律由 §3 **扩展至全部新端点**（`/api/auth/*`、`/api/accounts*`）；日志扫描须零命中（[B14]）。
 - **（R13）未改动他处**：`FreeArk` 仓库**任何文件未作修改**；需求侧文档**只读未改**；`architecture_design.md` / `module_design.md` 的 R1 / R2 / R7 / R8 结论**未改写**（R13 只追加）；`implementation_plan.md`（GROUP_C）**未改**；**未写入任何口令 / 令牌 / 密钥字面量**；本阶段**止于 GROUP_B**。
 - **（R13）版本订正说明**：任务文本称本文件由 1.3.0 升 1.4.0；**实际起版为 1.3.1**（R7 + R10 传递依赖许可登记，`author=software-developer`）→ 本提案为 **1.3.1 → 1.4.0 / REV-13**。
+- **（REV-18）登记型补丁修订的技术面结论**：① **无新第三方依赖 / 无新选型 / 无键名改名** —— LLM Key 载体（DB）与项目注册表均复用**既有 SQLite（stdlib `sqlite3`）** 与**既有手写 scoped 迁移机制**（新增迁移 `005_projects.sql` / `006_llm_key.sql`，属交付物，非选型）；§1 选型表**未新增行**、§1.1 **未新增留痕**、§2 许可台账**未新增条目**。② **唯一实质订正 = 凭据载体口径**：`<credential_policy>` 与 §1「配置载体」行由「**一律经环境变量**」收窄为「**除外 LLM Key**：LLM Key 经 DB（库文件 **0600** 且属主对齐服务账号）；其余密钥仍经环境变量」（REQ-FUNC-IB-47 / REQ-NFR-IB-20 / C-IB-42 / ADR-38）—— 目的是**消除与架构侧 ADR-38 的口径不一致（不产生假陈述）**。
+- **（REV-18）凭据纪律（新增口径）**：本文档**只登记键名 / 表名 / 文件层名**；**LLM Key 的字面量（明文 / 掩码 / 前缀）不在本文件出现**；`IB_LLM_API_KEY` **不再作为 LLM Key 来源**；新增键 `IB_PROJECT_REGISTRY_BACKEND` / `IB_LLM_KEY_BACKEND` 的**语义**在 `module_design.md` §2.2.9（本文件不重复登记值）。**未写入任何密钥 / 令牌 / 口令 / 证书字面量。**
+- **（REV-18）禁项与硬约束未松动**：**未引入 Docker / 容器化**（DR-03）、**未引入 Redis / RabbitMQ**（C-IB-08）、**未引入 PyMuPDF 或任何 AGPL / copyleft 组件**（REQ-NFR-IB-12）、**未引入 Cookie 会话**（DR-10）、**未引入 Django ORM / `contrib.auth`**（ADR-07-R1）、**未引入第三方密钥管理服务**（LLM Key 载体内自有 DB，OOS-18 为扩展点预留）；端口契约仍 **framework-free**（新增契约全部落在 MOD-IB-01，纯 stdlib）。
+- **（REV-18）未改动他处**：`FreeArk` 仓库**任何文件未作修改**（全程只读）；需求侧文档（`requirements_spec.md` / `user_stories.md` v1.10.0）**只读未改**；`architecture_design.md` / `module_design.md` 的既有结论**未改写**（REV-18 只追加）；`implementation_plan.md`（GROUP_C）**未改**；本阶段**止于 GROUP_B**。
+- **（REV-18）版本口径**：本轮起版 = **1.4.0（REV-13）** → 本提案为 **1.4.0 → 1.4.1 / REV-18**（**登记型补丁**；理由见文件顶部「版本决策」）。
 - **（R2）L-03 补交已完成**：新增 **§1.2 服务端配置键登记**（`ib-embed` / MOD-IB-26 的配置**键名**清单，**只登记键名与语义、不含任何值**，对应 IFC-IB-286 的第二份 `EnvironmentFile`）；「Embedding 推理运行时」行改写为**三候选**并显式化**选择依据 / 许可 / CPU-only 可用性 / 传递依赖 / 指令集基线风险**；§2 台账补登传递依赖 `torch`（BSD-3-Clause）与 `transformers`（Apache-2.0）（**条件性采纳**）；§5.2 新增**目标机缺 AVX2 → SIGILL** 风险行（该风险**同时命中既有 OCR 链路**，须合并评估）。
 - **（R2）技术面硬约束未松动**：**未引入 PyMuPDF**（仍为 AGPL-3.0，不采纳）、**未引入 Docker/容器化**（DR-03）、**未引入 Redis/RabbitMQ**；新候选 ③（`onnxruntime` 直载）与既有 OCR 运行时**同组件**，**未净增组件面**。
 - **（R2）凭据纪律**：§1.2 **只登记键名**；`ib-embed` **不需要任何令牌**，其 `EnvironmentFile` **不得**写入任何凭据；全文**不含任何键值**。

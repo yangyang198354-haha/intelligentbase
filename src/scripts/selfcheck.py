@@ -764,9 +764,22 @@ def http_contract_offline() -> None:
     r = client.post("/api/files", {"kb_id": "kb_a", "file": bad}, **auth)
     assert r.status_code == 400, f"魔数不符应 400，实际 {r.status_code}"
 
-    # 上传：kb_id 不属于本项目 → 403（**不是** 404）
+    # 上传：REV-18（IFC-IB-375 / ADR-41）—— 请求体 kb 字段被**忽略**，kb_id 由主体推导。
+    # 提交 kb_b（属 p_beta）时不再 403，而是落库 kb_id = 主体 project_id（"p_alpha"）；
+    # 「上传到外项目 KB」由此在**结构上不可达**（比 403 更强）。归属断言本身保留且失败仍 403
+    # —— 见下方端口层直测 `assert_kb_in_project`（红线不削弱）。
     r = client.post("/api/files", {"kb_id": "kb_b", "file": SimpleUploadedFile("n2.txt", b"hi\n")}, **auth)
-    assert r.status_code == 403, f"跨项目 kb_id 应 403，实际 {r.status_code}"
+    assert r.status_code == 201, r.content
+    assert r.json()["kb_id"] == "p_alpha", "kb_id 必须由主体推导（请求体 kb_b 应被忽略）"
+    from ib.core import ScopeViolationError
+
+    deps.ledger.assert_kb_in_project("p_alpha", "p_alpha")  # 合法归属：放行
+    try:
+        deps.ledger.assert_kb_in_project("p_alpha", "kb_b")  # 跨项目：须 fail-closed
+    except ScopeViolationError:
+        pass
+    else:
+        raise AssertionError("assert_kb_in_project 对外项目 kb 未抛 ScopeViolationError（红线被削弱？）")
 
     # 重试非 failed 文档 → 409
     r = client.post(f"/api/files/{doc['doc_id']}/retry", **auth)
@@ -2897,11 +2910,32 @@ def r13_account_store_parity() -> None:
         verify_password,
     )
 
-    # 端口恰好 13 个方法（IFC-IB-310 的数目是在设计里写死的，多一个少一个都要在此失败）。
+    # 端口方法数 = R13 基线 13（IFC-IB-310）+ REV-18 加成式扩展 1（`update_user`，IFC-IB-366）
+    # = 14。既有 13 方法文本一字不改（加成式扩展，module_design.md §2.2.4 订正说明）；
+    # 多一个少一个都要在此失败。
+    _BASELINE_METHODS = {
+        "create_user",
+        "get_user",
+        "get_user_by_username",
+        "issue_session",
+        "list_users",
+        "purge_expired_sessions",
+        "record_login_failure",
+        "renew_session",
+        "reset_login_failures",
+        "resolve_session",
+        "revoke_session",
+        "set_password",
+        "set_status",
+    }
     methods = sorted(
         name for name in vars(AccountStore) if not name.startswith("_")
     )
-    assert len(methods) == 13, f"AccountStore 方法数 {len(methods)} != 13：{methods}"
+    expected = sorted(_BASELINE_METHODS | {"update_user"})
+    assert len(methods) == 14, f"AccountStore 方法数 {len(methods)} != 14：{methods}"
+    assert methods == expected, (
+        f"AccountStore 方法集与设计不符（R13 基线 13 + REV-18 `update_user`）：{methods}"
+    )
 
     # Windows 上未关闭的 SQLite 连接会让临时目录删除失败（WinError 32）—— 这是**实现细节**
     # 而非缺陷，但若不处理会让整个用例假失败，故把两处 sqlite 实例收集起来显式关闭。
@@ -3013,6 +3047,23 @@ def r13_account_store_parity() -> None:
             assert updated.must_change_password is False, label
             assert verify_password(_PW_C, store.get_user(admin.user_id).password_hash)
             assert not verify_password(_PW_A, store.get_user(admin.user_id).password_hash)
+
+            # 10) REV-18（IFC-IB-366）：`update_user` 加成式扩展 —— 重绑项目 / 改名 / 置状态；
+            #     未知用户返回 None（fail-closed，不静默创建）；改名后旧用户名不再命中。
+            rebound = store.update_user(
+                ops.user_id, project_id="p_beta", username="ops2", status="active"
+            )
+            assert rebound is not None, f"{label}: update_user 对已知用户返回 None"
+            assert (
+                rebound.project_id == "p_beta"
+                and rebound.username == "ops2"
+                and rebound.status == "active"
+            ), f"{label}: update_user 未按入参更新：{rebound}"
+            assert store.get_user_by_username("ops2").user_id == ops.user_id, label
+            assert store.get_user_by_username("ops1") is None, f"{label}: 改名后旧用户名仍可命中"
+            assert store.update_user("no-such-id", username="x") is None, (
+                f"{label}: 未知用户的 update_user 应返回 None"
+            )
 
         # SQLite 形态的真实落盘检查：库里**不得**出现口令明文。
         #
@@ -3375,11 +3426,39 @@ def r13_deploy_discipline() -> None:
     )
     assert "ibweb.accounts.policy" in env, "未登记内置策略模块这一取值"
 
-    # 4) 检查清单：B15 ~ B20 齐备，且签署行已同步。
+    # 4) 检查清单：B15 ~ B23 齐备（B21~B23 为 REV-18），且签署行已同步。
     checklists = (deploy / "checklists.txt").read_text(encoding="utf-8")
-    for item in ("[B15]", "[B16]", "[B17]", "[B18]", "[B19]", "[B20]"):
+    for item in (
+        "[B15]",
+        "[B16]",
+        "[B17]",
+        "[B18]",
+        "[B19]",
+        "[B20]",
+        "[B21]",
+        "[B22]",
+        "[B23]",
+    ):
         assert item in checklists, f"checklists.txt 缺少验收项 {item}"
-    assert "B1–B20" in checklists, "签署行未同步到 B20"
+    assert "B1–B23" in checklists, "签署行未同步到 B23"
+
+    # 4b) REV-18 迁移：005 / 006 存在、幂等（IF EXISTS）、且**纯追加**（只建新表 / 不回改旧表）。
+    for name, table in (
+        ("005_projects.sql", "projects"),
+        ("006_llm_key.sql", "llm_key"),
+    ):
+        text = (deploy / "migrations" / name).read_text(encoding="utf-8")
+        assert f"CREATE TABLE IF NOT EXISTS {table}" in text, f"{name} 缺幂等建表"
+        # 纯追加：**可执行**语句里不得出现破坏性 DROP TABLE（注释里的回滚说明不算）。
+        for line in text.splitlines():
+            code = line.split("--")[0].strip()
+            if code:
+                assert "DROP TABLE" not in code.upper(), (
+                    f"{name} 含可执行的破坏性 DROP TABLE（应纯追加 / 回滚 = 代码回滚）"
+                )
+    # LLM Key 单行表以结构保证全局唯一（CHECK(id = 1)）。
+    llm_ddl = (deploy / "migrations" / "006_llm_key.sql").read_text(encoding="utf-8")
+    assert "CHECK (id = 1)" in llm_ddl or "CHECK(id = 1)" in llm_ddl, "006 未以结构表达单行唯一"
 
     # 5) 键名登记（IFC-IB-312 / MOD-IB-02）：R13 键在**唯一真源** `ib.config` 内有登记，
     #    且**不**混入 MOD-IB-01 声明的「不得新增 / 改名」核心装配开关集合。
@@ -3401,6 +3480,15 @@ def r13_deploy_discipline() -> None:
     assert not missing, f"ib.config.IB_RUNTIME_ENV_KEYS 缺少 R13 键名登记（IFC-IB-312）：{missing}"
     leaked = sorted(r13_keys & set(ib_config.IB_ENV_KEYS))
     assert not leaked, f"R13 键不得进入核心装配开关集合 IB_ENV_KEYS：{leaked}"
+
+    # 5b) REV-18 键名登记（IFC-IB-369 / MOD-IB-02）：项目注册表后端 / LLM Key 后端。
+    rev18_keys = {"IB_PROJECT_REGISTRY_BACKEND", "IB_LLM_KEY_BACKEND"}
+    missing18 = sorted(rev18_keys - registered)
+    assert not missing18, (
+        f"ib.config.IB_RUNTIME_ENV_KEYS 缺少 REV-18 键名登记（IFC-IB-369）：{missing18}"
+    )
+    leaked18 = sorted(rev18_keys & set(ib_config.IB_ENV_KEYS))
+    assert not leaked18, f"REV-18 键不得进入核心装配开关集合 IB_ENV_KEYS：{leaked18}"
 
 
 # --------------------------------------------------------------------------- #

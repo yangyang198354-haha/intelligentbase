@@ -161,6 +161,12 @@ class Deps:
     # 为什么不是**进程级全局**：挂在 Deps 上即「每装配实例一份」——每个测试夹具
     # `build_deps(force=True)` 得到全新空窗口，天然保持用例隔离、无跨用例状态泄漏。
     login_throttle: Any = None
+    # REV-18 项目注册表（第 18 个端口的装配实例；IFC-IB-367/370）。`Deps.projects` 的
+    # **数据源** = `project_registry.list_active()`（ADR-37）；项目 CRUD 端点亦经它。
+    project_registry: Any = None
+    # REV-18 LLM Key 存储（第 19 个端口的装配实例；IFC-IB-368/371）。**唯一写入口**
+    # = `PUT /api/llm-key`；装配期解析为唯一读点。HTTP 层只暴露 `LlmKeyStatus`（不含明文）。
+    llm_key_store: Any = None
 
     def __post_init__(self) -> None:
         self._lock = threading.Lock()
@@ -471,7 +477,27 @@ def _assemble() -> Deps:
 
     # 2) 台账 + 项目登记（配置是项目/知识库的真源）
     ledger = build_ledger(cfg)
-    projects = _seed_projects(cfg, ledger)
+    seeded_projects = _seed_projects(cfg, ledger)
+
+    # 2b) REV-18（IFC-IB-370 / ADR-37）：构造**项目注册表**并**幂等首次播种**。
+    #     播种以配置为初始数据（`INSERT ... ON CONFLICT DO NOTHING`，**不覆盖既有行**）；
+    #     `Deps.projects` 的**数据源由配置快照切换为注册表读出的活动项目**（ADR-37 口径）。
+    from ib.ledger import build_project_registry_store
+
+    ledger_path = str(getattr(cfg, "ledger_path", "") or ":memory:")
+    project_registry = build_project_registry_store(cfg, ledger_path=ledger_path)
+    project_registry.seed(
+        _registry_seed_entries(cfg, seeded_projects)
+    )
+    projects = _projects_from_registry(cfg, ledger, project_registry)
+
+    # 2c) REV-18（IFC-IB-371 / ADR-38 / ADR-39 Option C）：构造 **LLM Key 存储**，
+    #     装配期经 `get()` → `resolve_secret()` 解析（**唯一读点**）。缺 Key **不再致命**。
+    from ib.ledger import build_llm_key_store
+
+    llm_key_store = build_llm_key_store(cfg, ledger_path=ledger_path)
+    llm_key_record = llm_key_store.get()
+    resolved_llm_key = llm_key_record.secret if llm_key_record is not None else None
 
     # 3) 适配器
     vectors = build_vector_store(cfg)
@@ -479,7 +505,7 @@ def _assemble() -> Deps:
     blobs = build_blob_store(cfg)
     ocr = build_ocr_engine(enabled=cfg.ocr_enabled)
     renderer = build_page_renderer(enabled=cfg.render_enabled)
-    llm = build_llm_provider(cfg)
+    llm = build_llm_provider(cfg, api_key=resolved_llm_key)
     sessions = MemorySessionStore(max_sessions=2000, idle_ttl_s=24 * 3600)
     collections = _CollectionResolver()
 
@@ -631,6 +657,8 @@ def _assemble() -> Deps:
         prompt_stores=prompt_stores,
         account_store=account_store,
         config_audit_store=config_audit_store,
+        project_registry=project_registry,
+        llm_key_store=llm_key_store,
         storage_state=storage_state,
         login_throttle=login_throttle,
     )
@@ -639,6 +667,9 @@ def _assemble() -> Deps:
         "succeeded",
         project_id=first_project,
         backend=_backend_summary(cfg),
+        # REV-18（ADR-39 ③）：启动日志**显式声明 LLM 是否已配置**（仅布尔，**不含任何 Key 值**）。
+        # 缺 Key 非致命故此处仍 `succeeded`；`llm_configured=false` 是运维排障的第一线索。
+        llm_configured=bool(resolved_llm_key),
         egress_remote=bool(getattr(deps.egress, "remote", False)),
         egress_host=getattr(deps.egress, "endpoint_host", "") or "",
         egress_data=",".join(str(c) for c in getattr(deps.egress, "data_categories", []) or []),
@@ -657,6 +688,9 @@ def _offline_view(cfg: Any) -> Any:
     return replace(
         cfg,
         ledger_backend="memory",
+        # REV-18：注册表 / LLM Key 后端一并切到内存替身（离线零外部 IO）。
+        project_registry_backend="memory",
+        llm_key_backend="memory",
         ocr_enabled=False,
         render_enabled=False,
         embedding=replace(cfg.embedding, backend="fake"),
@@ -687,7 +721,62 @@ def _seed_projects(cfg: Any, ledger: Any) -> dict[str, ProjectRecord]:
         ledger.upsert_project(record)
         for kb_id in getattr(project_cfg, "kb_ids", ()) or ():
             ledger.upsert_kb(KbRecord(kb_id=kb_id, project_id=project_id, name=kb_id, created_at=""))
+        # REV-18（IFC-IB-375 / ADR-41）：项目域资料上传以 `kb_id ≡ project_id` 推导 kb，
+        # 故须为每个项目登记一个 `kb_id == project_id` 的知识库行（归属断言的判定依据）。
+        ledger.upsert_kb(
+            KbRecord(kb_id=project_id, project_id=project_id, name=project_id, created_at="")
+        )
         out[project_id] = record
+    return out
+
+
+def _registry_seed_entries(cfg: Any, seeded: dict[str, ProjectRecord]) -> list[Any]:
+    """由已播种的台账项目派生**注册表首次播种**条目（IFC-IB-370；ADR-37）。
+
+    以 `IB_CONFIG_FILE.projects.<id>` 为初始数据（沿用 `_seed_projects` 语义）；
+    状态一律 `active`（新建项目默认启用）。**不携带任何凭据 / 配置取值**。
+    """
+    from ib.core import ProjectRegistryEntry
+    from ib.context import utc_now_iso
+
+    entries: list[Any] = []
+    for project_id, record in seeded.items():
+        now = getattr(record, "created_at", "") or utc_now_iso()
+        entries.append(
+            ProjectRegistryEntry(
+                project_id=project_id,
+                name=getattr(record, "name", project_id) or project_id,
+                status="active",
+                created_at=now,
+                updated_at=now,
+            )
+        )
+    return entries
+
+
+def _projects_from_registry(cfg: Any, ledger: Any, registry: Any) -> dict[str, ProjectRecord]:
+    """由**注册表活动项目**派生 `Deps.projects`（ADR-37 数据源口径切换）。
+
+    排序纪律：**先按 `cfg.projects` 的声明序，再按 `project_id` 升序**补足运行期新建项目
+    —— 既保留既有「配置首项目」（`first_project`）语义，又使运行期 CRUD 新建的项目
+    出现在「项目枚举 / 切换器」中。台账侧列（collection 版本 / 嵌入规格）从**同一张
+    `projects` 表**读出；缺失时回退配置的全局嵌入规格。
+    """
+    entries = {entry.project_id: entry for entry in registry.list_active()}
+    ordered = [pid for pid in cfg.projects if pid in entries]
+    ordered += [pid for pid in sorted(entries) if pid not in set(ordered)]
+    out: dict[str, ProjectRecord] = {}
+    for project_id in ordered:
+        entry = entries[project_id]
+        record = ledger.get_project(project_id) if hasattr(ledger, "get_project") else None
+        out[project_id] = ProjectRecord(
+            project_id=project_id,
+            name=getattr(entry, "name", project_id) or project_id,
+            active_collection_version=getattr(record, "active_collection_version", "") or "1",
+            embedding_model_id=getattr(record, "embedding_model_id", "") or cfg.embedding.model_id,
+            dim=int(getattr(record, "dim", 0) or cfg.embedding.dim),
+            created_at=getattr(record, "created_at", "") or entry.created_at,
+        )
     return out
 
 

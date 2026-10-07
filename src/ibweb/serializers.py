@@ -51,6 +51,9 @@ __all__ = [
     # REV-16-4 配置审计 / 存储态（IFC-IB-356 / 361）
     "ConfigAuditEntrySerializer",
     "StorageStateSerializer",
+    # REV-18 项目注册表 / LLM Key（IFC-IB-372 / 374）
+    "ProjectRegistryEntrySerializer",
+    "LlmKeyStatusSerializer",
 ]
 
 
@@ -300,6 +303,47 @@ class StorageStateSerializer(serializers.Serializer):
             "prompt_store": instance.prompt_store,
             "definition_store_configured": bool(instance.definition_store_configured),
             "prompt_store_configured": bool(instance.prompt_store_configured),
+        }
+
+
+# --------------------------------------------------------------------------- #
+# REV-18 项目注册表 / LLM Key（IFC-IB-372 / 374）
+#
+# 同本模块总纪律：字段逐个写出；**绝不**用 `dataclasses.asdict` 自动展开 ——
+# 对 `LlmKeyStatus` 尤其致命：其字段集**天然不含明文**，但一旦改成自动展开，
+# 未来给 `LlmKeyStatus` 加一个内部字段就会把它静默送上 API。
+# --------------------------------------------------------------------------- #
+
+
+class ProjectRegistryEntrySerializer(_DataclassSerializer):
+    """`ProjectRegistryEntry` 的对外投影（IFC-IB-372 的 `201` / `200` 响应体）。
+
+    只出注册表五字段；`project_id` **不是**凭据，可安全外露。
+    """
+
+    _fields = {
+        "project_id": None,
+        "name": None,
+        "status": None,
+        "created_at": None,
+        "updated_at": None,
+    }
+
+
+class LlmKeyStatusSerializer(serializers.Serializer):
+    """`LlmKeyStatus` 的对外投影（IFC-IB-368 / 374；`GET|PUT /api/llm-key`）。
+
+    **手写 `to_representation`**（先于 `_DataclassSerializer` 自动路径）：显式只出
+    `configured` / `masked` / `updated_at` 三字段。`masked` 是**固定占位符**
+    （`LLM_KEY_MASK`），**不含明文的任何前缀 / 后缀 / 长度信息** —— 这是一条
+    「存在性可披露、取值不可披露」的**契约**，不是实现细节（ADR-38）。
+    """
+
+    def to_representation(self, instance: Any) -> dict[str, Any]:
+        return {
+            "configured": bool(instance.configured),
+            "masked": instance.masked,
+            "updated_at": instance.updated_at,
         }
 
 

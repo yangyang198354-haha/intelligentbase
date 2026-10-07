@@ -2,18 +2,19 @@
 /**
  * @module MOD-IB-24
  * @implements IFC-IB-256（消费 IFC-IB-242 列表 / 243 上传 / 244 删除 / 245 重试）
+ *             IFC-IB-376（REV-18）视图由「知识库」改为「**项目域**」：移除「知识库标识」
+ *             输入框，上传的 `kb_id` 由服务端按已认证主体 `project_id` 推导（ADR-41）
  * @author software-developer
  *
- * 资料管理页：上传、列表、删除、失败重试。
+ * 资料管理页（**项目域**视图）：上传、列表、删除、失败重试。
  *
- * ## `kb_id` 为什么由用户填而不是从后端取
+ * ## 为什么移除「知识库标识」输入框（REV-18 / ADR-41 / IFC-IB-375）
  *
- * 项目可归属的 KB 集合来自服务端配置（`projects.<id>.kb_ids`），但没有对外暴露
- * 「列出本项目的 KB」的端点 —— 为 3 个页面的一个下拉框新增一个端点、一个契约与一条
- * 权限检查，收益不成比例。此处退化为文本输入（默认 `kb_default`，与
- * `deploy/config.example.json` 的示例配置一致）。**越权在这里是拦得住的**：
- * 若填的 `kb_id` 不属于当前项目，后端 `_require_manage` 会抛 `ScopeViolationError` → 403，
- * 前端如实展示，不会被当作「上传失败」模糊掉。
+ * 范围**不可由客户端自证**（架构红线 `architecture_design.md:120`）。REV-18 起
+ * `kb_id` 由**已认证主体的 `project_id`** 推导（`kb_id ≡ project_id`）：上传请求体
+ * **不再携带** kb 字段；`project_id` 经 `X-IB-Project` 头（由 `client.ts` 的 `headers()`
+ * 单点注入，来源于当前项目上下文）。服务端**保留** `assert_kb_in_project` 归属断言
+ * （失败 403）—— 因此「越权」在服务端仍被结构性拦住。
  *
  * ## 轮询只在「有未完成文档」时进行
  *
@@ -34,7 +35,6 @@ const loading = ref(false);
 const error = ref('');
 const statusFilter = ref('');
 
-const kbId = ref('kb_default');
 const picked = ref<File | null>(null);
 const uploading = ref(false);
 const busyDocId = ref('');
@@ -115,7 +115,8 @@ async function upload(): Promise<void> {
   uploading.value = true;
   error.value = '';
   try {
-    await props.client.uploadFile(picked.value, kbId.value.trim());
+    // REV-18：仅传文件；kb_id 由服务端按当前项目推导（不再由客户端提交）。
+    await props.client.uploadFile(picked.value);
     picked.value = null;
     const input = document.querySelector<HTMLInputElement>('input[type=file]');
     if (input) input.value = ''; // 允许再次选择同一文件
@@ -169,13 +170,9 @@ onMounted(load);
 
 <template>
   <section class="page">
-    <h2>资料管理</h2>
+    <h2>资料管理（项目域）</h2>
 
     <form class="uploader" @submit.prevent="upload">
-      <label>
-        知识库标识
-        <input v-model="kbId" type="text" required autocomplete="off" />
-      </label>
       <label>
         选择文件
         <input type="file" accept=".pdf,.txt,.md,.markdown,.docx" @change="onPick" />
@@ -189,7 +186,8 @@ onMounted(load);
       待上传：{{ picked.name }}（{{ humanSize(picked.size) }}）
     </p>
     <p class="hint">
-      支持 PDF / TXT / Markdown / DOCX。上传后进入解析队列，状态自动刷新。
+      支持 PDF / TXT / Markdown / DOCX。资料归属**当前项目**（项目域），
+      上传后进入解析队列，状态自动刷新。
     </p>
 
     <p v-if="error" class="error" role="alert">{{ error }}</p>
@@ -213,7 +211,7 @@ onMounted(load);
       <thead>
         <tr>
           <th>文件名</th>
-          <th>知识库</th>
+          <th>项目域</th>
           <th>大小</th>
           <th>切片</th>
           <th>状态</th>

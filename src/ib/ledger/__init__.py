@@ -66,6 +66,13 @@ __all__ = [
     "SqliteConfigAuditStore",
     "MemoryConfigAuditStore",
     "build_config_audit_store",
+    # REV-18（IFC-IB-370/371）：项目注册表 / LLM Key 存储
+    "SqliteProjectRegistryStore",
+    "MemoryProjectRegistryStore",
+    "build_project_registry_store",
+    "SqliteLlmKeyStore",
+    "MemoryLlmKeyStore",
+    "build_llm_key_store",
 ]
 
 
@@ -694,4 +701,20 @@ def __getattr__(name: str) -> Any:
         from ib.ledger import config_audit as _config_audit
 
         return getattr(_config_audit, name)
+    if name in {
+        "SqliteProjectRegistryStore",
+        "MemoryProjectRegistryStore",
+        "build_project_registry_store",
+    }:
+        from ib.ledger import projects as _projects
+
+        return getattr(_projects, name)
+    if name in {
+        "SqliteLlmKeyStore",
+        "MemoryLlmKeyStore",
+        "build_llm_key_store",
+    }:
+        from ib.ledger import llm_key as _llm_key
+
+        return getattr(_llm_key, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

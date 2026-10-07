@@ -7,13 +7,13 @@
 | 文档 ID | DOC-IB-CR-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 开发者自我代码评审报告 |
 | 产出代理 | software-developer |
-| 调用 ID | INV-GROUP_C-INTELBASE-001（R1）／ INV-GROUP_C-INTELBASE-002（R2 增量）／ INV-GROUP_C-INTELBASE-003（R3 缺陷修复增量）／ INV-GROUP_C-INTELBASE-004（R4 缺陷修复 + 依赖补齐增量）／ INV-GROUP_C-INTELBASE-005（R7 定义外置 + 可视化配置增量）／ INV-GROUP_C-INTELBASE-007（R8 FND-R7-01 校验项补齐）／ INV-GROUP_C-INTELBASE-008（R10 前端构建阻断修复）／ INV-GROUP_C-INTELBASE-010（R11 IB-20 流式 / 会话增量，协调者轮次口径 REV-12）／ **INV-GROUP_C-INTELBASE-012（R13 账户 / 会话 / 商用界面重构增量，设计侧口径 REV-13）** ／ **INV-GROUP_C-INTELBASE-013（R13.1 回修增量：DEFECT-R13-01 来源 IP 维度登录限速修复）** ／ **INV-GROUP_C-INTELBASE-014（R14 回归缺陷修复增量：全局管理员「当前项目」选择与 `X-IB-Project` 传播，设计侧口径 REV-14）** ／ **INV-GROUP_C-INTELBASE-015（REV-16-2 提示词分层 + 工具可视化配置增量，设计侧口径 REV-16-3）** ／ **INV-GROUP_C-INTELBASE-016（REV-16-4 配置审计（只读）+ 存储态暴露 + DEFECT-R16-01/02 修复增量，设计侧口径 REV-16-4）** |
+| 调用 ID | INV-GROUP_C-INTELBASE-001（R1）／ INV-GROUP_C-INTELBASE-002（R2 增量）／ INV-GROUP_C-INTELBASE-003（R3 缺陷修复增量）／ INV-GROUP_C-INTELBASE-004（R4 缺陷修复 + 依赖补齐增量）／ INV-GROUP_C-INTELBASE-005（R7 定义外置 + 可视化配置增量）／ INV-GROUP_C-INTELBASE-007（R8 FND-R7-01 校验项补齐）／ INV-GROUP_C-INTELBASE-008（R10 前端构建阻断修复）／ INV-GROUP_C-INTELBASE-010（R11 IB-20 流式 / 会话增量，协调者轮次口径 REV-12）／ **INV-GROUP_C-INTELBASE-012（R13 账户 / 会话 / 商用界面重构增量，设计侧口径 REV-13）** ／ **INV-GROUP_C-INTELBASE-013（R13.1 回修增量：DEFECT-R13-01 来源 IP 维度登录限速修复）** ／ **INV-GROUP_C-INTELBASE-014（R14 回归缺陷修复增量：全局管理员「当前项目」选择与 `X-IB-Project` 传播，设计侧口径 REV-14）** ／ **INV-GROUP_C-INTELBASE-015（REV-16-2 提示词分层 + 工具可视化配置增量，设计侧口径 REV-16-3）** ／ **INV-GROUP_C-INTELBASE-016（REV-16-4 配置审计（只读）+ 存储态暴露 + DEFECT-R16-01/02 修复增量，设计侧口径 REV-16-4）** ／ **INV-GROUP_C-INTELBASE-019（REV-18 系统管理三分 + 项目 CRUD + LLM Key 管理 + 项目域资料上传增量，设计侧口径 REV-18/REV-18-R2）** |
 | 项目 | intelligentbase |
 | 阶段 | PHASE_06b（自我代码评审） |
-| 版本 | **R13**（R1 主体 §1~§8 未改写；R2 增量见 **§9**；R3 增量见 **§10**；R4 增量见 **§11**；R7 增量见 **§12**；R8 增量见 **§13**；R10 增量见 **§14**；R11 增量见 **§15**；R13 增量见 **§16**；R13.1 回修增量见 **§17**；**R14 回归缺陷修复增量见 §18**；**REV-16-2 提示词分层与工具可视化配置增量见 §19**；**REV-16-4 配置审计（只读）与存储态暴露 + 两回归缺陷修复增量见 §20**；**REV-17 提示词兜底层重定位增量（提示词文本移出定义文档 + 合并结果进 system 位 + 通用内置安全网）见 §21**） |
+| 版本 | **R13**（R1 主体 §1~§8 未改写；R2 增量见 **§9**；R3 增量见 **§10**；R4 增量见 **§11**；R7 增量见 **§12**；R8 增量见 **§13**；R10 增量见 **§14**；R11 增量见 **§15**；R13 增量见 **§16**；R13.1 回修增量见 **§17**；**R14 回归缺陷修复增量见 §18**；**REV-16-2 提示词分层与工具可视化配置增量见 §19**；**REV-16-4 配置审计（只读）与存储态暴露 + 两回归缺陷修复增量见 §20**；**REV-17 提示词兜底层重定位增量（提示词文本移出定义文档 + 合并结果进 system 位 + 通用内置安全网）见 §21**；**REV-18 系统管理三分增量（父级「系统管理」+ 三子项账户/项目/LLM Key + 项目域资料上传 + 项目注册表 CRUD 与软删 + LLM Key 管理）见 §22**） |
 | status | DRAFT（待 GROUP_D / PM 复核） |
-| 上游输入 | `docs/architecture_design.md`（**1.4.0 / R8**，GR-B-005 PASS_WITH_CONDITIONS）、`docs/module_design.md`（**1.4.0 / R8**）、`docs/tech_stack.md`（**1.3.1 / R10**，R8 设计轮次判 NO_CHANGE）、`docs/ib_embed_service_contract.md`（R2，权威契约）、`docs/test_report.md`（**1.7.0 / R11**，FND-R11-01 与「2 项未覆盖 + 4 项部分覆盖 AC」登记处）、`docs/user_stories.md`（**1.3.0 / R7**，US-IB-19 / US-IB-20）；**R10 触发输入** = PM 只读取证（`.github/workflows/ci.yml` 阶段9 `npm ci` 因锁不同步 EUSAGE）与 `src/frontend/package.json` / `package-lock.json` / `ConfigPage.vue` 现场（tech_stack 已随 R10 升至 1.3.1，见 §14）。**R13 触发输入** = `docs/module_design.md` **1.5.0/REV-13**（IFC-IB-309~332 / 第 15 个端口 / §2.2.4 段号索引）、`docs/architecture_design.md` **1.5.0/REV-13**（ADR-18~ADR-27）、`docs/tech_stack.md` **1.4.0/REV-13**（§1 三新行 / §1.4 客户端键登记 / §4.5 第 13~18 项）、`docs/requirements_spec.md` **1.4.0/REV-13**（REQ-FUNC-IB-28~36 / REQ-NFR-IB-15~18 / C-IB-09 / DR-09~DR-17）；上游门控 **GR-B-006 = PASS_WITH_CONDITIONS**（见 §16）；**R13.1 触发输入** = GROUP_D 门控 `condition_1` 登记的 **DEFECT-R13-01**（MEDIUM）/ `tests/integration/test_accounts_int_r13.py::TC-INT-119`（见 §17）；**R14 触发输入** = `docs/architecture_design.md` **1.6.0/REV-14**（ADR-28 项目上下文的选择与传播，Option B 选定 + §2.0.5 R14 影响复核 + §10.1 R14 OPEN ITEM）、`docs/module_design.md` **1.6.0/REV-14**（IFC-IB-333~336 / §2.2.5 段号索引 / §3 MOD-IB-23 端点与契约 / §3 MOD-IB-24 store 与传播约束 / §4.2.5 无环性再声明 / §9.8 覆盖率再声明）、`docs/tech_stack.md` **1.4.0/REV-14**（**NO_CHANGE**：无新依赖）、需求侧 US-IB-24 / AC-IB-24-02 / AC-IB-24-03 / REQ-FUNC-IB-23/31/32、`docs/phase_status.md` 的 **IC-IB-02**（REV-14 实现约束）与 REV-14-2；上游 GROUP_B **GR-B-007 = PASS_WITH_CONDITIONS**（见 §18）。**R14 现场根因** = R13 回归：全局管理员（`users.project_id IS NULL` ⇒ `effective_project == "*"`）因项目级端点 fail-closed 而无法使用任何项目级页面（问答 / 文件 / 重建 / 可视化配置一律 503），且无「选择当前项目」入口。 |
-| 覆盖范围 | MOD-IB-01 ~ MOD-IB-26（**R2 追加 MOD-IB-26**；R1 覆盖 01~25）。**R3 重评 MOD-IB-13 与 MOD-IB-23**；**R4 只重评被触及的部分**：MOD-IB-12 与 MOD-IB-13，外加依赖面新增文件 `src/requirements-embed.txt`（B-05，非模块）；**R7 只重评被触及的部分**：MOD-IB-01（端口 13 → 14 + 结构）、MOD-IB-02（定义文档数据层）、MOD-IB-16（派生注入）、MOD-IB-23（装配期闸门 + 端点）、MOD-IB-24（可视化配置页）；**R8 只重评被触及的部分**：MOD-IB-02（`ib/config/definition.py::validate` 校验项补齐）；**R10 只重评被触及的部分**：MOD-IB-24（前端构建管线：锁同步 / 源文件跟踪 / 类型错误 / 冒烟入口）；**R11 只重评被触及的部分**：MOD-IB-01（R8 类型 / 枚举 / 常量）、MOD-IB-02（键名登记与值域 + `validate` 第 3 子项）、MOD-IB-16（`is_delegating` 消费侧话术）、MOD-IB-21（终态单发 / 可见性 / 确认事件 / 会话存储逐字段复制）、MOD-IB-22（确认门装配 / `resume` fail-closed / G2 单跳交接）、MOD-IB-23（`chat_stream` 显式 4xx + `POST /api/chat/resume`）、MOD-IB-24（确认区呈递 / 决策回传 / 会话标识纪律）；**R13 只重评被触及的部分**：MOD-IB-01（账户 / 会话 / 令牌契约 + 第 15 个端口 `AccountStore`）、MOD-IB-02（IFC-IB-312 键名登记）、MOD-IB-11（bcrypt / `SqliteAccountStore` / `MemoryAccountStore` / 幂等种子）、MOD-IB-23（账户 / 会话 / 账户 CRUD 端点 + `SessionTokenResolver` + 可注入策略 + 中间件扩展 + 装配 + 条件性限速审计）、MOD-IB-24（登录页 / 首登强制改密 / 控制台外壳 / 路由守卫 / 类型化客户端 / 主题 / 组件库本地打包）、MOD-IB-25（迁移 003 / nginx TLS 模板 / 键模板 / 检查清单 B15~B20 / `bcrypt` 依赖登记）；**R13.1 只重评被触及的部分**：MOD-IB-23（`Deps.login_throttle` 应用级装配 + 登录端点判定顺序）；**R14 只重评被触及的部分**：MOD-IB-23（`projects_endpoint` + `api/projects` 路由 + `X-IB-Project` 头契约登记）、MOD-IB-24（`stores/project.ts` 新建 / `api/client.ts` 单点注入 + 项目枚举客户端 / `app/env.ts` 接线 / `layouts/ConsoleLayout.vue` 选择器与视图态重置 / `main.ts` 401 清空） |
+| 上游输入 | `docs/architecture_design.md`（**1.4.0 / R8**，GR-B-005 PASS_WITH_CONDITIONS）、`docs/module_design.md`（**1.4.0 / R8**）、`docs/tech_stack.md`（**1.3.1 / R10**，R8 设计轮次判 NO_CHANGE）、`docs/ib_embed_service_contract.md`（R2，权威契约）、`docs/test_report.md`（**1.7.0 / R11**，FND-R11-01 与「2 项未覆盖 + 4 项部分覆盖 AC」登记处）、`docs/user_stories.md`（**1.3.0 / R7**，US-IB-19 / US-IB-20）；**R10 触发输入** = PM 只读取证（`.github/workflows/ci.yml` 阶段9 `npm ci` 因锁不同步 EUSAGE）与 `src/frontend/package.json` / `package-lock.json` / `ConfigPage.vue` 现场（tech_stack 已随 R10 升至 1.3.1，见 §14）。**R13 触发输入** = `docs/module_design.md` **1.5.0/REV-13**（IFC-IB-309~332 / 第 15 个端口 / §2.2.4 段号索引）、`docs/architecture_design.md` **1.5.0/REV-13**（ADR-18~ADR-27）、`docs/tech_stack.md` **1.4.0/REV-13**（§1 三新行 / §1.4 客户端键登记 / §4.5 第 13~18 项）、`docs/requirements_spec.md` **1.4.0/REV-13**（REQ-FUNC-IB-28~36 / REQ-NFR-IB-15~18 / C-IB-09 / DR-09~DR-17）；上游门控 **GR-B-006 = PASS_WITH_CONDITIONS**（见 §16）；**R13.1 触发输入** = GROUP_D 门控 `condition_1` 登记的 **DEFECT-R13-01**（MEDIUM）/ `tests/integration/test_accounts_int_r13.py::TC-INT-119`（见 §17）；**R14 触发输入** = `docs/architecture_design.md` **1.6.0/REV-14**（ADR-28 项目上下文的选择与传播，Option B 选定 + §2.0.5 R14 影响复核 + §10.1 R14 OPEN ITEM）、`docs/module_design.md` **1.6.0/REV-14**（IFC-IB-333~336 / §2.2.5 段号索引 / §3 MOD-IB-23 端点与契约 / §3 MOD-IB-24 store 与传播约束 / §4.2.5 无环性再声明 / §9.8 覆盖率再声明）、`docs/tech_stack.md` **1.4.0/REV-14**（**NO_CHANGE**：无新依赖）、需求侧 US-IB-24 / AC-IB-24-02 / AC-IB-24-03 / REQ-FUNC-IB-23/31/32、`docs/phase_status.md` 的 **IC-IB-02**（REV-14 实现约束）与 REV-14-2；上游 GROUP_B **GR-B-007 = PASS_WITH_CONDITIONS**（见 §18）。**R14 现场根因** = R13 回归：全局管理员（`users.project_id IS NULL` ⇒ `effective_project == "*"`）因项目级端点 fail-closed 而无法使用任何项目级页面（问答 / 文件 / 重建 / 可视化配置一律 503），且无「选择当前项目」入口。**REV-18 触发输入** = `docs/architecture_design.md` **1.10.2/REV-18-R2**（ADR-37~ADR-42 + **ADR-21-R1**：N:1 订正，关闭 OI-1）、`docs/module_design.md` **1.10.2/REV-18-R2**（IFC-IB-366~377 + §2.2.9 REV-18 IFC 段号索引；端口 17 → 19 纯追加）、`docs/tech_stack.md` **1.4.1/REV-18**（**NO_CHANGE**：零新增第三方依赖，复用 stdlib `sqlite3`）、`docs/requirements_spec.md` **1.10.0/REV-18-2**（REQ-FUNC-IB-43~48 / REQ-NFR-IB-20 / C-IB-42~43 / OOS-18~19 / DR-21）、`docs/user_stories.md` **1.10.0/REV-18-2**（US-IB-35~40）；上游门控 **GR-B-010（+REV-18-R1/R2 收尾）= PASS**。 |
+| 覆盖范围 | MOD-IB-01 ~ MOD-IB-26（**R2 追加 MOD-IB-26**；R1 覆盖 01~25）。**R3 重评 MOD-IB-13 与 MOD-IB-23**；**R4 只重评被触及的部分**：MOD-IB-12 与 MOD-IB-13，外加依赖面新增文件 `src/requirements-embed.txt`（B-05，非模块）；**R7 只重评被触及的部分**：MOD-IB-01（端口 13 → 14 + 结构）、MOD-IB-02（定义文档数据层）、MOD-IB-16（派生注入）、MOD-IB-23（装配期闸门 + 端点）、MOD-IB-24（可视化配置页）；**R8 只重评被触及的部分**：MOD-IB-02（`ib/config/definition.py::validate` 校验项补齐）；**R10 只重评被触及的部分**：MOD-IB-24（前端构建管线：锁同步 / 源文件跟踪 / 类型错误 / 冒烟入口）；**R11 只重评被触及的部分**：MOD-IB-01（R8 类型 / 枚举 / 常量）、MOD-IB-02（键名登记与值域 + `validate` 第 3 子项）、MOD-IB-16（`is_delegating` 消费侧话术）、MOD-IB-21（终态单发 / 可见性 / 确认事件 / 会话存储逐字段复制）、MOD-IB-22（确认门装配 / `resume` fail-closed / G2 单跳交接）、MOD-IB-23（`chat_stream` 显式 4xx + `POST /api/chat/resume`）、MOD-IB-24（确认区呈递 / 决策回传 / 会话标识纪律）；**R13 只重评被触及的部分**：MOD-IB-01（账户 / 会话 / 令牌契约 + 第 15 个端口 `AccountStore`）、MOD-IB-02（IFC-IB-312 键名登记）、MOD-IB-11（bcrypt / `SqliteAccountStore` / `MemoryAccountStore` / 幂等种子）、MOD-IB-23（账户 / 会话 / 账户 CRUD 端点 + `SessionTokenResolver` + 可注入策略 + 中间件扩展 + 装配 + 条件性限速审计）、MOD-IB-24（登录页 / 首登强制改密 / 控制台外壳 / 路由守卫 / 类型化客户端 / 主题 / 组件库本地打包）、MOD-IB-25（迁移 003 / nginx TLS 模板 / 键模板 / 检查清单 B15~B20 / `bcrypt` 依赖登记）；**R13.1 只重评被触及的部分**：MOD-IB-23（`Deps.login_throttle` 应用级装配 + 登录端点判定顺序）；**R14 只重评被触及的部分**：MOD-IB-23（`projects_endpoint` + `api/projects` 路由 + `X-IB-Project` 头契约登记）、MOD-IB-24（`stores/project.ts` 新建 / `api/client.ts` 单点注入 + 项目枚举客户端 / `app/env.ts` 接线 / `layouts/ConsoleLayout.vue` 选择器与视图态重置 / `main.ts` 401 清空）；**REV-18 只重评被触及的部分**：MOD-IB-01（`ProjectRegistryEntry`/`ProjectStatus`/`LlmKeyStatus`/`LlmKeyRecord`/`LLM_KEY_MASK` + 第 18 个端口 `ProjectRegistryStore`（5 方法）/ 第 19 个端口 `LlmKeyStore`（3 方法）+ `AccountStore.update_user` 加成式扩展（13 → 14））、MOD-IB-02（`IB_PROJECT_REGISTRY_BACKEND` / `IB_LLM_KEY_BACKEND` 仅登记键名，不入 `IB_ENV_KEYS`）、MOD-IB-11（`SqliteProjectRegistryStore`/`MemoryProjectRegistryStore`/`SqliteLlmKeyStore`/`MemoryLlmKeyStore` + 迁移单源 `005_projects.sql`/`006_llm_key.sql` + `_harden_file_permissions`）、MOD-IB-20（`UnconfiguredLlmProvider` 调用期 fail-closed）、MOD-IB-23（`projects_endpoint` 数据源切换 + `POST`/`PATCH`/`DELETE /api/projects` + `PATCH|DELETE /api/accounts/{user_id}` + 建账号 422 顺序依赖 + `GET|PUT|DELETE /api/llm-key` + `_upload_file` kb 推导 + `/healthz/deps` llm 字段）、MOD-IB-24（系统管理三分 IA + `ProjectsPage`/`LlmKeyPage`/`SystemSection.vue` + 上传页去 kb + 类型化客户端）、MOD-IB-25（迁移 005/006 + 检查清单 B21~B23 + `env.example` 两新键） |
 | 评审方式 | 5 维评分 + 逐条 finding（含文件:行号）+ 离线实跑证据 |
 ---
 
@@ -2701,3 +2701,108 @@ EXIT=2
 **REV-17 增量自评 = PASS_WITH_MINOR**：**CRITICAL = 0 / MAJOR = 0 / MINOR = 3**（1 项建议下轮改签名、1 项结转、1 项登记观察）。三项均**非阻塞**。三件事（移出定义文档 / 进 system 位 / 通用安全网）全部落地并经离线实跑验证：Python 327 / 前端 29 / 自检 51 全绿，零回归。
 
 **§21.9 守约复核**：未新增模块（仍 26）/ 未改端口数（仍 17）/ 未新增第三方依赖 / 未改模块边界 / 未改依赖边（DAG 不变）/ 未改配置键名与默认值 / **未 bump `schema_version`** / 未改 `IFC-IB-001~363` 中除两处索引已登记 10 条口径外的任何编号与签名名 / **未改任何既有 ADR 正文**（ADR-15 与 ADR-15-R1 一字未动，收窄全落 ADR-15-R2；ADR-29 / ADR-31 / ADR-33 的修订均带**明文 REV-17 标记**）/ 两条顶层键红线守住（definition GET 与 PUT 顶层恰 4 键、prompts 顶层恰 5 键）/ 未 `git add` / `commit` / `push` / 部署 / FreeArk 参考仓**只读** / 无任何口令、令牌或密钥字面量。
+
+---
+
+## §22 REV-18 增量自评（系统管理三分 + 项目 CRUD + LLM Key 管理 + 项目域资料上传）
+
+**设计侧口径**：`docs/architecture_design.md` **1.10.2/REV-18-R2**（ADR-37~ADR-42 + **ADR-21-R1**）+ `docs/module_design.md` **1.10.2/REV-18-R2**（IFC-IB-366~377 + §2.2.9）+ `docs/tech_stack.md` **1.4.1/REV-18**（NO_CHANGE）+ `docs/requirements_spec.md` **1.10.0/REV-18-2** / `docs/user_stories.md` **1.10.0/REV-18-2**。**本节五维评分与 finding 覆盖以下被触及文件**（20 个）：`src/ib/core/types.py`、`src/ib/core/ports.py`、`src/ib/core/__init__.py`、`src/ib/config/__init__.py`、`src/ib/ledger/schema.py`、`src/ib/ledger/projects.py`（新）、`src/ib/ledger/llm_key.py`（新）、`src/ib/ledger/accounts.py`、`src/ib/ledger/__init__.py`、`src/ib/llm/__init__.py`、`src/ibweb/views.py`、`src/ibweb/urls.py`、`src/ibweb/serializers.py`、`src/ibweb/composition.py`、`src/frontend/src/router/index.ts`、`src/frontend/src/layouts/ConsoleLayout.vue`、`src/frontend/src/views/{SystemSection,ProjectsPage,LlmKeyPage,UploadPage,AccountsPage}.vue`、`src/frontend/src/api/client.ts`、`src/deploy/migrations/005_projects.sql`（新）、`src/deploy/migrations/006_llm_key.sql`（新）、`src/deploy/checklists.txt`、`src/deploy/env.example`。
+
+### 22.1 结论摘要（9 条红线逐条取证）
+
+| 红线 | 结论 | 取证（file:line） | 验证方式 |
+|------|------|------------------|----------|
+| **① kb 归属断言不削弱** | **DONE** | `src/ibweb/views.py:312`（`_upload_file`）→ `:327`（`kb_id = scope.project_id`）→ `:329`（`deps.ledger.assert_kb_in_project(scope.project_id, kb_id)`）；`src/ib/ledger/schema.py::project_registry_ddl_script()`（`kb_default` 幂等前向迁移） | `tests/integration/test_http_contract.py::test_TC_INT_035`（请求体 `kb_b` 被忽略 → 201 且 `kb_id=="p_alpha"`）+ `::test_TC_INT_035b`（**端口层**直测：`assert_kb_in_project("p_alpha","kb_b")` 抛 `ScopeViolationError`）；`selfcheck.py::http_contract_offline` 同断言 |
+| **② 凭据纪律** | **DONE** | `src/ibweb/views.py:2023-2057`（`llm_key_endpoint`：PUT 唯一写入口）；`src/ib/core/types.py:1448`（`LlmKeyStatus` 无明文字段）/ `:1426`（`LLM_KEY_MASK`）；`src/ib/ledger/llm_key.py:134-146`（POSIX `chmod 0600`）；`src/ibweb/authz.py:253`（`token_in_query_forbidden`） | `tests/integration/test_rev18_system_management_int.py::test_TC_INT_152`（PUT 后响应体**不含** `sk-rev18` 前缀）/ `::test_TC_INT_153`（非 admin 403 + `?token=` 400 + 零 Cookie） |
+| **③ 缺 Key 非致命** | **DONE** | `src/ibweb/composition.py:494-500`（`llm_key_store.get()` → `resolved_llm_key`）+ `:671-672`（`llm_configured=bool(resolved_llm_key)` 入启动日志）；`src/ib/llm/__init__.py:303-305`（`UnconfiguredLlmProvider.health()` → `ok=False, detail="LLM 未配置（Key 未设置）"`）；`src/ibweb/views.py:769`（`/healthz/deps` llm 字段） | 启动**不**因缺 Key 失败（`selfcheck.py` 全 51 项离线装配通过即证据）；`tests/integration/test_http_contract.py::test_TC_INT_029` 断言 `/healthz/deps` 含 llm 字段 |
+| **④ 契约红线（4/5 键）** | **DONE（未触碰）** | `src/ibweb/views.py:880-886`（definition 顶层恰 4 键）/ `:1256-1274`（prompts 顶层恰 5 键） | 本轮零改动，由既有 `selfcheck.py` / `tests/integration/test_prompt_config_r16.py` 断言继续守护 |
+| **⑤ 分层规则** | **DONE（未触碰）** | `src/ib/config/__init__.py` 本轮仅追加键名登记，**无新 import 边** | 沿用既有分层断言 |
+| **⑥ `_clients` 装配期常量** | **DONE（未触碰）** | `src/ib/llm/__init__.py:162`（无界 dict）/ `:236-266`（键含 `system_prompt`；REV-17 已立硬规则） | 本轮零改动 |
+| **⑦ 账户语义** | **DONE** | `src/ib/ledger/schema.py:206-221`（`users.project_id TEXT` **无 UNIQUE**）；`src/ibweb/views.py:1948-2020`（`account_detail_endpoint`）→ `:2005-2007`（`confirm_username`）/ `:2008-2010`（`role=="admin"` → `ConflictError` → 409）/ `:2011`（软删 `set_status(...,"disabled")`）；`:1543-1552`（项目 `confirm_project_id`）；`:1916-1928`（建账号前置 422） | `test_TC_INT_127`（422 + 停用后空列表）、`test_TC_INT_150`（改名 200 / 404 / 禁删 admin 409 / 确认不符 400 / 软删 200 → 登录 401）、`test_TC_INT_151`（顺序依赖正反例） |
+| **⑧ 迁移** | **DONE** | `src/deploy/migrations/005_projects.sql`、`006_llm_key.sql`（均由 `schema.py` 单源原样摘录；纯追加 `CREATE TABLE IF NOT EXISTS`） | `selfcheck.py::r13_deploy_discipline`（4b）断言两文件存在 + 幂等建表 + **可执行语句无 `DROP TABLE`** + 006 含 `CHECK (id = 1)` |
+| **⑨ 环境纪律** | **DONE** | 零新增第三方依赖（`src/requirements*.txt` 未改；复用 stdlib `sqlite3`）；前端依赖集不变（Element Plus / vue-router 仍本地打包） | `tech_stack.md` 1.4.1/REV-18 判 **NO_CHANGE**；`npm run build` 无新 CDN 引用 |
+
+### 22.2 finding 计数
+
+| 级别 | 数量 | 明细 |
+|------|------|------|
+| **CRITICAL** | **0** | — |
+| **MAJOR** | **0** | — |
+| **MINOR** | **4** | MINOR-1（运行期新建项目未登记配置 → 检索 / 上传不可用，D-R18-01）；MINOR-2（`assert_kb_in_project` 的 403 分支在 HTTP 层不可达，设计使然）；MINOR-3（`LlmKeyStatus.masked` 未配置时为 `""`，前端以 `—` 兜底）；MINOR-4（CRED-01 结转，非本轮引入） |
+
+### 22.3 逐条 finding（含位置 / 事实 / 处置）
+
+**MINOR-1 · 运行期经 `POST /api/projects` 新建的项目「可建账号、可枚举，但尚不可用于检索 / 上传」**
+- 位置：`src/ibweb/composition.py::_projects_from_registry`（`Deps.projects` 由注册表派生）与 `src/ib/ledger/*` 的 `load_project_record(ledger, cfg, project_id)`（对**不在配置文件**中的项目抛 `ConfigError`）。
+- 事实：`POST /api/projects` 在注册表建行（`status="active"`），账号可绑定（422 前置通过）、可被 `GET /api/projects` 枚举；但检索 / 上传所需的 collection 与 ledger 项目记录仍源自**配置文件**（装配期装载）。因 `kb_id ≡ project_id`，上传路径会对未登记配置的项目拿不到 `ProjectRecord` → `ConfigError`。
+- 为何不修：这是 **ADR-32「生效 = 保存 + 服务重启重装配」在项目维度的自然延伸** —— 允许运行期把项目注入配置会**引入第二真源**（配置文件 vs 注册表），越 ADR 边界。正确用法 = 建项目 → 配置侧登记 → **由用户**执行服务重启。
+- **判定：MINOR（非阻塞；登记为交付注意 + `architecture_design.md §10.1` 性质）**。
+
+**MINOR-2 · `assert_kb_in_project` 的 403 分支在 HTTP 层不可从客户端触发**
+- 位置：`src/ibweb/views.py:329`。
+- 事实：因 `kb_id` **恒等于**主体的 `project_id`（`:327`），提交任何 kb 字段都被忽略，故 HTTP 层**结构上不可能**提交外项目 kb —— 403 分支保留但不可达。这是「**比 403 更强**」的保证（外项目 kb 在上传路径**无法被表达**），**不是**断言被删或放宽。
+- 取证：`tests/integration/test_http_contract.py::test_TC_INT_035b` 在**端口层**直测断言本体仍 fail-closed（`ScopeViolationError`）；`selfcheck.py::http_contract_offline` 同。
+- **判定：MINOR（设计使然；已在用例与 §25.3(e) 明文记录，避免后人误判为「死代码」而删除）**。
+
+**MINOR-3 · `LlmKeyStatus.masked` 在未配置时为 `""`（空串）而非固定掩码**
+- 位置：`src/ib/ledger/llm_key.py::_status_of`（`record is None` → `masked=""`）。
+- 事实：契约语义正确（未配置即无掩码可言），但前端 `LlmKeyPage.vue` 仍渲染 `{{ configured ? status?.masked : '—' }}`（以 `configured` 分流），故界面不会出现空白。**无缺陷**，仅登记「空串」这一取值以固定契约理解。
+- **判定：MINOR（非阻塞，登记）**。
+
+**MINOR-4 · CRED-01 结转**
+- 沿用既有登记的凭据面观察项（历史遗留，**非本轮引入**）。REV-18 的凭据面**只收紧不放松**：LLM Key 载体由 `.env`（0600）改为 **DB 单行表**（`C-IB-42` 修订），进一步减少明文落盘面；HTTP 只回 `LlmKeyStatus`（**类型层无明文字段**）；审计只记 `outcome="updated"/"cleared"`，**不记 Key 值 / 掩码 / 前缀**（`views.py:2046` / `:2050`）。
+- **判定：MINOR（非阻塞，结转）**。
+
+### 22.4 逐模块 REV-18 评审详情
+
+| MOD-ID | 模块 | 评审要点 | 结论 |
+|--------|------|----------|------|
+| MOD-IB-01 | 核心契约 | 新增 `ProjectRegistryEntry` / `ProjectStatus` / `LlmKeyStatus` / `LlmKeyRecord` / `LLM_KEY_MASK`（frozen，纯 stdlib）；`ProjectRegistryStore`（**恰 5 方法**）/ `LlmKeyStore`（**恰 3 方法**）Protocol；`AccountStore.update_user` 为 **加成式扩展**（既有 13 方法文本一字不改 → 14）。`LlmKeyStatus` **类型层不含明文字段** —— 凭据纪律由类型系统承载，而非靠调用方自觉 | 通过 |
+| MOD-IB-02 | 配置 / 数据层 | 新增 `IB_PROJECT_REGISTRY_BACKEND` / `IB_LLM_KEY_BACKEND` **仅登记键名**，且**不进入** `IB_ENV_KEYS` 核心装配开关集合（`selfcheck.py` 5b 断言）；**缺 Key 非致命**的启动校验口径改由组合根承载（不在此模块 fail-fast） | 通过 |
+| MOD-IB-11 | SQL 适配器 / 迁移单源 | `project_registry_ddl_script()` / `llm_key_ddl_script()` 为**单源**；`ensure_schema` 幂等并入（对既有库同样生效）；`missing_llm_key_columns` 守结构完整；内存替身与 SQL 实现**同契约**（同一套一致性自检）；`_harden_file_permissions` 在 **POSIX** 上 best-effort `0600`，**属主对齐由用户在部署期执行**（不越权） | 通过 |
+| MOD-IB-20 | LLM 提供方 | `UnconfiguredLlmProvider`：`health()` **永不抛**且如实声明未配置；`build_expert` / `build_aggregator` **调用期** fail-closed（错误文本不含 Key 信息）；`build_llm_provider(cfg, api_key=...)` 缺 Key 返回该形态 —— **启动路径零异常**（ADR-39 Option C） | 通过 |
+| MOD-IB-23 | Web / 组合根 / 端点 | `projects_endpoint` **数据源切换**而授权口径 / 响应字段 / fail-closed 语义**逐位不变**；`project_detail_endpoint` 二次确认 + 软删；`account_detail_endpoint` 禁删 admin / 二次确认 / 软删 + 撤销会话；`accounts_endpoint` POST **前置 422**（顺序依赖，**不静默建无主账号**）；`llm_key_endpoint` 唯一写入口 + 只回 `LlmKeyStatus`；`_upload_file` kb 推导 + **保留**断言；`_project_registry` / `_llm_key_store` 不可用 → `DependencyUnavailableError` → 503（fail-closed）。**非 admin 一律 403**（`_require_admin` 前置） | 通过 |
+| MOD-IB-24 | 前端 | 三分 IA（父级 + 三子项）只作**体验分组**，`requiresAdmin` 不承担安全（服务端 403 兜底）；hash 路由保留（不引 `try_files`）；旧 `#/accounts` 深链重定向；`uploadFile` 去掉 kb 入参（`FormData` 只 append `file`）；`LlmKeyPage` 只回显掩码 / 存在性 / 更新时间，明文提交后**立即清空**，且**不暗示即时生效**（明示「重启由用户手工执行」） | 通过 |
+| MOD-IB-25 | 部署交付物 | `005` / `006` 纯追加快照；`checklists.txt` 新增 B21（项目注册表迁移幂等 / 前向 / 回滚）、B22（承载库文件 0600 属主对齐）、B23（Key 不入 `.env` / git / 命令行）；签署行同步至 **B1–B23**；`env.example` 登记两个后端键并**明文声明「Key 值不入 .env」** | 通过 |
+
+### 22.5 5 维评分（REV-18 增量，仅被触及面）
+
+| 维度 | 得分 | 依据 |
+|------|------|------|
+| Correctness | **9** | 端点契约与 IFC-IB-372~374 逐条对齐（状态码 / 二次确认 / 软删 / 422 顺序依赖）；kb 由主体推导后「越权上传」**结构上不可达**；缺 Key 非致命而其它必需项仍 fail-fast。扣 1：MINOR-1（运行期新建项目的能力边界需用户重启才齐备，属 D-R18-01 预期）。 |
+| Security | **10** | 凭据纪律**只收紧不放松**（Key 载体由 `.env` 改 DB；HTTP 类型层无明文；审计不记 Key；0600）；非 admin 一律服务端 403（UI 分组非权限机制）；`?token=` 一律 4xx；零 `Set-Cookie`；`project_id` 字符集收窄防路径注入；软删替代硬删（OOS-19）。 |
+| Performance | **9** | 注册表 / Key 存储复用**同一 SQLite 文件**（不引第二后端）；`GET /api/projects` 由 `list_active()` 单次查询；`LlmKeyStore` 为单行表（读写 O(1)）。扣 1：列表未分页（项目量级小，与既有口径一致）。 |
+| Maintainability | **9** | 端口数 / 方法数在自检中**写死并可自证**（`AccountStore` 14 / `ProjectRegistryStore` 5 / `LlmKeyStore` 3）；内存与 SQL 实现同契约；迁移为单源快照（可人工审阅）；`_PROJECT_ID_PATTERN` 单点收窄。扣 1：MINOR-2 / MINOR-3 的登记项需靠注释与用例保持可见性。 |
+| Test Coverage（可测试性） | **9** | 新增集成用例 6 条（TC-INT-148~153）覆盖项目生命周期 / 授权 / 账户改删 / 顺序依赖 / LLM Key 生命周期与纪律；前端冒烟新增 5 条（30~34）；4 条既有用例就地对齐新契约；`selfcheck` 三条既有检查订正为 REV-18 口径。扣 1：运行期新建项目的「配置登记 + 重启」路径属部署行为，不在离线可测范围（MINOR-1）。 |
+| **均值** | **9.2** | — |
+
+### 22.6 REV-18 实跑证据（命令 + 实际结果 + EXIT）
+
+| # | 命令 | 实际结果 | EXIT |
+|---|------|----------|------|
+| 1 | `python -m pytest tests/unit tests/integration tests/e2e -q` | **334 passed**（unit **149** / integration **161** / e2e **24**；零 skip 零 xfail；相对 REV-17 基线 327 **零回归**） | **0** |
+| 2 | `python -m pytest tests/integration/test_rev18_system_management_int.py -q` | **6 passed**（TC-INT-148~153） | **0** |
+| 3 | `python -X utf8 src/scripts/selfcheck.py` | **51/51 通过** | **0** |
+| 4 | `cd src/frontend && npm run typecheck` | 无输出（`vue-tsc --noEmit`） | **0** |
+| 5 | `cd src/frontend && npm test` | **34 passed**（REV-17 为 29；新增 30~34） | **0** |
+| 6 | `cd src/frontend && npm run build` | `✓ built in 4.19s`（chunk 体积告警为既有 Element Plus 体积，非本轮回归） | **0** |
+
+**就地订正既有用例（4 条，均为「契约变更 → 测试同步」，非放宽断言）**：见 `docs/implementation_plan.md` §25.5 表 —— `test_TC_INT_035`（改写 + 新增 035b）、`test_TC_E2E_001` / `002`（`Scope` kb 段改为 `p_alpha`）、`test_TC_INT_126` / `127`（方法纪律与顺序依赖口径）。
+
+**行为等价性论证**：REV-18 **不改变任何既有端点的既有语义** —— 只新增端点族与切换 `GET /api/projects` 数据源（授权口径与响应字段不变）；上传路径的可见变化为「请求体 kb 被忽略、落库 kb_id = 主体 project_id」，由改写后的 035 + 新增 035b **双向**守护。
+
+### 22.7 REV-18 本地不可验证项（如实登记）
+
+| # | 项 | 为何本地不可验 | 处置 |
+|---|----|----------------|------|
+| 1 | 生产**承载库文件 0600 与属主对齐服务账号**（B22） | 需目标机文件系统与账号权限；属主变更须改变运行身份 | **由用户**在部署期执行并核对（检查清单 B22）；实现侧只做 POSIX best-effort `chmod 0600` |
+| 2 | LLM Key 的**真实 DeepSeek 调用**与「未配置 → fail-closed」的生产表现 | 需真实 Key 与外网 | 部署阶段实测；离线仅验证形态与状态码（`UnconfiguredLlmProvider.health()`） |
+| 3 | 运行期新建项目的**完整可用性**（配置登记 + 重启后检索 / 上传） | 属部署行为（ADR-32 生效口径），且需用户手工重启 | 见 MINOR-1 / D-R18-01；**首次环境变量配置与生产重启须由用户执行**，本代理不执行 |
+| 4 | `005` / `006` 在**既有生产库**上的前向迁移实况 | 需目标机库文件（本阶段禁写操作） | 部署阶段按 B21 执行并归档证据；`ensure_schema()` 幂等已由离线装配覆盖 |
+| 5 | 前端三分 IA 的**视觉 / 交互**实际效果 | 本机仅源码结构 + 构建验证 | 部署后人工核对；冒烟用例已锁结构契约（路由 / 导航 / 文案 / 无即时生效暗示） |
+
+### 22.8 §22 结论
+
+**REV-18 增量自评 = PASS_WITH_MINOR**：**CRITICAL = 0 / MAJOR = 0 / MINOR = 4**（D-R18-01 能力边界 1 项 + 设计使然 1 项 + 契约取值 1 项 + 历史结转 1 项），**四项均非阻塞**。九条红线逐条落地并取证；离线实跑 Python **334** / 前端 **34** / 自检 **51/51** 全绿，相对 REV-17 零回归。
+
+**§22.9 守约复核**：未新增模块（仍 **26**）/ 端口 **17 → 19**（纯追加，`ProjectRegistryStore` + `LlmKeyStore`）/ 未新增第三方依赖（复用 stdlib `sqlite3`）/ 未改模块边界 / **未新增 §4.1 依赖边（DAG 不变）** / 未改既有配置键名与默认值（仅新增两个后端键，不入 `IB_ENV_KEYS`）/ 未改 `IFC-IB-001~365` 中除已登记 7 条（`IFC-IB-024` / 242 / 243 / 262 / 263 / 321 / 333）口径外的任何编号与签名名 / **未改任何既有 ADR 正文**（ADR-21 一字未动，N:1 全落 **ADR-21-R1**）/ 未 bump `schema_version` / 两条顶层键红线守住（definition 顶层恰 4 键、prompts 顶层恰 5 键）/ 未 `git add` / `commit` / `push` / 部署 / FreeArk 参考仓**只读** / **无任何口令、令牌或密钥字面量**（测试内 LLM Key 为 `sk-rev18-placeholder-not-a-real-key-0000` 占位值）/ **不引运行期热重载**；**生产后端重启与首次环境变量配置须由用户执行**（本代理不执行，文档只写「由用户执行」）。

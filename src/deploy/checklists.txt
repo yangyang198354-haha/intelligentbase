@@ -193,6 +193,12 @@
     属**已知且已声明**的数据外发，不是泄漏。凭据本身**不得**出现在任何输出/日志中。
     注意：若 `langchain-openai` 版本 >= 0.3，`build_llm_provider` 应在构造期即报错
     （`assert_langchain_openai_version`）—— 这正是 B2 要单独核对版本的原因。
+    REV-18 补注（ADR-38 / ADR-39）：**LLM Key 的取值来源改由 DB 装配期解析**（见 [B23]），
+    `IB_LLM_API_KEY` **不再是 Key 来源**（登记型口径修订）。上面直接 `build_llm_provider(cfg)`
+    （不传 `api_key`）走的是**历史 / 兼容**回退（`read_secret(api_key_env)`）；生产经组合根装配，
+    Key 由 `LlmKeyStore.get()` 解析后注入。**缺 Key 非致命**（ADR-39）：此时本段将得到
+    `UnconfiguredLlmProvider`（`egress.remote=True` 仍成立，`health.ok=False`，调用期 fail-closed），
+    故 B7 的「成功极小调用」验收**须先按 [B23] 写入 Key 并重启后再执行**。
 
 [B8] 台账（SQLite）WAL 与并发参数真生效
     $ /opt/intelligentbase/venv/bin/python -c "
@@ -327,10 +333,39 @@
     说明：四个迁移文件（001/002/003/004）由既有的 `ExecStartPre` 统一应用；
     本增量**不新增** systemd 单元（仍为四单元，DR-09），也未引入 Django ORM / makemigrations。
 
+[B21] 项目注册表迁移幂等、可前向、可回滚（REV-18 / ADR-37 / IFC-IB-377）
+    $ python -m ibweb.bootstrap --ensure-schema       # 期望：可重复执行，无报错
+    $ python -m ibweb.bootstrap --ensure-schema       # 再跑一次（幂等重放，无副作用）
+    $ sqlite3 /var/lib/intelligentbase/ledger/ledger.sqlite3 ".schema projects" | grep -E 'status|updated_at'
+    $ sqlite3 /var/lib/intelligentbase/ledger/ledger.sqlite3 "SELECT COUNT(*) FROM projects WHERE status='active';"
+    [ ] `005_projects.sql` 幂等重放无副作用（`CREATE TABLE / INDEX IF NOT EXISTS` + 前向数据迁移收敛）
+    [ ] `projects` 表含注册表侧列 `status`（默认 `'active'`）与 `updated_at`；索引 `idx_projects_status` 存在
+    [ ] `kb_default` 归属迁移幂等（重复执行后 `SELECT COUNT(*) FROM documents WHERE kb_id='kb_default';` 归零）
+    [ ] 回滚策略确认：本迁移**纯前向放大** → 回滚 = **代码回滚**（数据保留；不执行破坏性 DDL）
+    说明：`005_projects.sql` 由既有 `ExecStartPre` 统一应用；软删 = 置 `status='disabled'`（不删行，OOS-19）。
+
+[B22] LLM Key 承载库文件权限 0600 且属主对齐服务账号（REV-18 / ADR-38 / REQ-NFR-IB-20）
+    $ stat -c '%a %U:%G %n' /var/lib/intelligentbase/ledger/ledger.sqlite3   # 期望 600 <运行用户>:<组>
+    $ sqlite3 /var/lib/intelligentbase/ledger/ledger.sqlite3 ".schema llm_key" | grep -i 'CHECK (id = 1)'
+    [ ] 承载库文件（含 `llm_key` 表的 `ledger.sqlite3`）mode 为 **600**
+    [ ] 该文件属主为运行用户（`ib-web` / `ib-worker` 的服务账号；**属主对齐须由用户执行**）
+    [ ] `llm_key` 为单行表（`CHECK (id = 1)`），全局唯一一个 Key（OQ-IB-26；多供应商 = OOS-18）
+    说明：文件权限位由 `SqliteLlmKeyStore` 在 POSIX 上 best-effort 收紧；**属主变更须由用户在部署期执行**。
+
+[B23] LLM Key 不入 `.env` / 不进 git / 不进命令行（REV-18 / C-IB-42）
+    $ grep -c -iE 'IB_LLM_API_KEY|sk-' /etc/intelligentbase/ib-web.env ; echo "exit=$?"   # 期望 0
+    $ git grep -nE 'sk-[A-Za-z0-9]|IB_LLM_API_KEY=' -- . ; echo "exit=$?"                  # 期望无命中
+    $ grep -c -iE 'llm[-_]?key|secret|sk-' <(journalctl -u ib-web -n 5000 --no-pager)      # 期望 0
+    [ ] `.env` 中**无** LLM Key（`IB_LLM_API_KEY` 不再是 Key 来源；`.env` 仅保留其他非 LLM 密钥）
+    [ ] 仓库 / 提交历史 / 命令行与 shell history 中 **Key 零命中**（唯一写入口 = `PUT /api/llm-key`）
+    [ ] 日志 / 审计中 **Key 明文与掩码零命中**（响应只承载 `configured` / `masked` / `updated_at`）
+    警告：本仓库**不得**出现任何真实 Key 值（含示例 / 注释 / 测试 / 提交历史）。
+    若曾误写入，删除文件**不足以**消除影响 —— 必须同时认定该 Key 已泄露并轮换处置。
+
 ##############################################################################
 # C. 验收签署
 ##############################################################################
 [ ] A1–A8 全部勾选，证据归档（命令原文 + 时间戳）
-[ ] B1–B20 全部勾选，证据归档
+[ ] B1–B23 全部勾选，证据归档
 [ ] 本文件不含任何真实凭据（自检：grep -nE 'sk-|ghp_|BEGIN .*PRIVATE KEY' 本文件应无命中）
 执行人：____________  复核人：____________  日期：____________

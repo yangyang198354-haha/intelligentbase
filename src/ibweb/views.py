@@ -8,6 +8,10 @@
             IFC-IB-333（R14）`GET /api/projects` 项目枚举（admin 全部 / ops 仅自身）
             IFC-IB-359/360（REV-16-4）`GET /api/config/audit` + 保存路径审计挂钩
             IFC-IB-362（REV-16-4）`GET /api/config/storage-state`
+            IFC-IB-372（REV-18）`GET|POST /api/projects` + `PATCH|DELETE /api/projects/{project_id}`
+            IFC-IB-373（REV-18）`PATCH|DELETE /api/accounts/{user_id}` + `POST /api/accounts` 顺序前置
+            IFC-IB-374（REV-18）`GET|PUT|DELETE /api/llm-key`（唯一写入口）
+            IFC-IB-375（REV-18）`POST|GET /api/files` 项目域化（kb_id 由主体 project_id 推导）
 @depends MOD-IB-23（authz/composition/serializers/sse）, MOD-IB-11/12/13/14/15/22（服务）
 @author software-developer
 
@@ -54,6 +58,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any
 
 from rest_framework import serializers, status
@@ -67,6 +72,7 @@ from ib.core import (
     DocStatus,
     IbError,
     NotFoundError,
+    ProjectRegistryEntry,
     ScopeViolationError,
     StorageState,
     ValidationError,
@@ -99,6 +105,8 @@ from ibweb.serializers import (
     EgressDescriptorSerializer,
     FileListEnvelopeSerializer,
     HealthStatusSerializer,
+    LlmKeyStatusSerializer,
+    ProjectRegistryEntrySerializer,
     RebuildJobSerializer,
     SaveResultSerializer,
     StorageStateSerializer,
@@ -137,6 +145,10 @@ __all__ = [
     "accounts_endpoint",
     "account_disable_endpoint",
     "account_reset_password_endpoint",
+    # REV-18 项目 CRUD / 账户扩展 / LLM Key（IFC-IB-372 / 373 / 374）
+    "project_detail_endpoint",
+    "account_detail_endpoint",
+    "llm_key_endpoint",
 ]
 
 #: 分页上限：**服务端硬上限**（不接受客户端指定更大的值）。
@@ -214,10 +226,14 @@ class FileListQuerySerializer(serializers.Serializer):
 class UploadInputSerializer(serializers.Serializer):
     """`POST /api/files` 的**表单字段**校验（文件字节走 `request.FILES`）。
 
-    只声明 `kb_id`：`project_id` **刻意不接受**（见模块文档「project_id 的唯一来源」）。
+    **REV-18（IFC-IB-375 / ADR-41）**：请求体**不再接收** `kb` / `kb_id` 字段 ——
+    `kb_id` 由**已认证主体的 `project_id` 推导**（`kb_id ≡ project_id`）。
+    `project_id` 与 `kb_id` 都**不可由客户端自证**（架构红线 `architecture_design.md:120`），
+    故本序列化器不再声明任何字段（DRF 对未知字段默认忽略）。
     """
 
-    kb_id = serializers.CharField(required=True, max_length=64, allow_blank=False)
+    #: 空字段集（显式保留结构，声明「请求体不得携带 kb 字段」）。
+    pass
 
 
 # --------------------------------------------------------------------------- #
@@ -297,16 +313,19 @@ def _upload_file(request: Any) -> Any:
     deps = composition.get_deps()
     try:
         ctx = _require_manage(request)
-        form = UploadInputSerializer(data={"kb_id": request.POST.get("kb_id", "")})
+        # REV-18（IFC-IB-375 / ADR-41）：请求体不再接收 kb 字段；`kb_id` 由已认证主体的
+        # `project_id` **推导**（`kb_id ≡ project_id`）—— 范围只认服务端结论，客户端
+        # **不可自证**（架构红线 architecture_design.md:120）。
+        form = UploadInputSerializer(data={})
         form.is_valid(raise_exception=True)
-        kb_id = str(form.validated_data["kb_id"])
 
         upload = request.FILES.get("file")
         if upload is None:
             raise ValidationError("缺少文件字段 file")
 
         scope = composition.resolve_scope(ctx)
-        # 归属断言先行：越权请求**不得**在磁盘或台账留下任何痕迹
+        kb_id = scope.project_id
+        # **保留**归属断言（IFC-IB-130）；失败仍 403（非 404，避免存在性探测）—— 红线不被削弱。
         deps.ledger.assert_kb_in_project(scope.project_id, kb_id)
 
         head = upload.read(4096)
@@ -1391,18 +1410,32 @@ def _put_prompt_layer(request: Any, expert: str, layer: str) -> Any:
 # `?token=` 出现在查询串时由中间件在其之前显式 `400`（本视图不为此开例外）。
 
 
-def projects_endpoint(request: Any) -> Any:
-    """`GET /api/projects`（IFC-IB-333）→ `200 {items: [ProjectSummary]}` | `401` | `4xx`。
+#: `project_id` 允许的字符集（供 `POST /api/projects` 校验）。
+#: 收窄到「字母 / 数字 / 下划线 / 连字符」与 collection 命名口径一致，避免项目标识
+#: 携带路径分隔符或空白而渗入下游（collection 名 / 前缀断言 / 文件路径拼装）。
+_PROJECT_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
-    `ProjectSummary(project_id: str, name: str, is_current: bool)`；`name` 取
-    `ProjectRecord.name`，`is_current` = 该项目是否等于**本请求**的 `effective_project`
-    （admin 未选定时为全局哨兵，故全部为 `False`）。按 `project_id` 升序稳定输出。
+
+def projects_endpoint(request: Any) -> Any:
+    """`GET|POST /api/projects`（IFC-IB-333 / REV-18 IFC-IB-372）。
+
+    ## `GET`（数据源 = **项目注册表**；REV-18 口径修订，端点号 / 名 / 签名不变）
+
+    `200 {items: [ProjectSummary]}` | `401` | `4xx`。`ProjectSummary(project_id: str,
+    name: str, is_current: bool)`；`is_current` = 该项目是否等于**本请求**的
+    `effective_project`（admin 未选定时为全局哨兵，故全部为 `False`）。按 `project_id`
+    升序稳定输出。
+
+    **数据源**由配置枚举快照（`Deps.projects`）**切换**为项目注册表
+    （`ProjectRegistryStore.list_active()` / `load()`，ADR-37）。**授权口径与
+    fail-closed 语义一字不动**：全局主体（admin）见**全部活动项目**；项目绑定主体
+    （ops）**仅见自身**（`items` 长度 ≤ 1，绝不枚举他项目）。
+
+    ## `POST`（**仅 admin**；REV-18 IFC-IB-372）
+
+    `{project_id, name}` → `201 ProjectRegistryEntry` | `409`（`project_id` 冲突）
+    | `400` | `403`。非 admin 一律服务端 **403**（ADR-42：UI 分组不作为权限机制）。
     """
-    if request.method != "GET":
-        return _json(
-            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
-            status.HTTP_405_METHOD_NOT_ALLOWED,
-        )
     deps = composition.get_deps()
     try:
         ctx = _ctx_of(request)
@@ -1413,22 +1446,114 @@ def projects_endpoint(request: Any) -> Any:
                 {"error": {"code": "unauthenticated", "message": "缺少或无效的认证凭据"}},
                 status.HTTP_401_UNAUTHORIZED,
             )
-        effective = ctx.authz.project_id
-        if is_global(authz):
-            visible = list(deps.projects.values())
-        else:
-            own = deps.projects.get(authz.project_id)
-            # ops 只回自身项目；未登记时不臆造记录（宁可空，也不枚举他项目）。
-            visible = [own] if own is not None else []
-        items = [
-            {
-                "project_id": record.project_id,
-                "name": record.name,
-                "is_current": record.project_id == effective,
-            }
-            for record in sorted(visible, key=lambda r: r.project_id)
-        ]
-        return _json({"items": items}, status.HTTP_200_OK)
+        if request.method == "GET":
+            registry = _project_registry()
+            effective = ctx.authz.project_id
+            if is_global(authz):
+                visible = list(registry.list_active())
+            else:
+                own = registry.load(authz.project_id)
+                # ops 只回自身项目（且须 active）；未登记 / 已停用时不臆造记录。
+                visible = [own] if own is not None and own.status == "active" else []
+            items = [
+                {
+                    "project_id": entry.project_id,
+                    "name": entry.name,
+                    "is_current": entry.project_id == effective,
+                }
+                for entry in sorted(visible, key=lambda e: e.project_id)
+            ]
+            return _json({"items": items}, status.HTTP_200_OK)
+        if request.method == "POST":
+            _require_admin(request)
+            payload = _json_body(request)
+            project_id = str(payload.get("project_id") or "").strip()
+            name = str(payload.get("name") or "").strip()
+            if not project_id:
+                raise ValidationError("缺少 project_id")
+            if not name:
+                raise ValidationError("缺少项目名称")
+            if _PROJECT_ID_PATTERN.match(project_id) is None:
+                raise ValidationError("project_id 只能含字母 / 数字 / 下划线 / 连字符（1~128 字符）")
+            now = utc_now_iso()
+            created = _project_registry().create(
+                ProjectRegistryEntry(
+                    project_id=project_id,
+                    name=name,
+                    status="active",
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            audit("project", outcome="created", status="ok", project_id=project_id)
+            return _json(ProjectRegistryEntrySerializer(created).data, status.HTTP_201_CREATED)
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+    except IbError as exc:
+        return error_response(exc)
+
+
+def project_detail_endpoint(request: Any, project_id: str) -> Any:
+    """`PATCH|DELETE /api/projects/{project_id}`（REV-18 IFC-IB-372；**仅 admin**）。
+
+    * `PATCH`（`{name?, status?}`）→ `200 ProjectRegistryEntry` | `404` | `400` | `403`；
+    * `DELETE`（**二次确认** `confirm_project_id` 与目标一致，否则 `400`）→
+      `200 ProjectRegistryEntry`（**软删 = `status="disabled"`，数据保留、可恢复**，
+      OOS-19）| `404` | `403`。
+
+    全程仅 `Authorization` 头；非 admin 一律服务端 `403`。
+    """
+    try:
+        _require_admin(request)
+        registry = _project_registry()
+        existing = registry.load(project_id)
+        if existing is None:
+            raise NotFoundError("项目不存在或不在可见范围内")
+        if request.method == "PATCH":
+            payload = _json_body(request)
+            name = payload.get("name")
+            new_status = payload.get("status")
+            if name is not None:
+                name = str(name).strip()
+                if not name:
+                    raise ValidationError("项目名称不能为空")
+            else:
+                name = existing.name
+            if new_status is not None:
+                new_status = str(new_status).strip()
+                if new_status not in ("active", "disabled"):
+                    raise ValidationError("status 只能为 active 或 disabled")
+            else:
+                new_status = existing.status
+            updated = registry.update(
+                ProjectRegistryEntry(
+                    project_id=project_id,
+                    name=name,
+                    status=new_status,
+                    created_at=existing.created_at,
+                    updated_at=utc_now_iso(),
+                )
+            )
+            if updated is None:
+                raise NotFoundError("项目不存在或不在可见范围内")
+            audit("project", outcome="updated", status="ok", project_id=project_id)
+            return _json(ProjectRegistryEntrySerializer(updated).data, status.HTTP_200_OK)
+        if request.method == "DELETE":
+            payload = _json_body(request)
+            confirm = str(payload.get("confirm_project_id") or "").strip()
+            if confirm != project_id:
+                raise ValidationError("删除确认不匹配（confirm_project_id 须与目标一致）")
+            disabled = registry.disable(project_id)
+            if disabled is None:
+                raise NotFoundError("项目不存在或不在可见范围内")
+            audit("project", outcome="disabled", status="ok", project_id=project_id)
+            return _json(ProjectRegistryEntrySerializer(disabled).data, status.HTTP_200_OK)
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
     except IbError as exc:
         return error_response(exc)
 
@@ -1510,6 +1635,24 @@ def _account_store() -> Any:
     store = getattr(deps, "account_store", None)
     if store is None:
         raise DependencyUnavailableError("账户存储不可用", dependency="ledger")
+    return store
+
+
+def _project_registry() -> Any:
+    """项目注册表（REV-18 ADR-37；组合根 `Deps.project_registry`）。不可用 → 503 fail-closed。"""
+    deps = composition.get_deps()
+    registry = getattr(deps, "project_registry", None)
+    if registry is None:
+        raise DependencyUnavailableError("项目注册表不可用", dependency="ledger")
+    return registry
+
+
+def _llm_key_store() -> Any:
+    """LLM Key 存储（REV-18 ADR-38；组合根 `Deps.llm_key_store`）。不可用 → 503 fail-closed。"""
+    deps = composition.get_deps()
+    store = getattr(deps, "llm_key_store", None)
+    if store is None:
+        raise DependencyUnavailableError("LLM Key 存储不可用", dependency="ledger")
     return store
 
 
@@ -1746,6 +1889,10 @@ def accounts_endpoint(request: Any) -> Any:
 
     GET → `200 {items: [AccountSummary]}`（`?project_id=` 可选过滤，缺省 = 全量）；
     POST → `201 AccountSummary` | `409`（用户名冲突）| `400`（强度 / 绑定缺失）| `403`。
+
+    **REV-18（IFC-IB-373 / ADR-40 ②）**：POST **增前置校验** —— 目标 `project_id` 须在
+    **项目注册表**（ADR-37）存在且为 `active`，否则 `422`（**顺序依赖：先建项目、后建账号**；
+    **不静默创建无主账号**，REQ-FUNC-IB-45）。
     """
     try:
         _require_admin(request)
@@ -1766,6 +1913,19 @@ def accounts_endpoint(request: Any) -> Any:
                 raise ValidationError("账户角色只能为 ops（管理员由种子产生）")
             if not project_id:
                 raise ValidationError("ops 账户必须绑定 project_id")
+            # REV-18：目标项目须在注册表存在且 active（否则 422；fail-closed，不建无主账号）。
+            registry = _project_registry()
+            target = registry.load(project_id)
+            if target is None or target.status != "active":
+                return _json(
+                    {
+                        "error": {
+                            "code": "project_not_active",
+                            "message": "目标项目不存在或未启用（请先创建项目再建账号）",
+                        }
+                    },
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
             problem = validate_password_strength(password)
             if problem:
                 return _json(
@@ -1777,6 +1937,118 @@ def accounts_endpoint(request: Any) -> Any:
             user = store.create_user(username, hash_password(password), "ops", project_id)
             audit("account", outcome="created", status="ok", project_id=project_id)
             return _json(_account_summary(user), status.HTTP_201_CREATED)
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+    except IbError as exc:
+        return error_response(exc)
+
+
+def account_detail_endpoint(request: Any, user_id: str) -> Any:
+    """`PATCH|DELETE /api/accounts/{user_id}`（REV-18 IFC-IB-373；**仅 admin**）。
+
+    * `PATCH`（`{project_id?, username?, status?}`；**不回显任何凭据**）→
+      `200 AccountSummary` | `404` | `400` | `403`。`project_id` 重绑的目标须在注册表
+      存在且 `active`（否则 `400`；由**服务层**校验，端口层不做跨表断言）。
+    * `DELETE`（**二次确认** `confirm_username` 与目标一致，否则 `400`；**禁删 `admin`
+      或最后一个有效 `admin`** → `409`）→ `200 AccountSummary`（**软删 = `status="disabled"`**）
+      | `404` | `403`。
+
+    软删**复用** `set_status`（`AccountStore` 端口方法集不变）；停用后撤销其全部会话。
+    """
+    try:
+        _require_admin(request)
+        store = _account_store()
+        target = store.get_user(user_id)
+        if target is None:
+            raise NotFoundError("账户不存在或不在可见范围内")
+        if request.method == "PATCH":
+            payload = _json_body(request)
+            project_id = payload.get("project_id")
+            username = payload.get("username")
+            new_status = payload.get("status")
+
+            rebind_project: str | None = None
+            if project_id is not None:
+                rebind_project = str(project_id).strip()
+                if not rebind_project:
+                    raise ValidationError("project_id 不能为空")
+                entry = _project_registry().load(rebind_project)
+                if entry is None or entry.status != "active":
+                    raise ValidationError("目标项目不存在或未启用")
+
+            if username is not None:
+                username = str(username).strip()
+                if not username:
+                    raise ValidationError("用户名不能为空")
+
+            if new_status is not None:
+                new_status = str(new_status).strip()
+                if new_status not in ("active", "disabled"):
+                    raise ValidationError("status 只能为 active 或 disabled")
+
+            updated = store.update_user(
+                user_id,
+                project_id=rebind_project,
+                username=username,
+                status=new_status,
+            )
+            if updated is None:
+                raise NotFoundError("账户不存在或不在可见范围内")
+            if new_status == "disabled":
+                store.revoke_sessions_for_user(user_id, now=utc_now_iso())
+            audit("account", outcome="updated", status="ok")
+            return _json(_account_summary(updated), status.HTTP_200_OK)
+        if request.method == "DELETE":
+            payload = _json_body(request)
+            confirm = str(payload.get("confirm_username") or "").strip()
+            if confirm != target.username:
+                raise ValidationError("删除确认不匹配（confirm_username 须与目标一致）")
+            if target.role == "admin":
+                # 禁删 admin 或最后一个有效 admin（OQ-IB-29；ADR-40 ①）——服务层判定。
+                raise ConflictError("禁止删除管理员账户（含最后一个有效管理员）")
+            updated = store.set_status(user_id, "disabled")
+            store.revoke_sessions_for_user(user_id, now=utc_now_iso())
+            audit("account", outcome="disabled", status="ok")
+            return _json(_account_summary(updated), status.HTTP_200_OK)
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+    except IbError as exc:
+        return error_response(exc)
+
+
+def llm_key_endpoint(request: Any) -> Any:
+    """`GET|PUT|DELETE /api/llm-key`（REV-18 IFC-IB-374；**仅 admin**）。
+
+    * `GET` → `200 LlmKeyStatus`（`configured` / `masked` / `updated_at`；**不含明文**）| `403`；
+    * `PUT`（`{secret}`；**唯一写入口**）→ `200 LlmKeyStatus`（**不回显明文**）| `400`（空值）| `403`；
+    * `DELETE` → `204`（清空单行）| `403`。
+
+    **凭据纪律（C-IB-42 / REQ-NFR-IB-20）**：错误体 / 日志**不回显明文 / 掩码 / 前缀**；
+    Key **不入 `.env` / 不进 git / 不进命令行**。**生效 = 保存 + 服务重启重装配**（ADR-32；
+    **重启由用户手工执行**，本层不做运行期热重载）。
+    """
+    try:
+        _require_admin(request)
+        store = _llm_key_store()
+        if request.method == "GET":
+            return _json(LlmKeyStatusSerializer(store.status()).data, status.HTTP_200_OK)
+        if request.method == "PUT":
+            payload = _json_body(request)
+            secret = str(payload.get("secret") or "").strip()
+            if not secret:
+                raise ValidationError("secret 不能为空")
+            result = store.set(secret)
+            # 审计只记「已更新」，**绝不**记录 Key 值 / 掩码 / 前缀。
+            audit("llm_key", outcome="updated", status="ok")
+            return _json(LlmKeyStatusSerializer(result).data, status.HTTP_200_OK)
+        if request.method == "DELETE":
+            store.clear()
+            audit("llm_key", outcome="cleared", status="ok")
+            return _no_content()
         return _json(
             {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
             status.HTTP_405_METHOD_NOT_ALLOWED,

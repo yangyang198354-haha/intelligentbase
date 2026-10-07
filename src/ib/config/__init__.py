@@ -171,6 +171,13 @@ IB_RUNTIME_ENV_KEYS: tuple[str, ...] = (
     #   IB_EXPERT_PROMPT_ENABLED —— 提示词域开关，**默认 true**（REQ-FUNC-IB-37/41 属 v1 范围）。
     "IB_EXPERT_PROMPT_DIR",
     "IB_EXPERT_PROMPT_ENABLED",
+    # REV-18（IFC-IB-369）：项目注册表 / LLM Key 的后端键名登记。**只登记键名，不含任何值**。
+    #   IB_PROJECT_REGISTRY_BACKEND —— 项目注册表后端，取值 `sqlite`（默认）或 `memory`（离线替身）。
+    #   IB_LLM_KEY_BACKEND —— LLM Key 后端，取值 `sqlite`（默认）或 `memory`（离线替身）。
+    # 二者**不进入 `IB_ENV_KEYS`**（后者声明「不得新增 / 改名」）—— 与 IB_ACCOUNT_BACKEND
+    # 同一条纪律：后端选择由组合根在装配期读取（`ib/ledger/projects.py` / `llm_key.py`）。
+    "IB_PROJECT_REGISTRY_BACKEND",
+    "IB_LLM_KEY_BACKEND",
 )
 
 #: v1 支持的 4 种格式（**OQ-IB-02 默认值**：其余格式按扩展点预留，不实现）。
@@ -351,6 +358,10 @@ class GlobalConfig:
     offline_mode: bool = False  # IB_OFFLINE_MODE
     ledger_backend: str = "sqlite"  # IB_LEDGER_BACKEND
     ledger_path: str = "./var/ledger/ledger.sqlite3"  # IB_LEDGER_PATH
+    #: REV-18（IFC-IB-369）：项目注册表 / LLM Key 的存储后端。与 `ledger_backend`
+    #: 同一条纪律（`sqlite` 默认 / `memory` 离线替身）；同库同迁移机制（ADR-37 / ADR-38）。
+    project_registry_backend: str = "sqlite"  # IB_PROJECT_REGISTRY_BACKEND
+    llm_key_backend: str = "sqlite"  # IB_LLM_KEY_BACKEND
     max_upload_mb: int = 50  # IB_MAX_UPLOAD_MB
     allowed_exts: tuple[str, ...] = SUPPORTED_EXTS
     ocr_enabled: bool = True  # IB_OCR_ENABLED
@@ -689,6 +700,10 @@ def resolve_global_config(raw: RawConfig) -> GlobalConfig:
         offline_mode=_as_bool(values.get("offline_mode"), default=False, key="IB_OFFLINE_MODE"),
         ledger_backend=str(values.get("ledger_backend", GlobalConfig.ledger_backend)),
         ledger_path=str(values.get("ledger_path", GlobalConfig.ledger_path)),
+        project_registry_backend=str(
+            values.get("project_registry_backend", GlobalConfig.project_registry_backend)
+        ),
+        llm_key_backend=str(values.get("llm_key_backend", GlobalConfig.llm_key_backend)),
         max_upload_mb=_as_int(values.get("max_upload_mb"), default=GlobalConfig.max_upload_mb, key="IB_MAX_UPLOAD_MB"),
         allowed_exts=allowed_exts,
         ocr_enabled=_as_bool(values.get("ocr_enabled"), default=True, key="IB_OCR_ENABLED"),
@@ -763,9 +778,14 @@ def validate_required(
         return errors
 
     # 1) 真实后端所需的凭据/端点（按后端条件判定）
+    #
+    # REV-18（IFC-IB-369 / ADR-39 Option C）：**LLM Key 未配置非致命** —— Key 的载体已由
+    # 环境变量改为 DB（ADR-38），唯一写入口是管理端点 `PUT /api/llm-key`；若沿用「缺
+    # `IB_LLM_API_KEY` 即 StartupError」会构成**首启死锁**（无 Key → 不启动 → 管理界面不可达）。
+    # 故此处**不再**把 LLM Key 列入启动必填；`LlmConfig.api_key_env` 语义**降级**为
+    # 「历史 / 兼容登记」（不删字段、不改键名）。LLM 依赖路径在**调用期** fail-closed
+    # （见 MOD-IB-05 / `dependency_unavailable`）。**其余必填项仍 fail-fast，不放宽。**
     needed: list[tuple[str, str]] = []
-    if cfg.llm.backend == "openai_compatible":
-        needed.append(("IB_LLM_API_KEY", cfg.llm.api_key_env))
     if cfg.embedding.backend == "http":
         needed.append(("IB_EMBED_URL", "IB_EMBED_URL"))
     if cfg.embedding.backend == "inproc":
@@ -798,6 +818,9 @@ def validate_required(
             {"in_process", "external"},
         ),
         "IB_CONFIG_SOURCE": (cfg.config_source, {"file", "dict"}),
+        # REV-18（IFC-IB-369）：项目注册表 / LLM Key 后端值域（sqlite 默认 / memory 离线替身）。
+        "IB_PROJECT_REGISTRY_BACKEND": (cfg.project_registry_backend, {"sqlite", "memory"}),
+        "IB_LLM_KEY_BACKEND": (cfg.llm_key_backend, {"sqlite", "memory"}),
     }
     for key, (value, allowed) in choices.items():
         if value not in allowed:

@@ -1,6 +1,7 @@
 """
 @module MOD-IB-11
 @implements IFC-IB-313 SqliteAccountStore（+ 账户/会话 DDL 单源）
+            IFC-IB-366 AccountStore.update_user（REV-18 加成式扩展：编辑账户归属字段）
             IFC-IB-314 默认管理员幂等种子 seed_default_admin
             IFC-IB-315 MemoryAccountStore（离线替身）
             IFC-IB-310 AccountStore 端口（13 方法）的 SQL / 内存两实现
@@ -395,6 +396,51 @@ class SqliteAccountStore:
             cursor.close()
         return [_row_to_user(row) for row in rows]
 
+    def update_user(
+        self,
+        user_id: str,
+        *,
+        project_id: str | None = None,
+        username: str | None = None,
+        status: AccountStatus | None = None,
+    ) -> UserRecord | None:
+        """编辑账户归属字段（IFC-IB-366，加成式扩展）。见端口 docstring。
+
+        不存在返回 `None`；`username` 冲突抛 `ConflictError`。**不接收也不回显任何凭据**。
+        """
+        if self.get_user(user_id) is None:
+            return None
+        assignments: list[str] = []
+        params: list[Any] = []
+        if project_id is not None:
+            assignments.append("project_id = ?")
+            params.append(project_id)
+        if username is not None:
+            assignments.append("username = ?")
+            params.append(username)
+        if status is not None:
+            assignments.append("status = ?")
+            params.append(status)
+        if not assignments:
+            return self.get_user(user_id)
+        assignments.append("updated_at = ?")
+        params.append(utc_now_iso())
+        params.append(user_id)
+        connection = self._conn()
+        cursor = connection.cursor()
+        try:
+            cursor.execute(
+                f"UPDATE users SET {', '.join(assignments)} WHERE user_id = ?", tuple(params)
+            )
+            connection.commit()
+        except sqlite3.IntegrityError as exc:
+            if "username" in str(exc).lower() or "unique" in str(exc).lower():
+                raise ConflictError("用户名已存在") from exc
+            raise
+        finally:
+            cursor.close()
+        return self.get_user(user_id)
+
     def record_login_failure(self, user_id: str, *, now: str) -> UserRecord:
         self._require_user(user_id)
         connection = self._conn()
@@ -654,6 +700,38 @@ class MemoryAccountStore:
                 if project_id is None or record.project_id == project_id
             ]
             return sorted(items, key=lambda item: item.username)
+
+    def update_user(
+        self,
+        user_id: str,
+        *,
+        project_id: str | None = None,
+        username: str | None = None,
+        status: AccountStatus | None = None,
+    ) -> UserRecord | None:
+        """编辑账户归属字段（IFC-IB-366，加成式扩展）。见端口 docstring。"""
+        with self._lock:
+            record = self._users.get(user_id)
+            if record is None:
+                return None
+            changes: dict[str, Any] = {}
+            if project_id is not None:
+                changes["project_id"] = project_id
+            if username is not None and username != record.username:
+                existing = self._by_username.get(username)
+                if existing is not None and existing != user_id:
+                    raise ConflictError("用户名已存在")
+                del self._by_username[record.username]
+                self._by_username[username] = user_id
+                changes["username"] = username
+            if status is not None:
+                changes["status"] = status
+            if not changes:
+                return record
+            changes["updated_at"] = utc_now_iso()
+            updated = _replace(record, **changes)
+            self._users[user_id] = updated
+            return updated
 
     def record_login_failure(self, user_id: str, *, now: str) -> UserRecord:
         with self._lock:

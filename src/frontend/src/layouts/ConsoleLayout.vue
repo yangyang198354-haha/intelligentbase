@@ -3,6 +3,7 @@
  * @module MOD-IB-24
  * @implements IFC-IB-328 运维控制台外壳（左侧导航 + 右侧内容；深浅色；中文优先）
  *             IFC-IB-335（R14）项目选择器（admin 可选 / ops 只读）+ 切换项目重置视图态
+ *             IFC-IB-376（REV-18）父级「系统管理」+ 三子项导航（账户 / 项目 / LLM Key）
  * @depends MOD-IB-24（app/env 会话单例, stores/theme）
  * @author software-developer
  *
@@ -18,12 +19,16 @@
  * │  · 资料   │      <router-view>           │
  * │  · 重建   │                              │
  * │  · 配置   │                              │
- * │  · 账户*  │                              │
+ * │  系统管理*│                              │
+ * │   · 账户  │                              │
+ * │   · 项目  │                              │
+ * │   · LLM   │                              │
  * └───────────┴──────────────────────────────┘
  * ```
  *
- * `*` 账户管理**仅 admin** 可见。隐藏入口不是安全措施（服务端对非 admin 一律 403），
- * 但它避免了「点了才知道不能用」的体验问题。
+ * `*` 「系统管理」分组（含账户 / 项目 / LLM Key 三子项）**仅 admin** 可见（REV-18
+ * IFC-IB-376 / ADR-42）。隐藏入口不是安全措施（服务端对非 admin 一律 403），
+ * 但它避免了「点了才知道不能用」的体验问题。**授权与导航解耦**：UI 分组不作为权限机制。
  *
  * ## 导航项由路由表驱动
  *
@@ -43,10 +48,17 @@ const { isDark, toggleTheme } = useTheme();
 
 type NavItem = { name: string; path: string; title: string; adminOnly: boolean };
 
-/** 期望的导航顺序（路由表注册顺序即期望顺序，但 `getRoutes()` 不保证保序）。 */
-const NAV_ORDER = ['chat', 'files', 'rebuild', 'config', 'accounts'];
+/**
+ * 期望的导航顺序（路由表注册顺序即期望顺序，但 `getRoutes()` 不保证保序）。
+ *
+ * REV-18（IFC-IB-376 / ADR-42）：既有 `accounts` 迁入父级「系统管理」分组，
+ * 与新增 `projects` / `llm-key` 并列；顶级项为 `chat / files / rebuild / config`
+ * （**资料管理**保持独立顶级，视图改为「项目域」）。
+ */
+const TOP_ORDER = ['chat', 'files', 'rebuild', 'config'];
+const SYSTEM_ORDER = ['accounts', 'projects', 'llm-key'];
 
-/** 从路由表派生导航（唯一真源 = 路由表）。 */
+/** 从路由表派生**全部**带标题的导航项（唯一真源 = 路由表）。 */
 const NAV: NavItem[] = (router.getRoutes() ?? [])
   .filter((r) => typeof r.name === 'string' && r.meta?.title && r.path !== '/' && r.name !== 'login' && r.name !== 'change-password')
   .map((r) => ({
@@ -54,10 +66,25 @@ const NAV: NavItem[] = (router.getRoutes() ?? [])
     path: r.path,
     title: String(r.meta.title),
     adminOnly: r.meta.requiresAdmin === true,
-  }))
-  .sort((a, b) => NAV_ORDER.indexOf(a.name) - NAV_ORDER.indexOf(b.name));
+  }));
 
-const visibleNav = computed(() => NAV.filter((item) => !item.adminOnly || session.isAdmin.value));
+/** 顶级导航（不含系统管理三子项）。 */
+const topNav = computed(() =>
+  NAV.filter((item) => TOP_ORDER.includes(item.name)).sort(
+    (a, b) => TOP_ORDER.indexOf(a.name) - TOP_ORDER.indexOf(b.name),
+  ),
+);
+
+/** 「系统管理」分组的三子项（REV-18 三分 IA）。 */
+const systemNav = computed(() =>
+  NAV.filter((item) => SYSTEM_ORDER.includes(item.name)).sort(
+    (a, b) => SYSTEM_ORDER.indexOf(a.name) - SYSTEM_ORDER.indexOf(b.name),
+  ),
+);
+
+const visibleTopNav = computed(() => topNav.value.filter((item) => !item.adminOnly || session.isAdmin.value));
+/** 系统管理分组**仅 admin 可见**（服务端对非 admin 一律 403；此处只是不摆无用入口）。 */
+const visibleSystemNav = computed(() => systemNav.value.filter((item) => !item.adminOnly || session.isAdmin.value));
 
 const activeName = computed(() => String(route.name ?? ''));
 
@@ -136,7 +163,7 @@ async function confirmLogout(): Promise<void> {
 
       <nav class="nav" aria-label="主导航">
         <button
-          v-for="item in visibleNav"
+          v-for="item in visibleTopNav"
           :key="item.name"
           type="button"
           class="nav-item"
@@ -145,6 +172,21 @@ async function confirmLogout(): Promise<void> {
         >
           {{ item.title }}
         </button>
+
+        <!-- REV-18（IFC-IB-376 / ADR-42）：父级「系统管理」+ 三子项（仅 admin 可见）。 -->
+        <template v-if="visibleSystemNav.length">
+          <div class="nav-group-label">系统管理</div>
+          <button
+            v-for="item in visibleSystemNav"
+            :key="item.name"
+            type="button"
+            class="nav-item nav-item-child"
+            :class="{ active: activeName === item.name }"
+            @click="router.push({ name: item.name })"
+          >
+            {{ item.title }}
+          </button>
+        </template>
       </nav>
 
       <div class="sidebar-foot ib-muted">
@@ -272,6 +314,19 @@ async function confirmLogout(): Promise<void> {
   color: var(--ib-accent);
   font-weight: 600;
   box-shadow: var(--ib-shadow-sm);
+}
+
+.nav-group-label {
+  margin-top: 12px;
+  padding: 6px 12px 2px;
+  font-size: 12px;
+  color: var(--ib-text-faint);
+  letter-spacing: 0.04em;
+}
+
+.nav-item-child {
+  padding-left: 24px;
+  font-size: 13px;
 }
 
 .sidebar-foot {

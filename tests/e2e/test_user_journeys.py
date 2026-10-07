@@ -45,10 +45,12 @@ def test_TC_E2E_001_import_then_rag_answer(http_app):
     # worker 处理（生产里由 task-scheduler/worker 触发）
     report = deps.lifecycle.process_pending("e2e-worker", 10)
     assert report.succeeded >= 1
-    assert deps.ledger.get_document(Scope("p_alpha", ("kb_a",)), doc_id).status == "indexed"
+    # REV-18（IFC-IB-375 / ADR-41）：HTTP 上传的 kb_id **由主体推导**（≡ project_id），
+    # 请求体 kb 字段被忽略 → 落库 kb_id 为 "p_alpha"（非请求体的 "kb_a"）。
+    assert deps.ledger.get_document(Scope("p_alpha", ("p_alpha",)), doc_id).status == "indexed"
 
     # 检索增强：命中该文档（来源可标注）
-    result = deps.retrieval.search("冷水机组启停顺序", scope=Scope("p_alpha", ("kb_a",)))
+    result = deps.retrieval.search("冷水机组启停顺序", scope=Scope("p_alpha", ("p_alpha",)))
     assert result.degraded is False and any(h.doc_id == doc_id for h in result.hits)
 
     # 问答入口（SSE）产出正文与结束事件
@@ -99,7 +101,8 @@ def test_TC_E2E_002_failed_then_retry(http_app):
     finally:
         deps.lifecycle._embedder = saved
 
-    scope = Scope("p_alpha", ("kb_a",))
+    # REV-18（IFC-IB-375 / ADR-41）：HTTP 上传落库 kb_id ≡ project_id = "p_alpha"。
+    scope = Scope("p_alpha", ("p_alpha",))
     failed = deps.ledger.get_document(scope, doc_id)
     assert failed.status == "failed" and failed.error_code
 

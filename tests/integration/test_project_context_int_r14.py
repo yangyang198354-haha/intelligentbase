@@ -180,22 +180,22 @@ def test_TC_INT_125_ops_sees_only_own_project_and_cross_project_is_403(accounts_
 
 
 # --------------------------------------------------------------------------- #
-# TC-INT-126 `/api/projects` 方法纪律：非 GET 一律 405（不放行任何写方法）+ 零 Cookie
+# TC-INT-126 `/api/projects` 方法纪律：非 GET/POST 一律 405 + POST 仅 admin（REV-18）+ 零 Cookie
 # --------------------------------------------------------------------------- #
 
 
 def test_TC_INT_126_projects_endpoint_method_discipline(accounts_app):
-    """US-IB-24 / AC-IB-24-03；IFC-IB-333。
+    """US-IB-24 / AC-IB-24-03；IFC-IB-333 / REV-18 IFC-IB-372。
 
-    项目枚举是**纯读**端点：非 `GET` 一律 `405 method_not_allowed`（admin 与 ops 同此），
-    且**任何**方法下都**不得**出现 `Set-Cookie`（零 Cookie 纪律贯穿全方法面）。
-    这一分支此前未被任何用例触达（R14 补测）。
+    REV-18 起 `/api/projects` **集合路径**新增 `POST`（项目创建，**仅 admin**；IFC-IB-372）——
+    故非 `GET` / `POST` 的方法仍一律 `405 method_not_allowed`；`POST` 由「一律 405」改为
+    「admin 合法创建 / ops 一律 403」。任何方法下都**不得**出现 `Set-Cookie`（零 Cookie 纪律）。
     """
     client = _client(accounts_app)
     admin_token = _login_admin(client)
     admin_h = bearer(admin_token)
 
-    for method in ("post", "put", "delete", "patch"):
+    for method in ("put", "delete", "patch"):
         resp = getattr(client, method)("/api/projects", **admin_h)
         assert resp.status_code == 405, (method, resp.status_code, resp.content)
         assert json.loads(resp.content)["error"]["code"] == "method_not_allowed", resp.content
@@ -204,38 +204,88 @@ def test_TC_INT_126_projects_endpoint_method_discipline(accounts_app):
     # 正常 GET 仍 200（方法纪律不误伤读路径）。
     assert client.get("/api/projects", **admin_h).status_code == 200
 
-    # ops 侧同样只读：POST 亦 405（不回显可枚举内容）。
+    # REV-18：POST 非法体 → 400（不再是 405）；合法体 → 201（admin 可创建）。
+    bad = client.post("/api/projects", data="{}", content_type="application/json", **admin_h)
+    assert bad.status_code == 400, bad.content
+    assert "Set-Cookie" not in bad.headers
+    ok = client.post(
+        "/api/projects",
+        data=json.dumps({"project_id": "p_r18", "name": "R18 项目"}),
+        content_type="application/json",
+        **admin_h,
+    )
+    assert ok.status_code == 201, ok.content
+    assert json.loads(ok.content)["project_id"] == "p_r18"
+    assert "Set-Cookie" not in ok.headers
+
+    # ops 侧：POST → 403（非 admin 一律服务端 403；ADR-42：UI 分组不是权限机制）。
     _create_ops(client, admin_token, "ops_a", "p_alpha")
     ops_token = _login_ops(client, "ops_a")
-    ops_post = client.post("/api/projects", **bearer(ops_token))
-    assert ops_post.status_code == 405, ops_post.content
+    ops_post = client.post(
+        "/api/projects",
+        data=json.dumps({"project_id": "p_ops", "name": "越权"}),
+        content_type="application/json",
+        **bearer(ops_token),
+    )
+    assert ops_post.status_code == 403, ops_post.content
     assert "Set-Cookie" not in ops_post.headers
 
 
 # --------------------------------------------------------------------------- #
-# TC-INT-127 ops 绑定**未登记**项目 → 空列表（不臆造、不枚举他项目）+ 项目级仍 fail-closed
+# TC-INT-127 顺序依赖（先建项目、后建账号）+ 停用项目的 ops → 空列表（不枚举他项目）
 # --------------------------------------------------------------------------- #
 
 
 def test_TC_INT_127_ops_with_unregistered_project_sees_empty_not_others(accounts_app):
-    """US-IB-24 / AC-IB-24-02；REQ-FUNC-IB-31 / IB-23。
+    """US-IB-24 / AC-IB-24-02；REQ-FUNC-IB-31 / IB-23 / IB-45；REV-18 IFC-IB-373。
 
-    ops 绑定了一个**未在组合根登记**的项目（`p_gamma`）：其可见项目列表**必须为空** ——
-    既不臆造 `p_gamma` 记录，**更不**因「查不到自身」而回落到枚举 `p_alpha`/`p_beta`
-    （横向枚举即越权）。同时项目级端点对其仍 **fail-closed（503）**；即便该 ops 声明他项目，
-    亦被 `403 project_mismatch` 拦下（不因自身项目未登记而放宽边界）。
+    REV-18 顺序依赖：`POST /api/accounts` 的目标 `project_id` 须在**项目注册表**存在且
+    `active`，否则 **422**（不静默创建无主账号）。既有「ops 见空列表而非枚举他项目」不变量
+    改由「**停用**项目的 ops」验证：先建 `p_gamma` → 建 `ops_g` → 软删（停用）`p_gamma`，
+    则 `ops_g` 的项目列表**必须为空**（`list_active()` 不含停用项目），且其声明他项目仍被
+    `403 project_mismatch` 拦下（边界不因自身项目停用而放宽）。
     """
     client = _client(accounts_app)
     admin_token = _login_admin(client)
-    _create_ops(client, admin_token, "ops_g", "p_gamma")  # p_gamma 未登记
+    admin_h = bearer(admin_token)
+
+    # 1) 顺序依赖：绑定**未登记**项目 → 422（不创建无主账号）。
+    unregistered = client.post(
+        "/api/accounts",
+        data=json.dumps(
+            {"username": "ops_g", "password": R13_OPS_PASSWORD, "project_id": "p_gamma"}
+        ),
+        content_type="application/json",
+        **admin_h,
+    )
+    assert unregistered.status_code == 422, unregistered.content
+    assert json.loads(unregistered.content)["error"]["code"] == "project_not_active"
+
+    # 2) 先建项目（admin），再建账号 → 201。
+    created = client.post(
+        "/api/projects",
+        data=json.dumps({"project_id": "p_gamma", "name": "伽马"}),
+        content_type="application/json",
+        **admin_h,
+    )
+    assert created.status_code == 201, created.content
+    _create_ops(client, admin_token, "ops_g", "p_gamma")
     ops_token = _login_ops(client, "ops_g")
+    assert json.loads(_projects(client, ops_token).content)["items"], "启用项目的 ops 应见自身项目"
 
+    # 3) 停用 p_gamma（软删，二次确认）→ ops_g 见空列表（不枚举他项目）。
+    disabled = client.delete(
+        "/api/projects/p_gamma",
+        data=json.dumps({"confirm_project_id": "p_gamma"}),
+        content_type="application/json",
+        **admin_h,
+    )
+    assert disabled.status_code == 200, disabled.content
+    assert json.loads(disabled.content)["status"] == "disabled"
     items = json.loads(_projects(client, ops_token).content)["items"]
-    assert items == [], f"未登记项目的 ops 必须见空列表，实际 {items}"
+    assert items == [], f"停用项目的 ops 必须见空列表，实际 {items}"
 
-    # 项目级端点：effective_project = p_gamma（无匹配项目）→ 503，不泄露。
-    assert client.get("/api/config/definition", **bearer(ops_token)).status_code == 503
-    # 声明他项目 → 403 project_mismatch（边界不因自身未登记而放宽）。
+    # 4) 声明他项目 → 403 project_mismatch（边界不因自身项目停用而放宽）。
     foreign = client.get(
         "/api/config/definition", **bearer(ops_token), HTTP_X_IB_PROJECT="p_alpha"
     )

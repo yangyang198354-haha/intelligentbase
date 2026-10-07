@@ -10,6 +10,8 @@
  *             独立提示词目录（第二真源）的列表元数据 / 单层读 / 单层原子保存
  *             IFC-IB-359 / 362（REV-16-4）`configAudit` / `storageState`：
  *             配置审计（只读）与存储态（只读，供 IFC-IB-363 非静默提示）
+ *             IFC-IB-372 / 373 / 374 / 375（REV-18）项目 CRUD / 账户编辑删除 / LLM Key /
+ *             项目域上传（`uploadFile` 去掉 `kbId` 入参，kb_id 由服务端推导）
  * @depends MOD-IB-23（HTTP / SSE 契约，**仅**契约，不 import 任何后端模块）
  * @author software-developer
  *
@@ -364,6 +366,34 @@ export type ProjectSummary = {
 
 export type ProjectListEnvelope = { items: ProjectSummary[] };
 
+// --------------------------------------------------------------------------- //
+// REV-18（IFC-IB-372 / 374）：项目注册表 / LLM Key
+// --------------------------------------------------------------------------- //
+
+/** 项目状态（软删 = `disabled`；不物理级联，OOS-19）。 */
+export type ProjectStatus = 'active' | 'disabled';
+
+/** 项目注册表条目（与后端 `ProjectRegistryEntry` **逐字段对齐**；IFC-IB-372）。 */
+export type ProjectRegistryEntry = {
+  project_id: string;
+  name: string;
+  status: ProjectStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * LLM Key 状态（与后端 `LlmKeyStatus` **逐字段对齐**；IFC-IB-368 / 374）。
+ *
+ * **不含明文字段**（类型层事实）：`masked` 是**固定占位掩码**（不含明文任何前 / 后缀字符）。
+ * 界面只显示 `configured` / `masked` / `updated_at`，**永不**回显明文。
+ */
+export type LlmKeyStatus = {
+  configured: boolean;
+  masked: string;
+  updated_at: string | null;
+};
+
 /**
  * 项目头提供者（IFC-IB-336）：返回要附加到请求头的项目上下文键值对。
  *
@@ -573,10 +603,18 @@ export class ApiClient {
     return this.request<FileListEnvelope>(`/api/files${suffix}`);
   }
 
-  uploadFile(file: File, kbId: string): Promise<DocumentRecord> {
+  /**
+   * 上传资料（REV-18 / IFC-IB-375 / ADR-41）。
+   *
+   * **请求体不再携带 `kb` / `kb_id` 字段** —— `kb_id` 由服务端按已认证主体的
+   * `project_id` 推导（`kb_id ≡ project_id`），客户端**不可自证范围**。服务端保留
+   * `assert_kb_in_project` 归属断言（失败 403）。
+   *
+   * `project_id` 经 `X-IB-Project` 头（`headers()` 单点注入），**不**进请求体。
+   */
+  uploadFile(file: File): Promise<DocumentRecord> {
     const body = new FormData();
-    // 字段名与后端 `UploadInputSerializer` + `request.FILES['file']` 逐字对齐
-    body.append('kb_id', kbId);
+    // 字段名与后端 `request.FILES['file']` 逐字对齐；**不含** kb 字段。
     body.append('file', file);
     // **不设置 Content-Type**：交给浏览器带 boundary 生成 multipart/form-data
     return this.request<DocumentRecord>('/api/files', { method: 'POST', body });
@@ -929,6 +967,37 @@ export class ApiClient {
     });
   }
 
+  /**
+   * 编辑账户（REV-18 / IFC-IB-373，仅 admin）。
+   *
+   * `project_id` / `username` / `status` 均可选；只传需要改的字段。**不回显任何凭据**
+   * （响应是 `AccountSummary`，无口令 / 令牌字段）。`project_id` 重绑的目标须存在且 active。
+   */
+  updateAccount(
+    userId: string,
+    input: { project_id?: string; username?: string; status?: 'active' | 'disabled' },
+  ): Promise<AccountSummary> {
+    return this.request<AccountSummary>(`/api/accounts/${encodeURIComponent(userId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+  }
+
+  /**
+   * 删除（软删）账户（REV-18 / IFC-IB-373，仅 admin）。
+   *
+   * **二次确认**：`confirmUsername` 须与目标用户名一致（否则服务端 `400`）。
+   * **禁删 `admin` 或最后一个有效 `admin`**（服务端 `409`）。软删 = `status="disabled"`。
+   */
+  deleteAccount(userId: string, confirmUsername: string): Promise<AccountSummary> {
+    return this.request<AccountSummary>(`/api/accounts/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm_username: confirmUsername }),
+    });
+  }
+
   // ------------------------------------------------------------------ //
   // R14（IFC-IB-333）：项目枚举
   // ------------------------------------------------------------------ //
@@ -943,6 +1012,70 @@ export class ApiClient {
   async listProjects(): Promise<ProjectSummary[]> {
     const envelope = await this.request<ProjectListEnvelope>('/api/projects');
     return envelope.items;
+  }
+
+  // ------------------------------------------------------------------ //
+  // REV-18（IFC-IB-372）：项目 CRUD（**仅 admin**；非 admin 后端 403）
+  // ------------------------------------------------------------------ //
+
+  /** 新建项目（仅 admin）→ `201 ProjectRegistryEntry` | `409`（冲突）| `400`。 */
+  createProject(projectId: string, name: string): Promise<ProjectRegistryEntry> {
+    return this.request<ProjectRegistryEntry>('/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: projectId, name }),
+    });
+  }
+
+  /** 编辑项目（仅 admin；`name?` / `status?`）→ `200 ProjectRegistryEntry` | `404` | `400`。 */
+  updateProject(
+    projectId: string,
+    input: { name?: string; status?: ProjectStatus },
+  ): Promise<ProjectRegistryEntry> {
+    return this.request<ProjectRegistryEntry>(`/api/projects/${encodeURIComponent(projectId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+  }
+
+  /**
+   * 软删项目（仅 admin；**二次确认** `confirmProjectId` 须与目标一致，否则 `400`）。
+   * 软删 = `status="disabled"`，数据保留、可恢复（OOS-19）。
+   */
+  deleteProject(projectId: string, confirmProjectId: string): Promise<ProjectRegistryEntry> {
+    return this.request<ProjectRegistryEntry>(`/api/projects/${encodeURIComponent(projectId)}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm_project_id: confirmProjectId }),
+    });
+  }
+
+  // ------------------------------------------------------------------ //
+  // REV-18（IFC-IB-374）：LLM Key（**仅 admin**；唯一写入口 = PUT）
+  // ------------------------------------------------------------------ //
+
+  /** 读取 LLM Key 状态（`configured` / `masked` / `updated_at`；**不含明文**）。 */
+  llmKeyStatus(): Promise<LlmKeyStatus> {
+    return this.request<LlmKeyStatus>('/api/llm-key');
+  }
+
+  /**
+   * 写入 / 覆盖 LLM Key（**唯一写入口**）→ `200 LlmKeyStatus`（**不回显明文**）。
+   *
+   * **生效 = 保存 + 服务重启重装配**（ADR-32）；**重启由用户手工执行**。
+   */
+  setLlmKey(secret: string): Promise<LlmKeyStatus> {
+    return this.request<LlmKeyStatus>('/api/llm-key', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret }),
+    });
+  }
+
+  /** 清除 LLM Key（回到未配置态）→ `204`。 */
+  async clearLlmKey(): Promise<void> {
+    await this.request<null>('/api/llm-key', { method: 'DELETE' });
   }
 }
 

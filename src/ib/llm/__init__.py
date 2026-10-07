@@ -56,6 +56,7 @@ from ib.core import (
 
 __all__ = [
     "OpenAiCompatibleProvider",
+    "UnconfiguredLlmProvider",
     "FakeLlmProvider",
     "build_llm_provider",
     "assert_langchain_openai_version",
@@ -266,6 +267,51 @@ class OpenAiCompatibleProvider:
             return client
 
 
+class UnconfiguredLlmProvider:
+    """**LLM 未配置态** provider（REV-18 / ADR-39 Option C；IFC-IB-374）。
+
+    当装配期既无 DB Key（`LlmKeyStore.get()`）又无兼容环境变量时构造本类。它使
+    **服务正常启动**（破除首启死锁：无 Key → 管理界面仍可达，方可写入首个 Key），
+    而 **LLM 依赖路径在调用期 fail-closed** —— 任一 `build_*` 抛
+    `DependencyUnavailableError`（可读、**不含任何 Key 信息**），**绝不**回落为
+    「无 Key 静默出空答案」（对齐 ADR-13「故障与空结果可区分」的精神）。
+
+    `health()` 显式声明「未配置」（`ok=False`）；`describe_egress()` 仍如实声明
+    远程外发边界（端点主机名来自配置，与是否已配 Key 无关）。
+    """
+
+    #: 未配置态的**统一可读错误**（不含任何 Key 值 / 前缀 / 长度）。
+    MESSAGE = "LLM 未配置：请由管理员在「系统管理 → LLM Key 管理」写入 Key 后重启服务"
+
+    def __init__(self, *, base_url: str = "") -> None:
+        self._base_url = base_url
+
+    def _fail(self) -> Any:
+        from ib.core import DependencyUnavailableError
+
+        raise DependencyUnavailableError(self.MESSAGE, dependency="llm")
+
+    def build_router(self) -> LlmRole:
+        self._fail()
+
+    def build_expert(self, spec: ExpertSpec, *, system_prompt: str | None = None) -> LlmRole:
+        self._fail()
+
+    def build_aggregator(self) -> LlmRole:
+        self._fail()
+
+    def health(self) -> HealthStatus:
+        """**永不抛异常**；如实声明「未配置」。"""
+        return HealthStatus(ok=False, detail="LLM 未配置（Key 未设置）", latency_ms=None)
+
+    def describe_egress(self) -> EgressDescriptor:
+        return EgressDescriptor(
+            remote=True,
+            endpoint_host=_host_of(self._base_url) if self._base_url else "",
+            data_categories=list(DEFAULT_REMOTE_DATA_CATEGORIES),
+        )
+
+
 class FakeLlmProvider:
     """离线替身（AC-IB-15-01）。
 
@@ -331,12 +377,19 @@ class FakeLlmProvider:
         return _call
 
 
-def build_llm_provider(cfg: Any) -> Any:
+def build_llm_provider(cfg: Any, *, api_key: str | None = None) -> Any:
     """按配置构造 LLM provider（组合根单点调用）。
 
     离线模式下**返回即抛**：`IB_OFFLINE_MODE=1` 时装配 `FakeLlmProvider` 是组合根的职责，
     本函数若在离线模式被调用，说明装配表写错了（应显式选 `fake` 后端），
     静默返回真实 provider 会让离线测试意外触网。
+
+    **REV-18（IFC-IB-369 / ADR-38 / ADR-39 Option C）**：`api_key` 由组合根在装配期经
+    `LlmKeyStore.get()` → `resolve_secret()`（**唯一读点**）解析后传入。Key 的载体已由
+    环境变量改为 **DB**。缺 Key **不再致命**：返回 `UnconfiguredLlmProvider`（服务照常启动，
+    LLM 依赖路径调用期 fail-closed）。
+    **兼容回退**：`api_key` 为 `None`/空时回退读 `cfg.llm.api_key_env`（历史登记键，
+    语义已降级为「兼容来源」），二者皆空即判为**未配置态**。
     """
     if getattr(cfg, "offline_mode", False) and cfg.llm.backend != "fake":
         from ib.core import StartupError
@@ -350,21 +403,20 @@ def build_llm_provider(cfg: Any) -> Any:
         from ib.core import StartupError
 
         raise StartupError(f"未知的 LLM 后端：{cfg.llm.backend!r}")
-    from ib.config import read_secret
+    resolved = (api_key or "").strip()
+    if not resolved:
+        # 兼容回退：历史登记键（ADR-38 已把 DB 定为唯一写入口；此处只作过渡来源）。
+        from ib.config import read_secret
 
-    api_key = read_secret(cfg.llm.api_key_env)
-    if not api_key:
-        from ib.core import StartupError
-
-        raise StartupError(
-            f"未读取到 LLM API key（环境变量 {cfg.llm.api_key_env} 为空）；"
-            "密钥只允许经环境变量注入，禁止写入任何被跟踪的文件"
-        )
+        resolved = (read_secret(cfg.llm.api_key_env) or "").strip()
+    if not resolved:
+        # **未配置态**（非致命）：服务正常启动，LLM 依赖路径调用期 fail-closed（ADR-39）。
+        return UnconfiguredLlmProvider(base_url=cfg.llm.base_url)
     assert_langchain_openai_version()
     return OpenAiCompatibleProvider(
         base_url=cfg.llm.base_url,
         model=cfg.llm.model,
-        api_key=api_key,
+        api_key=resolved,
         router_temperature=cfg.llm.router_temperature,
         expert_temperature=cfg.llm.expert_temperature,
         aggregator_temperature=cfg.llm.aggregator_temperature,

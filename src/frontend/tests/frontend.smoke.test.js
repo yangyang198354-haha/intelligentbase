@@ -611,3 +611,119 @@ describe('R16-4 前端冒烟：存储态非静默提示（IFC-IB-361 / 362 / 363
     );
   });
 });
+
+// --------------------------------------------------------------------------- //
+// REV-18 前端冒烟：系统管理三分 IA + 项目域上传 + LLM Key（IFC-IB-375 / 376 / ADR-42）
+//
+// 溯源：US-IB-43~46 / AC-IB-43~46。均为**源码结构**断言（与 R10/R13/R14/R16 同策略）。
+// --------------------------------------------------------------------------- //
+
+const rev18 = {
+  router: join(root, 'src', 'router', 'index.ts'),
+  layout: join(root, 'src', 'layouts', 'ConsoleLayout.vue'),
+  upload: join(root, 'src', 'views', 'UploadPage.vue'),
+  llmKey: join(root, 'src', 'views', 'LlmKeyPage.vue'),
+  systemSection: join(root, 'src', 'views', 'SystemSection.vue'),
+  client: join(root, 'src', 'api', 'client.ts'),
+};
+
+describe('REV-18 前端冒烟：系统管理三分 IA + 项目域上传 + LLM Key', () => {
+  it('30. 路由：父级「系统管理」+ 三子项 + 旧 accounts 深链重定向（hash 模式保留）', () => {
+    const text = stripComments(readText(rev18.router));
+    assert.match(text, /SystemSection/, '缺少父级透传容器 SystemSection');
+    assert.match(text, /path:\s*'system'/, '缺少父级路由 system');
+    for (const child of ["'accounts'", "'projects'", "'llm-key'"]) {
+      assert.ok(text.includes(`path: ${child}`), `缺少子路由 ${child}`);
+    }
+    // ADR-42 ③：既有 `#/accounts` 深链迁移（保留 hash，不引 try_files）。
+    assert.match(text, /path:\s*'accounts',\s*redirect/, '缺少旧 accounts 深链的重定向迁移');
+    assert.match(text, /createWebHashHistory/, '路由模式应为 hash（不得改为 history + try_files）');
+    // 三分 IA 是**体验**分组，不是权限机制 —— 子项须带 requiresAdmin（授权仍由服务端裁决）。
+    assert.ok(
+      (text.match(/requiresAdmin:\s*true/g) || []).length >= 3,
+      '三子项须各自声明 requiresAdmin（授权唯一经服务端，此处只是体验）',
+    );
+  });
+
+  it('31. 控制台导航：顶级四项 + 「系统管理」分组三子项', () => {
+    const layout = stripComments(readText(rev18.layout));
+    assert.match(layout, /TOP_ORDER\s*=\s*\[[^\]]*'chat'[^\]]*'files'[^\]]*'rebuild'[^\]]*'config'/, '缺少顶级导航顺序');
+    assert.match(layout, /SYSTEM_ORDER\s*=\s*\[[^\]]*'accounts'[^\]]*'projects'[^\]]*'llm-key'/, '缺少系统管理分组顺序');
+    assert.ok(layout.includes('系统管理'), '缺少「系统管理」分组标签');
+    assert.match(layout, /nav-item-child/, '缺少子项样式类（层级可见性）');
+  });
+
+  it('32. 项目域上传：请求体不再携带 kb 字段（kb_id 由服务端按主体推导）', () => {
+    const upload = stripComments(readText(rev18.upload));
+    assert.doesNotMatch(upload, /kbId|kb_id\s*[:=]/, '上传视图仍出现 kb 输入 / 变量（应已移除）');
+    assert.match(upload, /uploadFile\(picked\.value\)/, '上传调用未改为单参（仅文件）');
+    assert.ok(upload.includes('项目域'), '视图文案未改为「项目域」');
+
+    const clientTs = stripComments(readText(rev18.client));
+    assert.match(clientTs, /uploadFile\(file:\s*File\)/, '客户端 uploadFile 签名应为单参（file）');
+    assert.match(clientTs, /body\.append\('file',\s*file\)/, 'FormData 只应 append file 字段');
+    assert.doesNotMatch(
+      clientTs,
+      /body\.append\(\s*'kb/,
+      'FormData 不得 append kb / kb_id（客户端不可自证范围，ADR-41）',
+    );
+  });
+
+  it('33. LLM Key 页：只回显掩码 / 存在性 / 更新时间 + 明文提交后清空 + 重启由用户手工执行', () => {
+    const page = stripComments(readText(rev18.llmKey));
+    assert.match(page, /status\?\.masked|status\.masked|masked/, '缺少掩码回显');
+    assert.match(page, /status\?\.updated_at|updated_at/, '缺少更新时间回显');
+    assert.match(page, /status\?\.configured|configured/, '缺少存在性（configured）回显');
+    assert.match(page, /type="password"/, '写入框应为 password 类型');
+    assert.match(page, /secret\.value\s*=\s*''/, '提交后须清空明文输入框');
+    // 生效口径：保存 / 清除后**不得**暗示即时生效，须明示「重启由用户手工执行」。
+    assert.ok(page.includes('重启由用户手工执行'), '缺少「重启由用户手工执行」提示');
+    assert.match(page, /不即时生效/, '应为「不即时生效」的显式提示（ADR-32：保存 + 重启装配）');
+    assert.doesNotMatch(page, /立即生效|实时生效/, '不得暗示即时生效');
+  });
+
+  it('34. 客户端：REV-18 端点方法齐备（项目 / 账户 / LLM Key）', () => {
+    const clientTs = stripComments(readText(rev18.client));
+    for (const method of [
+      'createProject',
+      'updateProject',
+      'deleteProject',
+      'updateAccount',
+      'deleteAccount',
+      'llmKeyStatus',
+      'setLlmKey',
+      'clearLlmKey',
+    ]) {
+      assert.ok(clientTs.includes(method), `客户端缺少 ${method} 方法`);
+    }
+    assert.match(clientTs, /'\/api\/llm-key'/, '缺少 /api/llm-key 路由字面量');
+    assert.match(clientTs, /export type LlmKeyStatus\b/, '缺少 LlmKeyStatus 类型（类型层不含明文）');
+  });
+
+  it('35. LLM Key 类型层不含明文字段 + 「资料管理」保持独立顶级（不并入系统管理三子域）', () => {
+    // 类型层事实（AC-IB-39-03 / REQ-NFR-IB-20 / C-IB-42）：响应类型只承载存在性 / 掩码 / 更新时间。
+    const clientTs = stripComments(readText(rev18.client));
+    const typeMatch = clientTs.match(/export type LlmKeyStatus = \{[\s\S]*?\};/);
+    assert.ok(typeMatch, '缺少 `export type LlmKeyStatus`（类型层不含明文的前提）');
+    const fields = typeMatch[0];
+    for (const name of ['configured', 'masked', 'updated_at']) {
+      assert.ok(fields.includes(name), `LlmKeyStatus 缺字段 ${name}`);
+    }
+    assert.doesNotMatch(
+      fields,
+      /\b(secret|api_key|plaintext|token)\b/,
+      'LlmKeyStatus 出现了明文字段（明文不得进入响应类型）',
+    );
+
+    // IA（OQ-IB-31 裁决）：三子域 = 账户 / 项目 / LLM Key；「资料管理」(files) **保持独立顶级**。
+    const layout = stripComments(readText(rev18.layout));
+    const top = layout.match(/TOP_ORDER\s*=\s*\[([^\]]*)\]/);
+    const system = layout.match(/SYSTEM_ORDER\s*=\s*\[([^\]]*)\]/);
+    assert.ok(top && system, '缺少 TOP_ORDER / SYSTEM_ORDER');
+    assert.ok(top[1].includes("'files'"), '「资料管理」不在顶级导航');
+    assert.ok(
+      !system[1].includes("'files'"),
+      '「资料管理」被并入系统管理三子域（应保持独立顶级）',
+    );
+  });
+});

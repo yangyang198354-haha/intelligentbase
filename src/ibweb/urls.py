@@ -8,6 +8,7 @@
             IFC-IB-316 ~ IFC-IB-321（R13）账户 / 会话路由
             IFC-IB-333（R14）`/api/projects` 项目枚举路由
             IFC-IB-359 / 362（REV-16-4）`/api/config/audit` + `/api/config/storage-state` 路由
+            IFC-IB-372/373/374（REV-18）`/api/projects/{id}` + `/api/accounts/{user_id}` + `/api/llm-key` 路由
 @depends MOD-IB-23（views）
 @author software-developer
 
@@ -77,10 +78,12 @@ urlpatterns = [
         views.storage_state_endpoint,
         name="ib-config-storage-state",
     ),
-    # R14（IFC-IB-333）：项目枚举（admin 见全部 / ops 仅见自身）。
+    # R14（IFC-IB-333）/ REV-18（IFC-IB-372）：项目枚举（admin 见全部 / ops 仅见自身）+ 新建。
     # **不是**项目级端点：全局主体未选定项目时也返回 200（否则 admin 无法引导选择项目）。
     # 仅 `Authorization` 头鉴权；`?token=` 由中间件先于路由拒绝（4xx）。
     path("api/projects", views.projects_endpoint, name="ib-projects"),
+    # REV-18（IFC-IB-372）：项目编辑 / 软删（PATCH / DELETE，**仅 admin**）。
+    path("api/projects/<str:project_id>", views.project_detail_endpoint, name="ib-project-detail"),
     # R13（IFC-IB-316~321）：账户 / 会话。
     # 登录是**唯一**免鉴权端点（尚无令牌），但它**仍**受 `?token=` 4xx 纪律约束；
     # 其余端点一律只认 `Authorization: Bearer`（不接受 `?token=`，中间件先于路由拒绝）。
@@ -90,10 +93,16 @@ urlpatterns = [
     path("api/auth/change-password", views.auth_change_password_endpoint, name="ib-auth-change-password"),
     path("api/auth/session/renew", views.auth_session_renew_endpoint, name="ib-auth-session-renew"),
     path("api/accounts", views.accounts_endpoint, name="ib-accounts"),
+    # REV-18（IFC-IB-373）：账户编辑 / 软删（PATCH / DELETE，**仅 admin**）。
+    # **必须在 `<str:user_id>/disable` 之前无冲突**（`disable` 是带后缀的字面量路径，
+    # 与 `<str:user_id>` 不冲突；此处排序不影响匹配）。
+    path("api/accounts/<str:user_id>", views.account_detail_endpoint, name="ib-account-detail"),
     path("api/accounts/<str:user_id>/disable", views.account_disable_endpoint, name="ib-account-disable"),
     path(
         "api/accounts/<str:user_id>/reset-password",
         views.account_reset_password_endpoint,
         name="ib-account-reset-password",
     ),
+    # REV-18（IFC-IB-374）：LLM Key（GET / PUT / DELETE，**仅 admin**；唯一写入口）。
+    path("api/llm-key", views.llm_key_endpoint, name="ib-llm-key"),
 ]

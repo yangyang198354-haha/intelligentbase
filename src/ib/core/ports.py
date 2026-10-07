@@ -1,11 +1,13 @@
 """
 @module MOD-IB-01
-@implements 17 个端口 Protocol（IFC-IB-021~022 / 032~033 / 051~053 / 061~063 / 071 /
+@implements 19 个端口 Protocol（IFC-IB-021~022 / 032~033 / 051~053 / 061~063 / 071 /
             081~082 / 090~096 / 098 / 100~110 / 120~131 / 131~134 / 211~215 / 221~223 /
             287~292（R7 第 14 个端口 DefinitionDocumentStore）/
             310（R13 第 15 个端口 AccountStore）/
             339（REV-16-2 第 16 个端口 ExpertPromptStore）/
-            357（REV-16-4 第 17 个端口 ConfigAuditStore））
+            357（REV-16-4 第 17 个端口 ConfigAuditStore）/
+            367（REV-18 第 18 个端口 ProjectRegistryStore）/
+            368（REV-18 第 19 个端口 LlmKeyStore））
 @depends (none)
 @author software-developer
 
@@ -46,11 +48,15 @@ from .types import (
     ExpertPromptDocumentRef,
     ExpertSpec,
     HealthStatus,
+    LlmKeyRecord,
+    LlmKeyStatus,
     LlmRole,
     OcrDescriptor,
     ParsedChunk,
     ParsedDocument,
     PointFilter,
+    ProjectRegistryEntry,
+    ProjectStatus,
     PromptDirectoryLayout,
     PromptLayer,
     PromptSaveResult,
@@ -87,6 +93,8 @@ __all__ = [
     "AccountStore",
     "ExpertPromptStore",
     "ConfigAuditStore",
+    "ProjectRegistryStore",
+    "LlmKeyStore",
 ]
 
 
@@ -664,6 +672,10 @@ class AccountStore(Protocol):
 
     **fail-closed 语义**（REQ-NFR-IB-18）：`resolve_session` 对「已撤销 / 已过期 /
     不存在」的令牌一律返回 `None`；调用方据此拒绝，不得退化为「放行」。
+
+    **REV-18 增记（IFC-IB-366）**：新增方法 `update_user`（**加成式扩展**）——
+    既有的 13 个方法**号 / 名 / 签名一字不动**。本方法**不接收也不回显**任何口令 /
+    令牌（编辑账号**不回显凭据**）。
     """
 
     def get_user_by_username(self, username: str) -> UserRecord | None:
@@ -706,6 +718,29 @@ class AccountStore(Protocol):
 
     def list_users(self, project_id: str | None) -> list[UserRecord]:
         """列账户；`project_id=None` 表示 **admin 视角全量**，否则只列该项目绑定账户。"""
+        ...
+
+    # --- REV-18 加成式扩展（IFC-IB-366）--- #
+
+    def update_user(
+        self,
+        user_id: str,
+        *,
+        project_id: str | None = None,
+        username: str | None = None,
+        status: AccountStatus | None = None,
+    ) -> UserRecord | None:
+        """编辑账户的**归属**字段（IFC-IB-366）：`project_id` 重绑 / `username` / `status`。
+
+        全部参数均为**可选**；`None` 表示「本字段不变」。不存在返回 `None`（→ HTTP 404）。
+        `username` 与既有其它账户冲突时抛 `ConflictError`（→ HTTP 409）。
+
+        **纪律（强制）**：
+          * 本方法**不接收也不回显**任何口令 / 令牌 —— 编辑账号**不回显凭据**；
+          * `project_id` 重绑的**目标项目存在性 / active 校验在服务层**完成（端口层不做
+            跨表断言，与既有 13 方法的「端口只做机械持久化」纪律一致）；
+          * 存储层只做「按 `user_id` 条件 UPDATE」，不做「先查后写」的竞态动作。
+        """
         ...
 
     def record_login_failure(self, user_id: str, *, now: str) -> UserRecord:
@@ -869,4 +904,87 @@ class ConfigAuditStore(Protocol):
 
         审计表是套在**追加台账**上的读视图：分页必须稳定，故按写入序升序回放。
         """
+        ...
+
+
+# =========================================================================== #
+# MOD-IB-01 REV-18 增量（第 18 / 19 个端口，IFC-IB-367 / 368）
+# =========================================================================== #
+#
+# 二者均为**纯追加**（端口 17 → 19），定义于零依赖层 MOD-IB-01，**零新增模块、
+# 零新增依赖边**（ADR-37 / ADR-38）。**工件不同**：
+#   * `ProjectRegistryStore` 管**项目注册表**（运行期可变状态：项目 CRUD + 软删 / 停用），
+#     与 `LedgerRepository`（项目 / 知识库 / 文档 / 块元数据）**表不同、职责不同**；
+#   * `LlmKeyStore` 管**单一全局 LLM Key**（**单行表，以结构保证全局唯一**，OOS-18 为
+#     扩展点预留），与 `AccountStore`（账户 / 会话）**工件不同**。
+# **唯一入口纪律**：所有需要「按项目 id 校验存在性 / 取活动项目」的路径**不得**各自读
+# 配置或各自建表，一律经组合根装配注入的 `ProjectRegistryStore`；LLM Key 的**装配期读取
+# 为唯一读点**（经组合根 + `resolve_secret()`），HTTP 层**只写不读明文**。
+
+
+@runtime_checkable
+class ProjectRegistryStore(Protocol):
+    """项目注册表存储端口（IFC-IB-367，**第 18 个端口**，**恰好 5 个方法**）。
+
+    生产实现 `SqliteProjectRegistryStore`（同一 SQLite 台账的 `projects` 表适配器，
+    DDL 单源 = 手写迁移 `005_projects.sql`）；离线替身 `MemoryProjectRegistryStore`。
+
+    **纪律：**
+      * **软删 = 置 `status="disabled"`**（不删行；数据保留、可恢复，OOS-19 移出物理级联）；
+      * 表内**只承载项目标识 / 名称 / 状态 / 时间戳**，**不承载任何凭据 / 配置取值**；
+      * 时间一律以**定长 UTC 字符串**承载，比较用字符串序。
+    """
+
+    def load(self, project_id: str) -> ProjectRegistryEntry | None:
+        """按 `project_id` 取注册表条目；不存在返回 `None`（**含 disabled 行**）。"""
+        ...
+
+    def list_active(self) -> tuple[ProjectRegistryEntry, ...]:
+        """列出**活动**项目（`status="active"`），按 `project_id` 稳定升序。
+
+        `GET /api/projects`（IFC-IB-333 / 372）的**唯一数据源**。
+        """
+        ...
+
+    def create(self, entry: ProjectRegistryEntry) -> ProjectRegistryEntry:
+        """登记新项目；`project_id` 已存在抛 `ConflictError`（→ HTTP 409）。"""
+        ...
+
+    def update(self, entry: ProjectRegistryEntry) -> ProjectRegistryEntry | None:
+        """更新既有项目（名称 / 状态）；不存在返回 `None`（→ HTTP 404）。
+
+        `entry.project_id` 为定位键；`name` / `status` 为要写入的值。
+        """
+        ...
+
+    def disable(self, project_id: str) -> ProjectRegistryEntry | None:
+        """软删 / 停用（置 `status="disabled"`）；不存在返回 `None`（→ HTTP 404）。**不删行**。"""
+        ...
+
+
+@runtime_checkable
+class LlmKeyStore(Protocol):
+    """LLM Key 存储端口（IFC-IB-368，**第 19 个端口**，**恰好 3 个方法**）。
+
+    生产实现 `SqliteLlmKeyStore`（同一 SQLite 台账的**单行表** `llm_key`，
+    DDL 单源 = 手写迁移 `006_llm_key.sql`）；离线替身 `MemoryLlmKeyStore`。
+
+    **凭据纪律（C-IB-42，硬约束）：**
+      * `get()` 返回 `LlmKeyRecord`，其 `secret` **仅用于组合根装配期解析**（唯一读点），
+        **绝不写入任何日志 / 响应 / 审计**；
+      * `set()` 为**唯一写入口**的底层：HTTP 层只经 `PUT /api/llm-key` 调用；
+      * `clear()` 清空单行（LLM 回到未配置态）；
+      * 承载**库文件 0600 且属主对齐服务账号**（REQ-NFR-IB-20）；WAL + `busy_timeout` 必开。
+    """
+
+    def get(self) -> LlmKeyRecord | None:
+        """取全局唯一的 Key 记录；未配置返回 `None`（**装配期唯一读点**）。"""
+        ...
+
+    def set(self, secret: str) -> LlmKeyStatus:
+        """写入 / 覆盖 Key（单行 upsert），返回**不含明文**的状态视图。"""
+        ...
+
+    def clear(self) -> None:
+        """清空 Key（单行删除）。幂等。"""
         ...

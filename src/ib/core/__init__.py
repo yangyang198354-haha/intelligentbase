@@ -3,6 +3,7 @@
 @implements IFC-IB-001..012（汇总导出）
             IFC-IB-337 ~ 342 / 339（REV-16-2 提示词 / 工具参数 / 第 16 个端口汇总导出）
             IFC-IB-355 ~ 363（REV-16-4 统合校验 / 存储态 / 配置审计 / 第 17 个端口汇总导出）
+            IFC-IB-366 ~ 368（REV-18 账户编辑 / 项目注册表 / LLM Key / 第 18 / 19 个端口汇总导出）
 @depends (none)
 @author software-developer
 
@@ -54,9 +55,11 @@ from .ports import (
     Embedder,
     ExpertPromptStore,
     LedgerRepository,
+    LlmKeyStore,
     LlmProvider,
     OcrEngine,
     PageRenderer,
+    ProjectRegistryStore,
     SessionStore,
     VectorStore,
 )
@@ -101,6 +104,9 @@ from .types import (
     HealthStatus,
     HnswParams,
     KbRecord,
+    LLM_KEY_MASK,
+    LlmKeyRecord,
+    LlmKeyStatus,
     LlmRole,
     LoginOutcome,
     Message,
@@ -116,6 +122,8 @@ from .types import (
     PointPayload,
     ProcessReport,
     ProjectRecord,
+    ProjectRegistryEntry,
+    ProjectStatus,
     PromptDirectoryLayout,
     PromptLayer,
     PromptSaveResult,
@@ -308,4 +316,13 @@ __all__ = [
     "StorageState",
     # REV-16-4 第 17 个端口（IFC-IB-357）
     "ConfigAuditStore",
+    # REV-18 项目注册表 / LLM Key（IFC-IB-367 / 368）
+    "ProjectStatus",
+    "ProjectRegistryEntry",
+    "LLM_KEY_MASK",
+    "LlmKeyStatus",
+    "LlmKeyRecord",
+    # REV-18 第 18 / 19 个端口（IFC-IB-367 / 368）
+    "ProjectRegistryStore",
+    "LlmKeyStore",
 ]
