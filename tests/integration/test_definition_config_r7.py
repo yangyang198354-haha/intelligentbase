@@ -88,7 +88,6 @@ def _expert(name: str, cn_label: str | None = None, *, is_default: bool = False)
         keywords=(f"k{name}",),
         exemplars=(),
         is_data_expert=False,
-        fallback_prompt=f"prompt-{name}",
         is_delegating=False,
         is_default=is_default,
     )
@@ -553,8 +552,8 @@ def test_TC_INT_087_r8_uniqueness_fails_fast_through_admit_and_endpoint(http_app
     illegal = build_definition_document(
         project_id="p_alpha",
         experts=(
-            ExpertSpecInput("a", "同标签", ("撞车词",), (), False, "pa", False, True),
-            ExpertSpecInput("b", "同标签", ("撞车词",), (), False, "pb", False, False),
+            ExpertSpecInput("a", "同标签", ("撞车词",), (), False, False, True),
+            ExpertSpecInput("b", "同标签", ("撞车词",), (), False, False, False),
         ),
         route=RouteSpecInput(0.65, 0.05, 8, "a"),
         orchestration=OrchestrationSpecInput(

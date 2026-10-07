@@ -161,7 +161,8 @@ class _ExpertSpecInputSerializer(_DataclassSerializer):
         "keywords": None,
         "exemplars": None,
         "is_data_expert": None,
-        "fallback_prompt": None,
+        # REV-17（ADR-36）：`fallback_prompt` 已移出定义文档 —— 提示词文本只由
+        # 独立提示词目录（main.md / fallback.md）与代码内置安全网承载，定义文档回归纯结构配置。
         "is_delegating": None,
         "is_default": None,
     }

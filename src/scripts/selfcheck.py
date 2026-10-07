@@ -597,7 +597,10 @@ def orchestration_events_order() -> None:
 
             return _Role()
 
-        def build_expert(self, spec: Any) -> Any:
+        def build_expert(self, spec: Any, *, system_prompt: str | None = None) -> Any:
+            # REV-17（ADR-36）：签名必须与端口 `LlmProvider.build_expert` 一致 ——
+            # `_run_expert` 现在传 keyword `system_prompt`，替身漏掉即抛 `TypeError`，
+            # 而那里 `except Exception` 会把它吞成 `degraded=llm_unavailable`（静默降级）。
             class _Broken:
                 name = str(getattr(spec, "name", "expert"))
 
@@ -1796,8 +1799,8 @@ def definition_pure_functions() -> None:
         base: dict[str, Any] = {
             "project_id": "p1",
             "experts": (
-                ExpertSpecInput("a", "A", ("k",), ("e",), True, "p", False, True),
-                ExpertSpecInput("b", "B", ("j",), (), False, "p", False, False),
+                ExpertSpecInput("a", "A", ("k",), ("e",), True, False, True),
+                ExpertSpecInput("b", "B", ("j",), (), False, False, False),
             ),
             "route": RouteSpecInput(0.65, 0.05, 8, "a"),
             "orchestration": OrchestrationSpecInput(
@@ -1832,8 +1835,8 @@ def definition_pure_functions() -> None:
     # 违规：默认专家两个 / 未知工具
     bad = _doc(
         experts=(
-            ExpertSpecInput("a", "A", ("k",), (), True, "p", False, True),
-            ExpertSpecInput("b", "B", ("k",), (), False, "p", False, True),
+            ExpertSpecInput("a", "A", ("k",), (), True, False, True),
+            ExpertSpecInput("b", "B", ("k",), (), False, False, True),
         ),
         tool_grants=(ToolGrantSpec("a", ("ghost-tool",)),),
     )
@@ -1907,7 +1910,7 @@ def definition_store_roundtrip() -> None:
     def _doc(tau: float = 0.65) -> Any:
         return build_definition_document(
             project_id="p1",
-            experts=(ExpertSpecInput("a", "A", ("k",), (), True, "p", False, True),),
+            experts=(ExpertSpecInput("a", "A", ("k",), (), True, False, True),),
             route=RouteSpecInput(tau, 0.05, 8, "a"),
             orchestration=OrchestrationSpecInput(
                 ("route", "a"), (ConditionalEdgeSpec("route", (("a", "a"),)),)
@@ -1961,7 +1964,7 @@ def definition_gate_refuses_invalid() -> None:
 
     def _doc(defaults: int) -> Any:
         experts = tuple(
-            ExpertSpecInput(f"e{i}", f"E{i}", (f"k{i}",), (), i == 0, "p", False, i < defaults)
+            ExpertSpecInput(f"e{i}", f"E{i}", (f"k{i}",), (), i == 0, False, i < defaults)
             for i in range(3)
         )
         return build_definition_document(
@@ -2012,8 +2015,8 @@ def definition_uniqueness_rejects_collisions() -> None:
         return build_definition_document(
             project_id="p1",
             experts=(
-                ExpertSpecInput("a", a_label, a_kws, (), True, "p", False, True),
-                ExpertSpecInput("b", b_label, b_kws, (), False, "p", False, False),
+                ExpertSpecInput("a", a_label, a_kws, (), True, False, True),
+                ExpertSpecInput("b", b_label, b_kws, (), False, False, False),
             ),
             route=RouteSpecInput(0.65, 0.05, 8, "a"),
             orchestration=OrchestrationSpecInput(
@@ -2317,7 +2320,9 @@ def r8_gate_and_resume() -> None:
 
                 return _Role()
 
-            def build_expert(self, spec: Any) -> Any:
+            def build_expert(self, spec: Any, *, system_prompt: str | None = None) -> Any:
+                # REV-17（ADR-36）：同 `_LlmStub` —— 漏掉该 keyword 会被 `_run_expert`
+                # 的 `except Exception` 吞成静默降级，症状是「答案变成了降级提示」。
                 class _Expert:
                     name = str(getattr(spec, "name", "expert"))
 
@@ -2508,7 +2513,8 @@ def r8_within_expert_keyword_validation() -> None:
             keywords=kws,
             exemplars=(),
             is_data_expert=False,
-            fallback_prompt=f"prompt-{name}",
+            # REV-17（ADR-36）：`ExpertSpecInput` 已无 `fallback_prompt` —— 定义文档不再承载
+            # 提示词文本（`ExpertSpec.fallback_prompt` 另存，见下方 `validate_specs` 段）。
             is_delegating=False,
             is_default=is_default,
         )
@@ -3606,12 +3612,12 @@ def r16_prompt_layers() -> None:
     )
     from ib.experts import install_prompt_bundles, main_prompts, prompt_bundles
 
-    # 分层优先级：主 > 兜底文件 > 文档兜底；三层皆空即非法
-    assert merge_prompt_layers("a", main_content="M", fallback_content="F", doc_fallback="D").resolved_from == "main_file"
-    assert merge_prompt_layers("a", main_content=None, fallback_content="F", doc_fallback="D").resolved_from == "fallback_file"
-    assert merge_prompt_layers("a", main_content="", fallback_content="", doc_fallback="D").resolved_from == "definition_doc_fallback"
+    # 分层优先级（REV-17 / ADR-36）：主 > 兜底文件 > **代码内置兜底**；三层皆空即非法
+    assert merge_prompt_layers("a", main_content="M", fallback_content="F", builtin_fallback="D").resolved_from == "main_file"
+    assert merge_prompt_layers("a", main_content=None, fallback_content="F", builtin_fallback="D").resolved_from == "fallback_file"
+    assert merge_prompt_layers("a", main_content="", fallback_content="", builtin_fallback="D").resolved_from == "builtin_fallback"
     try:
-        merge_prompt_layers("a", main_content=None, fallback_content="", doc_fallback="  ")
+        merge_prompt_layers("a", main_content=None, fallback_content="", builtin_fallback="  ")
         raise AssertionError("三层皆空竟未抛 PromptNotFoundError")
     except PromptNotFoundError:
         pass
@@ -3623,7 +3629,8 @@ def r16_prompt_layers() -> None:
             keywords=(f"k{name}",),
             exemplars=(),
             is_data_expert=False,
-            fallback_prompt=f"doc::{name}",
+            # REV-17（ADR-36）：定义文档不再承载提示词文本 —— 提示词只由独立目录的
+            # `main.md` / `fallback.md` 与代码内置兜底承载。
             is_delegating=False,
             is_default=is_default,
         )
@@ -3658,6 +3665,19 @@ def r16_prompt_layers() -> None:
         by_name = {b.expert_name: b for b in view.prompt_bundles}
         assert by_name["a"].effective_prompt == "MAIN-A" and by_name["a"].resolved_from == "main_file"
         assert by_name["b"].effective_prompt == "FB-B" and by_name["b"].resolved_from == "fallback_file"
+
+        # REV-17（ADR-36）：两层文件皆缺 → 回落代码内置兜底；且**不**再报「缺兜底」
+        # （「兜底恒非空」由结构保证，不再由文档层校验设卡 —— 这正是新增专家死锁的解法）。
+        from ib.experts import builtin_fallback_for
+
+        builtins = {n: builtin_fallback_for(n) for n in ("a", "b")}
+        bare_refs = tuple(r for r in refs if r.expert_name != "b")  # b 的两层都拿掉
+        assert validate_prompt_directory(bare_refs, doc=doc, builtin_fallbacks=builtins) == ()
+        bare_view = derive_prompt_layers(doc, bare_refs, builtin_fallbacks=builtins)
+        bare_by = {b.expert_name: b for b in bare_view.prompt_bundles}
+        assert bare_by["b"].resolved_from == "builtin_fallback"
+        assert bare_by["b"].effective_prompt == builtin_fallback_for("b")
+        assert bare_by["b"].effective_prompt.strip(), "生效提示词恒非空（ADR-29）"
 
         # 存储实现：兜底为空非法 + 乐观并发冲突（两实现语义一致）
         for store in (InMemoryExpertPromptStore("p1"), FsExpertPromptStore(root, "p1")):
@@ -3768,6 +3788,63 @@ def r16_prompt_tool_endpoints() -> None:
     assert deps.orchestrator_for("p_alpha") is deps.orchestrator_for("p_alpha")
 
 
+@_case("r17_build_expert_system_slot：build_expert 签名一致性 + system 位真的生效（IFC-IB-212；REV-17）")
+def r17_build_expert_system_slot() -> None:
+    """防「契约漂移被静默降级掩盖」。
+
+    REV-17（ADR-36）把两域合并后的生效提示词送进 **system 消息位**（`system_prompt`），
+    human 位只留用户问题。这条链最容易**静默**断掉：
+
+      * 具体 provider / 离线替身少一个 `system_prompt` 形参 → `_run_expert` 的
+        `except Exception` 把 `TypeError` 吞成 `degraded=llm_unavailable`，
+        症状是「专家一律降级」，极难定位；
+      * 空白提示词被原样传给 `_make_langchain_client` → 返回**裸客户端**（无
+        `run_tool_loop`）→ 同时失去 system 消息与 function-calling，**不报错**。
+
+    故此处直接比对三处签名 + 用真替身跑一次真实调用。
+    """
+    import inspect
+
+    from ib.core import LlmProvider as LlmPort
+    from ib.experts import get
+    from ib.llm import FakeLlmProvider, OpenAiCompatibleProvider
+    from ib.orchestration import _run_expert
+
+    # ① 端口 / 具体实现 / 离线替身：三处签名必须一致（keyword-only，默认 None）
+    for target in (LlmPort.build_expert, OpenAiCompatibleProvider.build_expert, FakeLlmProvider.build_expert):
+        params = inspect.signature(target).parameters
+        assert "system_prompt" in params, f"{target} 缺 system_prompt 形参（契约漂移）"
+        assert params["system_prompt"].kind is inspect.Parameter.KEYWORD_ONLY, target
+        assert params["system_prompt"].default is None, target
+        assert "spec" in params, target
+
+    # ② 替身必须**接受**该 keyword（`runtime_checkable` Protocol 不校验签名，故只能实调）
+    spec = get("freeark-expert")
+    assert FakeLlmProvider().build_expert(spec, system_prompt="装配期合并结果") is not None
+
+    # ③ 真实链路：生效提示词进 system 位、human 位只留用户问题（用`_run_expert` 的实际接线）
+    captured: dict[str, Any] = {}
+
+    class _Impl:
+        def invoke(self, prompt: str, **kwargs: Any) -> str:
+            captured["human"] = prompt
+            return "答复"
+
+    class _Llm:
+        def build_expert(self, spec: Any, *, system_prompt: str | None = None) -> Any:
+            from ib.core import LlmRole
+
+            captured["system"] = system_prompt
+            return LlmRole(role="expert", temperature=0.0, impl=_Impl())
+
+    result = _run_expert(
+        {"expert": "freeark-expert", "query": "设备怎么巡检？", "prompt": "MERGE-结果"}, _Llm(), {}
+    )
+    assert result.degraded is False, result.degrade_reason
+    assert captured["system"] == "MERGE-结果", "生效提示词必须进 system 位"
+    assert captured["human"] == "设备怎么巡检？", "human 位只留用户问题（旧口径的前缀拼接已废弃）"
+
+
 @_case("r16_rename_alignment：FreeArk 专家名硬改名（无旧名残留）+ 禁止标签并集（ADR-31）")
 def r16_rename_alignment() -> None:
     """核验专家名 / 中文标签已按 ADR-31 硬改名，且骨架不含业务中文名（仅过渡并集例外）。"""
@@ -3863,6 +3940,8 @@ def main() -> int:
         r16_prompt_layers,
         r16_prompt_tool_endpoints,
         r16_rename_alignment,
+        # ---- REV-17 增量（提示词兜底层重定位；ADR-36；IFC-IB-364/365） ----
+        r17_build_expert_system_slot,
     ]
     for case in cases:
         case()

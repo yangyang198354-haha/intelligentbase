@@ -56,6 +56,7 @@ __all__ = [
     "non_editable_changes",
     "validate",
     "validate_definition_full",
+    "validate_two_domains",
     "derive",
     "build_definition_document",
     "document_to_json",
@@ -863,6 +864,7 @@ from .definition import (  # noqa: E402  (循环导入防护：置于模块末�
     semantic_hash,
     validate,
     validate_definition_full,
+    validate_two_domains,
 )
 from .prompts import (  # noqa: E402  (REV-16-2 提示词域；同「置于模块末尾」防护)
     EXPERT_PROMPT_DIR_KEY,

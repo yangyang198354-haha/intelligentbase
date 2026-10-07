@@ -1,6 +1,7 @@
 """
 @module MOD-IB-02
 @implements IFC-IB-288, IFC-IB-289, IFC-IB-290, IFC-IB-291, IFC-IB-292, IFC-IB-355
+            IFC-IB-364（REV-17 新增：validate_two_domains 跨域统合校验）
 @depends MOD-IB-01
 @author software-developer
 
@@ -26,7 +27,7 @@ import os
 import tempfile
 from dataclasses import replace
 from hashlib import sha256
-from typing import Any
+from typing import Any, Mapping
 
 from ib.core import (
     RESERVED_GRAPH_ENDPOINTS,
@@ -35,6 +36,7 @@ from ib.core import (
     DefinitionDocument,
     DerivedView,
     EdgeSpec,
+    ExpertPromptDocumentRef,
     ExpertSpecInput,
     OrchestrationSpecInput,
     RouteSpecInput,
@@ -55,6 +57,7 @@ __all__ = [
     "non_editable_changes",
     "validate",
     "validate_definition_full",
+    "validate_two_domains",
     "derive",
     "build_definition_document",
     "document_from_json",
@@ -100,7 +103,6 @@ def _semantic_payload(doc: DefinitionDocument) -> dict[str, Any]:
                 "keywords": list(e.keywords),
                 "exemplars": list(e.exemplars),
                 "is_data_expert": e.is_data_expert,
-                "fallback_prompt": e.fallback_prompt,
                 "is_delegating": e.is_delegating,
                 "is_default": e.is_default,
             }
@@ -170,7 +172,6 @@ def editable_field_whitelist() -> frozenset[str]:
             "experts[].keywords",
             "experts[].exemplars",
             "experts[].is_data_expert",
-            "experts[].fallback_prompt",
             "experts[].is_delegating",
             "experts[].is_default",
             # 路由参数（节点参数）
@@ -235,7 +236,7 @@ def validate(
       2. project_id 非空；
       3. 专家集合非空、名字唯一；
       4. **默认专家恰好一个**（REQ-FUNC-IB-26 ③ 不得被绕过）；
-      5. 专家文本字段非空（`cn_label` / `fallback_prompt`）；
+      5. 专家文本字段非空（`cn_label`；**REV-17 起不再含 `fallback_prompt`**，见下）；
       6. 路由 `default_expert` 必须是已知专家；阈值在合法域内；
       7. 编排节点非空；条件边**必须**显式 `branch_map` 且端点均在节点集合内（REQ-FUNC-IB-26 ④）；
       8. 工具授权：专家名已知、工具名在已知注册表内、同一专家不重复授权；
@@ -246,6 +247,10 @@ def validate(
 
     第 10 / 11 / 12 类为 **R8 纯追加**：既有 1~9 类的语义与顺序**一字未改**，新增项仅在末尾追加。
     第 12 类不削弱 `ib.experts.validate_specs` 的派生安装期兜底（后者仍对空 / 重复关键词 fail-fast）。
+
+    **REV-17（ADR-36）**：第 5 类**收窄为只剩 `cn_label`** —— `fallback_prompt` 不再是本类
+    字段（`ExpertSpecInput` 已删除该字段）。其余各类的判据、错误码与**顺序一字未改**，
+    既有错误项的相对次序不受影响。
     `known_tools` 为空集时不校验工具名（离线可测；装配期由组合根传入真实注册表）。
     """
     errors: list[ValidationErrorItem] = []
@@ -286,13 +291,12 @@ def validate(
         )
 
     # 5. 专家文本字段
+    #    REV-17（ADR-36）：`fallback_prompt` 校验项已移除 —— 定义文档不再承载提示词文本。
+    #    「兜底非空」（ADR-29）改由**结构**保证：提示词域两层文件皆缺时回落到代码内置
+    #    安全网（`ib.experts.builtin_fallback_for`，恒非空），故无需在文档层设卡。
     for e in doc.experts:
         if not e.cn_label.strip():
             errors.append(_err(f"experts[{e.name}].cn_label", "expert_text_missing", "cn_label 不得为空"))
-        if not e.fallback_prompt.strip():
-            errors.append(
-                _err(f"experts[{e.name}].fallback_prompt", "expert_text_missing", "fallback_prompt 不得为空")
-            )
 
     # 6. 路由
     if names and doc.route.default_expert not in names:
@@ -542,6 +546,46 @@ def validate_definition_full(
     return ValidationReport(ok=not errors, errors=tuple(errors))
 
 
+def validate_two_domains(
+    doc: DefinitionDocument,
+    *,
+    known_tools: tuple[str, ...] | frozenset[str] | set[str] | None = None,
+    tool_param_specs: tuple[ToolParamSpec, ...] = (),
+    prompt_refs: tuple[ExpertPromptDocumentRef, ...] = (),
+    builtin_fallbacks: Mapping[str, str] | None = None,
+) -> ValidationReport:
+    """**跨域统合校验**（REV-17 / ADR-36）。**纯函数**：无 I/O、无副作用。
+
+    = `validate_definition_full`（定义域 ∪ 工具参数域）∪ `validate_prompt_directory`
+    （提示词域）。三段错误按**固定顺序**合并为一次回执：
+
+      1. 定义文档域（`validate`）；2. 工具参数域（`validate_tool_params`）；
+      3. 提示词域（`validate_prompt_directory`）。
+
+    **存在的理由**：REV-17 之前，提示词域只在**装配期**校验（`admit_two_domains`），
+    而定义文档的**保存期**只查前两域 —— 于是「页面上存得下、重启装配才炸」成为可能。
+    把三域收进同一入口后，`_put_definition_config` 与 `admit_two_domains` 共用一条判据，
+    保存即预演装配（ADR-33 单一入口精神的延伸）。
+
+    **不改 `validate_definition_full` 的签名**：该函数已被既有测试与文档锚定
+    （`tests/unit/test_config_audit_rev16_4_unit.py` 直接扫其源码文本），本函数是**并列**的
+    新入口，而非它的替代。
+
+    循环导入说明同 `validate_definition_full`：`validate_prompt_directory` 位于
+    `ib.config.prompts`，必须**函数内惰性导入**。
+    """
+    from .prompts import validate_prompt_directory  # 惰性导入，避免模块级循环依赖
+
+    report = validate_definition_full(
+        doc, known_tools=known_tools, tool_param_specs=tool_param_specs
+    )
+    errors: list[ValidationErrorItem] = list(report.errors)
+    errors.extend(
+        validate_prompt_directory(prompt_refs, doc=doc, builtin_fallbacks=builtin_fallbacks)
+    )
+    return ValidationReport(ok=not errors, errors=tuple(errors))
+
+
 # --------------------------------------------------------------------------- #
 # 只读派生（IFC-IB-291；纯函数）
 # --------------------------------------------------------------------------- #
@@ -612,14 +656,65 @@ def document_to_json(doc: DefinitionDocument) -> str:
     return json.dumps(payload, sort_keys=True, ensure_ascii=False, indent=2) + "\n"
 
 
-def document_from_json(project_id: str, text: str) -> DefinitionDocument:
-    """从 JSON 文本反序列化。结构非法 → 抛 `ConfigError`（可读原因，**不静默回退**）。"""
+def _check_legacy_fallback_keys(
+    data: dict[str, Any], builtin_fallbacks: Mapping[str, str] | None
+) -> None:
+    """REV-17（ADR-36）：处置旧文档残留的 `experts[].fallback_prompt`。
+
+    只做**一件事** —— 值与该专家的内置兜底不一致时 fail-closed。相同的静默通过
+    （零信息损失），未注入映射的（`builtin_fallbacks is None`）一律通过。
+    错误消息**不回显提示词正文**（IFC-IB-348 纪律），只出路径、长度与迁移目标。
+    """
+    if not builtin_fallbacks:
+        return
+    for entry in data.get("experts", []) or []:
+        if not isinstance(entry, dict) or "fallback_prompt" not in entry:
+            continue
+        name = str(entry.get("name", ""))
+        raw = str(entry.get("fallback_prompt", "") or "").strip()
+        if not raw or name not in builtin_fallbacks:
+            continue
+        if raw == str(builtin_fallbacks[name]).strip():
+            continue
+        raise ConfigError(
+            f"定义文档专家 '{name}' 仍带有 REV-17 已移除的 fallback_prompt 字段"
+            f"（{len(raw)} 字，与内置兜底不一致）。该字段不再是提示词载体，"
+            f"继续加载会**静默丢弃**这段文本。请把它迁移到提示词目录文件："
+            f"<IB_EXPERT_PROMPT_DIR>/<project_id>/{name}/fallback.md，"
+            f"然后从定义文档中删除 fallback_prompt 键。",
+            key="IB_DEFINITION_DOC_PATH",
+        )
+
+
+def document_from_json(
+    project_id: str,
+    text: str,
+    *,
+    builtin_fallbacks: Mapping[str, str] | None = None,
+) -> DefinitionDocument:
+    """从 JSON 文本反序列化。结构非法 → 抛 `ConfigError`（可读原因，**不静默回退**）。
+
+    **REV-17（ADR-36）legacy 键处置**：旧文档可能仍带已移除的
+    `experts[].fallback_prompt`。本函数**分级**处理，绝不静默丢弃用户写的提示词文本：
+
+      * 该专家**不在** `builtin_fallbacks` 中（未注入，或本就不在映射里）→ 键被忽略；
+      * 值与该专家的内置兜底**逐字相同** → 静默丢弃（**零信息损失**：删字段后生效文本不变。
+        生产的种子文档正是这一支，因为它由 `_default_definition_document` 从
+        `spec.fallback_prompt` 直抄而来）；
+      * 值**不同** → 抛 `ConfigError`，指明迁移目标。这是真正的信息损失（用户改过这一栏），
+        必须 fail-closed，否则「保存成功但提示词不见了」会静默发生。
+
+    `builtin_fallbacks` 由**装配/端点层注入**（`ib.experts.builtin_fallbacks_for`）——
+    本模块只允许 stdlib + `ib.core`，不得 import `ib.experts`。不注入时退化为
+    「一律忽略 legacy 键」（向后兼容既有 2 参调用方），故真实装载路径必须注入。
+    """
     try:
         data = json.loads(text)
     except (json.JSONDecodeError, TypeError) as exc:
         raise ConfigError("定义文档缺失或不可解析（IB_DEFINITION_DOC_PATH）", key="IB_DEFINITION_DOC_PATH") from exc
     if not isinstance(data, dict):
         raise ConfigError("定义文档缺失或不可解析（IB_DEFINITION_DOC_PATH）", key="IB_DEFINITION_DOC_PATH")
+    _check_legacy_fallback_keys(data, builtin_fallbacks)
     try:
         experts = tuple(
             ExpertSpecInput(
@@ -628,7 +723,6 @@ def document_from_json(project_id: str, text: str) -> DefinitionDocument:
                 keywords=tuple(str(k) for k in e.get("keywords", [])),
                 exemplars=tuple(str(x) for x in e.get("exemplars", [])),
                 is_data_expert=bool(e.get("is_data_expert", False)),
-                fallback_prompt=str(e.get("fallback_prompt", "")),
                 is_delegating=bool(e.get("is_delegating", False)),
                 is_default=bool(e.get("is_default", False)),
             )
@@ -765,9 +859,13 @@ class FileDefinitionDocumentStore:
         path: str,
         *,
         known_tools: frozenset[str] | set[str] | None = None,
+        builtin_fallbacks: Mapping[str, str] | None = None,
     ) -> None:
         self._path = path
         self._known_tools = frozenset(known_tools) if known_tools else None
+        #: REV-17（ADR-36）：旧文档 legacy `fallback_prompt` 键的比对基准，由组合根用
+        #: `ib.experts.BUILTIN_FALLBACKS` 注入（**全名域**映射，未知专家也有值）。
+        self._builtin_fallbacks = builtin_fallbacks
 
     @property
     def path(self) -> str:
@@ -781,7 +879,9 @@ class FileDefinitionDocumentStore:
                 text = fh.read()
         except OSError as exc:
             raise ConfigError("定义文档缺失或不可解析（IB_DEFINITION_DOC_PATH）", key="IB_DEFINITION_DOC_PATH") from exc
-        return document_from_json(project_id, text)
+        return document_from_json(
+            project_id, text, builtin_fallbacks=self._builtin_fallbacks
+        )
 
     def save(
         self,

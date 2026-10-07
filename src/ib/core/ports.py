@@ -532,8 +532,17 @@ class LlmProvider(Protocol):
         """路由分类角色（**temperature=0**，确定性，AC-IB-09-07）。"""
         ...
 
-    def build_expert(self, spec: ExpertSpec) -> LlmRole:
-        """专家作答角色。"""
+    def build_expert(self, spec: ExpertSpec, *, system_prompt: str | None = None) -> LlmRole:
+        """专家作答角色（IFC-IB-212）。
+
+        **REV-17（ADR-36）新增 `system_prompt`**：装配期由两域合并派生的生效提示词
+        （`ExpertPromptBundle.effective_prompt`）在此进入 **system 消息位**；为 `None`
+        或全空白时回落到 `spec.fallback_prompt`（代码内置安全网，ADR-29）。
+
+        **调用方纪律**：`system_prompt` **只允许是装配期常量** —— 实现按
+        `(temperature, system_prompt)` 缓存底层 client（`_clients`），请求期变量会
+        让缓存无界增长。禁止把用户问题 / 会话历史拼进来。
+        """
         ...
 
     def build_aggregator(self) -> LlmRole:
@@ -765,10 +774,11 @@ class ExpertPromptStore(Protocol):
       * 错误体**只出** `path` / `code` / `message`，**不回显**提示词正文或任何凭据值。
     """
 
-    def load_bundle(self, expert_name: str, *, doc_fallback: str) -> ExpertPromptBundle:
+    def load_bundle(self, expert_name: str, *, builtin_fallback: str) -> ExpertPromptBundle:
         """按专家取「主 / 兜底 / 生效」分层合并结果（IFC-IB-343）。
 
-        `doc_fallback` 是定义文档侧的兜底字段（结构与配置域）；当提示词目录内
+        `builtin_fallback` 是**代码内置兜底**（REV-17 / ADR-36；由
+        `ib.experts.builtin_fallback_for` 派生，非定义文档字段）；当提示词目录内
         `fallback.md` 缺失时作为兜底层的来源。**两者皆空 → 抛 `PromptNotFoundError`**。
         """
         ...

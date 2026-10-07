@@ -145,7 +145,6 @@ export type ExpertSpecInput = {
   keywords: string[];
   exemplars: string[];
   is_data_expert: boolean;
-  fallback_prompt: string;
   is_delegating: boolean;
   is_default: boolean;
 };
@@ -235,6 +234,13 @@ export type PromptExpertEntry = {
   name: string;
   cn_label: string;
   layers: Record<PromptLayer, PromptLayerMeta>;
+  /**
+   * 代码内置兜底（REV-17 / ADR-36）：两层文件皆缺时**实际生效**的提示词。
+   *
+   * **只读** —— 它是代码里的进程常量，界面**不**为它提供写入口（否则又回到「同一语义两个
+   * 可写入口」的重叠真源）。此处仅用于让用户看见「兜底到底是什么」。
+   */
+  builtin_fallback: string;
 };
 
 /** 工具参数规格（IFC-IB-340）：由后端从**既有工具声明**派生；界面据此生成控件。 */

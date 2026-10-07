@@ -869,9 +869,11 @@ def _get_definition_config(request: Any) -> Any:
 
 
 def _put_definition_config(request: Any) -> Any:
-    from ib.config import document_from_json, non_editable_changes, validate_definition_full
+    from ib.config import document_from_json, non_editable_changes, validate_two_domains
+    from ib.experts import BUILTIN_FALLBACKS
 
     deps = composition.get_deps()
+    submitted = None
     try:
         ctx = _require_manage(request)  # 写操作需管理权限（否则 403）
         actor = ctx.authz.actor_id
@@ -883,6 +885,9 @@ def _put_definition_config(request: Any) -> Any:
         submitted = document_from_json(
             project_id,
             json.dumps(form.validated_data["document"], ensure_ascii=False),
+            # REV-17（ADR-36）：旧文档残留的 `fallback_prompt` 键据此分级处置
+            # （同内置 → 静默丢弃；不同 → fail-closed 并给出迁移路径），故必须注入。
+            builtin_fallbacks=BUILTIN_FALLBACKS,
         )
         current = deps.definition_store.load(project_id)
     except ConfigError:
@@ -901,13 +906,22 @@ def _put_definition_config(request: Any) -> Any:
         return _validation_failure_response(illegal, "存在不可编辑字段的变更（REQ-FUNC-IB-26）")
 
     # ② 完备性校验（服务端为唯一裁决者；界面预校验不作数）→ 400
-    #    **REV-16-4（ADR-33）**：改用合成纯函数 `validate_definition_full`（IFC-IB-355）
-    #    = IFC-IB-290 ∪ IFC-IB-346 —— 与**装配路径**（`admit_two_domains`）同一校验入口，
-    #    结构性消除 DEFECT-R16-02 根因（保存期漏掉工具参数校验）。
-    report = validate_definition_full(
+    #    **REV-16-4（ADR-33）**：改用合成纯函数，与**装配路径**（`admit_two_domains`）
+    #    同一校验入口，结构性消除 DEFECT-R16-02 根因（保存期漏掉工具参数校验）。
+    #    **REV-17（ADR-36）**：入口升级为 `validate_two_domains`（IFC-IB-364），把**提示词域**
+    #    也一并纳入 —— 此前保存期不查提示词目录，于是「页面上存得下、重启装配才炸」成立。
+    #    校验对象是 `submitted`（**新提交的文档**），不是 `current` —— 查旧文档等于没查。
+    #    提示词引用取**当前目录实况**（保存期不写提示词，故实况 = 生效后装配所见）。
+    try:
+        prompt_refs = _prompt_refs_for(deps, project_id)
+    except DependencyUnavailableError as exc:
+        return error_response(exc)  # 目录不可读 → 503（与 GET /api/config/prompts 同口径）
+    report = validate_two_domains(
         submitted,
         known_tools=composition.known_tool_names(),
         tool_param_specs=deps.tool_param_specs(),
+        prompt_refs=prompt_refs,
+        builtin_fallbacks=composition.builtin_fallbacks_of(submitted),
     )
     if not report.ok:
         _audit_definition_save(deps, project_id, actor, changed, "rejected", report.errors)
@@ -1144,12 +1158,29 @@ def _prompt_store_for(request: Any) -> tuple[Any, Any]:
     return deps, store
 
 
-def _doc_fallback_of(deps: Any, project_id: str, expert: str) -> str:
-    doc = (getattr(deps, "definitions", None) or {}).get(project_id)
-    for e in getattr(doc, "experts", ()) or ():
-        if getattr(e, "name", None) == expert:
-            return getattr(e, "fallback_prompt", "") or ""
-    return ""
+def _prompt_refs_for(deps: Any, project_id: str) -> tuple[Any, ...]:
+    """取该项目提示词目录的**当前实况引用**（IFC-IB-345）。
+
+    供**保存期**跨域校验使用（REV-17 / ADR-36）：定义文档保存不写提示词文件，故目录实况
+    就是「保存后重启装配」所见的那份 —— 这正是本条校验的意义所在（保存即预演装配）。
+    目录不可读 → `DependencyUnavailableError`（由调用方转 503，**不**降级成 500，
+    也不静默当成空目录放行）。
+    """
+    store = (getattr(deps, "prompt_stores", None) or {}).get(project_id)
+    if store is None:
+        return ()
+    return tuple(store.list_refs())
+
+
+def _builtin_fallback_of(deps: Any, project_id: str, expert: str) -> str:
+    """该专家的**代码内置兜底**（REV-17 / ADR-36）。
+
+    取代原 `_doc_fallback_of`（后者读定义文档字段，该字段已删）：兜底层不再来自任何
+    可写入口，改由 `ib.experts.builtin_fallback_for` 统一解析（与装配期**同源**）。
+    """
+    from ib.experts import builtin_fallback_for
+
+    return builtin_fallback_for(expert)
 
 
 def _tool_param_spec_payload(spec: Any) -> dict[str, Any]:
@@ -1190,7 +1221,16 @@ def _get_prompts_list(request: Any) -> Any:
                 "exists": bool(getattr(ref, "exists", False)),
                 "content_hash": getattr(ref, "content_hash", "") if ref is not None else "",
             }
-        experts.append({"name": e.name, "cn_label": e.cn_label, "layers": layers})
+        experts.append(
+            {
+                "name": e.name,
+                "cn_label": e.cn_label,
+                "layers": layers,
+                # 加成式（REV-17 / ADR-36）：代码内置兜底**只读展示**，供界面在两层文件皆缺时
+                # 说明「当前生效的是什么」。它**不是**可写载体 —— 界面不为它开第二写入口。
+                "builtin_fallback": _builtin_fallback_of(deps, project_id, e.name),
+            }
+        )
 
     payload = {
         "experts": experts,
@@ -1203,7 +1243,12 @@ def _get_prompts_list(request: Any) -> Any:
         "layout": {
             "root_key": "IB_EXPERT_PROMPT_DIR",
             "file_pattern": "<root>/<project_id>/<expert_name>/{main.md|fallback.md}",
-            "naming_rule": "子目录名 = 专家 name；main.md 可缺，fallback.md 不得缺",
+            # REV-17（ADR-36）：`fallback.md` 亦可缺 —— 两层文件皆缺时回落到**代码内置兜底**，
+            # 由 `merge_prompt_layers` 的结构保证「兜底恒非空」。
+            "naming_rule": (
+                "子目录名 = 专家 name；main.md 可缺，fallback.md 亦可缺"
+                "（皆缺时回落代码内置兜底）"
+            ),
         },
         # **只登记键名，不含任何值**（IFC-IB-348）。
         "config_key_names": ["IB_EXPERT_PROMPT_DIR", "IB_EXPERT_PROMPT_ENABLED"],
@@ -1232,9 +1277,13 @@ def _get_prompt_layer(request: Any, expert: str, layer: str) -> Any:
             {"error": {"code": "not_found", "message": "提示词层不存在"}},
             status.HTTP_404_NOT_FOUND,
         )
-    doc_fallback = _doc_fallback_of(deps, project_id, expert)
     try:
-        bundle = store.load_bundle(expert, doc_fallback=doc_fallback)
+        # REV-17（ADR-36）：兜底只取**代码内置**（与装配期同源），不再读定义文档字段。
+        # 本端点只在 `ref.exists` 为真的分支里取值，故 `builtin_fallback` 在此仅作
+        # `load_bundle` 的形式参数（该层文件已在，合并结果不会用到它）。
+        bundle = store.load_bundle(
+            expert, builtin_fallback=_builtin_fallback_of(deps, project_id, expert)
+        )
     except Exception as exc:  # noqa: BLE001
         return error_response(exc)
     content = bundle.main_prompt if layer == "main" else bundle.fallback_prompt

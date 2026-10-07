@@ -50,7 +50,6 @@ def _expert(
         keywords=(f"k{name}",) if keywords is None else keywords,
         exemplars=(),
         is_data_expert=False,
-        fallback_prompt=f"prompt-{name}",
         is_delegating=False,
         is_default=is_default,
     )

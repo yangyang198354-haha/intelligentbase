@@ -46,7 +46,6 @@ def _expert(
         keywords=keywords,
         exemplars=(),
         is_data_expert=False,
-        fallback_prompt=f"prompt-{name}",
         is_delegating=False,
         is_default=is_default,
     )

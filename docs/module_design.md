@@ -3,12 +3,12 @@
   <artifact>module_design</artifact>
   <path>docs/module_design.md</path>
   <doc_id>MOD-INTELBASE-001</doc_id>
-  <version>1.8.0</version>
-  <revision>REV-16-4</revision>
+  <version>1.9.0</version>
+  <revision>REV-17</revision>
   <status>DRAFT_FOR_GATE_REVIEW</status>
   <phase>GROUP_B / PHASE_04 模块详细设计</phase>
   <author>system-architect</author>
-  <invocation_id>INV-GROUP_B-INTELBASE-010</invocation_id>
+  <invocation_id>INV-GROUP_B-INTELBASE-011</invocation_id>
   <created_at>2026-09-25</created_at>
   <revision_history>
     <rev no="R1" date="2026-09-25" by="system-architect" basis="REV-01（框架切换 FastAPI→Django）">
@@ -38,11 +38,14 @@
     <rev no="REV-16-4" date="2026-10-06" by="system-architect" invocation_id="INV-GROUP_B-INTELBASE-010" basis="REV-16-4 设计增量（回归缺陷修复轮 GROUP_B：DEFECT-R16-02 / GAP-R16-03 / GAP-R16-04）">
       不新增模块、不新增依赖边：保存期合成校验 validate_definition_full（IFC-IB-355）并入 MOD-IB-02；配置审计结构 ConfigAuditEntry 与只读端口 ConfigAuditStore（IFC-IB-356 / 357，第 17 个端口）与内存态 StorageState（IFC-IB-361）并入 MOD-IB-01；SQLite 审计适配器与手写迁移 004_config_audit.sql（IFC-IB-358）并入 MOD-IB-11（同一 SQLite 台账；WAL + busy_timeout 纪律不变）；审计端点 GET /api/config/audit、保存路径审计挂钩与内存态端点 GET /api/config/storage-state（IFC-IB-359 / 360 / 362）并入 MOD-IB-23；配置页内存态提示（IFC-IB-363）并入 MOD-IB-24。新增 IFC 编号 355 ~ 363（9 条，全部类型化，frozen dataclass / Protocol / 纯 stdlib，零第三方依赖）；IFC-IB-285 仍预留未分配；既有重号 IFC-IB-131 登记不修。端口 16 → 17（纯追加）。既有 MOD-IB-01 ~ 26、IFC-IB-001 ~ 354、§4.1 依赖边清单与 DAG 拓扑一字不动（纯追加；零新增边的再声明见 §4.2.7）。计数不变（REQ-FUNC 42/42、NFR 19；本增量不新增 REQ、不改 AC）。增补位置：§2.2 端口行与增记、§2.2.7 IFC 段号索引、§3 的 MOD-IB-01 / 02 / 11 / 23 / 24 增补、§4.2.7 无环性再声明、§9.10 覆盖率再声明、§11 自检。需求侧文档只读；未修改 FreeArk 任何文件；未写入任何口令 / 令牌 / 密钥字面量（只登记键名）。
     </rev>
+    <rev no="REV-17" date="2026-10-07" by="system-architect" invocation_id="INV-GROUP_B-INTELBASE-011" basis="用户裁决（2026-10-07）：「取消定义文档（承载提示词），仅仅使用 markdown 文件和兜底提示词」；上游 architecture_design.md 1.9.0（REV-17）ADR-15-R2 / ADR-36 / §2.0.8">
+      **不新增模块、不新增端口、不新增依赖边**（模块数 26、端口数 17、§4.1 依赖边逐行不变、DAG 无环）：提示词域单入口合成校验 `validate_two_domains`（IFC-IB-364）并入 **MOD-IB-02**；内置兜底安全网 `BUILTIN_FALLBACK_DEFAULT` / `BUILTIN_FALLBACKS` / `builtin_fallback_for` / `builtin_fallbacks_for`（IFC-IB-365）并入 **MOD-IB-16**（`ib.experts`，由 `_DEFAULT_SPECS` 派生的模块级常量）。新增 IFC 编号 **364 ~ 365**（2 条，全部类型化，零第三方依赖）；**`IFC-IB-001 ~ 363` 的号 / 名 / 签名一字不动** —— 仅 **10 条文字与取值口径修订**（IFC-IB-212 / 287 / 290 / 292 / 338 / 339 / 343 / 345 / 347 / 355，逐条登记于 §2.2.8）；**IFC-IB-285 仍预留未分配**；既有重号 IFC-IB-131 登记不修。**定义文档交出提示词文本**：`ExpertSpecInput.fallback_prompt` 移出 schema（§2.1）；`resolved_from` 第三值 → `builtin_fallback`；`load_bundle` / `load_prompt_bundle` / `derive_prompt_layers` 的 keyword-only 形参 `doc_fallback` → `builtin_fallback`；`validate_prompt_directory` 的「缺兜底」判据 → 「无 `fallback.md` 且无内置兜底」（新增可选形参 `builtin_fallbacks`）；`build_expert` 补 keyword-only `system_prompt`（IFC-IB-212），消解假陈述 docstring。**同一兜底语义的第二可写入口被结构性排除**；「兜底恒非空」改由**结构**保证（全函数内置兜底）；「界面新增专家」死锁由**通用安全网**打破（反越域不放松：孤儿文件仍被拒）；**不 bump `schema_version`**（legacy 键分级处置：同内置静默丢弃 / 异内置 fail-closed）。计数不变（REQ-FUNC 42/42、NFR 19；本增量不新增 REQ、不改 AC）。**生效口径不变**（保存 + 服务重启重装配；ADR-32 / C-IB-40 / OOS-16；不引热重载、不重编译图）。增补位置：§1 REV-17 补充纪律段、§2.1 一行字段集修订、§2.2 增记、§2.2.8 REV-17 IFC 段号索引与文字修订索引、§3 的 MOD-IB-02 / 16 / 20 增补、§11 自检。需求侧文档只读（落盘载体措辞的同步另立交付项）；未修改 FreeArk 任何文件；未写入任何口令 / 令牌 / 密钥字面量（只登记键名 / 头名 / 字段名 / 文件层名；不含任何提示词正文）。
+    </rev>
   </revision_history>
   <inputs>
     <input path="docs/requirements_spec.md" version="1.7.0" revision="REV-16-3" status="APPROVED"/>
     <input path="docs/user_stories.md" version="1.8.0" revision="REV-16-4" status="APPROVED"/>
-    <input path="docs/architecture_design.md" version="1.8.0" revision="REV-16-4" status="DRAFT_FOR_GATE_REVIEW"/>
+    <input path="docs/architecture_design.md" version="1.9.0" revision="REV-17" status="DRAFT_FOR_GATE_REVIEW"/>
     <readonly_reference path="FreeArk 仓库" note="只读参考；未修改任何文件"/>
     <input path="docs/ib_embed_service_contract.md" version="1.0.0" revision="R2" status="DRAFT_FOR_GATE_REVIEW" note="MOD-IB-26 契约唯一落点；本文件 §3 MOD-IB-26 为摘要视图，冲突时以其为准"/>
   </inputs>
@@ -79,6 +82,8 @@
 **REV-16-2 补充纪律（两个持久化载体 ≠ 第二真源）**：本增量引入**第二个持久化载体**（独立提示词 markdown 目录），但**不构成第二真源** —— 真源**按域唯一**（结构 / 配置域 = 定义文档；提示词域 = 提示词目录），两域**内容不得重叠**（定义文档不得承载主提示词正文，提示词目录不得承载专家元数据）。**越域写入即视为违规**，由装配期校验拒绝（IFC-IB-345）。**编号即拓扑序的边界情形**在本轮再次适用：提示词 / 工具参数的装载与派生**必然被组合根 MOD-IB-23 依赖**，故**不得新开** `MOD-IB-27`（否则产生 `23 → 27` 边，破坏 `w(A) > w(B)`），只能并入既有模块（同 §1 R7 补充纪律）。
 
 **REV-16-4 补充纪律与性质（回归缺陷修复增量；DEFECT-R16-02 / GAP-R16-03 / GAP-R16-04）**：REV-16-4 **零新增模块**（仍 **MOD-IB-01 ~ MOD-IB-26**，共 26 个）、**零新增依赖边**；**端口 16 → 17**（`ConfigAuditStore`，IFC-IB-357，**纯追加**，**2 方法**：`record` / `list_by_project`，**无 `update` / `delete`**）。新增工件并入既有模块：保存期合成校验 → **MOD-IB-02**；配置审计与存储态的类型化契约 → **MOD-IB-01**；SQLite 审计适配器（**同一 SQLite 台账**）→ **MOD-IB-11**；审计 / 内存态端点与保存路径审计挂钩 → **MOD-IB-23**；配置页内存态提示 → **MOD-IB-24**。**编号即拓扑序的边界情形**在本轮再一次适用：配置审计与存储态**必然被组合根 `MOD-IB-23` 依赖 / 承载**，故**不得新开** `MOD-IB-27`（否则产生 `23 → 27` 边，破坏 `w(A) > w(B)`），只能并入既有模块（同 §1 R7 补充纪律）。**只读审计 / 非第二真源**：`ConfigAuditStore` **无写回配置的路径**、`ConfigAuditEntry` **只含字段名与结果码**（ADR-34）。**生效口径未变**：仍为「保存 + 服务重启重装配」（ADR-32 / C-IB-40 / OOS-16），**不引入**运行期热重载（ADR-35）。
+
+**REV-17 补充纪律与性质（提示词兜底层重定位增量；ADR-15-R2 / ADR-36）**：REV-17 **零新增模块**（仍 **MOD-IB-01 ~ MOD-IB-26**，共 26 个）、**零新增端口**（仍 **17**）、**零新增依赖边**。新增工件并入既有模块：提示词域单入口合成校验 `validate_two_domains`（IFC-IB-364）→ **MOD-IB-02**（framework-free 纯函数）；内置兜底安全网（IFC-IB-365）→ **MOD-IB-16**（`ib.experts`，由 `_DEFAULT_SPECS` 派生的**模块级常量**，import 时求值）。**分层纪律（强制）**：`ib.config` **只允许** stdlib + `ib.core`，**不得** import `ib.experts` —— 内置兜底一律经**参数注入**（`builtin_fallbacks`）传入，由 `ibweb` 在装配期取用；这既是分层要求，也是 `_DEFAULT_SPECS`（永不被 rebind）与 `EXPERT_SPECS`（可被 `install_derived` rebind）之别在依赖图上的落地。**单一可写载体**：提示词文本只由独立 markdown 目录的 `main.md` / `fallback.md` 两层文件承载；`ExpertSpecInput` **不再有** `fallback_prompt` 字段，代码内置兜底**不可经界面编辑**（无写入口，只读回显）—— ADR-15-R1 否决 Option C 所指的**重叠第二真源**自此被**结构性**排除。**兜底恒非空由结构保证**：`builtin_fallback_for(name)` 为**全函数**（未登记专家回落 `BUILTIN_FALLBACK_DEFAULT`），故 `merge_prompt_layers` 的 `effective_prompt` **不可能为空**；由此「界面新增专家」的死锁（`PUT definition` 要兜底 × `PUT prompts/<新专家>/fallback` 因未登记 `404`）被打破，而**反越域不放松**（孤儿文件 `prompt_orphan_file` 仍被拒）。**编号即拓扑序的边界情形**在本轮**不适用**（无新模块、无新端口、无新边），但仍**重申**：`ib.experts` 属于 MOD-IB-16（L4），**不得**被 L0 的 MOD-IB-02 依赖 —— 这正是内置兜底必须**参数注入**而非直接 import 的原因。**生效口径未变**：仍为「保存 + 服务重启重装配」（ADR-32 / C-IB-40 / OOS-16），**不引入**运行期热重载、**不重编译图**；`fallback.md` 可缺**只改变合并结果取值来源，不改变生效时机**。
 
 | MOD-ID | 模块名 | 层 | 职责（一句话） | 依赖于 |
 |--------|--------|----|----------------|--------|
@@ -147,7 +152,7 @@
 | `PageImageBinding`（R2 新增，定义于 MOD-IB-01） | `project_id: str`；`kb_id: str`；`doc_id: str`；`page_or_section: str`；`images: tuple[PageImageRef, ...]` |
 | `RelatedImageItem` / `RelatedImagesPayload`（R2 新增，定义于 MOD-IB-01） | `RelatedImageItem`: `image_id: str`；`doc_id: str`；`doc_name: str`；`page_or_section: str`；`url_path: str`。`RelatedImagesPayload`: `images: tuple[RelatedImageItem, ...]`
 | `DefinitionDocument`（R7 新增，定义于 MOD-IB-01） | `schema_version: int`；`project_id: str`；`content_hash: str`；`experts: tuple[ExpertSpecInput, ...]`；`route: RouteSpecInput`；`orchestration: OrchestrationSpecInput`；`tool_grants: tuple[ToolGrantSpec, ...]`；`updated_at: str` |
-| `ExpertSpecInput` / `RouteSpecInput` / `ToolGrantSpec`（R7 新增，定义于 MOD-IB-01） | `ExpertSpecInput`: `name: str`；`cn_label: str`；`keywords: tuple[str, ...]`；`exemplars: tuple[str, ...]`；`is_data_expert: bool`；`fallback_prompt: str`；`is_delegating: bool`；`is_default: bool`。`RouteSpecInput`: `tau: float`；`margin: float`；`max_expert_steps: int`；`default_expert: str`。`ToolGrantSpec`: `expert_name: str`；`tool_names: tuple[str, ...]` |
+| `ExpertSpecInput` / `RouteSpecInput` / `ToolGrantSpec`（R7 新增，定义于 MOD-IB-01；**REV-17 修订字段集**） | `ExpertSpecInput`: `name: str`；`cn_label: str`；`keywords: tuple[str, ...]`；`exemplars: tuple[str, ...]`；`is_data_expert: bool`；`is_delegating: bool`；`is_default: bool`。（**REV-17 / ADR-36 / ADR-15-R2**：`fallback_prompt: str` **已移出本结构** —— 提示词文本只由独立 markdown 目录的两层文件与代码内置安全网承载；本结构回归**纯结构配置**。**`ExpertSpec.fallback_prompt`（运行期类型，IFC-IB-171 内）原样保留** —— 它是安全网本体，非文档字段）`RouteSpecInput`: `tau: float`；`margin: float`；`max_expert_steps: int`；`default_expert: str`。`ToolGrantSpec`: `expert_name: str`；`tool_names: tuple[str, ...]` |
 | `OrchestrationSpecInput` / `ConditionalEdgeSpec`（R7 新增，定义于 MOD-IB-01） | `OrchestrationSpecInput`: `nodes: tuple[str, ...]`；`conditional_edges: tuple[ConditionalEdgeSpec, ...]`。`ConditionalEdgeSpec`: `from_node: str`；`branch_map: tuple[tuple[str, str], ...]`（元素为 `(branch_key: str, target_node: str)` 的有序对；**缺失或为空即非法** —— 界面无法判定可达性，由 IFC-IB-290 拒绝） |
 | `DerivedView` / `ValidationErrorItem` / `ValidationReport` / `SaveResult`（R7 新增，定义于 MOD-IB-01） | `DerivedView`: `experts: tuple[ExpertSpecInput, ...]`；`capability_digest: str`；`graph_config: OrchestrationSpecInput`。`ValidationErrorItem`: `path: str`；`code: str`；`message: str`（**不回显任何凭据值**）。`ValidationReport`: `ok: bool`；`errors: tuple[ValidationErrorItem, ...]`（**无 `force` / `ignore` / `warn_only` 字段**）。`SaveResult`: `ok: bool`；`content_hash: str`；`conflict: bool`；`errors: tuple[ValidationErrorItem, ...]` | |
 | `SessionState` / `SessionTurn`（R8 新增，定义于 MOD-IB-01；**补齐** `IFC-IB-221/222` 的既有悬置引用） | `SessionState`: `session_key: str`；`project_id: str`；`actor_id: str`；`turns: tuple[SessionTurn, ...]`；`gate: ConfirmationGateState 或 None`；`updated_at: str`。`SessionTurn`: `role: Literal["user","assistant"]`；`text: str`；`citations: tuple[CitationItem, ...]`；`created_at: str` |
@@ -156,7 +161,7 @@
 | `ConfirmationPrompt` / `ConfirmationDecision` / `ConfirmationGateState`（R8 新增，定义于 MOD-IB-01） | `ConfirmationPrompt`: `gate_id: str`；`expert_name: str`；`summary: str`（**由接入方构造**，骨架不生成业务话术）。`ConfirmationDecision`: `gate_id: str`；`approved: bool`。`ConfirmationGateState`: `gate_id: str`；`prompt: ConfirmationPrompt`；`decision: ConfirmationDecision 或 None`（`None` = 待决策） |
 | `StreamEventKind` **值域追加成员**（R8，定义于 MOD-IB-01） | 既有 6 个成员（`reasoning` / `content` / `degraded` / `related_images` / `error` / `done`）**一字不动**；**追加** `confirmation_required`（确认中间态的呈递事件；**仅在 `IB_CONFIRMATION_GATE_ENABLED=true` 时出现**） |
 | `PromptLayer` / `ExpertPromptDocumentRef`（REV-16-2 新增，定义于 MOD-IB-01） | `PromptLayer` = `Literal["main","fallback"]`。`ExpertPromptDocumentRef`: `expert_name: str`；`layer: PromptLayer`；`rel_path: str`；`content_hash: str`；`exists: bool` |
-| `ExpertPromptBundle` / `PromptDirectoryLayout`（REV-16-2 新增，定义于 MOD-IB-01） | `ExpertPromptBundle`: `expert_name: str`；`main_prompt: str \| None`（**可缺**）；`fallback_prompt: str`（**非空**）；`effective_prompt: str`（**恒非空**）；`resolved_from: Literal["main_file","fallback_file","definition_doc_fallback"]`。`PromptDirectoryLayout`: `root_key: str`；`file_pattern: str`；`naming_rule: str`（子目录名 = 专家 `name`，见 [ARCH-ASSUMPTION-A10]） |
+| `ExpertPromptBundle` / `PromptDirectoryLayout`（REV-16-2 新增，定义于 MOD-IB-01；**REV-17 修订第三值**） | `ExpertPromptBundle`: `expert_name: str`；`main_prompt: str \| None`（**可缺**）；`fallback_prompt: str`（**非空**）；`effective_prompt: str`（**恒非空**）；`resolved_from: Literal["main_file","fallback_file","builtin_fallback"]`（**REV-17 / ADR-15-R2 / ADR-36**：第三值由 `definition_doc_fallback` **更名**为 `builtin_fallback` —— 兜底层载体由定义文档字段换为**代码内置安全网**；取值域仍为**三值**，语义一一对应）。`PromptDirectoryLayout`: `root_key: str`；`file_pattern: str`；`naming_rule: str`（子目录名 = 专家 `name`；**REV-17**：`main.md` 可缺、`fallback.md` **亦可缺** —— 两层皆缺时回落代码内置兜底，见 [ARCH-ASSUMPTION-A10] / ADR-15-R2） |
 | `ToolParamSpec` / `ToolParamValue`（REV-16-2 新增，定义于 MOD-IB-01；**加成式扩展** `ToolGrantSpec`（IFC-IB-287），其文本不改） | `ToolParamSpec`: `name: str`；`type: Literal["int","float","bool","str"]`；`default: str`；`minimum: float \| None`；`maximum: float \| None`；`choices: tuple[str, ...] \| None`。`ToolParamValue`: `name: str`；`value: str`。`ToolGrantSpec` **增列** `param_values: tuple[ToolParamValue, ...] = ()` |
 | `FreeArkAlignedExpertSpec` / `AlignmentChecklist` / `DimensionCheck`（REV-16-2 新增，定义于 MOD-IB-01） | `FreeArkAlignedExpertSpec`: = `ExpertSpec` 的 7 字段 + `main_prompt: str \| None` + `exemplars: tuple[str, ...]`（共 **9 维**）+ `tool_names: tuple[str, ...]`（第 **10** 维，**工具名对齐**）。`DimensionCheck`: `dimension: str`；`base_value: str`；`freeark_value: str`；`aligned: bool`；`unalignable: bool`；`note: str`。`AlignmentChecklist`: `items: tuple[DimensionCheck, ...]`（**10 维**，其中工具参数为 `unalignable=True` 的显式排除项） |
 | `PromptSaveResult` / `PromptNotFoundError` / `ToolParamValidationError`（REV-16-2 新增，定义于 MOD-IB-01） | `PromptSaveResult`: `saved: bool`；`ref: ExpertPromptDocumentRef`；`content_hash: str`；`errors: tuple[ValidationErrorItem, ...]`。`PromptNotFoundError` / `ToolParamValidationError` 继承 `IbError`（IFC-IB-012 层次） |
@@ -308,7 +313,7 @@
 | IFC-IB-337 ~ 338 | MOD-IB-01 | `PromptLayer` / `ExpertPromptDocumentRef`；`ExpertPromptBundle` / `PromptDirectoryLayout` | §3 MOD-IB-01（本件） |
 | IFC-IB-339 | MOD-IB-01 | 端口 `ExpertPromptStore`（**第 16 个端口**，5 方法：`load_bundle` / `save_layer` / `list_refs` / `delete_layer` / `layout`） | §3 MOD-IB-01（本件） |
 | IFC-IB-340 ~ 342 | MOD-IB-01 | `ToolParamSpec` / `ToolParamValue`（**加成式扩展** `ToolGrantSpec`，其文本不改）；`PromptSaveResult` / `PromptNotFoundError` / `ToolParamValidationError`；`FreeArkAlignedExpertSpec` / `AlignmentChecklist` / `DimensionCheck` | §3 MOD-IB-01（本件） |
-| IFC-IB-343 ~ 348 | MOD-IB-02 | `load_prompt_bundle`（主缺失回退兜底）/ `save_prompt_layer`（原子写 + 乐观并发）/ `load_prompt_directory` + `validate_prompt_directory`（孤儿文件 / 命名不符 / 缺兜底）/ `validate_tool_params`（越界 / 类型 / 未知 / 未授权带参）/ `derive_prompt_layers`（跨域合并派生，只读）/ 键名登记 `IB_EXPERT_PROMPT_DIR` / `IB_EXPERT_PROMPT_ENABLED` | §3 MOD-IB-02（本件） |
+| IFC-IB-343 ~ 348 | MOD-IB-02 | `load_prompt_bundle`（主缺失回退兜底）/ `save_prompt_layer`（原子写 + 乐观并发）/ `load_prompt_directory` + `validate_prompt_directory`（孤儿文件 / 命名不符 / 缺兜底）/ `validate_tool_params`（越界 / 类型 / 未知 / 未授权带参）/ `derive_prompt_layers`（跨域合并派生，只读）/ 键名登记 `IB_EXPERT_PROMPT_DIR` / `IB_EXPERT_PROMPT_ENABLED`。**（REV-17 修订，见 §2.2.8）**：`load_prompt_bundle` / `derive_prompt_layers` / 两个 store 的 `load_bundle` 的 keyword-only 形参 `doc_fallback` **更名 `builtin_fallback`**；`validate_prompt_directory` 的「缺兜底」判据改为「**无 `fallback.md` 且无内置兜底**」，并新增可选形参 `builtin_fallbacks`，**三类判据的号 / 名 / 其余签名一字不动** | §3 MOD-IB-02（本件） |
 | IFC-IB-349 | MOD-IB-16 | `prompt_bundles()` / `main_prompts()`（**加成式**；`IFC-IB-171~179` 一字不动） | §3 MOD-IB-16（本件） |
 | IFC-IB-350 | MOD-IB-17 | `build_authorized_tools` / `validate_grants`（勾选 → 最小授权；工具参数绑定；**不新增工具本体**） | §3 MOD-IB-17（本件） |
 | IFC-IB-351 | MOD-IB-22 | `forbidden_labels(cn_map) -> tuple[str, ...]`（**派生视图**；AC-IB-09-03；对齐 ADR-09） | §3 MOD-IB-22（本件） |
@@ -321,7 +326,7 @@
 
 | IFC 段 | 归属模块 | 内容 | 权威落点 |
 |--------|----------|------|----------|
-| IFC-IB-355 | MOD-IB-02 | `validate_definition_full(doc, *, known_tools, tool_param_specs) -> ValidationReport`（**合成纯函数** = IFC-IB-290 ∪ IFC-IB-346；保存路径与装配路径共用的唯一校验入口；`ValidationReport` 仍不含 `force` / `ignore` / `warn_only`） | §3 MOD-IB-02（本件） |
+| IFC-IB-355 | MOD-IB-02 | `validate_definition_full(doc, *, known_tools, tool_param_specs) -> ValidationReport`（**合成纯函数** = IFC-IB-290 ∪ IFC-IB-346；保存路径与装配路径共用的唯一校验入口；`ValidationReport` 仍不含 `force` / `ignore` / `warn_only`）。**（REV-17）**：本函数**自身不变**（号 / 名 / 签名一字不动），自 REV-17 起被**更上层**的合成入口 **IFC-IB-364 `validate_two_domains`** 包含 —— 该上层入口**另将提示词域**并入同一单入口（见 §2.2.8） | §3 MOD-IB-02（本件） |
 | IFC-IB-356 | MOD-IB-01 | 数据结构 `ConfigAuditEntry`（`timestamp` / `project` / `actor` / `action` / `changed_field_names` / `result` / `detail_code`；**只含字段名与结果码，不含任何取值**） | §3 MOD-IB-01（本件） |
 | IFC-IB-357 | MOD-IB-01 | 端口 `ConfigAuditStore`（`Protocol`，**第 17 个端口**，**2 方法**：`record` / `list_by_project`；**无 `update` / `delete`**） | §3 MOD-IB-01（本件） |
 | IFC-IB-358 | MOD-IB-11 | `SqliteConfigAuditStore` 适配器（**同一 SQLite 台账**；DDL 单源 = 手写迁移 `004_config_audit.sql`；只读审计） | §3 MOD-IB-11（本件） |
@@ -332,6 +337,30 @@
 | IFC-IB-363 | MOD-IB-24 | 前端配置页**内存态非静默提示**（任一 `mode == "memory"` ⇒ 提示「配置仅内存生效、不跨重启保留」） | §3 MOD-IB-24（本件） |
 
 **REV-16-4 编号规范（强制，延续 R2 / R7 / R8 / R13 / R14 / REV-16-2）**：新增号只许**追加**（本轮取 **355 ~ 363**）；`IFC-IB-001 ~ 354` 的号 / 名 / 签名 / 字段集**一字不动**（其中 `IFC-IB-290` / `IFC-IB-346` 仅被**合成入口** `IFC-IB-355` 复用，其文本不改）；**`IFC-IB-285` 仍预留未分配**；既有重号 `IFC-IB-131` **登记不修**（残余项 R-9）。以上 9 条 IFC 全部为**类型化契约**（`name: type` + 可空性），**不含任何实现体**；**不含任何口令 / 令牌 / 密钥字面量，也不含任何配置取值**（只登记键名 / 头名 / 字段名 / 结果码）。
+
+### 2.2.8 REV-17 新增 IFC 索引（IFC-IB-364 ~ 365）与文字修订索引
+
+| IFC 段 | 归属模块 | 内容 | 权威落点 |
+|--------|----------|------|----------|
+| IFC-IB-364 | MOD-IB-02 | `validate_two_domains(doc, *, known_tools, tool_param_specs, prompt_refs, builtin_fallbacks) -> ValidationReport`（**合成纯函数** = IFC-IB-355 ∪ IFC-IB-345；**保存路径与装配路径共用的唯一校验入口**，覆盖**三域且顺序固定**：定义域 → 工具域 → 提示词域；两路径回执的校验项**逐条同序 / 同码 / 同路径**；`ValidationReport` 仍不含 `force` / `ignore` / `warn_only`） | §3 MOD-IB-02（本件） |
+| IFC-IB-365 | MOD-IB-16 | 内置兜底安全网：`BUILTIN_FALLBACK_DEFAULT` / `BUILTIN_FALLBACKS`（由 **`_DEFAULT_SPECS` 派生**的模块级常量，import 时求值）/ `builtin_fallback_for(name)` / `builtin_fallbacks_for(names)`（皆为**全函数**，**非空**）；**不可经界面编辑** | §3 MOD-IB-16（本件） |
+
+**REV-17 文字修订索引（10 条；只改文字与取值口径，号 / 名 / 签名一字不动）**：
+
+| IFC | 修订内容 |
+|-----|----------|
+| `IFC-IB-212` | 新增 keyword-only 形参 `system_prompt: str \| None = None`；消解「有 `system_prompt` 覆盖形参」的**假陈述 docstring**；同类修订同步 `FakeLlmProvider.build_expert` |
+| `IFC-IB-287` | `ExpertSpecInput` **去** `fallback_prompt: str` 字段（移出 schema / 白名单 / 定义域校验项） |
+| `IFC-IB-290` | 定义域校验项 5 **只留** `cn_label` 分支；可编辑白名单去 `experts[].fallback_prompt` |
+| `IFC-IB-292` | `_semantic_payload` 去该键 → **一次性 `content_hash` 变更**（所有既有定义文档哈希变一次） |
+| `IFC-IB-338` | `resolved_from` 第三值 `definition_doc_fallback` → **`builtin_fallback`** |
+| `IFC-IB-339` | `load_bundle` 的 keyword-only 形参 `doc_fallback` → **`builtin_fallback`** |
+| `IFC-IB-343` | `load_prompt_bundle` 形参同上更名；`merge_prompt_layers` 增第三分支 `resolved_from="builtin_fallback"`；「兜底为空即非法」降级为防御性断言 |
+| `IFC-IB-345` | 「缺兜底」判据 → 「**无 `fallback.md` 且无内置兜底**」；新增可选形参 `builtin_fallbacks` |
+| `IFC-IB-347` | `derive_prompt_layers` 形参 `builtin_fallbacks`（原 `doc_fallback`） |
+| `IFC-IB-355` | **自身不变**；被更上层 IFC-IB-364 包含 |
+
+**REV-17 编号规范（强制，延续 R2 / R7 / R8 / R13 / R14 / REV-16-2 / REV-16-4）**：新增号只许**追加**（本轮取 **364 ~ 365**）；`IFC-IB-001 ~ 363` 的**号 / 名 / 签名一字不动**（**仅上表 10 条文字与取值口径修订**，逐条登记）；**`IFC-IB-285` 仍预留未分配**；既有重号 `IFC-IB-131` **登记不修**（残余项 R-9）。**端口数不变（17，未新增）**；**模块数不变（26）**；**零新增依赖边**。以上 2 条 IFC 全部为**类型化契约**（`name: type` + 可空性），**不含任何实现体**；**不含任何口令 / 令牌 / 密钥字面量，也不含任何配置取值**（只登记键名 / 头名 / 字段名 / 结果码）。
 
 ## 3. 模块详情
 
@@ -386,8 +415,8 @@
     - `token_digest(token: str) -> str`（SHA-256 hex；**服务端只存此摘要**，使「读到库 ≠ 拿到可用令牌」）。
     - `token_digest_matches(token: str, digest: str) -> bool`（`hmac.compare_digest`，**常量时间比较**，防时序侧信道）。
   - **IFC-IB-337（REV-16-2 新增）**: `PromptLayer` = `Literal["main","fallback"]`；`ExpertPromptDocumentRef`（`expert_name` / `layer` / `rel_path` / `content_hash` / `exists`）。**frozen dataclass / Literal，纯 stdlib，无实现体**。
-  - **IFC-IB-338（REV-16-2 新增）**: `ExpertPromptBundle`（`expert_name` / `main_prompt: str | None` / `fallback_prompt: str`（**非空**）/ `effective_prompt: str`（**恒非空**）/ `resolved_from`）；`PromptDirectoryLayout`（`root_key` / `file_pattern` / `naming_rule`）。**分层并存、主缺失回退兜底**（ADR-29）。
-  - **IFC-IB-339（REV-16-2 新增）**: 端口 `ExpertPromptStore`（`Protocol`，**5 方法**，定义于 MOD-IB-01 零依赖层；**第 16 个端口**）：`load_bundle(expert_name: str, *, doc_fallback: str) -> ExpertPromptBundle`；`save_layer(expert_name: str, layer: PromptLayer, content: str, *, expected_hash: str | None) -> PromptSaveResult`；`list_refs() -> tuple[ExpertPromptDocumentRef, ...]`；`delete_layer(expert_name: str, layer: PromptLayer) -> None`；`layout() -> PromptDirectoryLayout`。**不实现于本模块**（实现落在 MOD-IB-02 的生产 / 离线适配器）。
+  - **IFC-IB-338（REV-16-2 新增；REV-17 修订第三值）**: `ExpertPromptBundle`（`expert_name` / `main_prompt: str | None` / `fallback_prompt: str`（**非空**）/ `effective_prompt: str`（**恒非空**）/ `resolved_from`）；`PromptDirectoryLayout`（`root_key` / `file_pattern` / `naming_rule`）。**分层并存、主缺失回退兜底**（ADR-29）。**REV-17 修订**：`resolved_from` 第三值 = **`builtin_fallback`**（原 `definition_doc_fallback`）；`.号 / .名 / 字段名其余部分一字不动`。
+  - **IFC-IB-339（REV-16-2 新增；REV-17 形参改名）**: 端口 `ExpertPromptStore`（`Protocol`，**5 方法**，定义于 MOD-IB-01 零依赖层；**第 16 个端口**）：`load_bundle(expert_name: str, *, doc_fallback: str) -> ExpertPromptBundle`；`save_layer(expert_name: str, layer: PromptLayer, content: str, *, expected_hash: str | None) -> PromptSaveResult`；`list_refs() -> tuple[ExpertPromptDocumentRef, ...]`；`delete_layer(expert_name: str, layer: PromptLayer) -> None`；`layout() -> PromptDirectoryLayout`。**不实现于本模块**（实现落在 MOD-IB-02 的生产 / 离线适配器）。**REV-17 修订**：`load_bundle` 的 keyword-only 形参 `doc_fallback: str` **更名为 `builtin_fallback: str`**（**方法名 / 其余形参 / 返回类型一字不动**）—— 该形参承载的已不是「定义文档兜底」，而是**代码内置安全网**（ADR-15-R2 / ADR-36）。
   - **IFC-IB-340（REV-16-2 新增）**: `ToolParamSpec`（`name` / `type: Literal["int","float","bool","str"]` / `default` / `minimum: float | None` / `maximum: float | None` / `choices: tuple[str, ...] | None`）与 `ToolParamValue`（`name` / `value: str`）。**加成式扩展** `ToolGrantSpec`（IFC-IB-287）：**增列** `param_values: tuple[ToolParamValue, ...] = ()`，**其既有文本一字不动**（沿用 IFC-IB-282 / 324 先例）。**不提供**新增工具本体的入口（ADR-30）。
   - **IFC-IB-341（REV-16-2 新增）**: `PromptSaveResult`（`saved: bool` / `ref` / `content_hash` / `errors: tuple[ValidationErrorItem, ...]`）；异常 `PromptNotFoundError` / `ToolParamValidationError`（继承 `IbError`，IFC-IB-012 层次）。**错误体只出 `path` / `code` / `message`，不回显任何凭据值**。
   - **IFC-IB-342（REV-16-2 新增）**: `FreeArkAlignedExpertSpec`（`ExpertSpec` 7 字段 + `main_prompt` + `exemplars` + `tool_names`，共 **10 维**）；`DimensionCheck`（`dimension` / `base_value` / `freeark_value` / `aligned` / `unalignable` / `note`）；`AlignmentChecklist`（`items: tuple[DimensionCheck, ...]`）。**工具参数为显式排除项**（`unalignable=True`，ADR-31）。**frozen dataclass，纯 stdlib，无实现体**。
@@ -430,13 +459,14 @@
 - **依赖模块**: MOD-IB-01
 - **外部依赖**: 配置文件解析库（YAML/JSON）；**凭据仅走环境变量**（C-IB-02 / REQ-NFR-IB-07）
 
-  - **IFC-IB-343（REV-16-2 新增）**: `load_prompt_bundle(expert_name: str, *, refs: tuple[ExpertPromptDocumentRef, ...], doc_fallback: str) -> ExpertPromptBundle`（**纯函数 + 端口协作**；**主存在→用主；主缺失→回退兜底**；**兜底为空即非法**；`resolved_from` 记录来源）。**永不返回空白系统提示词**（ADR-29 / REQ-FUNC-IB-37）。
+  - **IFC-IB-343（REV-16-2 新增；REV-17 修订分支与形参名）**: `load_prompt_bundle(expert_name: str, *, refs: tuple[ExpertPromptDocumentRef, ...], builtin_fallback: str) -> ExpertPromptBundle`（**纯函数 + 端口协作**；**主存在→用主；主缺失→用兜底文件；两层皆缺→用代码内置兜底**；`resolved_from` 记录来源）。**永不返回空白系统提示词**（ADR-29 / REQ-FUNC-IB-37）；**REV-17 起该不变量由结构保证** —— 内置兜底为对任意专家名非空的**全函数**（IFC-IB-365），故合并结果不可能为空，原「兜底为空即非法」降级为**防御性断言**（ADR-15-R2 规则 ③）。**REV-17 修订**：keyword-only 形参 `doc_fallback` **更名为 `builtin_fallback`**；`merge_prompt_layers` 增第三分支 `resolved_from="builtin_fallback"`。
   - **IFC-IB-344（REV-16-2 新增）**: `save_prompt_layer(expert_name: str, layer: PromptLayer, content: str, *, expected_hash: str | None) -> PromptSaveResult`（**先写临时文件、再原子替换**；`expected_hash` 不匹配 → `conflict`，**拒绝覆盖**；沿用 IFC-IB-289 的乐观并发纪律）。**保存失败不破坏在用配置**（fail-safe，REQ-NFR-IB-19）。
-  - **IFC-IB-345（REV-16-2 新增）**: `load_prompt_directory() -> tuple[ExpertPromptDocumentRef, ...]` + `validate_prompt_directory(refs, *, doc) -> tuple[ValidationErrorItem, ...]`（**纯函数**：**孤儿提示词文件**（目录有、文档未登记）/ **命名不符**（子目录名 != 专家 name）/ **缺兜底**（`fallback.md` 缺失且文档 `fallback_prompt` 为空）逐条检出）。错误体只出 `path` / `code` / `message`。
+  - **IFC-IB-345（REV-16-2 新增；REV-17 修订第三类判据）**: `load_prompt_directory() -> tuple[ExpertPromptDocumentRef, ...]` + `validate_prompt_directory(refs, *, doc, builtin_fallbacks=None) -> tuple[ValidationErrorItem, ...]`（**纯函数**：**孤儿提示词文件**（目录有、文档未登记）/ **命名不符**（子目录名 != 专家 name）/ **缺兜底**（**REV-17 修订判据**：由「`fallback.md` 缺失**且文档 `fallback_prompt` 为空**」改为「**无 `fallback.md` 且无内置兜底**」）逐条检出）。错误体只出 `path` / `code` / `message`。**REV-17 口径收窄**：因内置兜底为**全函数**（IFC-IB-365），第三类 `prompt_fallback_missing` 在正常配置下**不再触发**，降级为「**注入的内置兜底映射残缺**」的**防御性断言**（ADR-36 Decision 第 2 条）；**前两类（孤儿 / 命名不符）判据与严格性不变** —— 通用兜底**不是**把校验整体关掉。新增可选形参 `builtin_fallbacks`（缺省 `None` → 由调用方注入的映射判定；**不改** `refs` / `doc` 两个既有形参，**不改**返回类型）。
   - **IFC-IB-346（REV-16-2 新增）**: `validate_tool_params(grants: tuple[ToolGrantSpec, ...], *, specs: tuple[ToolParamSpec, ...]) -> tuple[ValidationErrorItem, ...]`（**纯函数**：参数**越界**（< minimum / > maximum）/ **类型不符**（不满足 `type`）/ **未知参数**（spec 未声明）/ **choices 不匹配** / **未授权工具带参**（工具不在该专家 `tool_names` 内却给出参数）→ 一律检出）。**不提供**新增工具本体的校验路径。
   - **IFC-IB-347（REV-16-2 新增）**: `derive_prompt_layers(doc: DefinitionDocument, prompt_refs: tuple[ExpertPromptDocumentRef, ...]) -> DerivedView`（**纯函数**；**跨域合并**：定义文档专家 `name` ↔ 提示词目录子目录**按 name join**；产出 prompt bundle 并并入派生注册表）。**不落盘、不可反写任一真源**（ADR-15-R1）。**新增合并维，不新增参数到既有 IFC-IB-291**（IFC-IB-291 签名文本不变，本函数为其合并扩展的**独立**入口）。
   - **IFC-IB-348（REV-16-2 新增）**: 配置**键名登记**（**仅登记键名，不含值**）：`IB_EXPERT_PROMPT_DIR`（独立提示词目录根路径）、`IB_EXPERT_PROMPT_ENABLED`（提示词域开关）。
   - **IFC-IB-355（REV-16-4 新增）**: `validate_definition_full(doc: DefinitionDocument, *, known_tools: tuple[str, ...] | None = None, tool_param_specs: tuple[ToolParamSpec, ...] = ()) -> ValidationReport`（**合成纯函数**，framework-free；= **IFC-IB-290（`validate`）∪ IFC-IB-346（`validate_tool_params`）**；**保存路径与装配路径共用的唯一校验入口**（ADR-33）；`ValidationReport` **仍不含** `force` / `ignore` / `warn_only`）。**既有 IFC-IB-290 / IFC-IB-346 的号 / 名 / 签名 / 字段集一字不动**（本项仅新增合成入口，非签名变更）；`known_tools` / `tool_param_specs` 的语义分别对齐 IFC-IB-346 的 `specs` 与工具名集合。
+  - **IFC-IB-364（REV-17 新增）**: `validate_two_domains(doc: DefinitionDocument, *, known_tools: tuple[str, ...] | None = None, tool_param_specs: tuple[ToolParamSpec, ...] = (), prompt_refs: tuple[ExpertPromptDocumentRef, ...], builtin_fallbacks: Mapping[str, str] | None = None) -> ValidationReport`（**合成纯函数**，framework-free；= **IFC-IB-355（`validate_definition_full`）∪ IFC-IB-345（`validate_prompt_directory`）**；**保存路径（IFC-IB-295）与装配路径（`admit_two_domains`）共用的唯一校验入口**（ADR-33 修订））。**错误顺序固定且两路径逐条一致**：**定义域 → 工具域 → 提示词域**（回执的 `(path, code)` 序列**完全相等** —— 该等价性是「保存期 ≡ 装配期」的**可测判据**，消除「页面上存得下、重启装配才炸」）。`ValidationReport` **仍不含** `force` / `ignore` / `warn_only`。**本次不新增模块、不新增端口、不新增依赖边**；`ib.config` **不得** import `ib.experts`（`builtin_fallbacks` 由 `ibweb` 在装配期注入）。
 
 ### MOD-IB-03 请求上下文 (L0)
 
@@ -645,8 +675,9 @@
 - **覆盖需求**: REQ-FUNC-IB-02（专家可配置）、**IB-25 / IB-26 / IB-27（R7：定义文档为该注册表的构造输入；REV-16-3：真源按域唯一 —— 结构与配置域 = 定义文档，提示词域 = 独立 markdown 目录，见 ADR-15 / ADR-15-R1 / C-IB-41）**；REQ-NFR-IB-01（可复用）
 - **R7 依赖不变声明**: 本模块的**依赖模块仍为 MOD-IB-01**（**零新增边**），对外契约 `IFC-IB-171~179` 的号 / 名 / 签名**一字不动**；R7 只改变**数据来源**（定义文档 → 装配期派生 → 构造注入），不改变模块边界与接口。派生的具体构造由 MOD-IB-02 的 `derive`（IFC-IB-291）完成、由组合根 MOD-IB-23 在装配期注入（见 §5 R7 说明）。
 - **公开接口契约**:
-  - IFC-IB-171: `EXPERT_SPECS: list[ExpertSpec]`（`ExpertSpec(name: str, cn_label: str, keywords: tuple[str, ...], is_data_expert: bool, fallback_prompt: str, is_delegating: bool, is_default: bool)`）
+  - IFC-IB-171: `EXPERT_SPECS: list[ExpertSpec]`（`ExpertSpec(name: str, cn_label: str, keywords: tuple[str, ...], is_data_expert: bool, fallback_prompt: str, is_delegating: bool, is_default: bool)`）。**REV-17 口径澄清**：`ExpertSpec.fallback_prompt` **原样保留** —— 自 REV-17 起它是**代码内置安全网本体**（`_DEFAULT_SPECS` 派生，经 IFC-IB-365 取值），而**不是**定义文档字段（`ExpertSpecInput.fallback_prompt` 已移出）。`fallback_prompts()`（IFC-IB-175）语义**不变**（仍返回兜底层，`dict[str, str]`，**非空**）。
   - IFC-IB-172: `names() -> tuple[str, ...]`；IFC-IB-173: `keywords_map() -> dict[str, tuple[str, ...]]`；IFC-IB-174: `cn_map() -> dict[str, str]`；IFC-IB-175: `fallback_prompts() -> dict[str, str]`；IFC-IB-176: `data_experts() -> tuple[str, ...]`；IFC-IB-177: `delegating_experts() -> tuple[str, ...]`；IFC-IB-178: `default_expert() -> str`；IFC-IB-179: `get(name: str) -> ExpertSpec | None`
+  - **IFC-IB-365（REV-17 新增）**: 内置兜底安全网 —— `BUILTIN_FALLBACK_DEFAULT: str`（**通用兜底**，`_DEFAULT_SPECS` 之外专家的回落文本，**非空**）；`BUILTIN_FALLBACKS: Mapping[str, str]`（由 **`_DEFAULT_SPECS` 派生**的**模块级常量**，import 时求值 —— **绝不可**取自 `EXPERT_SPECS`：后者是 `install_derived` 可 rebind 的全局名，`build_deps(force=True)` 只重建 `_DEPS` 而**不回滚**它，故「装配前取一次」在第二次装配即漂移）；`builtin_fallback_for(name: str) -> str`（**全函数**：`_DEFAULT_SPECS` 内取该专家专属文本，其外回落 `BUILTIN_FALLBACK_DEFAULT`）；`builtin_fallbacks_for(names: Iterable[str]) -> dict[str, str]`（**全函数**，无 `KeyError` / 无空洞）。**单一来源**：`derive_prompt_layers` 的合并、`validate_prompt_directory` 的判据、`_inject_derived_experts` 的 `ExpertSpec.fallback_prompt` **三点共用同一份映射**。**分层纪律**：`ib.config` **不得** import `ib.experts`（只允许 stdlib + `ib.core`），内置兜底经**参数注入**；`ibweb` 直接调用。**不可经界面编辑**（无写入口，只读回显）。
   - **IFC-IB-349（REV-16-2 新增）**: `prompt_bundles() -> dict[str, ExpertPromptBundle]`（按专家 `name` 取**主 / 兜底 / 生效提示词**）；`main_prompts() -> dict[str, str | None]`（仅主提示词，可缺）。**加成式扩展**：`IFC-IB-171~179` 的号 / 名 / 签名**一字不动**；其中 `IFC-IB-175 `fallback_prompts()`` 的语义**不变** —— 其仍返回**兜底层**（`dict[str, str]`，**非空**）。本模块持有的是**由两域在装配期合并派生并注入**的只读注册表（ADR-15-R1）。
 - **依赖模块**: MOD-IB-01
 - **外部依赖**: **无**（framework-free；不 import langchain/langgraph）
@@ -691,7 +722,7 @@
 - **覆盖需求**: REQ-FUNC-IB-18、IB-19、IB-21；DR-04；AC-IB-12-05、AC-IB-09-07
 - **公开接口契约**:
   - IFC-IB-211: `LlmProvider.build_router() -> LlmRole`（`temperature=0`，确定性）
-  - IFC-IB-212: `LlmProvider.build_expert(spec: ExpertSpec) -> LlmRole`
+  - IFC-IB-212: `LlmProvider.build_expert(spec: ExpertSpec, *, system_prompt: str | None = None) -> LlmRole`（**REV-17 修订**：新增 keyword-only 形参 `system_prompt`，缺省 `None` —— 由装配期**合并派生**的生效提示词经此进 **system 消息**；实现侧 `strip()` 后为空即回落 `spec.fallback_prompt`（内置安全网）。**REV-17 之前**该方法**无此形参**，而其 docstring 声称「主提示词经 `system_prompt` 覆盖」—— 系**假陈述**，本次一并消解。**方法名 / 既有形参 / 返回类型一字不动**；同类修订同步落于 `FakeLlmProvider.build_expert`。**硬规则**：`system_prompt` **只允许是装配期常量**（人格文本），**不得**拼入请求期变量 —— 否则 `_clients` 缓存项随请求数增长（内存泄漏），且「同人格共用实例」前提被破坏）
   - IFC-IB-213: `LlmProvider.build_aggregator() -> LlmRole`
   - IFC-IB-214: `LlmProvider.health() -> HealthStatus`
   - IFC-IB-215: `LlmProvider.describe_egress() -> EgressDescriptor(remote: bool, endpoint_host: str, data_categories: list[str])`
@@ -1484,3 +1515,17 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
       - **OQ / OPEN ITEM 未越权**：`config_audit` **保留策略**与「保存成功但记录缺失」窗口**保持开放**（[ARCH-ASSUMPTION-A11] / [TBD-T25]）；架构层不自行拍板保留数值、不自行扩围为 fail-closed。
       - **凭据纪律**：全文只登记**键名** / **头名** / **字段名** / **结果码**；**未写入任何配置取值、口令 / 令牌 / 密钥字面量**；令牌仅经 `Authorization` 头；`?token=` 纪律对全部新端点生效。
       - **边界合规**：REV-16-4 增量**不含实现代码**（无函数体、无伪代码）；**未修改 FreeArk 任何文件**（全程只读）；需求侧文档只读未改；`tech_stack.md` **未改（无新第三方依赖，仅 stdlib `sqlite3`）**；本阶段**止于 GROUP_B**。
+    - **REV-17 自检（提示词兜底层重定位增量；ADR-15-R2 / ADR-36 / IFC-IB-364 ~ 365）**：
+      - **覆盖同步**：REQ 覆盖**不变**（**42/42 REQ-FUNC + 19 REQ-NFR**；本增量**不新增 REQ、不改 AC**）；条目数不变。
+      - **零新增模块 / 零新增端口 / 零新增依赖边**：模块数仍 **26**、**端口数仍 17**（`IFC-IB-364` 落 MOD-IB-02 纯函数、`IFC-IB-365` 落 MOD-IB-16 常量与函数，**均非新端口**）；**§4.1 依赖边清单逐行未改**（`ib.config` **不得** import `ib.experts` —— 内置兜底经**参数注入**，见 IFC-IB-365）；**DAG 无环**。
+      - **类型化未降级 / 编号纪律未破**：新增 `IFC-IB-364 ~ 365`（2 条）全部为 `name: type` + 可空性的**类型化契约**（frozen dataclass / Protocol / 纯 stdlib，零第三方依赖）；**`IFC-IB-001 ~ 363` 的号 / 名 / 签名一字不动** —— **仅 10 条文字与取值口径修订**（逐条登记于 §2.2.8）；**`IFC-IB-285` 仍预留未分配**；既有重号 `IFC-IB-131` **登记不修**（残余项 R-9）。
+      - **第二写入口被结构性排除**：`ExpertSpecInput` **不再有** `fallback_prompt` 字段（移出 schema / 白名单 IFC-IB-291 / 定义域校验项 5）；提示词文本的**唯一可写载体** = 目录 `main.md` / `fallback.md`；代码内置兜底（IFC-IB-365）**不可经界面编辑**（无写入口，只读回显）。
+      - **兜底恒非空由结构保证**：`builtin_fallback_for(name)` 对**任意**专家名非空（**全函数**）⇒ `merge_prompt_layers` 的 `effective_prompt` **不可能为空**（ADR-29 修订 / ADR-15-R2 规则 ③）；「界面新增专家」**死锁已破**（通用安全网 `BUILTIN_FALLBACK_DEFAULT`）。
+      - **反越域未放松**：通用兜底**不是**把校验整体关掉 —— 孤儿提示词文件（`prompt_orphan_file`）与命名不符**仍被拒**；`prompt_fallback_missing` 的**口径收窄**（判据改为「无 `fallback.md` **且** 无内置兜底」）**已逐条登记**（IFC-IB-345 / ADR-36 Decision 第 2 条）。
+      - **单入口覆盖含提示词域**：`validate_two_domains`（IFC-IB-364）为**保存路径与装配路径共用的唯一校验入口**，覆盖**三域且顺序固定**（定义域 → 工具域 → 提示词域），两路径回执**逐条同序 / 同码 / 同路径**（ADR-33 修订）；`ValidationReport` **仍不含** `force` / `ignore` / `warn_only`；**`validate_definition_full`（IFC-IB-355）自身不变**（其被既有测试以 `getsource` 扫描）。
+      - **`build_expert` 假陈述消解**：`IFC-IB-212` 补 keyword-only 形参 `system_prompt: str | None = None`（**方法名 / 既有形参 / 返回类型一字不动**），合并派生的生效提示词经此进 **system 消息**；**REV-17 之前**该形参不存在而 docstring 声称存在，系**假陈述**，本次一并订正。**硬规则**：`system_prompt` **只允许是装配期常量**（`_clients` 缓存上界 = 专家数 + 3，可测断言）。
+      - **legacy 键 fail-closed**：旧定义文档残留的 `experts[].fallback_prompt` —— 与内置**逐字相同** ⇒ 静默丢弃（零信息损失）；**不同** ⇒ **抛 `ConfigError`** 并指明迁移目标 `<root>/<project_id>/<name>/fallback.md`，**只报长度、不回显正文**（对齐 IFC-IB-348 纪律）；**不 bump `schema_version`**（无迁移机制）。
+      - **生效口径未变**：**保存 + 服务重启重装配**（ADR-32 / C-IB-40 / OOS-16）；**不提供**运行期热重载、**不重编译编排图**；`fallback.md` 可缺**只改变合并结果取值来源，不改变生效时机**。
+      - **OQ / OPEN ITEM 未越权**：`general` / 无专家路径的人格串为代码内置且**不可配置** —— **既有不对称事实，只登记不修复**（`architecture_design.md` §10.1 OPEN ITEM）；修复它须先有需求侧条目（新 REQ / AC），架构层**不发明需求**。
+      - **凭据纪律**：全文只登记**键名** / **头名** / **字段名** / **文件层名**；**未写入任何配置取值、口令 / 令牌 / 密钥字面量**（不含任何提示词正文）；令牌仅经 `Authorization` 头；`?token=` 纪律对全部既有端点有效。
+      - **边界合规**：REV-17 增量**不含实现代码**（无函数体、无伪代码）；**未修改 FreeArk 任何文件**（全程只读）；需求侧文档只读未改（落盘载体措辞的同步**另立交付项**）；`tech_stack.md` **未改（无新第三方依赖）**；本阶段**止于 GROUP_B**。

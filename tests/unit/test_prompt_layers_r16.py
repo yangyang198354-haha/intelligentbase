@@ -52,14 +52,14 @@ from ib.tools import (
 # --------------------------------------------------------------------------- #
 
 
-def _expert(name: str, *, is_default: bool = False, fallback: str | None = None) -> ExpertSpecInput:
+def _expert(name: str, *, is_default: bool = False) -> ExpertSpecInput:
+    # REV-17（ADR-36）：ExpertSpecInput 已不含 fallback_prompt —— 定义文档不再承载提示词文本。
     return ExpertSpecInput(
         name=name,
         cn_label=f"标签{name}",
         keywords=(f"k{name}",),
         exemplars=(),
         is_data_expert=False,
-        fallback_prompt=f"doc::{name}" if fallback is None else fallback,
         is_delegating=False,
         is_default=is_default,
     )
@@ -107,23 +107,29 @@ def _tool_registry():
 
 
 # --------------------------------------------------------------------------- #
-# IFC-IB-343：分层合并（主 > 兜底文件 > 文档兜底；兜底恒非空）
+# IFC-IB-343：分层合并（主 > 兜底文件 > **代码内置兜底**；兜底恒非空）
+#
+# REV-17（ADR-36）：第三层来源由「定义文档兜底字段」改为「代码内置安全网」，
+# 故 `resolved_from` 第三值为 `builtin_fallback`（原 `definition_doc_fallback`）。
 # --------------------------------------------------------------------------- #
 
 
 def test_merge_layers_priority_then_never_blank():
     # 主存在 → 用主（resolved_from=main_file）
-    b = merge_prompt_layers("a", main_content="MAIN", fallback_content="FB", doc_fallback="DOC")
+    b = merge_prompt_layers("a", main_content="MAIN", fallback_content="FB", builtin_fallback="BI")
     assert b.effective_prompt == "MAIN" and b.main_prompt == "MAIN" and b.resolved_from == "main_file"
     # 主缺失 → 回退兜底文件
-    b = merge_prompt_layers("a", main_content=None, fallback_content="FB", doc_fallback="DOC")
+    b = merge_prompt_layers("a", main_content=None, fallback_content="FB", builtin_fallback="BI")
     assert b.effective_prompt == "FB" and b.main_prompt is None and b.resolved_from == "fallback_file"
-    # 两层皆缺 → 文档兜底
-    b = merge_prompt_layers("a", main_content="", fallback_content="", doc_fallback="DOC")
-    assert b.effective_prompt == "DOC" and b.resolved_from == "definition_doc_fallback"
+    # 两层皆缺 → 代码内置兜底
+    b = merge_prompt_layers("a", main_content="", fallback_content="", builtin_fallback="BI")
+    assert b.effective_prompt == "BI" and b.resolved_from == "builtin_fallback"
+    # 主存在时兜底层字段仍如实回填（供界面展示「兜底是什么」，不参与生效）
+    b = merge_prompt_layers("a", main_content="MAIN", fallback_content="", builtin_fallback="BI")
+    assert b.fallback_prompt == "BI"
     # 三层皆空 → 非法（effective_prompt 永不空白，ADR-29）
     with pytest.raises(PromptNotFoundError):
-        merge_prompt_layers("a", main_content=None, fallback_content="", doc_fallback="   ")
+        merge_prompt_layers("a", main_content=None, fallback_content="", builtin_fallback="   ")
 
 
 def test_prompt_content_hash_is_semantic_and_stable():
@@ -154,15 +160,18 @@ def test_validate_prompt_directory_detects_orphan_naming_and_missing_fallback(tm
     _write_prompt(root, "p1", "a", "fallback", "fb-a")
     _write_prompt(root, "p1", "ghost", "fallback", "fb-ghost")  # 孤儿
     refs = load_prompt_directory(root, "p1")
-    codes = {e.code for e in validate_prompt_directory(refs, doc=doc)}
+    # REV-17（ADR-36）：缺兜底的第二判据由「文档兜底为空」改为「内置兜底缺失」。
+    codes = {e.code for e in validate_prompt_directory(refs, doc=doc, builtin_fallbacks={"a": "BI", "b": "BI"})}
     assert "prompt_orphan_file" in codes
-    # b 无 fallback.md 且文档兜底非空（doc::b）→ 不算缺兜底
+    # b 无 fallback.md 但有内置兜底 → 不算缺兜底（这正是 REV-17 要放行的场景）
     assert "prompt_fallback_missing" not in codes
 
-    # 文档兜底为空 + 无 fallback.md → 缺兜底
-    bare = _doc("p1", experts=(_expert("a", is_default=True, fallback=""),))
-    codes2 = {e.code for e in validate_prompt_directory((), doc=bare)}
+    # 无 fallback.md **且** 内置兜底缺失 → 缺兜底（注入残缺的防御性断言）
+    codes2 = {e.code for e in validate_prompt_directory((), doc=doc, builtin_fallbacks={})}
     assert "prompt_fallback_missing" in codes2
+
+    # 未注入（None）时从严：等价于「无内置兜底」
+    assert "prompt_fallback_missing" in {e.code for e in validate_prompt_directory((), doc=doc)}
 
 
 def test_validate_prompt_directory_naming_mismatch(tmp_path):
@@ -305,7 +314,7 @@ def test_derive_prompt_layers_joins_by_expert_name_and_installs(tmp_path):
     _write_prompt(root, "p1", "a", "fallback", "FB-A")
     _write_prompt(root, "p1", "b", "fallback", "FB-B")
     refs = load_prompt_directory(root, "p1")
-    view = derive_prompt_layers(doc, refs)
+    view = derive_prompt_layers(doc, refs, builtin_fallbacks={"a": "BI-A", "b": "BI-B"})
     by_name = {b.expert_name: b for b in view.prompt_bundles}
     assert by_name["a"].effective_prompt == "MAIN-A" and by_name["a"].resolved_from == "main_file"
     assert by_name["b"].effective_prompt == "FB-B" and by_name["b"].resolved_from == "fallback_file"
@@ -317,8 +326,14 @@ def test_derive_prompt_layers_joins_by_expert_name_and_installs(tmp_path):
     assert prompt_bundles()["b"].effective_prompt == "FB-B"
 
 
-def test_derive_prompt_layers_without_files_uses_doc_fallback():
-    view = derive_prompt_layers(_doc("p1"), ())
+def test_derive_prompt_layers_without_files_uses_builtin_fallback():
+    """REV-17（ADR-36）：提示词目录两层皆缺 → 生效提示词取**代码内置兜底**。
+
+    这是「配置页编辑的 markdown 从未进 system 位」缺陷的对照面：兜底层必须恒有值，
+    且该值**不来自**任何一个可写入口。
+    """
+    view = derive_prompt_layers(_doc("p1"), (), builtin_fallbacks={"a": "BI-a", "b": "BI-b"})
     by_name = {b.expert_name: b for b in view.prompt_bundles}
-    assert by_name["a"].effective_prompt == "doc::a"
-    assert by_name["a"].resolved_from == "definition_doc_fallback"
+    assert by_name["a"].effective_prompt == "BI-a"
+    assert by_name["a"].resolved_from == "builtin_fallback"
+    assert by_name["b"].resolved_from == "builtin_fallback"

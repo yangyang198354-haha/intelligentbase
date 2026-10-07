@@ -75,7 +75,6 @@ def _expert(
         keywords=(f"k{name}",) if keywords is None else keywords,
         exemplars=(),
         is_data_expert=False,
-        fallback_prompt=f"prompt-{name}",
         is_delegating=False,
         is_default=is_default,
     )
@@ -309,7 +308,8 @@ def test_TC_UNIT_058_roundtrip_is_semantically_equivalent():
         assert tuple(got.keywords) == tuple(want.keywords)
         assert tuple(got.exemplars) == tuple(want.exemplars)
         assert got.is_data_expert == want.is_data_expert
-        assert got.fallback_prompt == want.fallback_prompt
+        assert got.is_delegating == want.is_delegating
+        assert got.is_default == want.is_default
         assert got.is_delegating == want.is_delegating
         assert got.is_default == want.is_default
     assert reloaded.route == original.route
@@ -432,9 +432,17 @@ def test_TC_UNIT_060_errors_carry_locators_without_credential_values():
     sentinel_value = "r7-placeholder-not-a-real-credential"
     doc = _doc(
         experts=(
+            # REV-17（ADR-36）：`fallback_prompt` 已从 ExpertSpecInput 移除，故把
+            # 「不得回显的敏感样值」放进同样自由文本的 `keywords`（本用例的意图是
+            # 「文档里的任意文本都不会被错误体回显」，与承载它的具体字段无关）。
             ExpertSpecInput(
-                "a", "标签", ("k",), (), False,
-                f"凭据请经环境变量 {key_name} 注入（定义文档只出现键名）", False, True,
+                name="a",
+                cn_label="标签",
+                keywords=(f"凭据请经环境变量 {key_name} 注入（定义文档只出现键名）",),
+                exemplars=(),
+                is_data_expert=False,
+                is_delegating=False,
+                is_default=True,
             ),
             _expert("b", cn_label="   "),  # 故意制造一条错误（cn_label 空）以便检视错误体
         )

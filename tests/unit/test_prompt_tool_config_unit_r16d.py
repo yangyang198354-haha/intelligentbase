@@ -40,7 +40,8 @@ _OLD_LABELS = (
 # --------------------------------------------------------------------------- #
 
 
-def _experts(*, fallback_freeark: str = "兜底提示词"):
+def _experts():
+    # REV-17（ADR-36）：ExpertSpecInput 已不含 fallback_prompt。
     return (
         core.ExpertSpecInput(
             name="freeark-expert",
@@ -48,7 +49,6 @@ def _experts(*, fallback_freeark: str = "兜底提示词"):
             keywords=("数据", "报表"),
             exemplars=("示例一",),
             is_data_expert=True,
-            fallback_prompt=fallback_freeark,
             is_delegating=False,
             is_default=True,
         ),
@@ -58,7 +58,6 @@ def _experts(*, fallback_freeark: str = "兜底提示词"):
             keywords=("知识", "问答"),
             exemplars=("示例二",),
             is_data_expert=False,
-            fallback_prompt="三恒兜底",
             is_delegating=False,
             is_default=False,
         ),
@@ -196,11 +195,26 @@ def test_TC_UNIT_112_admit_two_domains_rejects_cross_domain_violations():
         admit_two_domains(doc, store=store, prompt_refs=orphan, tool_specs=())
     assert "prompt_orphan_file" in {i.code for i in ei.value.validation_items}
 
-    # (b) 缺兜底：文档 fallback 为空且目录无 fallback.md → 拒绝
-    empty_fb = _doc(experts=_experts(fallback_freeark="   "))
+    # (b) 缺兜底：目录无 fallback.md **且** 该专家无内置兜底 → 拒绝。
+    #     REV-17（ADR-36）：判据已不再来自定义文档字段（该字段已删），而来自注入的内置兜底。
+    #     正常装配下 `builtin_fallbacks` 恒覆盖每个专家，故这里显式注入空映射来触发它 ——
+    #     该错误码因此退化为「提示词域注入残缺」的防御性断言。
+    doc_b = _doc()
     with pytest.raises(core.ConfigError) as ei:
-        admit_two_domains(empty_fb, store=_store(empty_fb), prompt_refs=(), tool_specs=())
+        admit_two_domains(
+            doc_b, store=_store(doc_b), prompt_refs=(), tool_specs=(), builtin_fallbacks={}
+        )
     assert "prompt_fallback_missing" in {i.code for i in ei.value.validation_items}
+
+    # (b2) 反之：有内置兜底、无 fallback.md → **通过**（这正是 REV-17 要放行的场景）
+    view_b = admit_two_domains(
+        doc_b,
+        store=_store(doc_b),
+        prompt_refs=(),
+        tool_specs=(),
+        builtin_fallbacks={"freeark-expert": "BI", "sanheng-knowledge": "BI"},
+    )
+    assert all(b.resolved_from == "builtin_fallback" for b in view_b.prompt_bundles)
 
     # (c) 未知工具参数（spec 未声明）→ 拒绝
     bad_param = _doc(
@@ -229,9 +243,14 @@ def test_TC_UNIT_113_admit_two_domains_clean_passes_and_derives_bundles():
     view = admit_two_domains(doc, store=_store(doc), prompt_refs=(), tool_specs=())
     by = {b.expert_name: b for b in view.prompt_bundles}
     assert set(by) == {"freeark-expert", "sanheng-knowledge"}
-    # 无提示词文件 → 退回文档兜底，且生效提示词恒非空（ADR-29）
-    assert all(b.resolved_from == "definition_doc_fallback" for b in by.values())
+    # 无提示词文件 → 退回**代码内置兜底**（REV-17 / ADR-36），且生效提示词恒非空（ADR-29）
+    assert all(b.resolved_from == "builtin_fallback" for b in by.values())
     assert all(b.effective_prompt.strip() for b in by.values())
+    # 两个专家名都在 `_DEFAULT_SPECS` 中 → 兜底取自各自的内置提示词（非通用安全网）
+    from ib.experts import BUILTIN_FALLBACK_DEFAULT, builtin_fallback_for
+
+    assert by["freeark-expert"].effective_prompt == builtin_fallback_for("freeark-expert")
+    assert by["freeark-expert"].effective_prompt != BUILTIN_FALLBACK_DEFAULT
 
 
 # --------------------------------------------------------------------------- #
@@ -396,9 +415,9 @@ def test_TC_UNIT_120_load_prompt_bundle_ref_exists_but_file_missing_falls_back()
         content_hash="sha256:stale",
         exists=True,  # 引用声称存在，但文件实际已缺（例如被外部删除）
     )
-    bundle = cfg.load_prompt_bundle("freeark-expert", refs=(ref,), doc_fallback="文档兜底")
-    assert bundle.resolved_from == "definition_doc_fallback"
-    assert bundle.effective_prompt == "文档兜底"
+    bundle = cfg.load_prompt_bundle("freeark-expert", refs=(ref,), builtin_fallback="内置兜底")
+    assert bundle.resolved_from == "builtin_fallback"
+    assert bundle.effective_prompt == "内置兜底"
     assert bundle.main_prompt is None
 
 
@@ -415,7 +434,7 @@ def test_TC_UNIT_121_editing_main_layer_keeps_fallback_layer():
     assert m2.saved is True
     refs2 = {r.layer: r for r in store.list_refs() if r.expert_name == "freeark-expert"}
     assert refs2["fallback"].content_hash == fb_hash_before  # 兜底层未被触碰
-    bundle = store.load_bundle("freeark-expert", doc_fallback="文档")
+    bundle = store.load_bundle("freeark-expert", builtin_fallback="内置")
     assert bundle.main_prompt == "主v2" and bundle.fallback_prompt == "兜底v1"
     assert bundle.resolved_from == "main_file"
 

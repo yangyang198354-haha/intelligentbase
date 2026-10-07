@@ -63,7 +63,12 @@ def test_TC_E2E_022_save_then_restart_reassembly_takes_effect(tmp_path, django_r
 
     # ③ 「重启」= 新进程视角：新 store 实例读盘 + 重新装载目录 + 重新装配（AC-IB-32-03）
     fresh_store = FsExpertPromptStore(str(tmp_path), "p_alpha")
-    bundle = fresh_store.load_bundle("freeark-expert", doc_fallback="文档兜底")
+    # REV-17（ADR-36）：兜底层由调用方从 `ib.experts` 注入，不再是定义文档字段。
+    from ib.experts import builtin_fallback_for
+
+    bundle = fresh_store.load_bundle(
+        "freeark-expert", builtin_fallback=builtin_fallback_for("freeark-expert")
+    )
     assert bundle.resolved_from == "main_file"
     assert bundle.effective_prompt.startswith("重启后生效")
 

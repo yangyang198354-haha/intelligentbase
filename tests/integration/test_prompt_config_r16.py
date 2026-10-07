@@ -38,10 +38,11 @@ def _put_layer(client, expert: str, layer: str, body: dict):
 def test_TC_INT_R16_assembly_installs_prompt_stores_and_bundles(deps):
     assert set(deps.prompt_stores) == {"p_alpha", "p_beta"}
     for view in deps.derived_views.values():
-        # 默认种子文档兜底非空 → 每位专家都有生效提示词（有效提示词恒非空）
+        # 无提示词文件 → 代码内置安全网兜底 → 每位专家都有生效提示词（恒非空）
+        # REV-17（ADR-36）：第三值由 `definition_doc_fallback` 改为 `builtin_fallback`。
         assert view.prompt_bundles
         assert all(b.effective_prompt.strip() for b in view.prompt_bundles)
-        assert all(b.resolved_from == "definition_doc_fallback" for b in view.prompt_bundles)
+        assert all(b.resolved_from == "builtin_fallback" for b in view.prompt_bundles)
 
     from ib.experts import prompt_bundles
 

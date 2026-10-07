@@ -833,13 +833,14 @@ def admit_two_domains(
     store: Any | None = None,
     prompt_refs: Any = (),
     tool_specs: Any = (),
+    builtin_fallbacks: Any = None,
 ) -> Any:
     """**[IFC-IB-353 装配序列] 两域聚合准入闸门 + 跨域派生**（REV-16-2）。
 
     聚合两段校验（任一段不通过即**拒绝装配**，一次性回执**全部**错误）：
-      1. 定义文档域 + 工具参数域：`validate_definition_full`（IFC-IB-355 = 290 ∪ 346，
-         与保存路径**同一校验入口**，ADR-33）；
-      2. 提示词目录域：`validate_prompt_directory`（IFC-IB-345：孤儿文件 / 命名不符 / 缺兜底）。
+      1. 定义文档域 + 工具参数域 + 提示词目录域：`validate_two_domains`
+         （IFC-IB-364 = 355 ∪ 345，**与保存路径同一校验入口**，ADR-33 / ADR-36）；
+      2. —— 原第 2 段已并入第 1 段，不再单独调用。
 
     通过后经 `derive_prompt_layers`（IFC-IB-347）产出**跨域合并**的只读派生视图
     （定义文档专家 `name` ↔ 提示词目录子目录按 name join；`DerivedView.prompt_bundles`）。
@@ -851,29 +852,52 @@ def admit_two_domains(
     （结构性消除 DEFECT-R16-02 根因：保存期漏掉 IFC-IB-346 的工具参数校验）。
     `known_tools` 取**唯一登记点**的工具名集合（与 `build_definition_store` 注入给存储的
     集合同源），故工具名校验语义不变。
+
+    **REV-17（ADR-36）**：改用 `validate_two_domains`，把**提示词域**也拉进这**同一个**
+    入口 —— 此前提示词域只在装配期校验，保存期不查，于是「页面上存得下、重启装配才炸」
+    成为可能。现在保存与装配共用一条判据、**同序同条**。
+    `builtin_fallbacks` 为 `None` 时按 `ib.experts.builtin_fallbacks_for(doc 专家名)` 取，
+    保证内置安全网在两条路径上**同源**。
     """
     if store is None:
         deps = get_deps(required=False)
         store = getattr(deps, "definition_store", None)
     if store is None:
         raise StartupError("准入闸门缺少定义文档存储：装配未完成或未注入 definition_store")
-    from ib.config import (
-        derive_prompt_layers,
-        validate_definition_full,
-        validate_prompt_directory,
-    )
+    from ib.config import derive_prompt_layers, validate_two_domains
 
-    # IFC-IB-355：定义文档域（290）∪ 工具参数域（346）；与保存路径同一入口。
-    report = validate_definition_full(
+    if builtin_fallbacks is None:
+        builtin_fallbacks = builtin_fallbacks_of(doc)
+
+    # IFC-IB-364：定义文档域（290）∪ 工具参数域（346）∪ 提示词目录域（345）；
+    # 与保存路径同一入口（ADR-33 / ADR-36）。
+    report = validate_two_domains(
         doc,
         known_tools=_known_tool_names(),
         tool_param_specs=tuple(tool_specs),
+        prompt_refs=prompt_refs,
+        builtin_fallbacks=builtin_fallbacks,
     )
-    errors = list(report.errors)
-    errors.extend(validate_prompt_directory(prompt_refs, doc=doc))  # IFC-IB-345
-    if errors:
-        _raise_admission_error(errors)
-    return derive_prompt_layers(doc, prompt_refs)  # IFC-IB-347
+    if report.errors:
+        _raise_admission_error(report.errors)
+    return derive_prompt_layers(  # IFC-IB-347
+        doc, prompt_refs, builtin_fallbacks=builtin_fallbacks
+    )
+
+
+def builtin_fallbacks_of(doc: Any) -> dict[str, str]:
+    """给一份定义文档解析**完备**的内置兜底映射（REV-17 / ADR-36）。
+
+    `ibweb` 内**唯一**的安全网取用点：装配路径（`admit_two_domains`）、保存路径
+    （`PUT /api/config/definition`）与端点单专家查询（`_doc_fallback_of` 的替代）
+    都必须经此处，杜绝三处各自拼默认值而漂移。
+
+    值恒非空（自定义专家回落 `BUILTIN_FALLBACK_DEFAULT`），故下游 `ib.config` 侧
+    只需 `mapping.get(name, "")` 即可，**无需知道通用兜底常量的存在**。
+    """
+    from ib.experts import builtin_fallbacks_for
+
+    return builtin_fallbacks_for([str(getattr(e, "name", "")) for e in getattr(doc, "experts", ()) or ()])
 
 
 def _raise_admission_error(errors: Any) -> None:
@@ -1092,7 +1116,6 @@ def _default_definition_document(project_id: str, cfg: Any) -> Any:
             keywords=tuple(spec.keywords),
             exemplars=tuple(exemplars_map.get(spec.name, ())),
             is_data_expert=spec.is_data_expert,
-            fallback_prompt=spec.fallback_prompt,
             is_delegating=spec.is_delegating,
             is_default=spec.is_default,
         )
@@ -1146,13 +1169,18 @@ def build_definition_store(cfg: Any, projects: dict[str, ProjectRecord]) -> Any:
       （显式记录，**不静默当作空文档** —— 对齐 IFC-IB-288 的「不静默回退」纪律）。
     """
     from ib.config import FileDefinitionDocumentStore, InMemoryDefinitionDocumentStore
+    from ib.experts import BUILTIN_FALLBACKS
     from ib.observability import log_event
 
     first = next(iter(projects), "")
     known = _known_tool_names()
     path = os.environ.get("IB_DEFINITION_DOC_PATH", "").strip()
     if not cfg.offline_mode and path:
-        return FileDefinitionDocumentStore(path, known_tools=known)
+        # REV-17（ADR-36）：注入**全名域**内置兜底映射，供 `load()` 处置旧文档残留的
+        # `fallback_prompt` 键（与内置一致 → 静默丢弃；不一致 → fail-closed 并给出迁移路径）。
+        return FileDefinitionDocumentStore(
+            path, known_tools=known, builtin_fallbacks=BUILTIN_FALLBACKS
+        )
     if not cfg.offline_mode and not path:
         log_event(
             "definition_doc",
@@ -1168,7 +1196,8 @@ def build_prompt_stores(cfg: Any, projects: dict[str, ProjectRecord]) -> dict[st
     """构造每项目的 `ExpertPromptStore`（IFC-IB-339 的实现选择；ADR-15-R1 第二真源）。
 
     * **离线模式 / 未配置 `IB_EXPERT_PROMPT_DIR` / `IB_EXPERT_PROMPT_ENABLED=false`**
-      → `InMemoryExpertPromptStore`（进程内替身，无提示词文件 → 生效提示词取自定义文档兜底）；
+      → `InMemoryExpertPromptStore`（进程内替身，无提示词文件 → 生效提示词取**代码内置
+      兜底**；REV-17 / ADR-36 起定义文档已不承载提示词文本）；
     * 非离线且 `IB_EXPERT_PROMPT_DIR` 已配置 → `FsExpertPromptStore`（本地 markdown 目录，
       原子写回 + 语义哈希乐观并发）。
 
@@ -1218,7 +1247,7 @@ def _inject_derived_experts(
     同 `ib.experts.install()` 文档既有口径）。`install_derived` 幂等，重复装配不抛。
     """
     from ib.core import ExpertSpec
-    from ib.experts import install_derived
+    from ib.experts import builtin_fallback_for, install_derived
 
     view = derived_views.get(project_id)
     if view is None:
@@ -1229,7 +1258,10 @@ def _inject_derived_experts(
             cn_label=e.cn_label,
             keywords=tuple(e.keywords),
             is_data_expert=e.is_data_expert,
-            fallback_prompt=e.fallback_prompt,
+            # REV-17（ADR-36）：定义文档已不承载提示词文本，兜底据此从**代码内置安全网**
+            # 取（`_DEFAULT_SPECS` 派生 → 自定义专家回落 `BUILTIN_FALLBACK_DEFAULT`）。
+            # 与 `derive_prompt_layers` 的合并、`validate_prompt_directory` 的判据**同源**。
+            fallback_prompt=builtin_fallback_for(e.name),
             is_delegating=e.is_delegating,
             is_default=e.is_default,
         )

@@ -10,7 +10,7 @@
 | 调用 ID | INV-GROUP_C-INTELBASE-001（R1）／ INV-GROUP_C-INTELBASE-002（R2 增量）／ INV-GROUP_C-INTELBASE-003（R3 缺陷修复增量）／ INV-GROUP_C-INTELBASE-004（R4 缺陷修复 + 依赖补齐增量）／ INV-GROUP_C-INTELBASE-005（R7 定义外置 + 可视化配置增量）／ INV-GROUP_C-INTELBASE-007（R8 FND-R7-01 校验项补齐）／ INV-GROUP_C-INTELBASE-008（R10 前端构建阻断修复）／ INV-GROUP_C-INTELBASE-010（R11 IB-20 流式 / 会话增量，协调者轮次口径 REV-12）／ **INV-GROUP_C-INTELBASE-012（R13 账户 / 会话 / 商用界面重构增量，设计侧口径 REV-13）** ／ **INV-GROUP_C-INTELBASE-013（R13.1 回修增量：DEFECT-R13-01 来源 IP 维度登录限速修复）** ／ **INV-GROUP_C-INTELBASE-014（R14 回归缺陷修复增量：全局管理员「当前项目」选择与 `X-IB-Project` 传播，设计侧口径 REV-14）** ／ **INV-GROUP_C-INTELBASE-015（REV-16-2 提示词分层 + 工具可视化配置增量，设计侧口径 REV-16-3）** ／ **INV-GROUP_C-INTELBASE-016（REV-16-4 配置审计（只读）+ 存储态暴露 + DEFECT-R16-01/02 修复增量，设计侧口径 REV-16-4）** |
 | 项目 | intelligentbase |
 | 阶段 | PHASE_06b（自我代码评审） |
-| 版本 | **R13**（R1 主体 §1~§8 未改写；R2 增量见 **§9**；R3 增量见 **§10**；R4 增量见 **§11**；R7 增量见 **§12**；R8 增量见 **§13**；R10 增量见 **§14**；R11 增量见 **§15**；R13 增量见 **§16**；R13.1 回修增量见 **§17**；**R14 回归缺陷修复增量见 §18**；**REV-16-2 提示词分层与工具可视化配置增量见 §19**；**REV-16-4 配置审计（只读）与存储态暴露 + 两回归缺陷修复增量见 §20**） |
+| 版本 | **R13**（R1 主体 §1~§8 未改写；R2 增量见 **§9**；R3 增量见 **§10**；R4 增量见 **§11**；R7 增量见 **§12**；R8 增量见 **§13**；R10 增量见 **§14**；R11 增量见 **§15**；R13 增量见 **§16**；R13.1 回修增量见 **§17**；**R14 回归缺陷修复增量见 §18**；**REV-16-2 提示词分层与工具可视化配置增量见 §19**；**REV-16-4 配置审计（只读）与存储态暴露 + 两回归缺陷修复增量见 §20**；**REV-17 提示词兜底层重定位增量（提示词文本移出定义文档 + 合并结果进 system 位 + 通用内置安全网）见 §21**） |
 | status | DRAFT（待 GROUP_D / PM 复核） |
 | 上游输入 | `docs/architecture_design.md`（**1.4.0 / R8**，GR-B-005 PASS_WITH_CONDITIONS）、`docs/module_design.md`（**1.4.0 / R8**）、`docs/tech_stack.md`（**1.3.1 / R10**，R8 设计轮次判 NO_CHANGE）、`docs/ib_embed_service_contract.md`（R2，权威契约）、`docs/test_report.md`（**1.7.0 / R11**，FND-R11-01 与「2 项未覆盖 + 4 项部分覆盖 AC」登记处）、`docs/user_stories.md`（**1.3.0 / R7**，US-IB-19 / US-IB-20）；**R10 触发输入** = PM 只读取证（`.github/workflows/ci.yml` 阶段9 `npm ci` 因锁不同步 EUSAGE）与 `src/frontend/package.json` / `package-lock.json` / `ConfigPage.vue` 现场（tech_stack 已随 R10 升至 1.3.1，见 §14）。**R13 触发输入** = `docs/module_design.md` **1.5.0/REV-13**（IFC-IB-309~332 / 第 15 个端口 / §2.2.4 段号索引）、`docs/architecture_design.md` **1.5.0/REV-13**（ADR-18~ADR-27）、`docs/tech_stack.md` **1.4.0/REV-13**（§1 三新行 / §1.4 客户端键登记 / §4.5 第 13~18 项）、`docs/requirements_spec.md` **1.4.0/REV-13**（REQ-FUNC-IB-28~36 / REQ-NFR-IB-15~18 / C-IB-09 / DR-09~DR-17）；上游门控 **GR-B-006 = PASS_WITH_CONDITIONS**（见 §16）；**R13.1 触发输入** = GROUP_D 门控 `condition_1` 登记的 **DEFECT-R13-01**（MEDIUM）/ `tests/integration/test_accounts_int_r13.py::TC-INT-119`（见 §17）；**R14 触发输入** = `docs/architecture_design.md` **1.6.0/REV-14**（ADR-28 项目上下文的选择与传播，Option B 选定 + §2.0.5 R14 影响复核 + §10.1 R14 OPEN ITEM）、`docs/module_design.md` **1.6.0/REV-14**（IFC-IB-333~336 / §2.2.5 段号索引 / §3 MOD-IB-23 端点与契约 / §3 MOD-IB-24 store 与传播约束 / §4.2.5 无环性再声明 / §9.8 覆盖率再声明）、`docs/tech_stack.md` **1.4.0/REV-14**（**NO_CHANGE**：无新依赖）、需求侧 US-IB-24 / AC-IB-24-02 / AC-IB-24-03 / REQ-FUNC-IB-23/31/32、`docs/phase_status.md` 的 **IC-IB-02**（REV-14 实现约束）与 REV-14-2；上游 GROUP_B **GR-B-007 = PASS_WITH_CONDITIONS**（见 §18）。**R14 现场根因** = R13 回归：全局管理员（`users.project_id IS NULL` ⇒ `effective_project == "*"`）因项目级端点 fail-closed 而无法使用任何项目级页面（问答 / 文件 / 重建 / 可视化配置一律 503），且无「选择当前项目」入口。 |
 | 覆盖范围 | MOD-IB-01 ~ MOD-IB-26（**R2 追加 MOD-IB-26**；R1 覆盖 01~25）。**R3 重评 MOD-IB-13 与 MOD-IB-23**；**R4 只重评被触及的部分**：MOD-IB-12 与 MOD-IB-13，外加依赖面新增文件 `src/requirements-embed.txt`（B-05，非模块）；**R7 只重评被触及的部分**：MOD-IB-01（端口 13 → 14 + 结构）、MOD-IB-02（定义文档数据层）、MOD-IB-16（派生注入）、MOD-IB-23（装配期闸门 + 端点）、MOD-IB-24（可视化配置页）；**R8 只重评被触及的部分**：MOD-IB-02（`ib/config/definition.py::validate` 校验项补齐）；**R10 只重评被触及的部分**：MOD-IB-24（前端构建管线：锁同步 / 源文件跟踪 / 类型错误 / 冒烟入口）；**R11 只重评被触及的部分**：MOD-IB-01（R8 类型 / 枚举 / 常量）、MOD-IB-02（键名登记与值域 + `validate` 第 3 子项）、MOD-IB-16（`is_delegating` 消费侧话术）、MOD-IB-21（终态单发 / 可见性 / 确认事件 / 会话存储逐字段复制）、MOD-IB-22（确认门装配 / `resume` fail-closed / G2 单跳交接）、MOD-IB-23（`chat_stream` 显式 4xx + `POST /api/chat/resume`）、MOD-IB-24（确认区呈递 / 决策回传 / 会话标识纪律）；**R13 只重评被触及的部分**：MOD-IB-01（账户 / 会话 / 令牌契约 + 第 15 个端口 `AccountStore`）、MOD-IB-02（IFC-IB-312 键名登记）、MOD-IB-11（bcrypt / `SqliteAccountStore` / `MemoryAccountStore` / 幂等种子）、MOD-IB-23（账户 / 会话 / 账户 CRUD 端点 + `SessionTokenResolver` + 可注入策略 + 中间件扩展 + 装配 + 条件性限速审计）、MOD-IB-24（登录页 / 首登强制改密 / 控制台外壳 / 路由守卫 / 类型化客户端 / 主题 / 组件库本地打包）、MOD-IB-25（迁移 003 / nginx TLS 模板 / 键模板 / 检查清单 B15~B20 / `bcrypt` 依赖登记）；**R13.1 只重评被触及的部分**：MOD-IB-23（`Deps.login_throttle` 应用级装配 + 登录端点判定顺序）；**R14 只重评被触及的部分**：MOD-IB-23（`projects_endpoint` + `api/projects` 路由 + `X-IB-Project` 头契约登记）、MOD-IB-24（`stores/project.ts` 新建 / `api/client.ts` 单点注入 + 项目枚举客户端 / `app/env.ts` 接线 / `layouts/ConsoleLayout.vue` 选择器与视图态重置 / `main.ts` 401 清空） |
@@ -2606,3 +2606,98 @@ EXIT=2
 | 5 | 抗性取证（脚本内即验，不落文件） | `log_event` 自身抛错 / `log_event` 属性缺失两种情形下 `record_config_audit` **均不抛**；WARN payload 键集 == `{stage, outcome, project_id, error_code, level}`（`stage=config_audit`、`outcome=config_audit_write_failed`、`level=WARN`） | — |
 
 **§20.10 守约复核**：未改任何既有 IFC 编号 / 签名 / 字段集；未新增模块 / 端口 / 依赖；`tests/**` **未触碰**（仅运行）；未 `git add` / `commit` / `push` / 部署；FreeArk 参考仓**只读**；无任何口令 / 令牌 / 密钥字面量。（finding 计数：**CRITICAL = 0 / MAJOR = 1（FIXED）/ MINOR = 4** —— §20.1、§20.3、§20.9、§20.10 四处一致。）
+
+---
+
+## §21 REV-17 增量自评（提示词兜底层重定位）
+
+**设计侧口径**：`docs/architecture_design.md` **1.9.0/REV-17**（新增 **ADR-36**、**ADR-15-R2**；明文修订 ADR-29 / ADR-31 / ADR-33；**§2.0.8 R17 影响复核表**）+ `docs/module_design.md` **1.9.0/REV-17**（新增 **IFC-IB-364** / **IFC-IB-365**；**§2.2.8 REV-17 文字修订索引**）。**触发输入** = 用户请求（2026-10-07）「取消定义文档，仅仅使用 markdown 文件和兜底提示词。可视化配置文件可以对 markdown 进行 CRUD，加载，保存，生效」+ 三轮澄清后用户拍板的七项裁决（见 §21.1）。**本节的五维评分与 finding 覆盖 `src/ib/core/types.py` / `src/ib/core/ports.py` / `src/ib/config/definition.py` / `src/ib/config/prompts.py` / `src/ib/config/__init__.py` / `src/ib/experts/__init__.py` / `src/ib/llm/__init__.py` / `src/ib/orchestration/__init__.py` / `src/ibweb/composition.py` / `src/ibweb/views.py` / `src/ibweb/serializers.py` / `src/frontend/src/api/client.ts` / `src/frontend/src/views/ConfigPage.vue` 共 13 个被触及文件。**
+
+### 21.1 结论摘要（三件事 + 七项用户裁决）
+
+| 项 | 类型 | 结论 | 落点 |
+|----|------|------|------|
+| 提示词文本移出定义文档 | 真源收窄（ADR-15-R2） | **DONE** | `ExpertSpecInput` 删字段；`_semantic_payload` / 白名单 / 校验项 5；legacy 键分级处置 |
+| 合并结果进 system 位 | 通道矫正（ADR-36） | **DONE** | `build_expert(spec, *, system_prompt)`（IFC-IB-212）+ `_run_expert` 传 `prompt or None`；**假陈述 docstring 消解** |
+| 通用内置安全网破死锁 | 结构性保证（IFC-IB-365） | **DONE** | `BUILTIN_FALLBACK_DEFAULT` / `builtin_fallback_for`；`validate_two_domains`（IFC-IB-364）保存期与装配期共用 |
+
+**七项用户裁决**：①只收窄不取消定义文档；②兜底层 = `fallback.md`（可编辑）为主 + 代码内置（不可界面编辑）为安全网；③生效口径维持「保存 + 服务重启重装配」（ADR-32），不引热重载；④矫正通道 = 合并结果进 system 位；⑤保存期一并校验提示词文件；⑥加通用内置安全网破「界面新增专家」死锁；⑦按正式修订 REV-17 交付。
+
+### 21.2 finding 计数
+
+| 级别 | 数量 | 明细 |
+|------|------|------|
+| **CRITICAL** | **0** | — |
+| **MAJOR** | **0** | — |
+| **MINOR** | **3** | MINOR-1（`builtin_fallbacks` 缺省 `None` 的默认不安全路径）；MINOR-2（CRED-01 结转，非本轮引入）；MINOR-3（`_clients` 无淘汰，上界仅靠调用方纪律） |
+
+### 21.3 逐条 finding
+
+**MINOR-1 · `builtin_fallbacks: Mapping | None = None` 的缺省路径不查内置兜底（默认不安全）**
+- 位置：`src/ib/config/prompts.py:287-292`（`validate_prompt_directory`）、`src/ib/config/prompts.py:449-454`（`derive_prompt_layers`）、`src/ib/config/definition.py:549-556`（`validate_two_domains`）。
+- 事实：三个函数的 `builtin_fallbacks` 均**可选**且缺省 `None`。缺省时判据回落到「无 `fallback.md` 即 `prompt_fallback_missing`」，即 **REV-17 之前的旧严格行为**。这是**分层纪律的必然结果** —— `ib.config` 只允许 import stdlib + `ib.core`，**不得** import `ib.experts`，故函数**无法**自行回落取内置映射，只能由调用方注入。
+- 影响面（已核）：**仓内全部调用点均显式传参** —— `composition.py::_assemble` 取一次 `builtin_fallbacks()` 后传 `admit_two_domains` 与 `_inject_derived_experts`；`validate_two_domains` 的缺省由 `admit_two_domains` 兜住。故**当前无实际缺陷**。
+- 为何仍登记：**API 形状是「默认不安全」** —— 将来若有新调用点漏传，会**静默**退回旧语义（保存期放行、装配期才炸），正是 REV-17 要堵的那类回归。**缓解**：`tests/unit/test_prompt_system_slot_r17.py` 与 `tests/integration/test_prompt_config_r17_int.py` 均以「显式注入」为前提断言；`selfcheck.py` 的 `r17_build_expert_system_slot` 亦锚定该链路。**建议**（不阻塞）：下一轮若再动这三个函数签名，考虑改为**必填** keyword-only 参数，把「忘了注入」从静默降级变成 `TypeError`。
+- **判定：MINOR（非阻塞，登记待下轮）**。
+
+**MINOR-2 · CRED-01 结转**
+- 沿用既有登记的凭据面观察项（历史遗留，**非本轮引入**）。REV-17 未新增任何凭据面：全文只登记键名（`IB_EXPERT_PROMPT_DIR` / `IB_EXPERT_PROMPT_ENABLED`）、头名（`Authorization`）与标签名；`?token=` 纪律未被放宽。
+- **判定：MINOR（非阻塞，结转）**。
+
+**MINOR-3 · `_clients` 缓存无淘汰，上界仅靠调用方纪律**
+- 位置：`src/ib/llm/__init__.py:161`（`self._clients`）、`:254-265`（`_client` 无淘汰写入）。
+- 事实：缓存键为 `(temperature, system_prompt)`，**无淘汰、无容量上限**。本轮已在 `_client` 的 docstring 写明硬规则（`system_prompt` 只允许是装配期常量，禁拼请求期变量），并以新用例断言「上界 = 专家数 + 3」。但**运行期无强制** —— 若将来有人在请求路径上传动态 `system_prompt`，缓存会随请求数增长。
+- 为何不修为硬上限：加 LRU 会引入与 `_clients` 语义无关的淘汰策略复杂度，且当前不变式（装配期常量）由装配层结构保证（ADR-32 无热重载 + 合并视图装配期派生）。**登记为观察项**。
+- **判定：MINOR（非阻塞，登记）**。
+
+### 21.4 逐模块 REV-17 评审详情
+
+| MOD-ID | 模块 | 评审要点 | 结论 |
+|--------|------|----------|------|
+| MOD-IB-01 | 核心契约 | `ExpertSpecInput` 删 `fallback_prompt` 而 **`ExpertSpec.fallback_prompt` 原样保留**（安全网本体，`_prompt_of` / `build_expert` 回落 / `IFC-IB-175` 三处锚点）；`resolved_from` 第三值更名后 `Literal` 与 docstring 同步；`build_expert` 的 `system_prompt` 为 **keyword-only 且有默认值**（既有替身不破） | 通过 |
+| MOD-IB-02 | 配置数据层 | `validate_two_domains` **不改** `validate_definition_full` 签名（`tests/unit/test_config_audit_rev16_4_unit.py` 用 `getsource` 扫它），只做外包；域序固定（定义域 → 工具域 → 提示词域）；`document_from_json` 的 legacy 分级处置 **fail-closed 且不回显正文**；`ib.config` **未** import `ib.experts`（分层纪律守住） | 通过 |
+| MOD-IB-16 | 专家注册表 / 安全网 | 快照由 **`_DEFAULT_SPECS`** 派生而**非** `EXPERT_SPECS` —— 此点是本轮最关键的一处不变式（`install_derived` rebind 全局名；`build_deps(force=True)` 不回滚进程级单例，测试里是常态）；`BUILTIN_FALLBACKS` 为**全函数**（任意名字恒有非空兜底），故 ADR-29「兜底恒非空」由**结构**保证 | 通过 |
+| MOD-IB-20 | LLM 提供方 | 生效口径 `effective = (system_prompt or "").strip() or spec.fallback_prompt`：**空白串视同未传**，避免「空白 system」被当成有效人格；`FakeLlmProvider` 同步加 keyword-only 参数（**不同步即离线全线静默降级**）；`_client` docstring 补硬规则并**修正**了此前「同一提示词共用实例」的模糊措辞 | 通过 |
+| MOD-IB-22 | 编排 | `_run_expert` 传 `system_prompt=prompt or None` 且 human 只留用户问题。**`or None` 是必须项**：`_make_langchain_client` 在 falsy 时返回**裸 client**，裸 client **无 `run_tool_loop`** → 落单次 `invoke`，**同时失去 system 消息与 function-calling 且不报错**；`general` / 无专家路径不经 `_run_expert`（走 `build_aggregator()`，system 为硬编码串），**不受影响** | 通过 |
+| MOD-IB-23 | Web / 组合根 | `_assemble` **装配期取一次**内置映射传下游；`admit_two_domains` 改调 `validate_two_domains`；`_inject_derived_experts` 改注入 `builtin_fallback_for(e.name)`（**删字段后唯一会当场断掉的落点**）；`_put_definition_config` 校验对象是 **`submitted` 而非 `current`**，且 refs 取用失败映射 **503**（同 `_get_prompts_list`，**不掉进通用异常变 500**） | 通过 |
+| MOD-IB-24 | 前端 | 定义文档兜底 textarea 改**只读展示**当前内置安全网并指向提示词页 —— 保留可见性而**不开第二写入口**；`resolvedFrom()` 第三值同步（`fallback_file` 文案一字未改，冒烟测试锁着它） | 通过 |
+| MOD-IB-25 | 部署交付物 | **NO_CHANGE**：零新增迁移、零新增依赖、**未 bump `schema_version`**（无迁移机制；bump 会让所有 v1 文档在 `load()` 阶段硬失败致服务起不来），改由 legacy 键分级处置兜底 | 通过 |
+
+### 21.5 5 维评分（REV-17 增量，仅被触及面）
+
+| 维度 | 得分 | 依据 |
+|------|------|------|
+| Correctness | **9** | 「兜底恒非空」由结构保证；保存期与装配期**同序同条**（新用例断言 `assembly_items == http_items`）；legacy 键 **fail-closed** 不静默丢用户文本；`system_prompt` 传参纪律落到 `or None`。扣 1：MINOR-1 的「默认不安全」API 形状。 |
+| Completeness | **9** | 七项用户裁决逐项落地；13 个被触及文件与 2 个新增测试文件覆盖正 / 反两面（含「越域未被顺手放开」的反证）。扣 1：`general` 路径人格串仍不可配置（既有不对称事实，**已登记 OPEN ITEM，非本轮范围**）。 |
+| Consistency | **10** | 单一校验入口（IFC-IB-364）；三处消费点共用同一份内置兜底映射（`derive_prompt_layers` 合并 / `validate_prompt_directory` 判据 / `_inject_derived_experts` 注入）；分层纪律（`ib.config` 不 import `ib.experts`）与两条顶层键红线（definition 4 键 / prompts 5 键）均守住。 |
+| Maintainability | **9** | 假陈述 docstring 消解并**改写成可执行纪律**（`_client` 硬规则）；legacy 迁移目标明确到具体文件路径。扣 1：MINOR-3（`_clients` 无淘汰，上界靠纪律）。 |
+| Security | **10** | 未新增凭据面；`?token=` 纪律未放宽；反越域防护**未削弱**（孤儿提示词文件仍拒）；legacy 错误信息**只报长度不回显正文**（不把用户提示词写进回执 / 日志）。 |
+| **均值** | **9.4** | — |
+
+### 21.6 REV-17 实跑证据（命令 + 结果 + EXIT）
+
+| # | 命令 | 结果 | EXIT |
+|---|------|------|------|
+| 1 | `python -X utf8 -m pytest tests/unit tests/integration tests/e2e -q` | **327 passed**（unit 149 / integration 154 / e2e 24；零 skip 零 xfail；相对 REV-16-4 基线 308 零回归） | **0** |
+| 2 | `python -X utf8 -m pytest tests/unit/test_prompt_system_slot_r17.py -q` | **13 passed** | **0** |
+| 3 | `python -X utf8 -m pytest tests/integration/test_prompt_config_r17_int.py -q` | **6 passed** | **0** |
+| 4 | `python -X utf8 src/scripts/selfcheck.py` | **51/51 通过**（REV-16-4 为 50/50；新增 `r17_build_expert_system_slot`） | **0** |
+| 5 | `cd src/frontend && npm run typecheck` | 无输出 | **0** |
+| 6 | `cd src/frontend && npm test` | **29 passed**（REV-16-4 为 28） | **0** |
+| 7 | `cd src/frontend && npm run build` | `✓ built` | **0** |
+
+**行为等价性（关键一条）**：生产种子文档的 `experts[].fallback_prompt` 本就是 `spec.fallback_prompt` **直抄**（旧 `composition.py::_default_definition_document`），故删字段后**生效提示词文本零变化**；只有 `resolved_from` 的**取值名**与界面标签文案变化。
+
+### 21.7 R17 本地不可验证项（如实登记）
+
+| # | 项 | 为何本地不可验 | 处置 |
+|---|----|----------------|------|
+| 1 | 生产重启后的**真实装配**（`{"outcome": "succeeded", "stage": "startup"}` 出现、`path_not_configured_using_in_memory_default` 不出现） | 需目标机与用户手工重启 | 部署阶段实测；沿用既有判据 |
+| 2 | 生产现存定义文档的 **legacy 键实际取值**（是否与内置逐字相同） | 需读目标机文件（本阶段禁写操作） | 运维侧先跑一次只读核对；若「不同」则按迁移目标落 `fallback.md` |
+| 3 | 开着配置页的旧会话首次保存的 **409 实际发生率** | 需真实前端会话 | 前端已有处理（`ConfigPage.vue`）；登记为交付注意 |
+
+### 21.8 §21 结论
+
+**REV-17 增量自评 = PASS_WITH_MINOR**：**CRITICAL = 0 / MAJOR = 0 / MINOR = 3**（1 项建议下轮改签名、1 项结转、1 项登记观察）。三项均**非阻塞**。三件事（移出定义文档 / 进 system 位 / 通用安全网）全部落地并经离线实跑验证：Python 327 / 前端 29 / 自检 51 全绿，零回归。
+
+**§21.9 守约复核**：未新增模块（仍 26）/ 未改端口数（仍 17）/ 未新增第三方依赖 / 未改模块边界 / 未改依赖边（DAG 不变）/ 未改配置键名与默认值 / **未 bump `schema_version`** / 未改 `IFC-IB-001~363` 中除两处索引已登记 10 条口径外的任何编号与签名名 / **未改任何既有 ADR 正文**（ADR-15 与 ADR-15-R1 一字未动，收窄全落 ADR-15-R2；ADR-29 / ADR-31 / ADR-33 的修订均带**明文 REV-17 标记**）/ 两条顶层键红线守住（definition GET 与 PUT 顶层恰 4 键、prompts 顶层恰 5 键）/ 未 `git add` / `commit` / `push` / 部署 / FreeArk 参考仓**只读** / 无任何口令、令牌或密钥字面量。

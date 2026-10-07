@@ -170,13 +170,22 @@ class OpenAiCompatibleProvider:
             impl=self._client(0.0, "只输出 JSON 数组，不要任何解释或代码围栏。"),
         )
 
-    def build_expert(self, spec: ExpertSpec) -> LlmRole:
-        """[IFC-IB-212] 专家角色。人格文本优先取自 `spec.fallback_prompt`
-        （主提示由接入方按 `spec.name` 加载后经 `system_prompt` 覆盖）。"""
+    def build_expert(self, spec: ExpertSpec, *, system_prompt: str | None = None) -> LlmRole:
+        """[IFC-IB-212] 专家角色。**REV-17（ADR-36）**：人格文本取 `system_prompt`
+        （装配期由两域合并派生的 `ExpertPromptBundle.effective_prompt`）；
+        缺省 / 全空白 → 回落 `spec.fallback_prompt`（代码内置安全网，ADR-29）。
+
+        此前本方法的 docstring 声称「主提示由接入方按 `spec.name` 加载后经 `system_prompt`
+        覆盖」，而 `system_prompt` **并不存在**、全仓无调用方 —— 是一句假陈述，且掩盖了
+        「配置页编辑的 markdown 提示词从未进过 system 消息」这一真实缺陷。现已名副其实。
+
+        **调用纪律**：`system_prompt` 只允许是**装配期常量**（见 `_client`）。
+        """
+        effective = (system_prompt or "").strip() or spec.fallback_prompt
         return LlmRole(
             role="expert",
             temperature=self._expert_temperature,
-            impl=self._client(self._expert_temperature, spec.fallback_prompt),
+            impl=self._client(self._expert_temperature, effective),
         )
 
     def build_aggregator(self) -> LlmRole:
@@ -228,6 +237,17 @@ class OpenAiCompatibleProvider:
 
         缓存键含 `system_prompt`：不同专家的系统提示必须落到**不同实例**，
         否则会出现「A 专家的人格被 B 专家复用」的串味回答。
+
+        **硬规则（REV-17 / ADR-36）**：`system_prompt` 只允许是**装配期常量**
+        —— 要么是代码内置的固定串，要么是 `ExpertPromptBundle.effective_prompt`
+        （装配期由两域合并派生、服务重启前不变，ADR-32 无热重载）。**禁止**把用户问题、
+        会话历史、时间戳等请求期变量拼进来：本缓存以 `system_prompt` 为键且**无淘汰**，
+        请求期变量会让 `_clients` 随请求数无界增长（内存泄漏），并把「同人格共用实例」
+        这一前提悄悄破坏掉。
+
+        传 `None` 或空串时（如 `health()` 的探测）返回**裸客户端**（无 system 注入）
+        —— 注意裸客户端**没有** `run_tool_loop`，故专家路径必须传非空提示词，
+        否则会静默同时失去 system 消息与 function-calling。
         """
         key = (temperature, system_prompt)
         with self._lock:
@@ -280,7 +300,13 @@ class FakeLlmProvider:
     def build_router(self) -> LlmRole:
         return LlmRole(role="router", temperature=0.0, impl=self._role_callable(self.router_output))
 
-    def build_expert(self, spec: ExpertSpec) -> LlmRole:
+    def build_expert(self, spec: ExpertSpec, *, system_prompt: str | None = None) -> LlmRole:
+        """[IFC-IB-212] 离线替身。**签名必须与端口一致**（REV-17 / ADR-36）：
+        端口是 `Protocol`、`runtime_checkable` 只查方法名不查签名，故漏掉
+        `system_prompt` 不会在装配期报错，而会在 `_run_expert` 里被
+        `except Exception` 吞成 `degraded=llm_unavailable` —— 静默降级，极难排查。
+        替身不消费提示词文本（离线输出固定），故参数接受后即忽略。
+        """
         text = f"[{spec.cn_label}] {self.expert_output}"
         return LlmRole(role="expert", temperature=0.6, impl=self._role_callable(text))
 

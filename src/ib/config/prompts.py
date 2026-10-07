@@ -3,6 +3,9 @@
 @implements IFC-IB-343 load_prompt_bundle / 344 save_prompt_layer / 345 load_prompt_directory
             + validate_prompt_directory / 346 validate_tool_params / 347 derive_prompt_layers
             / 348 键名登记（IB_EXPERT_PROMPT_DIR / IB_EXPERT_PROMPT_ENABLED）
+            （REV-17 / ADR-36 修订：343 的第三层来源改「代码内置兜底」，
+            345 的缺兜底判据改「无 fallback.md 且无内置兜底」，347 增 keyword-only
+            builtin_fallbacks —— 三条 IFC 的**号 / 名一字未改**）
 @depends MOD-IB-01
 @author software-developer
 
@@ -16,7 +19,12 @@
 物理布局（[ARCH-ASSUMPTION-A10]，REV-16-3 已确认）::
 
     <root>/<project_id>/<expert_name>/main.md      # 主提示词（**可缺**）
-    <root>/<project_id>/<expert_name>/fallback.md  # 兜底提示词（**不得缺**）
+    <root>/<project_id>/<expert_name>/fallback.md  # 兜底提示词（可缺 → 回落代码内置）
+
+**REV-17（ADR-36）**：`fallback.md` 的「不得缺」硬约束**改由代码内置安全网承接**。
+两层文件皆缺时，生效系统提示词取 `ib.experts.builtin_fallback_for(name)`
+（**不可配置**，故不构成第二个可写入口）。本模块经 keyword-only 参数 `builtin_fallback(s)`
+接收该值 —— `ib.config` 不得 import `ib.experts`（分层纪律）。
 
 `<root>` 经 `IB_EXPERT_PROMPT_DIR` 注入；其值**只登记键名**，不进文档、不进日志。
 
@@ -33,7 +41,7 @@ import os
 import tempfile
 from dataclasses import replace
 from hashlib import sha256
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from ib.core import (
     ConfigError,
@@ -123,24 +131,31 @@ def merge_prompt_layers(
     *,
     main_content: str | None,
     fallback_content: str | None,
-    doc_fallback: str,
+    builtin_fallback: str,
 ) -> ExpertPromptBundle:
     """**跨域合并纯函数**（IFC-IB-343 的合并内核；ADR-29）。
 
     优先级：`main_content`（提示词域主层）> `fallback_content`（提示词域兜底层）
-    > `doc_fallback`（结构与配置域兜底字段）。
+    > `builtin_fallback`（**代码内置安全网**）。
+
+    **REV-17（ADR-36）**：第三层来源由「定义文档兜底字段」改为「代码内置兜底」。
+    定义文档已不承载提示词文本，故 `resolved_from` 的第三值随之改为 `builtin_fallback`。
+    代码内置兜底**不是**可配置载体（`ib.experts.builtin_fallback_for` 派生自
+    进程常量），因此三层之间不存在两个可写入口争抢同一语义的情况 —— 这正是本次修订
+    要消除的重叠真源。
 
     **兜底恒非空**：三层皆空 → 抛 `PromptNotFoundError`（`effective_prompt` 永不空白）。
+    正常装配下该分支不可达（内置兜底恒非空），保留它作为「注入残缺」的防御性断言。
     """
     main = (main_content or "").strip()
     fallback_file = (fallback_content or "").strip()
-    fallback_doc = (doc_fallback or "").strip()
+    fallback_builtin = (builtin_fallback or "").strip()
 
     if main:
         return ExpertPromptBundle(
             expert_name=expert_name,
             main_prompt=main_content or "",
-            fallback_prompt=fallback_file or fallback_doc,
+            fallback_prompt=fallback_file or fallback_builtin,
             effective_prompt=main_content or "",
             resolved_from="main_file",
         )
@@ -152,16 +167,16 @@ def merge_prompt_layers(
             effective_prompt=fallback_content or "",
             resolved_from="fallback_file",
         )
-    if fallback_doc:
+    if fallback_builtin:
         return ExpertPromptBundle(
             expert_name=expert_name,
             main_prompt=None,
-            fallback_prompt=doc_fallback,
-            effective_prompt=doc_fallback,
-            resolved_from="definition_doc_fallback",
+            fallback_prompt=builtin_fallback,
+            effective_prompt=builtin_fallback,
+            resolved_from="builtin_fallback",
         )
     raise PromptNotFoundError(
-        f"专家 {expert_name!r} 无任何可用提示词（主 / 兜底 / 定义文档兜底皆空）",
+        f"专家 {expert_name!r} 无任何可用提示词（主 / 兜底 / 内置兜底皆空）",
         code="prompt_fallback_empty",
     )
 
@@ -170,7 +185,7 @@ def load_prompt_bundle(
     expert_name: str,
     *,
     refs: tuple[ExpertPromptDocumentRef, ...],
-    doc_fallback: str,
+    builtin_fallback: str,
 ) -> ExpertPromptBundle:
     """由提示词文件引用装载并合并分层提示词（IFC-IB-343；**纯函数 + 端口协作**）。
 
@@ -179,6 +194,9 @@ def load_prompt_bundle(
 
     内容经 `ref.rel_path` 读取（存在且非空方计入）；`ref.exists` 为 False 或缺文件时视为
     该层缺失。**不落盘、不反写任一真源**（ADR-15-R1）。
+
+    `builtin_fallback` 由调用方（装配 / 端点层）从 `ib.experts.builtin_fallback_for` 注入
+    —— 本模块不得 import `ib.experts`（分层：`ib.config` 只允许 stdlib + `ib.core`）。
     """
     main_content: str | None = None
     fallback_content: str | None = None
@@ -198,7 +216,7 @@ def load_prompt_bundle(
         expert_name,
         main_content=main_content,
         fallback_content=fallback_content,
-        doc_fallback=doc_fallback,
+        builtin_fallback=builtin_fallback,
     )
 
 
@@ -270,16 +288,23 @@ def validate_prompt_directory(
     refs: tuple[ExpertPromptDocumentRef, ...],
     *,
     doc: DefinitionDocument,
+    builtin_fallbacks: Mapping[str, str] | None = None,
 ) -> tuple[ValidationErrorItem, ...]:
     """提示词目录完备性校验（IFC-IB-345）。**纯函数**。
 
     检出：**孤儿提示词文件**（目录有、文档未登记）/ **命名不符**（子目录名 != 专家 name）/
-    **缺兜底**（`fallback.md` 缺失且文档 `fallback_prompt` 为空）。错误体只出
+    **缺兜底**（`fallback.md` 缺失**且**该专家无内置兜底）。错误体只出
     `path` / `code` / `message`（**不回显提示词正文**）。
+
+    **REV-17（ADR-36）**：缺兜底的第二判据由「文档 `fallback_prompt` 为空」改为
+    「`builtin_fallbacks` 中无此项」。正常装配下 `builtin_fallbacks` 由
+    `ib.experts.builtin_fallbacks_for` 生成、**恒覆盖每个专家且值非空**，故
+    `prompt_fallback_missing` 退化为「注入残缺」的防御性断言（不再由用户配置触发）。
+    未注入（`None`）时按「无内置兜底」从严判定 —— 保持既有 2 参调用方的行为不变。
     """
     errors: list[ValidationErrorItem] = []
     known = {e.name for e in doc.experts}
-    doc_fallback = {e.name: e.fallback_prompt for e in doc.experts}
+    builtins: Mapping[str, str] = builtin_fallbacks or {}
 
     for ref in refs:
         parent = _entry_name(ref.rel_path)
@@ -301,17 +326,18 @@ def validate_prompt_directory(
                 )
             )
 
-    # 缺兜底：某专家无可用 fallback 层（目录无 fallback.md）且文档兜底为空。
+    # 缺兜底：某专家无可用 fallback 层（目录无 fallback.md 且无内置兜底）。
     for name in sorted(known):
         has_fallback_file = any(
             r.expert_name == name and r.layer == "fallback" and r.exists for r in refs
         )
-        if not has_fallback_file and not (doc_fallback.get(name) or "").strip():
+        if not has_fallback_file and not (builtins.get(name) or "").strip():
             errors.append(
                 _err(
                     f"prompt_directory[{name}]",
                     "prompt_fallback_missing",
-                    f"专家 '{name}' 缺兜底提示词（fallback.md 缺失且文档 fallback_prompt 为空）",
+                    f"专家 '{name}' 缺兜底提示词（fallback.md 缺失且无内置兜底，"
+                    f"提示词域注入残缺）",
                 )
             )
     return tuple(errors)
@@ -423,15 +449,27 @@ def with_prompt_bundles(
 def derive_prompt_layers(
     doc: DefinitionDocument,
     prompt_refs: tuple[ExpertPromptDocumentRef, ...],
+    *,
+    builtin_fallbacks: Mapping[str, str] | None = None,
 ) -> DerivedView:
     """跨域合并派生（IFC-IB-347）。**纯函数**；**不落盘、不可反写任一真源**。
 
     定义文档专家 `name` ↔ 提示词目录子目录**按 name join**；产出 prompt bundle 并并入
     派生视图（`DerivedView.prompt_bundles`）。**不新增参数到既有 IFC-IB-291**
     （`derive` 签名文本不变，本函数为其合并扩展的**独立**入口）。
+
+    **REV-17（ADR-36）新增 keyword-only `builtin_fallbacks`**：由装配层用
+    `ib.experts.builtin_fallbacks_for(doc 专家名)` 注入（**完备映射，每组值非空**）。
+    未注入时按空串处理 —— 主 / 兜底两层文件皆缺的专家会抛 `PromptNotFoundError`，
+    这是**从严**行为，保证「没注入安全网」不会被当成「安全网是空的」而静默放行。
     """
+    builtins: Mapping[str, str] = builtin_fallbacks or {}
     bundles = [
-        load_prompt_bundle(e.name, refs=prompt_refs, doc_fallback=e.fallback_prompt)
+        load_prompt_bundle(
+            e.name,
+            refs=prompt_refs,
+            builtin_fallback=builtins.get(e.name, ""),
+        )
         for e in doc.experts
     ]
     return with_prompt_bundles(_derive_document(doc), bundles)
@@ -482,9 +520,9 @@ class FsExpertPromptStore:
             raise ConfigError(f"未知提示词层 {layer!r}（仅支持 main / fallback）", key=EXPERT_PROMPT_DIR_KEY)
         return os.path.join(self._expert_dir(expert_name), filename)
 
-    def load_bundle(self, expert_name: str, *, doc_fallback: str) -> ExpertPromptBundle:
+    def load_bundle(self, expert_name: str, *, builtin_fallback: str) -> ExpertPromptBundle:
         return load_prompt_bundle(
-            expert_name, refs=self._refs_for(expert_name), doc_fallback=doc_fallback
+            expert_name, refs=self._refs_for(expert_name), builtin_fallback=builtin_fallback
         )
 
     def _refs_for(self, expert_name: str) -> tuple[ExpertPromptDocumentRef, ...]:
@@ -570,7 +608,10 @@ class FsExpertPromptStore:
         return PromptDirectoryLayout(
             root_key=EXPERT_PROMPT_DIR_KEY,
             file_pattern="<root>/<project_id>/<expert_name>/{main.md|fallback.md}",
-            naming_rule="子目录名 = 专家 name（ADR-15-R1 合并键的物理实现）；main.md 可缺，fallback.md 不得缺",
+            naming_rule=(
+                "子目录名 = 专家 name（ADR-15-R1 合并键的物理实现）；"
+                "main.md 可缺；fallback.md 亦可缺（REV-17 起回落到代码内置兜底）"
+            ),
         )
 
     def _atomic_write(self, path: str, content: str) -> None:
@@ -615,13 +656,13 @@ class InMemoryExpertPromptStore:
     def project_id(self) -> str:
         return self._project_id
 
-    def load_bundle(self, expert_name: str, *, doc_fallback: str) -> ExpertPromptBundle:
+    def load_bundle(self, expert_name: str, *, builtin_fallback: str) -> ExpertPromptBundle:
         layers = self._docs.get(expert_name, {})
         return merge_prompt_layers(
             expert_name,
             main_content=layers.get("main"),
             fallback_content=layers.get("fallback"),
-            doc_fallback=doc_fallback,
+            builtin_fallback=builtin_fallback,
         )
 
     def save_layer(
@@ -706,5 +747,8 @@ class InMemoryExpertPromptStore:
         return PromptDirectoryLayout(
             root_key=EXPERT_PROMPT_DIR_KEY,
             file_pattern="<root>/<project_id>/<expert_name>/{main.md|fallback.md}",
-            naming_rule="子目录名 = 专家 name（ADR-15-R1 合并键的物理实现）；main.md 可缺，fallback.md 不得缺",
+            naming_rule=(
+                "子目录名 = 专家 name（ADR-15-R1 合并键的物理实现）；"
+                "main.md 可缺；fallback.md 亦可缺（REV-17 起回落到代码内置兜底）"
+            ),
         )

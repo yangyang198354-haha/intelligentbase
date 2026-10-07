@@ -723,8 +723,13 @@ class Orchestrator:
 
     def _prompt_of(self, expert: str) -> str:
         """专家系统提示词。**REV-16-2（ADR-29）**：优先取跨域合并派生的**生效提示词**
-        （`effective_prompt` = 主提示文件 > 兜底文件 > 定义文档兜底；装配期注入，IFC-IB-349）。
-        未注入分层结果时回退既有 `spec.fallback_prompt`（R7 行为逐位不变）。
+        （`effective_prompt` = 主提示文件 > 兜底文件 > **代码内置兜底**；装配期注入，
+        IFC-IB-349）。未注入分层结果时回退既有 `spec.fallback_prompt`。
+
+        **REV-17（ADR-36）**：`spec.fallback_prompt` 的口径由「定义文档兜底字段」改为
+        **代码内置安全网**（由 `_inject_derived_experts` 从 `builtin_fallback_for` 注入）。
+        本函数的返回值现在作为 `system_prompt` 传给 `build_expert`（见 `_run_expert`），
+        **真正落进 system 消息位** —— 此前它只是被拼进 human 前缀。
         """
         from ib.experts import fallback_prompts, get, prompt_bundles
 
@@ -1114,20 +1119,28 @@ def _run_expert(payload: dict, llm: Any, tools_by_expert: dict[str, list[Any]]) 
             return ExpertResult(
                 expert=expert, content="", degraded=True, degrade_reason="unknown_expert"
             )
-        role = llm.build_expert(spec)
+        # REV-17（ADR-36）：合并后的生效提示词进 **system 消息位**（人格 / 护栏），
+        # human 位只留用户问题本身。此前它被拼成 `f"{prompt}\n\n用户问题：{query}"` 走 human
+        # 前缀，system 位恒为代码内置兜底 —— 即「配置页编辑的主提示词从未真正生效为系统提示」。
+        # 传 `prompt or None` 而非原样：`None`/空白会让 `build_expert` 回落到
+        # `spec.fallback_prompt`，避免 `_client` 返回**裸客户端**
+        # （裸客户端没有 `run_tool_loop` → 静默同时失去 system 消息与 function-calling）。
+        role = llm.build_expert(spec, system_prompt=prompt or None)
         impl = getattr(role, "impl", None)
         if impl is None:
             return ExpertResult(expert=expert, content="", degraded=True, degrade_reason="llm_unavailable")
         tools = tools_by_expert.get(expert, [])
-        full_prompt = f"{prompt}\n\n用户问题：{query}"
+        # human 位只留用户问题：人格文本已在 system 位，**不得**再回填 human
+        # （否则同一段文本出现两次，且 chat 模板下会被当成用户发言）。
+        user_prompt = query
         # 工具调用循环：真正的 function-calling（LLM 自主决定是否/何时检索，多轮往返）。
         # 若 provider 未实现工具循环（离线替身 `FakeLlmProvider` 等），回退到单次文本补全 ——
         # 与既有行为逐位一致（替身的输出与 prompt 无关，见 llm._role_callable）。
         loop = getattr(impl, "run_tool_loop", None)
         if callable(loop) and tools:
-            text = loop(full_prompt, tools=tools)
+            text = loop(user_prompt, tools=tools)
         else:
-            result = impl.invoke(full_prompt) if hasattr(impl, "invoke") else impl(full_prompt)
+            result = impl.invoke(user_prompt) if hasattr(impl, "invoke") else impl(user_prompt)
             text = _text_of(result)
         if not text:
             return ExpertResult(expert=expert, content="", degraded=True, degrade_reason="empty_response")

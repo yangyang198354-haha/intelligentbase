@@ -11,12 +11,14 @@
  *
  * ## REV-16-2：三个编辑域，各有其真源（ADR-15-R1 / ADR-29 / ADR-30 / ADR-32）
  *
- *   - **定义文档域**（专家 / 路由 / 编排 / 工具授权 / 参数取值）：真源 = 服务端定义文档，
- *     经 `GET|PUT /api/config/definition`（既有白名单表单）。
+ *   - **定义文档域**（专家元数据 / 路由 / 编排 / 工具授权 / 参数取值）：真源 = 服务端定义文档，
+ *     经 `GET|PUT /api/config/definition`（既有白名单表单）。**REV-17（ADR-36）起不再承载任何
+ *     提示词文本** —— 页面上的「代码内置兜底」区只有**只读回显**，不给第二写入口。
  *   - **提示词域**（主 / 兜底分层）：真源 = **独立提示词目录**，经 `GET|PUT /api/config/prompts/...`
  *     （IFC-IB-352）。两域在**装配期**按专家 `name` 合并，故本页**不**把提示词塞进定义文档草稿。
- *   - **回退链可见**：主缺失时必须让用户看见「当前生效 = 兜底」（`resolved_from`），
- *     否则「主提示词存了却没生效」会被误判为保存失败（US-IB-30）。
+ *   - **回退链可见**：合并优先序 `main.md` > `fallback.md` > 代码内置兜底；前两层皆缺时
+ *     必须让用户看见「当前生效 = 内置兜底」（`resolvedFrom()` 本地推算），否则
+ *     「主提示词存了却没生效」会被误判为保存失败（US-IB-30）。
  *
  * ## 生效口径显式提示（ADR-32 / C-IB-40，强制）
  *
@@ -387,7 +389,9 @@ function addExpert(): void {
     keywords: [],
     exemplars: [],
     is_data_expert: false,
-    fallback_prompt: '请填写该专家的兜底提示。',
+    // REV-17（ADR-36）：定义文档不再承载提示词文本；新专家的兜底由代码内置安全网保证
+    // （`builtin_fallback_for` → 未登记名字回落通用内置），故此处**不再**预填任何提示词。
+    // 由此「界面新增专家」不再死锁：PUT definition 缺兜底不再报错。
     is_delegating: false,
     is_default: false,
   });
@@ -528,7 +532,10 @@ function setPromptText(expertName: string, layer: PromptLayer, value: string): v
 }
 
 /**
- * 回退链的**当前生效层**（US-IB-30）：主 > 兜底文件 > 定义文档兜底。
+ * 回退链的**当前生效层**（US-IB-30）：主文件 > 兜底文件 > 代码内置兜底。
+ *
+ * REV-17（ADR-36）：第三层由「定义文档兜底字段」改为「代码内置安全网」—— 定义文档已不承载
+ * 提示词文本。该值由前端**本地推算**（后端不传 `resolved_from`），故与装配期合并同序同条。
  *
  * 必须可见 —— 只显示两个文本框时，用户存了主提示词却因未保存兜底而「看不出哪层在生效」。
  */
@@ -537,14 +544,20 @@ function resolvedFrom(expertName: string): string {
   if (!entry) return '';
   if (entry.layers.main.exists) return 'main_file';
   if (entry.layers.fallback.exists) return 'fallback_file';
-  return 'definition_doc_fallback';
+  return 'builtin_fallback';
 }
 
 const RESOLVED_LABEL: Record<string, string> = {
   main_file: '当前生效 = 主提示词',
   fallback_file: '主提示词缺失，当前生效 = 兜底提示词',
-  definition_doc_fallback: '提示词目录无该专家，当前生效 = 定义文档兜底',
+  builtin_fallback: '两层文件皆缺，当前生效 = 代码内置兜底（只读）',
 };
+
+/** 当前生效层为内置兜底时，供界面回显其**正文**（只读展示，非写入口）。 */
+function builtinFallbackOf(expertName: string): string {
+  const entry = promptExperts.value.find((e) => e.name === expertName);
+  return entry?.builtin_fallback ?? '';
+}
 
 async function loadPrompts(): Promise<void> {
   promptPhase.value = 'loading';
@@ -905,18 +918,26 @@ async function savePromptLayer(expertName: string, layer: PromptLayer): Promise<
         </div>
       </div>
 
-      <h3>定义文档兜底提示（终级回退：提示词目录两层皆缺时生效）</h3>
-      <div v-for="expert in draft.experts" :key="`p-${expert.name}`" class="prompt">
-        <label>
-          {{ expert.name }}
-          <textarea
-            v-model="expert.fallback_prompt"
-            :disabled="!canEdit('experts[].fallback_prompt')"
-            rows="3"
-            @change="markDirty"
-          />
-        </label>
-      </div>
+      <h3>代码内置兜底（只读 · 终级回退：提示词目录两层皆缺时生效）</h3>
+      <p class="hint">
+        提示词文本**只**由下方「提示词分层」承载（<code>main.md</code> / <code>fallback.md</code>）。
+        两层文件皆缺时回落到**代码内置兜底** —— 它是随服务发布的进程常量，界面**不可编辑**，
+        因此同一份兜底提示词**不存在第二个写入口**（ADR-36）。
+      </p>
+      <p v-if="promptPhase === 'unavailable'" class="blocked">
+        提示词域当前不可用，无法回显内置兜底正文。请在下方「提示词分层」区域确认状态。
+      </p>
+      <div v-else-if="promptPhase === 'loading'">载入中…</div>
+      <template v-else>
+        <div v-for="expert in promptExperts" :key="`p-${expert.name}`" class="prompt">
+          <div class="prompt-head">
+            <strong>{{ expert.cn_label || expert.name }}</strong>
+            <code>{{ expert.name }}</code>
+            <span class="hint">只读 · 不可界面编辑</span>
+          </div>
+          <textarea class="readonly" :value="builtinFallbackOf(expert.name)" rows="3" readonly />
+        </div>
+      </template>
 
       <h3>提示词分层（独立提示词目录 · 与定义文档分属两个真源）</h3>
       <p v-if="promptPhase === 'unavailable'" class="blocked">
@@ -925,7 +946,8 @@ async function savePromptLayer(expertName: string, layer: PromptLayer): Promise<
       <p v-else-if="promptPhase === 'loading'">提示词载入中…</p>
       <template v-else-if="promptEnvelope">
         <p class="hint">
-          主提示词可缺、兜底不得缺；主缺失时**自动回退兜底**。保存**不热重载** ——
+          两层文件**皆可缺**；合并优先序为 主 <code>main.md</code> &gt; 兜底
+          <code>fallback.md</code> &gt; 代码内置兜底。保存**不热重载** ——
           重启 <code>ib-web</code> / <code>ib-worker</code> 后装配期才重新合并生效（ADR-32）。
         </p>
         <p class="hint">
@@ -1106,6 +1128,12 @@ td input {
 }
 .prompt textarea {
   width: 100%;
+}
+/* 代码内置兜底回显：**只读**，视觉上区别于可编辑的两层文本域（REV-17 / ADR-36）。 */
+.prompt textarea.readonly {
+  background: #f6f8fa;
+  color: #57606a;
+  cursor: default;
 }
 .prompt-head {
   display: flex;

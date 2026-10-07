@@ -3,14 +3,14 @@
   <artifact>agent_platform_research</artifact>
   <path>docs/agent_platform_research.md</path>
   <doc_id>RESEARCH-INTELBASE-001</doc_id>
-  <version>0.1.0</version>
+  <version>0.1.1</version>
   <status>APPROVED</status>
   <phase>GROUP_A / PHASE_01 — 需求规格增量：业界对标调研补充</phase>
   <author_agent>requirement-analyst</author_agent>
   <invocation_id>INV-GROUP_A-INTELBASE-002</invocation_id>
   <mode>RESEARCH_SUPPLEMENT</mode>
   <created_at>2026-09-27</created_at>
-  <updated_at>2026-09-27</updated_at>
+  <updated_at>2026-10-07</updated_at>
   <inputs>
     <input path="docs/requirements_spec.md" version="1.1.0" status="APPROVED" note="只读；本文件未修改"/>
     <input path="docs/user_stories.md" version="1.1.0" status="APPROVED" note="只读；本文件未修改"/>
@@ -30,6 +30,7 @@
   <revision_history>
     <rev version="0.1.0" date="2026-09-27" note="初稿（GROUP_A 增量）：9 个开源项目的官方文档调研、缺口映射（G1~G8）、对三条用户诉求的证据化差距分析与 P0~P3 候选路线、风险与反模式。待 PM 门控。"/>
     <rev version="0.1.0" date="2026-09-27" note="PM 门控 GR-A-002 = PASS_WITH_CONDITIONS：status 置 APPROVED。遗留（WebFetch 不可用 → 证据经 WebSearch 检索摘要；用户诉求③『UI 可视化配置』无 REQ 承接，须用户裁决）见 docs/phase_status.md。"/>
+    <rev version="0.1.1" date="2026-10-07" note="§3.2 缺口表 G3 关档登记（PM 机械落盘，无新调研、无结论变更）：G3 的两条事实陈述均已作废 —— 提示词文件加载已由 ExpertPromptStore 承载（ADR-15-R1 / ADR-29），且 build_expert 曾声称的 system_prompt 覆盖形参已由 REV-17（ADR-36 / IFC-IB-212）真正补上。原行措辞保留，仅追加注记；status 维持 APPROVED。" />
   </revision_history>
 </file_header>
 
@@ -37,7 +38,7 @@
 
 **文档编号**: RESEARCH-INTELBASE-001
 **项目名称**: intelligentbase（通用 RAG + 多智能体可复用基础架构）
-**版本**: 0.1.0 ｜ **状态**: APPROVED（PM 门控 GR-A-002 = PASS_WITH_CONDITIONS，2026-09-27；遗留条件见 `docs/phase_status.md`）
+**版本**: 0.1.1 ｜ **状态**: APPROVED（PM 门控 GR-A-002 = PASS_WITH_CONDITIONS，2026-09-27；遗留条件见 `docs/phase_status.md`。0.1.1 为 2026-10-07 的 G3 关档注记，无新调研、无结论变更）
 **作者**: requirement-analyst (via pm-orchestrator)
 **调用**: `INV-GROUP_A-INTELBASE-002`（`RESEARCH_SUPPLEMENT`，非重写需求规格、非架构设计）
 **上游基线**: `docs/requirements_spec.md` v1.1.0（APPROVED）、`docs/user_stories.md` v1.1.0（APPROVED）
@@ -324,6 +325,8 @@
 | **G1** | `install()` 无配置入口，专家写死在 `.py` | CrewAI 的 YAML + 装饰器注入（最轻）；Dify DSL（重量级）；MAF 声明式 YAML；AutoGen `load_component(config)` | 低（YAML 形态）/ 高（DSL 形态） |
 | **G2** | `is_delegating` / `delegating_experts()` 是死字段，handoff 未实现，但提示里已写「可委托数据管家」 | MAF handoff 构建器（`turn_limits` / `approval_mode` / 稳定 `Id`）；OpenAI Agents SDK（handoff = 工具调用 + `input_filter`；**且 as_tool 才是 manager 语义**） | 中 |
 | **G3** | `build_expert` 只用 `fallback_prompt`，**无提示文件加载**；注释声称的「按 name 加载主提示」机制不存在 | Dify：提示模板与模型参数**随 DSL 一起搬运**；CrewAI：`backstory` 在 YAML；MAF：`instructions` 在 YAML | 低 |
+
+> **G3 关档登记（REV-17 / 2026-10-07，PM 机械落盘）**：本行的两条事实陈述均已作废。① 提示词文件加载自 REV-16 起由 `ExpertPromptStore` 承载（`main.md` / `fallback.md` 两层，装配期合并；`docs/architecture_design.md` ADR-15-R1 / ADR-29）；② 「注释声称的『按 name 加载主提示』机制不存在」是一条**假陈述** —— `LlmProvider.build_expert` 的 docstring 曾声称可由接入方按 `spec.name` 加载后经 `system_prompt` 覆盖，而该形参当时并不存在、全仓无调用方。REV-17（ADR-36）把该形参**真正补上**（`IFC-IB-212`：`build_expert(spec, *, system_prompt: str | None = None)`），并由编排层把合并后的生效提示词传入 system 位，假陈述随实现补全而消解。原行措辞保留不改，仅以本注记关档。
 | **G4** | L1 语义路由生产哑火（范例目录为空） | semantic-router：Route = name + utterances（范例即定义）；未命中返回 `None` | 低（**数据工作 > 代码工作**） |
 | **G5** | 专家注册表全局单例，多项目无法共存不同专家表 | LangGraph：`context_schema` + `Runtime.context`（官方正规路径，取代已弃用的 `config_schema`）；Assistants 不改图改行为；Dify：一个实例多应用；CrewAI：一个项目一份 YAML | 中 |
 | **G6** | 关键词路由是纯 `substring in`，无词边界/同义词 | semantic-router：以**语义范例**取代字面子串（从根上绕开词边界问题） | 低 |

@@ -46,7 +46,6 @@ def _expert(
         keywords=keywords,
         exemplars=(),
         is_data_expert=False,
-        fallback_prompt=f"prompt-{name}",
         is_delegating=False,
         is_default=is_default,
     )
@@ -90,7 +89,6 @@ def _default_derived_document():
             keywords=tuple(s.keywords),
             exemplars=(),
             is_data_expert=s.is_data_expert,
-            fallback_prompt=s.fallback_prompt,
             is_delegating=s.is_delegating,
             is_default=s.is_default,
         )

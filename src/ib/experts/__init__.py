@@ -4,6 +4,8 @@
             IFC-IB-175 fallback_prompts / 176 data_experts / 177 delegating_experts
             IFC-IB-178 default_expert / 179 get
             IFC-IB-349（REV-16-2 加成式）install_prompt_bundles / prompt_bundles / main_prompts
+            IFC-IB-365（REV-17 加成式）BUILTIN_FALLBACK_DEFAULT / BUILTIN_FALLBACKS /
+            builtin_fallback_for / builtin_fallbacks_for
 @depends MOD-IB-01
 @author software-developer
 
@@ -38,7 +40,7 @@
 
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Iterator, Mapping, Sequence
 
 from ib.core import ExpertPromptBundle, ExpertSpec
 
@@ -59,6 +61,11 @@ __all__ = [
     "install_prompt_bundles",
     "prompt_bundles",
     "main_prompts",
+    # REV-17（ADR-36）
+    "BUILTIN_FALLBACK_DEFAULT",
+    "BUILTIN_FALLBACKS",
+    "builtin_fallback_for",
+    "builtin_fallbacks_for",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -76,6 +83,11 @@ __all__ = [
 #: `fallback_prompt` 是**提示文件缺失时的内置兜底**，不是主提示 —— 主提示由独立 markdown
 #: 提示词目录（`ExpertPromptStore`，IFC-IB-339）按 `ExpertSpec.name` 加载，缺失时回落到这里，
 #: 保证「提示缺失」不会退化成无系统提示（ADR-29）。
+#:
+#: **REV-17（ADR-36）**：`fallback_prompt` 现在是三层合并（`main.md` > `fallback.md` >
+#: 内置）的**第三层**，也是唯一一层的**不可配置**来源。装配期由
+#: `builtin_fallback_for()` 注入（`_inject_derived_experts`），故本表的取值**不再是**
+#: 手写文案的直接后果，而是 `_DEFAULT_SPECS` 经安全网解析的结果 —— 改这里等于改兜底行为。
 #:
 #: **兜底提示词必须保留 grounding 护栏**（不得编造 / 说明局限 / 说明适用边界）—— 生产未配
 #: `IB_EXPERT_PROMPT_DIR` 时，兜底层**就是生效系统提示词**（`build_prompt_stores` 走
@@ -163,6 +175,41 @@ _DEFAULT_SPECS: list[ExpertSpec] = [
         is_default=False,
     ),
 ]
+
+# --------------------------------------------------------------------------- #
+# REV-17 内置兜底（ADR-36）：提示词域的**代码安全网**
+#
+# 提示词的可配置载体**只有**提示词目录（`ExpertPromptStore`，IFC-IB-339）。定义文档
+# 已不再承载任何提示词文本（`ExpertSpecInput.fallback_prompt` 已移除）。但「兜底恒非空」
+# （ADR-29）仍需一个**不可配置**的最后防线，否则提示词域两层文件皆缺时会退化成
+# 「无系统提示词」——这正是 ADR-29 要杜绝的失败模式。
+#
+# 本映射由 `_DEFAULT_SPECS` 派生，**不是** `EXPERT_SPECS`：
+#   * `EXPERT_SPECS` 会被 `install()` / `install_derived()` **rebind**（装配期每次注入
+#     派生结果都会整体换掉它），而 `build_deps(force=True)` 在测试与生产复装配里是常态；
+#     若按「装配时快照当前注册表」取值，第二次装配就会漂移到文档派生值上，
+#     安全网将不再独立于真源，失去兜底意义；
+#   * `_DEFAULT_SPECS` 是**模块级私有常量，永不被 rebind**，元素是 frozen dataclass。
+# 故本映射是**进程生命周期内的稳定常量**（import 时求值一次）。
+# --------------------------------------------------------------------------- #
+
+#: 内置兜底映射（ADR-36）：由 `_DEFAULT_SPECS` 派生的**不可配置安全网**。
+_BUILTIN_FALLBACK_PROMPTS: dict[str, str] = {s.name: s.fallback_prompt for s in _DEFAULT_SPECS}
+
+#: 通用内置安全网（ADR-36）：**不在** `_BUILTIN_FALLBACK_PROMPTS` 中的专家（典型是
+#: 界面新增的自定义专家）回落到此串。
+#:
+#: 它的存在破掉一个真实死锁：`PUT /api/config/definition` 要求新专家有兜底提示词，
+#: 而 `PUT /api/config/prompts/<expert>/fallback` 又要求专家**已登记**（否则 404）
+#: —— 两端口互为前提，界面上永远加不进新专家。有了通用兜底，「先存专家、再写提示词」
+#: 成为唯一可行且合理的顺序。
+#:
+#: **护栏不可删**：与 `_DEFAULT_SPECS` 的兜底同纪律（DEFECT-R16-4-02）—— 提示词域
+#: 两层文件皆缺时，本串**就是**生效系统提示词，必须保留 grounding 约束。
+BUILTIN_FALLBACK_DEFAULT: str = (
+    "你是企业知识助手。严格依据检索到的资料与工具返回的数据作答，"
+    "不得编造数据、来源或结论；无法取得依据时应直接说明，并说明结论的适用边界。"
+)
 
 #: 当前生效的注册表（`install()` 可整体替换）。
 EXPERT_SPECS: list[ExpertSpec] = list(_DEFAULT_SPECS)
@@ -272,8 +319,59 @@ def cn_map() -> dict[str, str]:
 
 
 def fallback_prompts() -> dict[str, str]:
-    """专家 -> 提示文件缺失时的内置兜底提示。[IFC-IB-175]"""
+    """专家 -> 提示文件缺失时的内置兜底提示。[IFC-IB-175]
+
+    **REV-17（ADR-36）语义澄清**：本视图取自**当前派生注册表** `EXPERT_SPECS`，
+    因此装配期由 `install_derived` 注入的内置兜底会如实反映。它**不是**安全网真源 ——
+    真源是 `builtin_fallback_for()`（恒取 `_DEFAULT_SPECS`，不受 rebind 影响）。
+    """
     return {spec.name: spec.fallback_prompt for spec in EXPERT_SPECS}
+
+
+def builtin_fallback_for(name: str) -> str:
+    """专家 `name` 的**内置兜底**（REV-17 / ADR-36；恒非空）。
+
+    取值：`_DEFAULT_SPECS` 里同名专家的兜底 → 否则 `BUILTIN_FALLBACK_DEFAULT`。
+    这是提示词域「主 / 兜底」两层皆缺时的**唯一**最后防线，也是
+    `derive_prompt_layers` 合并、`validate_prompt_directory` 判据与
+    `_inject_derived_experts` 注入三者**共用的同一份映射**（单一真源）。
+    """
+    return _BUILTIN_FALLBACK_PROMPTS.get(name) or BUILTIN_FALLBACK_DEFAULT
+
+
+def builtin_fallbacks_for(names: Sequence[str]) -> dict[str, str]:
+    """给一组专家名解析出**完备**的内置兜底映射（供跨域合并按名查表）。
+
+    返回的每个值都非空（自定义专家回落到 `BUILTIN_FALLBACK_DEFAULT`），故下游
+    `ib.config` 侧只需 `mapping.get(name, "")`，**无需知道通用兜底常量的存在** ——
+    这正是把默认值解析收在本模块的原因（`ib.config` 不得 import `ib.experts`）。
+    """
+    return {name: builtin_fallback_for(name) for name in names}
+
+
+class _BuiltinFallbackMap(Mapping[str, str]):
+    """按名即取的内置兜底映射：**任意** name 都有值（未知者回落通用安全网）。
+
+    存在的理由：定义文档的**解析期**（`document_from_json` 的 legacy 键检查）需要在
+    知道文档里有谁之前就回答「这个专家的内置兜底是什么」—— 此时专家名尚未解析出来，
+    无法用 `builtin_fallbacks_for(names)` 预先生成静态字典。
+    """
+
+    def __getitem__(self, name: str) -> str:
+        return builtin_fallback_for(name)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(_BUILTIN_FALLBACK_PROMPTS)
+
+    def __len__(self) -> int:
+        return len(_BUILTIN_FALLBACK_PROMPTS)
+
+
+#: 全名域内置兜底映射（REV-17 / ADR-36）：**单例**，供 `ibweb` 注入给 `ib.config`。
+#:
+#: `__getitem__` 恒不抛 `KeyError`，故 `in` / `.get()` 对任意 name 都成立且非空 ——
+#: 下游（`validate_prompt_directory` 的缺兜底判据、legacy 键比对）因此无需特殊分支。
+BUILTIN_FALLBACKS: Mapping[str, str] = _BuiltinFallbackMap()
 
 
 def data_experts() -> tuple[str, ...]:
