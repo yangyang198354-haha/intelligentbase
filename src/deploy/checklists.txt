@@ -344,13 +344,25 @@
     [ ] 回滚策略确认：本迁移**纯前向放大** → 回滚 = **代码回滚**（数据保留；不执行破坏性 DDL）
     说明：`005_projects.sql` 由既有 `ExecStartPre` 统一应用；软删 = 置 `status='disabled'`（不删行，OOS-19）。
 
-[B22] LLM Key 承载库文件权限 0600 且属主对齐服务账号（REV-18 / ADR-38 / REQ-NFR-IB-20）
-    $ stat -c '%a %U:%G %n' /var/lib/intelligentbase/ledger/ledger.sqlite3   # 期望 600 <运行用户>:<组>
+[B22] LLM Key 承载库文件权限 0660（组 `ib` 共享）且属主对齐服务账号（REV-18 / ADR-38 / REQ-NFR-IB-20；
+      0600 → 0660 由 DEFECT-R18-01 订正，2026-10-07 生产事故）
+    $ stat -c '%a %U:%G %n' /var/lib/intelligentbase/ledger/ledger.sqlite3   # 期望 660 ib-web:ib
+    $ sudo -u ib-worker test -r /var/lib/intelligentbase/ledger/ledger.sqlite3; echo "ib-worker 可读=$?"
     $ sqlite3 /var/lib/intelligentbase/ledger/ledger.sqlite3 ".schema llm_key" | grep -i 'CHECK (id = 1)'
-    [ ] 承载库文件（含 `llm_key` 表的 `ledger.sqlite3`）mode 为 **600**
-    [ ] 该文件属主为运行用户（`ib-web` / `ib-worker` 的服务账号；**属主对齐须由用户执行**）
+    [ ] 承载库文件（含 `llm_key` 表的 `ledger.sqlite3`）mode 为 **660**（**不是 600** —— 见下方警告块）
+    [ ] 该文件属主为 `ib-web`、组为 `ib`
+    [ ] `ib-web` 与 `ib-worker` **两个**服务账号**均**属组 `ib`（`id ib-web; id ib-worker` 可复查）
     [ ] `llm_key` 为单行表（`CHECK (id = 1)`），全局唯一一个 Key（OQ-IB-26；多供应商 = OOS-18）
-    说明：文件权限位由 `SqliteLlmKeyStore` 在 POSIX 上 best-effort 收紧；**属主变更须由用户在部署期执行**。
+    !! 绝不要 chmod 600 !! 台账由**两个**服务账号共享：ib-web 是属主，ib-worker **不是**，
+       靠共同组 `ib` 读写。chmod 600 只留属主位 → ib-worker 启动即
+       「sqlite3.OperationalError: unable to open database file」；因其单元为 Restart=always，
+       表现为**无限重启**，而 ib-web 与 /healthz **全部正常** —— 症状极具迷惑性。
+       2026-10-07 生产事故 DEFECT-R18-01 即此因（当时本项写的是 600，且代码把它硬执行了）。
+    说明：权限位由 `SqliteLlmKeyStore._harden_file_permissions` 在 POSIX 上 best-effort
+    收紧至 **0660**（**只去 other 位、保留 group 位**）；**属主变更须由用户在部署期执行**。
+    机密边界是**两道**：① 目录 `/var/lib/intelligentbase` 为 `0770 ib-web:ib` —— 非 `ib` 账号
+    根本无法进入（**主要的一道**）；② 文件 0660（目录被误配宽松时的纵深防御）。WAL 边车
+    `-wal` / `-shm` 由部署机 umask 决定、不受该 chmod 管辖，同样由第 ① 道兜住。
 
 [B23] LLM Key 不入 `.env` / 不进 git / 不进命令行（REV-18 / C-IB-42）
     $ grep -c -iE 'IB_LLM_API_KEY|sk-' /etc/intelligentbase/ib-web.env ; echo "exit=$?"   # 期望 0

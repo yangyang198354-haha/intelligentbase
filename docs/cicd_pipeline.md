@@ -254,7 +254,7 @@ python -c "import sys; sys.path.insert(0,'src'); from ib.ledger.schema import ac
 | 项 | 归属 |
 |----|------|
 | **LLM Key 提交（`PUT /api/llm-key`）+ 重启生效**（`configured=true` / 启动日志 `llm_configured=true`） | `deployment_plan.md` §15.3 DEPLOY-031 / §15.8 |
-| **承载库文件 0600 + 属主对齐服务账号**（checklists B22） | `deployment_plan.md` §15.8 |
+| **承载库文件 0660（组 `ib` 共享）+ 属主对齐服务账号**（checklists B22；`0600 → 0660` 见 DEFECT-R18-01） | `deployment_plan.md` §15.8 |
 | **Key 不进 git / 不进 shell history / 不进命令行**（checklists B23） | `deployment_plan.md` §15.8 |
 | **ADR-39 调用期 fail-closed 文本**（缺 Key 非致命 + 其余必需项仍 fail-fast） | `deployment_plan.md` §15.7 / §15.8 |
 | **`005` 迁移在既有生产库上的实际行为**（CI 只在 `:memory:` 跑，不跑真机库） | `deployment_plan.md` §15.2 / §15.3 DEPLOY-024~025 |

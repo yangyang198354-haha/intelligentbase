@@ -20,14 +20,20 @@ LLM Key 的持久化（REV-18 增量；module_design.md §3 MOD-IB-11；ADR-38 /
     **绝不写入任何日志 / 响应 / 审计**；
   * 对外只暴露 `LlmKeyStatus`（`configured` / `masked` / `updated_at`）——
     **类型层不含明文字段**；`masked` 为固定占位掩码（不含明文任何前 / 后缀字符）；
-  * 承载**库文件 0600 且属主对齐服务账号**（部署检查清单 B22；属主对齐由**用户**在
-    部署期执行，本模块只做 best-effort 收紧权限位）；
+  * 承载**库文件 0660（组 `ib` 共享）且属主对齐服务账号**（部署检查清单 B22；属主对齐由
+    **用户**在部署期执行，本模块只做 best-effort 收紧权限位）。
+    **不可用 `0600`** —— 见下节的「两个服务账号」硬约束（DEFECT-R18-01，2026-10-07 生产事故）；
   * Key **不入 `.env` / 不进 git / 不进命令行与 shell history**（B23）。
 
 ## 同一 SQLite 台账
 
 `SqliteLlmKeyStore` 与台账 / 账户 / 审计 / 注册表指向**同一** `IB_LEDGER_PATH`
 （ADR-38：不引入第二个存储后端）；**WAL + `busy_timeout` 必开**（沿用 MOD-IB-11）。
+
+**由此推出一条硬约束**：这个文件不是单一进程的私有文件 —— 它由**两个** systemd
+服务账号共享读写（`ib-web` = 属主，`ib-worker` = 非属主，靠共同组 `ib`）。故其权限位
+**必须保留 group 位**；任何把它收成 `0600` 的动作都会让 `ib-worker` 打不开台账。
+详见 `_harden_file_permissions` 的 docstring。
 """
 
 from __future__ import annotations
@@ -52,6 +58,15 @@ __all__ = [
     "MemoryLlmKeyStore",
     "build_llm_key_store",
 ]
+
+#: 台账（= LLM Key 承载库）权限位：`0660`。
+#:
+#: **不可用 `0600`** —— 该文件由 `ib-web`（属主）与 `ib-worker`（**非属主**，靠共同组 `ib`）
+#: **两个**服务账号共享读写。摘掉 group 位会让 `ib-worker` 启动即
+#: `sqlite3.OperationalError: unable to open database file`，并在其单元 `Restart=always`
+#: 下**无限重启**（DEFECT-R18-01，2026-10-07 生产事故）。
+#: 详见 `SqliteLlmKeyStore._harden_file_permissions` 的 docstring 与 `checklists.txt` B22。
+LEDGER_FILE_MODE = 0o660
 
 
 def _status_of(record: LlmKeyRecord | None) -> LlmKeyStatus:
@@ -132,16 +147,36 @@ class SqliteLlmKeyStore:
         self._harden_file_permissions()
 
     def _harden_file_permissions(self) -> None:
-        """best-effort 收紧承载库文件权限位至 `0600`（REQ-NFR-IB-20 / B22）。
+        """best-effort 收紧承载库文件权限位至 `0660`（REQ-NFR-IB-20 / B22）。
+
+        ## 为什么是 `0660` 而不是 `0600`（DEFECT-R18-01，2026-10-07 生产事故）
+
+        本模块与台账指向**同一**文件，而该文件由**两个**服务账号共享：`ib-web`
+        （属主，读写）与 `ib-worker`（**非属主**，靠共同组 `ib` 读写）。`0600` 把
+        **group 位**一并摘掉，后果是 `ib-worker` 一启动就
+        `sqlite3.OperationalError: unable to open database file`；又因其单元是
+        `Restart=always`，表现为**无限重启**（`NRestarts` 单调爬升），而 `ib-web`
+        与服务健康检查**全部正常**，故症状极具迷惑性。
+
+        同源前车之鉴：`ib/blob/__init__.py:226-230` 已对「web 进程写、worker 进程读，
+        二者分属不同 systemd 用户」留过注释并对齐 `0664`。
+
+        故此处**只去掉 other 位、保留 group 位**：非 `ib` 账号读不到，两个服务账号
+        仍共享。机密边界是**两道**：① 目录 `/var/lib/intelligentbase`（`0770 ib-web:ib`
+        —— 非 `ib` 账号根本无法进入，这是**第一道也是主要的一道**）；② 本 chmod
+        （目录被误配宽松时的纵深防御）。WAL 边车 `-wal` / `-shm` 由 sqlite 按部署机
+        umask 创建，不受本方法管辖，同样由第 ① 道兜住。
+
+        `os.chmod` 只对**属主**（或 root）生效 —— `ib-worker` 侧调用会 `EPERM`，被
+        下方 `except OSError` 静默吸收，不影响其启动。
 
         **属主对齐服务账号**由**用户**在部署期执行（本模块无法在不改变运行身份的前提下
-        完成属主变更）；此处只在 POSIX 上尽力去掉 group / other 位。失败**不**阻断启动
-        （权限的最终判据是部署检查清单 B22 的人工核对）。
+        完成属主变更）；失败**不**阻断启动（权限的最终判据是部署检查清单 B22 的人工核对）。
         """
         if os.name == "nt" or self._path == ":memory:":
             return
         try:
-            os.chmod(self._path, 0o600)
+            os.chmod(self._path, LEDGER_FILE_MODE)
         except OSError:
             pass
 

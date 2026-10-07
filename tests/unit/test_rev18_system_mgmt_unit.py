@@ -17,7 +17,9 @@
 from __future__ import annotations
 
 import dataclasses
+import os
 import sqlite3
+import stat
 from pathlib import Path
 
 import pytest
@@ -399,5 +401,48 @@ def test_TC_UNIT_R18_008_accounts_project_id_has_no_unique_constraint(tmp_path) 
         assert first.project_id == second.project_id == "p_x"
         assert first.user_id != second.user_id
         assert {u.username for u in store.list_users("p_x")} == {"ops_1", "ops_2"}
+    finally:
+        store.close()
+
+
+# --------------------------------------------------------------------------- #
+# TC-UNIT-R18-009 台账权限位必须保留 group 位（DEFECT-R18-01 回归锁）
+# --------------------------------------------------------------------------- #
+
+
+def test_TC_UNIT_R18_009_ledger_mode_keeps_group_share(tmp_path) -> None:
+    """REQ-NFR-IB-20 / B22；DEFECT-R18-01 回归锁。
+
+    台账**不是**单进程私有文件：`ib-web`（属主）与 `ib-worker`（**非属主**，靠共同组
+    `ib`）**两个**服务账号共享读写。把权限位收成 `0600` 会摘掉 group 位，令 `ib-worker`
+    启动即 `sqlite3.OperationalError: unable to open database file`；其单元为
+    `Restart=always`，故表现为**无限重启**，而 `ib-web` 与健康检查**全部正常**
+    —— 2026-10-07 生产事故的完整成因。
+
+    本用例把「**group 位不得为 0**」钉成回归项：将来任何人再把它收紧到 `0600`，
+    这里必红。权限位先按**常量**核（任何平台都真跑），再在 POSIX 上核对文件系统上的
+    实际位（Windows 的 `os.chmod` 只有只读位语义，表达不了 `0660`）。
+    """
+    from ib.ledger.llm_key import LEDGER_FILE_MODE, SqliteLlmKeyStore
+
+    mode = LEDGER_FILE_MODE
+    assert mode == 0o660, f"台账权限位常量应为 0660，实得 {oct(mode)}"
+    # 逐位断言：即便将来只改常量，也让「group 位被摘」这一失败语义单独可读
+    assert mode & stat.S_IRGRP, "group 读位被摘 → ib-worker 打不开台账（DEFECT-R18-01）"
+    assert mode & stat.S_IWGRP, "group 写位被摘 → ib-worker 无法写入台账"
+    assert not mode & stat.S_IROTH, "other 位应被去掉（REQ-NFR-IB-20 的收紧意图）"
+    assert mode != 0o600, "台账不可为 0600（DEFECT-R18-01）"
+
+    if os.name != "posix":
+        pytest.skip("POSIX 权限位语义：Windows 的 chmod 表达不了 0660（常量断言已在上方跑过）")
+
+    db_path = tmp_path / "ledger.sqlite3"
+    store = SqliteLlmKeyStore(str(db_path))
+    try:
+        on_disk = stat.S_IMODE(os.stat(db_path).st_mode)
+        assert on_disk == 0o660, f"台账实际权限位应为 0660，实得 {oct(on_disk)}"
+        # 幂等：二次构造不得翻转模式（ib-worker 侧 chmod 会 EPERM 静默吸收）
+        SqliteLlmKeyStore(str(db_path)).close()
+        assert stat.S_IMODE(os.stat(db_path).st_mode) == 0o660, "二次装配翻转了台账权限位"
     finally:
         store.close()

@@ -1024,7 +1024,7 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 ## 15. REV-18 增量：系统管理三分 + 项目 CRUD 软删 + LLM Key 管理（载体 = DB）+ 项目域资料上传（含 2 迁移，`kb_default` 数据迁移**不可逆**）
 
 > **本节为 REV-18 增量（INV-GROUP_E-INTELBASE-006），仅计划** —— **未连接、未触碰目标机 `192.168.31.133`**；**未执行任何迁移 / 备份 / 重启**；**所有命令须 PM CONFIRM 后执行**。
-> 依据：`architecture_design.md` **1.10.2/REV-18-R2**（**ADR-37** 项目注册表承载 / 软删；**ADR-38** LLM Key 载体 = DB / 装配期解析 / 0600；**ADR-39** Option C 缺 Key 非致命 / 调用期 fail-closed；**ADR-40** 运维账号 CRUD / 删除保护 / 顺序依赖；**ADR-41** `kb_id ≡ project_id` 推导 + 归属断言保留 + `kb_default` 迁移；**ADR-42** 系统管理三分 IA；**ADR-21-R1** N:1 订正；**§10.1** OI-1/OI-2 关闭·OI-3 OPEN）/ `module_design.md` **1.10.2/REV-18-R2**（**IFC-IB-366~377**，端口 17 → 19）/ `tech_stack.md` **1.4.1/REV-18（NO_CHANGE）** / `implementation_plan.md` **2.13.0/REV-18 §25** / `test_report.md` **1.14.0/REV-18 §23**（GR-D-015）/ `docs/phase_status.md` / `src/deploy/**`、`src/ib/ledger/schema.py`、`src/ibweb/**`、`src/frontend/**`（均**只读**引用）。
+> 依据：`architecture_design.md` **1.10.2/REV-18-R2**（**ADR-37** 项目注册表承载 / 软删；**ADR-38** LLM Key 载体 = DB / 装配期解析 / 0660（组 `ib` 共享；`0600 → 0660` 见 DEFECT-R18-01）；**ADR-39** Option C 缺 Key 非致命 / 调用期 fail-closed；**ADR-40** 运维账号 CRUD / 删除保护 / 顺序依赖；**ADR-41** `kb_id ≡ project_id` 推导 + 归属断言保留 + `kb_default` 迁移；**ADR-42** 系统管理三分 IA；**ADR-21-R1** N:1 订正；**§10.1** OI-1/OI-2 关闭·OI-3 OPEN）/ `module_design.md` **1.10.2/REV-18-R2**（**IFC-IB-366~377**，端口 17 → 19）/ `tech_stack.md` **1.4.1/REV-18（NO_CHANGE）** / `implementation_plan.md` **2.13.0/REV-18 §25** / `test_report.md` **1.14.0/REV-18 §23**（GR-D-015）/ `docs/phase_status.md` / `src/deploy/**`、`src/ib/ledger/schema.py`、`src/ibweb/**`、`src/frontend/**`（均**只读**引用）。
 
 ### 15.1 R18 交付物清单
 
@@ -1135,7 +1135,7 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 - **操作**：以**运行账户身份**执行同一 `ExecStartPre` 代码路径：`sudo -u ib-web PYTHONUTF8=1 /opt/intelligentbase/venv/bin/python -m ibweb.bootstrap --ensure-schema`（须带同一 `EnvironmentFile` 的 `IB_LEDGER_PATH` 等）；**连跑两次**验幂等。（若 PM 选择仅由 `ib-web` 重启的 `ExecStartPre` 顺带执行，则可省略本步的手工执行，但**仍须完成 DEPLOY-024 的备份 + 核算**。）
 - **预期结果**：两次均 `exit 0`；`projects` 含 `status`（默认 `'active'`）与 `updated_at`，`idx_projects_status` 存在；`kbs` 每个项目一行（`kb_id == project_id`）；`SELECT COUNT(*) FROM documents WHERE kb_id='kb_default'` = **0**；`llm_key` 表存在（单行表 `CHECK (id=1)`，`0` 行 —— Key 尚未写入）；文件属主/权限**仍对齐运行账户**（B22）。
 - **对应回滚**：ROLLBACK-025
-- **备注**：**本步含唯一不可逆数据变更**；`--ensure-schema` 走的是**同一代码路径**（非 `sqlite3 < 005` 手工路径 —— 后者对老库会 `no such column: status`，见 §15.2(b)）。以 `ib-web` 身份执行是**为保持文件属主/权限 0600 + 服务账户对齐**（B22）。
+- **备注**：**本步含唯一不可逆数据变更**；`--ensure-schema` 走的是**同一代码路径**（非 `sqlite3 < 005` 手工路径 —— 后者对老库会 `no such column: status`，见 §15.2(b)）。以 `ib-web` 身份执行是**为保持文件属主/权限 0660 + 服务账户对齐**（B22；`0600 → 0660` 见 DEFECT-R18-01）。
 
 ---
 **DEPLOY-026: 前端重建（`npm ci` + `npm run build`）**
@@ -1312,7 +1312,7 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 | # | 项（test_report §23.5 编号） | 类型 | 验收步骤 | 判据 |
 |---|------|------|----------|------|
 | **AC-IB-39-02-a** | 服务**重启**后 LLM Key 生效（§23.5 第 2 项） | DEPLOY_REQUIRED | ① 用户在界面 `PUT /api/llm-key` 提交 Key；② 用户**手工重启** `ib-web`；③ `GET /api/llm-key` | `configured=true`；启动日志 `llm_configured=true`；`.env` 内 `IB_LLM_API_KEY` 零命中 |
-| **AC-IB-39-02-b** | 承载库文件 **0600** 且属主对齐服务账号（§23.5 第 3 项） | DEPLOY_REQUIRED | `stat -c '%a %U:%G' /var/lib/intelligentbase/ledger/ledger.sqlite3` | = **`600 <run-user>:<group>`**（`<run-user>` = `ib-web` / `ib-worker` 服务账号；**属主对齐须由用户执行**，代理不执行生产变更）—— checklists **B22** |
+| **AC-IB-39-02-b** | 承载库文件 **0660（组 `ib` 共享）** 且属主对齐服务账号（§23.5 第 3 项；**0600 → 0660 由 DEFECT-R18-01 订正**） | DEPLOY_REQUIRED | ① `stat -c '%a %U:%G' /var/lib/intelligentbase/ledger/ledger.sqlite3`；② `sudo -u ib-worker test -r /var/lib/intelligentbase/ledger/ledger.sqlite3; echo $?` | ① = **`660 ib-web:ib`**；② = **0** —— **非属主账号 `ib-worker` 必须能打开台账**，这正是 `0600` 与 `0660` 的分水岭（`0600` 会使 `ib-worker` 在 `Restart=always` 下无限重启）。`ib-web` / `ib-worker` **两个**服务账号均属组 `ib`；**属主对齐须由用户执行**，代理不执行生产变更 —— checklists **B22** |
 | **AC-IB-39-03** | 提交 Key 后 **shell history 与命令行不留明文**（§23.5 第 4 项） | PARTIAL | ① `grep -c -iE 'llm[-_]?key\|secret\|sk-' <(journalctl -u ib-web -n 5000 --no-pager)`；② `grep -c -iE 'IB_LLM_API_KEY\|sk-' /etc/intelligentbase/ib-web.env`；③ `git grep -nE 'sk-[A-Za-z0-9]\|IB_LLM_API_KEY=' -- .` | ① = **0**；② = **0**；③ **无命中** —— checklists **B23** |
 | **ADR-39 调用期 fail-closed** | 「LLM 路径调用期 fail-closed 文本」（§23.5 第 5 项） | PARTIAL | **未配 Key** 时：服务起得来 + 触发一次 LLM 路径调用 | 启动日志 `llm_configured=false` 且出现 `{"outcome":"succeeded","stage":"startup"}`；非 LLM 路径正常；LLM 路径给**清晰可读错误**（`DependencyUnavailableError`-类，**非崩溃、非静默空答案**）；其余必填项仍 fail-fast |
 | **TBD-T26** | 容量 / 时延真机结论（§23.5 第 6 项）—— 项目注册表 | DEPLOY_REQUIRED | 目标机实测（**未实测前不得给结论**）：`projects` 表行数上界；`GET /api/projects` 与 CRUD 端点耗时；**装配期播种**（`_registry_seed_entries`）耗时 | **登记为实测项**；给出探针命令（`time curl` + `sqlite3 "SELECT COUNT(*) FROM projects"`），实测值回填部署记录 |
