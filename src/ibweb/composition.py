@@ -23,8 +23,10 @@
 
 ## 启动期做三件「宁可在启动时失败」的事
 
-1. **必填校验**（`validate_required`）：缺 `IB_LLM_API_KEY` 之类的错误，若推迟到首个请求，
-   表现是「用户上传后卡住」；启动即失败则 systemd 会重试并给出清晰的键名。
+1. **必填校验**（`validate_required`）：缺 `IB_EMBED_URL` / `IB_QDRANT_URL` 之类的错误，若推迟到
+   首个请求，表现是「用户上传后卡住」；启动即失败则 systemd 会重试并给出清晰的键名。
+   **REV-18 订正**：此处原举例为 `IB_LLM_API_KEY`，但该键自 ADR-39 Option C 起**已不在启动必填之列**
+   （Key 载体改为 DB；沿用旧口径会造成「首启死锁」）—— 详见 `ib/config/__init__.py::validate_required`。
 2. **AuthzPolicy 注入断言**：见 `ibweb.authz` 模块文档（静默 403 是最难查的故障形态）。
 3. **台账播种 + collection 就绪 + 前缀断言（FM-5）**：项目/知识库是配置实体，
    启动时写进台账；并逐个 `ensure_collection` + `assert_prefix`。

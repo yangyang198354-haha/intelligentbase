@@ -374,7 +374,7 @@ sudo PYTHONUTF8=1 /opt/intelligentbase/venv/bin/pip install -r /opt/intelligentb
 | `WorkingDirectory` | `/opt/intelligentbase` |
 | `ExecStartPre` | `/opt/intelligentbase/venv/bin/python -m ibweb.bootstrap --ensure-schema`（**失败即中止启动，不得加 `-`**） |
 | `ExecStart` | `/opt/intelligentbase/venv/bin/waitress-serve --host=127.0.0.1 --port=18080 --threads=8 --channel-timeout=120 ibweb.wsgi:application` |
-| `EnvironmentFile` | **`/etc/intelligentbase/ib-web.env`**（**凭据唯一来源**，权限 **0600**、属主 `ib-web`） |
+| `EnvironmentFile` | **`/etc/intelligentbase/ib-web.env`**（**非 LLM 凭据的唯一来源** —— 权限 **0600**、属主 `ib-web`）。**REV-18 订正**：此处原写「凭据唯一来源」，但自 ADR-38 / `C-IB-42` 起 **LLM Key 的载体是台账**（`llm_key` 表，唯一写入口 `PUT /api/llm-key`），**不再是本文件**；本文件仍承载服务账号令牌 / 默认管理员口令等**非 LLM** 密钥。`ib-worker` 有**自己的** `ib-worker.env`（§7.4），两个单元**各自**解析 Key —— 判据须按 `/etc/intelligentbase/*.env` **逐份**查（checklists B23 / DEFECT-R18-04） |
 | `Restart=` | `on-failure` / `RestartSec=3s`；`KillSignal=SIGTERM` / `TimeoutStopSec=30`（留给 SSE 写回会话） |
 | 限制 | `MemoryMax=1024M`；`ReadWritePaths=/var/lib/intelligentbase` |
 | 自启 | `enable` |
@@ -461,7 +461,8 @@ sudo install -m 0600 -o ib-embed  -g ib-embed  <repo>/src/deploy/ib-embed.env.ex
 sudo install -m 0640 -o ib-web    -g ib-web    <repo>/src/deploy/config.example.json   /etc/intelligentbase/config.json
 ```
 
-- **`0600` + 属主为运行用户**：`ib-web.env` **是**凭据真源（值经环境变量注入进程）；`0644` 会让同机任何用户读到 LLM API Key / 服务账号令牌。
+- **`0600` + 属主为运行用户**：每份 `.env` 都是其对应单元的凭据真源（值经环境变量注入进程）；`0644` 会让同机任何用户读到**服务账号令牌**等密钥。**REV-18 订正**：此处原文举例含「LLM API Key」—— 自 ADR-38 / `C-IB-42` 起 LLM Key 的载体已改为**台账**（`llm_key` 表，唯一写入口 `PUT /api/llm-key`），**不再是 `.env`**（§15.7 / DEPLOY-031）。
+- **`0600` 的判据须覆盖每一份**：`/etc/intelligentbase/` 下**不止一份** `.env`（`ib-web.env` / `ib-worker.env` / `ib-embed.env`），各单元**各自**读自己的 `EnvironmentFile`、**各自**在装配期解析 LLM Key（`ibweb.worker` 同样走 `composition.get_deps()`）—— 只查一份的判据是**假 PASS**（checklists B19 / B23，DEFECT-R18-04）。
 - **`ib-worker.env` 与 `ib-web.env` 键集逐键一致**（C-03）：worker 是**同一代码基座**的另一入口，读同一份 `config.json` / 台账 / 向量库 / LLM / 鉴权键。R4 只**补齐缺失的模板**（`src/deploy/ib-worker.env.example`），**未新增、未改名任何键**——键名契约以 module_design §5 为准，新增键须先回设计文档评审。
 - **填值只在部署机的 0600 文件里做**；模板被 git 跟踪，写真实值会**永久留在 `git log -p`**。
 - **`ib-embed.env` 零凭据**（本服务不需令牌；加令牌 = 净增凭据面）。
@@ -519,15 +520,29 @@ sudo ln -sfn /opt/intelligentbase/src/ib_embed /opt/ib-embed/ib_embed
 ### 9.1 端到端 smoke 步骤（计划，可粘贴）
 
 ```bash
-# 前置：ib-web.env 已按 0600 注入 IB_LLM_BASE_URL / IB_LLM_MODEL / IB_LLM_API_KEY
+# 前置：ib-web.env 已按 0600 注入 IB_LLM_BASE_URL / IB_LLM_MODEL
 #       （凭据不回显、不入日志、不入文档）
+#       **REV-18 订正**：`IB_LLM_API_KEY` **不在 `.env` 里**了 —— Key 载体改为台账
+#       （`llm_key` 表，经 `PUT /api/llm-key` 写入）。故下面这段**从台账解析 Key**，
+#       与组合根的取法一致（`ibweb/composition.py`：`build_llm_key_store(cfg, ledger_path=…)`
+#       → `.get().secret` → `build_llm_provider(cfg, api_key=…)`）。
+#       沿用旧的「只 build_llm_provider(cfg) 走 env 回退」写法，在 DEPLOY-031 之后
+#       会拿到 UnconfiguredLlmProvider（S-3 假 FAIL）—— 见 DEFECT-R18-04 同轮订正。
 
 # (1) LLM 连通性 + 外发边界声明（checklists B7）
-/opt/intelligentbase/venv/bin/python - <<'PY'
+#     **必须以服务账号运行**：以 root 打开台账会让 SQLite 把 -wal / -shm **建为 root 属主**，
+#     之后 ib-web / ib-worker 就打不开它们了（这正是 DEFECT-R18-01 的形态）。chmod 只改 mode、
+#     不改属主，故事后 chmod 救不回来，只能 chown。
+sudo -u ib-web /opt/intelligentbase/venv/bin/python - <<'PY'
 from ib.config import ConfigurationResolver, FileConfigurationSource
 from ib.llm import build_llm_provider
+from ib.ledger import build_llm_key_store
 cfg = ConfigurationResolver(FileConfigurationSource("/etc/intelligentbase/config.json")).global_config()
-provider = build_llm_provider(cfg)                 # 版本不符应在此构造期即抛（pin 断言）
+store = build_llm_key_store(cfg, ledger_path=str(cfg.ledger_path))
+record = store.get()                               # 台账里的 Key（唯一真源）
+api_key = record.secret if record is not None else None
+print("configured=", record is not None)           # 期望 True；False 则先去界面提交 Key
+provider = build_llm_provider(cfg, api_key=api_key)  # 版本不符应在此构造期即抛（pin 断言）
 print("egress=", provider.describe_egress())       # 期望含 endpoint_host + data_categories
 print("health=", provider.health())
 impl = provider.build_aggregator().impl
@@ -850,7 +865,7 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 | V13-8 | **令牌过期与续期** | TTL 过期后请求；窗口内调 `/api/auth/session/renew` | 过期 → **401**；窗口内 → 续期成功；窗口外 → 不延长 | IFC-IB-312 / [TBD-T22] |
 | V13-9 | **迁移幂等** | `python -m ibweb.bootstrap --ensure-schema` 连跑两次 | 两次均 exit 0；`users`/`sessions` 存在且无重复 | B20 |
 | V13-10 | **前端商用界面可用** | 浏览器访问 `https://<host>/`：登录 → 运维台（左导航 + 右内容 + 暗/亮主题 + 中文） | 登录后进入控制台；**零粘贴令牌入口**；刷新无 404 | NV-07 / B12 |
-| V13-11 | **凭据纪律** | `git grep -n 'IB_DEFAULT_ADMIN_PASSWORD=' -- . \| grep -v REPLACE_ME`；`stat -c '%a' /etc/intelligentbase/ib-web.env` | 仓库零命中；env 文件 **600** | B19 |
+| V13-11 | **凭据纪律** | `git grep -n 'IB_DEFAULT_ADMIN_PASSWORD=' -- . \| grep -v REPLACE_ME`；`sudo stat -c '%a %U:%G %n' /etc/intelligentbase/*.env` | 仓库零命中；**每一份** `*.env`（非仅 `ib-web.env`）均为 **600** 且属主对齐各服务账号（DEFECT-R18-04 同源订正：原只查一份） | B19 |
 | V13-12 | **日志纪律** | 抽查 nginx / waitress 访问日志 | 零 `Bearer `/`token=`/`password`/`api-key`；无问句正文 / 片段原文 | B14 |
 
 ### 13.9 R13 风险（增量）
@@ -1189,8 +1204,8 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
   1. 由**管理员**在界面（`SystemSection → LLM Key 管理`）提交现有 Key —— 经 **`PUT /api/llm-key`**（**明文绝不进命令行 / 文件 / shell history**）；
   2. 提交后由**用户手工重启** `ib-web`（ADR-32 / ADR-38：生效 = 保存 + 服务重启重装配）；
   3. 重启后 `GET /api/llm-key` → `configured=true`；
-  4. **处置 `.env` 里的旧 `IB_LLM_API_KEY`**（**移除，理由见 §15.7**）。
-- **预期结果**：`GET /api/llm-key` → `configured=true`；启动日志 `llm_configured=true`；`.env` 内 `IB_LLM_API_KEY` **零命中**；日志 / 命令行 / shell history **无 Key 明文**。
+  4. **处置 `.env` 里的旧 `IB_LLM_API_KEY`**（**移除，理由见 §15.7**）—— **两份都要查**：`/etc/intelligentbase/ib-web.env` **与** `ib-worker.env`。两个单元**各自**读自己的 `EnvironmentFile`、各自在装配期解析 Key（`ibweb.worker` 同样走 `composition.get_deps()`），只清一份则另一份的旧 Key **原样留着**。删行用 `sudo sed -i '/^[[:space:]]*IB_LLM_API_KEY=/d' <该文件>`（**勿用 vim** —— 删掉的行会进寄存器、可能落到 `~/.viminfo`；**勿先 `cp` 备份** —— 那会多留一份含 Key 的副本），改完复核 `stat` 仍为 600（checklists B23）。
+- **预期结果**：`GET /api/llm-key` → `configured=true`；启动日志 `llm_configured=true`（**只取自 DB**，见上 AC-IB-39-02-a —— 清空 `.env` 后仍为 `true` 才证明 DB 侧真的在供给 Key）；**全部** `/etc/intelligentbase/*.env` 内 `IB_LLM_API_KEY` **零命中**；日志 / 命令行 / shell history **无 Key 明文**。
 - **对应回滚**：ROLLBACK-031
 - **备注**：**顺序安全（须显式声明）**：依 **ADR-39 Option C**，**缺 Key 非致命** —— 服务照常启动、非 LLM 路径正常、LLM 路径**调用期 fail-closed**。故「**先部署后配 Key**」**是允许且安全的顺序**，但在**配 Key 并重启的窗口期内，LLM 功能不可用**（判据：`GET /api/llm-key` → `configured=false`；启动日志 `llm_configured=false`；LLM 相关调用返回可读的 fail-closed 错误，**非静默空答案**）。
 
@@ -1298,7 +1313,7 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
    - **明文绝不进命令行 / 文件 / shell history**（不在终端粘贴、不写入任何临时文件、不 `curl -d '{...key...}'` 直接构造）；
    - 提交后由**用户手工重启** `ib-web`（ADR-32：生效 = 保存 + 重启重装配）；
    - 验证：`GET /api/llm-key` → `configured=true`；启动日志 `llm_configured=true`。
-2. **迁移后 `.env` 里那份的处置（推荐 = 移除）**：
+2. **迁移后 `.env` 里那份的处置（推荐 = 移除；**两份 `*.env` 都要查**，见 checklists B23 / DEFECT-R18-04）**：
    - **推荐移除 `.env` 里的 `IB_LLM_API_KEY`**（理由）：依 ADR-38 / `C-IB-42`，`IB_LLM_API_KEY` **已不再是 Key 来源**（`build_llm_provider(cfg)` 不传 `api_key` 时走的是**历史 / 兼容回退** `read_secret(api_key_env)`，生产经组合根装配，Key 由 `LlmKeyStore.get()` 解析后注入）—— **保留一份失效明文 = 净增凭据面**（同机可读者仍能读到该 Key，且 Key 已在 DB 中另存一份，形成**双处明文**）。故倾向**移除**。
    - **替代（不推荐）**：若 PM 要求保留「失效兜底」，须显式标注该键**已不作为 Key 来源**且须在**下一次密钥轮换时一并删除**；但**不推荐** —— 与 REQ-NFR-IB-20「`.env` 仅保留非 LLM Key 的其他密钥」直接冲突。
 3. **ADR-39 Option C —— 「先部署后配 Key」是否安全**：
@@ -1311,9 +1326,9 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 
 | # | 项（test_report §23.5 编号） | 类型 | 验收步骤 | 判据 |
 |---|------|------|----------|------|
-| **AC-IB-39-02-a** | 服务**重启**后 LLM Key 生效（§23.5 第 2 项） | DEPLOY_REQUIRED | ① 用户在界面 `PUT /api/llm-key` 提交 Key；② 用户**手工重启** `ib-web`；③ `GET /api/llm-key` | `configured=true`；启动日志 `llm_configured=true`；`.env` 内 `IB_LLM_API_KEY` 零命中 |
+| **AC-IB-39-02-a** | 服务**重启**后 LLM Key 生效（§23.5 第 2 项） | DEPLOY_REQUIRED | ① 用户在界面 `PUT /api/llm-key` 提交 Key；② 用户**手工重启** `ib-web`；③ `GET /api/llm-key`；④ **在问答页实提一问**确认 LLM 路径可用（**再**动 `.env`） | `configured=true`；启动日志 `llm_configured=true` —— **该值只取自 DB**（`composition.py` 用 `LlmKeyStore.get()` 的结果算它，`.env` 回退在其下游 `build_llm_provider`），故**旧 `.env` 掩盖不了它**，DB 写失败时它必为 `false`；**全部** `/etc/intelligentbase/*.env`（**非仅 `ib-web.env`**，DEFECT-R18-04）内 `IB_LLM_API_KEY` 零命中；④ 拿到回答而非 fail-closed 错误 |
 | **AC-IB-39-02-b** | 承载库**及其 WAL 边车** **0660（组 `ib` 共享）** 且属主对齐服务账号（§23.5 第 3 项；**0600 → 0660 由 DEFECT-R18-01 订正**；**边车纳入判据由 DEFECT-R18-02 订正**；**判据改为「凡存在者」+ 排除冷备 + 约束查询时机由 DEFECT-R18-03 订正**） | DEPLOY_REQUIRED | ① `systemctl is-active ib-web`（先确认装配完成）→ `sudo ls -la /var/lib/intelligentbase/ledger`；② `systemctl is-failed ib-worker`；③ `journalctl -u ib-worker --since "<重启时刻>" -g "unable to open database file" --no-pager`；④ `sqlite3 … ".schema llm_key"` | ① 目录下**除 `*.pre-rev18.bak*` 外**的每个 `ledger.sqlite3*`（**凡存在者**）均为 `-rw-rw---- ib-web ib`（**不是 600**）；`-wal` / `-shm` 为**易失**文件 —— 最后一条连接干净关闭即被 SQLite 删除，**缺席不算失败**（DEFECT-R18-03），且查询须在 `ib-web` **装配完成之后**（`ib-web.service` 为 `Type=simple`，`systemctl restart` 的返回早于装配）；② = `active`（非 `failed`）；③ **一条都不匹配** —— **非属主账号 `ib-worker` 必须能打开台账**，这正是 `0600` 与 `0660` 的分水岭（`0600` 使其在 `Restart=always` 下无限重启）。`ib-web` / `ib-worker` **两个**服务账号均属组 `ib`；**属主对齐须由用户执行**，代理不执行生产变更 —— checklists **B22**。注：`sudo -u ib-worker test -r` 一法**已撤回**（2026-10-07 实测对已是 0660 的主文件亦报 FAIL，属假阴性，疑因 `sudo -u` 未携带目标用户附加组），改用 `sudo runuser -u ib-worker -- test -r`。**2026-10-07 生产实测：本条四条判据全通过**（主库与两枚边车均 `-rw-rw---- ib-web ib`＝660、`ib-worker` `active`、`journalctl` 零命中），**DEFECT-R18-01 / R18-02 至此在生产闭合** |
-| **AC-IB-39-03** | 提交 Key 后 **shell history 与命令行不留明文**（§23.5 第 4 项） | PARTIAL | ① `grep -c -iE 'llm[-_]?key\|secret\|sk-' <(journalctl -u ib-web -n 5000 --no-pager)`；② `grep -c -iE 'IB_LLM_API_KEY\|sk-' /etc/intelligentbase/ib-web.env`；③ `git grep -nE 'sk-[A-Za-z0-9]\|IB_LLM_API_KEY=' -- .` | ① = **0**；② = **0**；③ **无命中** —— checklists **B23** |
+| **AC-IB-39-03** | 提交 Key 后 **shell history 与命令行不留明文**（§23.5 第 4 项） | PARTIAL | ① `grep -c -iE 'llm[-_]?key\|secret\|sk-' <(journalctl -u ib-web -n 5000 --no-pager)`；② `sudo grep -c -iE 'IB_LLM_API_KEY\|sk-' /etc/intelligentbase/*.env`（**逐份**，非仅 `ib-web.env` —— DEFECT-R18-04 同源订正）；③ `git grep -nE 'sk-[A-Za-z0-9]\|IB_LLM_API_KEY=' -- .` | ① = **0**；② **每一份** `*.env` = **0**（至少含 `ib-web.env` 与 `ib-worker.env` 两份）；③ **无命中** —— checklists **B23** |
 | **ADR-39 调用期 fail-closed** | 「LLM 路径调用期 fail-closed 文本」（§23.5 第 5 项） | PARTIAL | **未配 Key** 时：服务起得来 + 触发一次 LLM 路径调用 | 启动日志 `llm_configured=false` 且出现 `{"outcome":"succeeded","stage":"startup"}`；非 LLM 路径正常；LLM 路径给**清晰可读错误**（`DependencyUnavailableError`-类，**非崩溃、非静默空答案**）；其余必填项仍 fail-fast |
 | **TBD-T26** | 容量 / 时延真机结论（§23.5 第 6 项）—— 项目注册表 | DEPLOY_REQUIRED | 目标机实测（**未实测前不得给结论**）：`projects` 表行数上界；`GET /api/projects` 与 CRUD 端点耗时；**装配期播种**（`_registry_seed_entries`）耗时 | **登记为实测项**；给出探针命令（`time curl` + `sqlite3 "SELECT COUNT(*) FROM projects"`），实测值回填部署记录 |
 | **TBD-T27** | 容量 / 时延真机结论（§23.5 第 6 项）—— LLM Key 承载库 | DEPLOY_REQUIRED | 目标机实测：承载库文件实际 `mode` / `owner`；`busy_timeout` 写耗时；`SqliteLlmKeyStore` 读写争用 | **登记为实测项**；探针（`stat` + 并发读写计时），实测值回填部署记录 |

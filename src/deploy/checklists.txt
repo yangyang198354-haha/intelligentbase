@@ -310,11 +310,12 @@
     另：改密成功后，该账户的**其他**会话应被撤销（旧令牌再用 → 401）。
 
 [B19] EnvironmentFile 权限与口令键的唯一落点（凭据纪律）
-    $ stat -c '%a %U:%G %n' /etc/intelligentbase/ib-web.env          # 期望 600 <运行用户>:<组>
-    $ grep -c 'IB_DEFAULT_ADMIN_PASSWORD' /etc/intelligentbase/ib-web.env
+    $ sudo stat -c '%a %U:%G %n' /etc/intelligentbase/*.env          # 期望**每一份**均为 600 且属主为各自的运行用户
+    $ sudo grep -c 'IB_DEFAULT_ADMIN_PASSWORD' /etc/intelligentbase/*.env
     $ git grep -n 'IB_DEFAULT_ADMIN_PASSWORD=' -- . | grep -v 'REPLACE_ME' ; echo "exit=$?"
     $ grep -c -iE 'Bearer |token=|password|api[_-]?key' <(journalctl -u ib-web -n 5000 --no-pager)
-    [ ] EnvironmentFile 权限为 **600** 且属主为运行用户
+    [ ] **每一份** `/etc/intelligentbase/*.env`（**非仅 `ib-web.env`** —— 至少含 `ib-worker.env`）权限为 **600**
+        且属主为该文件对应单元的运行用户（DEFECT-R18-04 同源订正：原只查一份，属**假 PASS** 面）
     [ ] `IB_DEFAULT_ADMIN_PASSWORD` **仅**出现在该 0600 文件里（仓库、日志、systemd unit 均零命中）
     [ ] 日志扫描命中数为 0（沿用 [B14] 纪律）
     [ ] 核对：库中 `users.password_hash` 以 `$2b$` 开头（bcrypt），**不存在**任何明文口令列
@@ -407,13 +408,26 @@
     实测：2026-10-07 生产验收 —— 主库与两枚边车均 `-rw-rw---- ib-web ib`（660）、`ib-worker`
     为 `active`、`journalctl -g "unable to open database file"` 零命中；本节各项**全通过**。
 
-[B23] LLM Key 不入 `.env` / 不进 git / 不进命令行（REV-18 / C-IB-42）
-    $ grep -c -iE 'IB_LLM_API_KEY|sk-' /etc/intelligentbase/ib-web.env ; echo "exit=$?"   # 期望 0
+[B23] LLM Key 不入 `.env` / 不进 git / 不进命令行（REV-18 / C-IB-42；
+      **查全部 `*.env`（非仅 `ib-web.env`）**由 DEFECT-R18-04 订正，2026-10-07）
+    $ sudo grep -c -iE 'IB_LLM_API_KEY|sk-' /etc/intelligentbase/*.env ; echo "exit=$?"  # 期望**每一份**均为 0
     $ git grep -nE 'sk-[A-Za-z0-9]|IB_LLM_API_KEY=' -- . ; echo "exit=$?"                  # 期望无命中
     $ grep -c -iE 'llm[-_]?key|secret|sk-' <(journalctl -u ib-web -n 5000 --no-pager)      # 期望 0
-    [ ] `.env` 中**无** LLM Key（`IB_LLM_API_KEY` 不再是 Key 来源；`.env` 仅保留其他非 LLM 密钥）
+    [ ] **全部** `/etc/intelligentbase/*.env` 中**无** LLM Key（**至少**含 `ib-web.env` 与
+        `ib-worker.env` 两份 —— 见下方警告；`IB_LLM_API_KEY` 不再是 Key 来源，`.env` 仅保留其他非 LLM 密钥）
     [ ] 仓库 / 提交历史 / 命令行与 shell history 中 **Key 零命中**（唯一写入口 = `PUT /api/llm-key`）
     [ ] 日志 / 审计中 **Key 明文与掩码零命中**（响应只承载 `configured` / `masked` / `updated_at`）
+    !! 别只查 `ib-web.env` !! `IB_LLM_API_KEY` 在**两份**模板里都有（`src/deploy/env.example:59`
+       与 `src/deploy/ib-worker.env.example:67`），而 `ib-web` 与 `ib-worker` 是**两个** systemd 单元、
+       各自读自己的 `EnvironmentFile`、各自在装配期解析 Key（`ibweb.worker` 同样走
+       `composition.get_deps()`）。**只查一份 ⇒ 另一份留着旧 Key 也照样 PASS** —— 那是**假 PASS**，
+       比假 FAIL 危险得多。故判据改用 glob `/etc/intelligentbase/*.env` **逐份**计数
+       （DEFECT-R18-04；本条原只写 `ib-web.env`，判据比现实窄）。
+    !! 编辑含 Key 的 `.env` 的安全做法 !! 删除该行用
+       `sudo sed -i '/^[[:space:]]*IB_LLM_API_KEY=/d' <该文件>`：
+       **不要**用 vim 打开它（被删的行会进 vim 寄存器，可能落到 `~/.viminfo`），
+       **不要**先 `cp` 备份（那会多留一份含 Key 的副本），也**不要**把该行贴进任何命令行。
+       改完复核 `sudo stat -c '%a %U:%G %n' <该文件>` **仍为 600**（`sed -i` 会重写文件）。
     警告：本仓库**不得**出现任何真实 Key 值（含示例 / 注释 / 测试 / 提交历史）。
     若曾误写入，删除文件**不足以**消除影响 —— 必须同时认定该 Key 已泄露并轮换处置。
 
