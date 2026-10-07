@@ -6,16 +6,16 @@
 | 文档 ID | DOC-IB-DP-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 生产部署计划 |
 | 产出代理 | devops-engineer (author_agent) |
-| 调用 ID | INV-GROUP_E-INTELBASE-005（**REV-14 增量**；前序 -004 / -002 / -003） |
+| 调用 ID | INV-GROUP_E-INTELBASE-006（**REV-18 增量**；前序 -005 / -004 / -002 / -003） |
 | 项目 | intelligentbase |
 | 阶段 | GROUP_E / **PHASE_10（部署计划，仅计划）**；PHASE_11（实际部署）**PENDING，禁止执行** |
-| revision | **REV-14**（R13 回归缺陷修复：全局管理员「当前项目」选择与 `X-IB-Project` 传播；前端产物替换 + 后端新端点，**无迁移**） |
-| 版本 | **1.3.0**（REV-14 增量；在 1.2.0/REV-13 之上追加 R14 部署面，见 §14） |
-| status | **APPROVED**（1.3.0/REV-14 经 **GR-E-005 = PASS_WITH_CONDITIONS** 门控通过，仅计划层；GR-E-001 对 R4 前版本有效、GR-E-002 对 1.1.0 有效、GR-E-003 对 1.1.1/R10 有效、GR-E-004 对 1.2.0/REV-13 有效）。**PHASE_11 实际部署仍 PENDING/冻结**，须用户明确 `PRODUCTION_DEPLOY_CONFIRM=true` |
+| revision | **REV-18**（系统管理三分：项目注册表 CRUD（软删）/ 唯一运维账号（N:1）/ LLM Key 管理（载体 = DB）/ 项目域资料上传（`kb_id ≡ project_id` 推导）；**含 2 个新迁移 `005_projects.sql` / `006_llm_key.sql` + `kb_default` 前向数据迁移**） |
+| 版本 | **1.4.0**（REV-18 增量；在 1.3.0/REV-14 之上追加 R18 部署面，见 §15） |
+| status | **APPROVED**（**GR-E-006 = PASS_WITH_CONDITIONS**，经协调者独立核验并由用户 2026-10-07 接受；GR-E-001 对 R4 前版本有效、GR-E-002 对 1.1.0 有效、GR-E-003 对 1.1.1/R10 有效、GR-E-004 对 1.2.0/REV-13 有效、GR-E-005 对 1.3.0/REV-14 有效）。**GR-E-006 协调者复核订正了 3 处**（`cicd_pipeline.md` 前端增量 `+14` → `+6`；§15.9 登记②③经实测不成立已撤回）。**PHASE_11 实际部署仍 PENDING/冻结**，须用户明确 `PRODUCTION_DEPLOY_CONFIRM=true` |
 | 创建日期 | 2026-09-26 |
-| 更新日期 | 2026-10-06（REV-14 增量） |
+| 更新日期 | 2026-10-07（REV-18 增量） |
 | 目标机 | `192.168.31.133`（Ubuntu 26.04 LTS / x86_64 / i7-3770S 4C8T / 11 GiB / 78 GiB 可用 / GTX 960 弃用） |
-| 上游输入 | `docs/architecture_design.md`(**1.6.0/REV-14**，ADR-28 + §2.0.5)、`docs/module_design.md`(**1.6.0/REV-14**，IFC-IB-333~336)、`docs/tech_stack.md`(**1.4.0/REV-13**，**NO_CHANGE**)、`docs/ib_embed_service_contract.md`(1.0.0/R2)、`docs/implementation_plan.md`(**2.9.0/R14**)、`docs/test_plan.md`(**1.9.0/R14**)、`docs/test_report.md`(**1.10.0/R14**，§19)、`docs/code_review_report.md`、`docs/phase_status.md`（GR-B-007 / GR-C-010 / GR-D-011）、`docs/rev14_project_context_apply_package.md`、`src/deploy/**`（含 **`migrations/003_accounts.sql`**、**`nginx/intelligentbase.conf.example`**）、`src/requirements*.txt`（含 **`bcrypt>=4,<5`**）、`src/ibweb/{views,urls}.py`、`src/frontend/**`（均**只读**） |
+| 上游输入 | `docs/architecture_design.md`(**1.10.2/REV-18-R2**，ADR-37/38/39/40/41/42 + ADR-21-R1 + §10.1 OI-1/OI-2 关闭·OI-3 OPEN)、`docs/module_design.md`(**1.10.2/REV-18-R2**，IFC-IB-366~377，端口 17→19)、`docs/tech_stack.md`(**1.4.1/REV-18**，**NO_CHANGE**)、`docs/ib_embed_service_contract.md`(1.0.0/R2)、`docs/requirements_spec.md`(**1.10.0/REV-18-2**)、`docs/user_stories.md`(**1.10.0/REV-18-2**)、`docs/implementation_plan.md`(**2.13.0/REV-18**，§25)、`docs/test_report.md`(**1.14.0/REV-18**，§23；GR-D-015)、`docs/phase_status.md`（GR-D-015 = PASS_WITH_CONDITIONS，用户 2026-10-07 接受）、`src/deploy/**`（**`migrations/005_projects.sql` / `006_llm_key.sql`**、**`checklists.txt` B21/B22/B23**、**`env.example` 新增 2 键**）、`src/ib/ledger/schema.py`（**迁移单源**）、`src/ibweb/{views,urls,composition,serializers}.py`、`src/frontend/**`（均**只读**） |
 | 凭据纪律 | 本文件**不含任何真实凭据 / 口令 / 令牌**；凡涉及凭据一律写「经环境变量 / EnvironmentFile 注入」；目标机 SSH 口令**不记录** |
 | 执行门控 | 任何目标机写操作（SSH 写 / rsync / scp / apt / pip / systemctl / 服务启动）**在收到 PM 的 `PRODUCTION_DEPLOY_CONFIRM=true` 之前一律禁止**；本轮为纯文档产出，**未连接、未触碰目标机** |
 
@@ -26,6 +26,12 @@
 > **REV-13 增量声明（前轮，INV-GROUP_E-INTELBASE-004）**：本文件为 **PHASE_10 计划层增量**——**仅更新计划**。**未连接、未触碰目标机 `192.168.31.133`**；**未执行任何 SSH / 写操作 / `git clone` / `apt` / `pip` / `systemctl` / `nginx` 写 / 文件上传**；**未 commit / push**；**未改 `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md`**；**未触发 PHASE_11**（本代理**未**、也**不得**自赋 `PRODUCTION_DEPLOY_CONFIRM`）。R13 增量内容见 **§13**，**所有命令须 PM CONFIRM 后执行**。
 
 > **REV-14 增量声明（本轮，INV-GROUP_E-INTELBASE-005）**：本文件为 **PHASE_10 计划层增量**——**仅更新计划，未执行任何部署**。**未连接、未触碰目标机 `192.168.31.133`**；**未执行任何 SSH / 写操作 / 连接 / 安装 / 服务启停 / `nginx` 写 / 文件上传**；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改 `src/**` 实现代码 / `tests/**` / 设计真源四文档（`architecture_design.md` / `module_design.md` / `tech_stack.md` / `requirements_spec.md`）/ `user_stories.md` / `docs/phase_status.md` / `docs/test_*.md`**；**未触发 PHASE_11**；**未收到、也未自赋 `PRODUCTION_DEPLOY_CONFIRM`**（本轮 `special_instructions` 明确「无 PRODUCTION_DEPLOY_CONFIRM；PHASE_11 保持冻结」）。R14 增量内容见 **§14**，**所有命令须 PM CONFIRM 后执行**。
+
+> **REV-18 增量声明（本轮，INV-GROUP_E-INTELBASE-006）**：本文件为 **PHASE_10 计划层增量**——**仅更新计划，未执行任何部署**。**未连接、未触碰目标机 `192.168.31.133`**；**未执行任何 SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传 / 数据库迁移**；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改 `src/**` 实现代码 / `tests/**` / 设计真源四文档（`architecture_design.md` / `module_design.md` / `tech_stack.md` / `requirements_spec.md`）/ `user_stories.md` / `docs/phase_status.md` / `docs/test_*.md` / `docs/implementation_plan.md` / `.github/workflows/ci.yml`**；**未触发 PHASE_11**；**未收到、也未自赋 `PRODUCTION_DEPLOY_CONFIRM`**（本轮 `special_instructions` 明确「仅 PHASE_10 计划层；PHASE_11 保持冻结」）。R18 增量内容见 **§15**，**所有命令须 PM CONFIRM 后执行**。
+>
+> **R18 变更面（一句话）**：后端**新增项目注册表 CRUD 端点 / 账户编辑·软删端点 / `PUT`·`GET`·`DELETE /api/llm-key` 端点 + 上传路径 `kb_id ≡ project_id` 推导**（`views.py` / `urls.py` / `composition.py` / `serializers.py`）+ 前端**三分 IA 三新视图**（`SystemSection.vue` / `ProjectsPage.vue` / `LlmKeyPage.vue`）+ **2 个手写 scoped 迁移**（`005_projects.sql` 含 `kb_default` 前向数据迁移 / `006_llm_key.sql`）+ **2 个新 env 键**（`IB_PROJECT_REGISTRY_BACKEND` / `IB_LLM_KEY_BACKEND`，**均有默认值 `sqlite`，无缺失失败模式**）——**零新第三方依赖（`tech_stack.md` NO_CHANGE）、零新增模块（仍 26）、端口 17 → 19（纯追加）、零新增依赖边、无 unit / nginx 站点改动**。故 R18 部署面 = **`git pull` → 后端依赖核对（应无新增）→ 迁移应用（含迁移前备份 + 受影响行数核算）→ 前端重建 → `dist/` 原子发布 → 重启 `ib-web` → 重启 `ib-worker`（推荐）→ 部署后验证**（见 §15.3），**其中 `005` 的 `kb_default` 归属重绑是本轮唯一存量数据变更、不可逆、须先备份**（见 §15.2 / §15.6）。
+>
+> **R18 门控前置备注（如实登记，待 PM 归口）**：本轮读取时，`docs/phase_status.md`（权威控制文档）记载 **GROUP_B = APPROVED（GR-B-010，REV-18-R1 由 PASS_WITH_CONDITIONS 升为 PASS）**、**GROUP_C = APPROVED（GR-C-013 = PASS_WITH_CONDITIONS）**、**GROUP_D = APPROVED（GR-D-015 = PASS_WITH_CONDITIONS，经用户 2026-10-07 接受）**。设计真源 `architecture_design.md` / `module_design.md` 已落盘 **1.10.2/REV-18-R2**（`tech_stack.md` NO_CHANGE 保持 1.4.1/REV-18）。**测试基线以此为准 = Python 351/351（unit 157 / integration 170 / e2e 24，0 skip/xfail）+ 前端冒烟 35/35 + `selfcheck.py` 51/51**（`test_report.md` 1.14.0 §23；其 `file_header.status` 对 §23 标 APPROVED）。**CRED-01**（未提交工作包不得原样提交）自 GR-B-007 起连续结转，见 §15.6。
 >
 > **R14 变更面（一句话）**：后端**新增 `GET /api/projects`**（`views.py` + `urls.py`，**无 schema 变更 / 无 DB 迁移**）+ 前端 `projectContext` store 与 `client.ts` 单点注入 `X-IB-Project`（**需前端重建 + 发布新 `dist/`**）——**无新第三方依赖（`tech_stack.md` NO_CHANGE）、无新 env 键、无 unit / nginx 站点改动**。故 R14 部署面 = **`git pull` → `npm ci && npm run build` → 发布新 `dist/` → 重启 `ib-web`**（见 §14.3），**风险面最小、回滚无数据迁移**（见 §14.4）。
 >
@@ -580,8 +586,9 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 | **DEPLOY-010** | 部署后验证（§11） + DeepSeek smoke（§9） | **ROLLBACK-010** | 若冒烟失败 → 按 §10.2 决策树整体回滚 |
 | **DEPLOY-011 ~ 016** | **REV-13 增量步骤**（bcrypt 依赖 / 003 迁移 / R13 环境变量 / 默认管理员播种 / nginx HTTPS / 令牌纪律校验）—— 正向定义见 **§13.6** | **ROLLBACK-011 ~ 016** | **R13 逆操作**（详见 **§13.7**；逆序执行，含 `[MANUAL_ROLLBACK_REQUIRED]` 项） |
 | **DEPLOY-017 ~ 021** | **REV-14 增量步骤**（`git pull` / 前端重建 `npm ci && npm run build` / 发布新 `dist/` / 重启 `ib-web` / 部署后验证）—— 正向定义见 **§14.3**。**无 DB 迁移、无新依赖、无新 env 键、无 unit 或站点改动** | **ROLLBACK-017 ~ 021** | **R14 逆操作**（详见 **§14.4**；逆序执行，**不涉数据迁移**，无 `[MANUAL_ROLLBACK_REQUIRED]` 项） |
+| **DEPLOY-022 ~ 031** | **REV-18 增量步骤**（`git pull` / 后端 venv 依赖核对 / **迁移前备份 + 受影响行数核算（硬前置）** / **迁移应用（`005` 的 `kb_default` 归属重绑不可逆）** / 前端重建 / 发布新 `dist/`（原子替换）/ 重启 `ib-web` / 重启 `ib-worker`（推荐）/ 部署后验证 / **LLM Key 从 `.env` 迁移到 DB（用户执行）**）—— 正向定义见 **§15.3**。**含 2 个新迁移（`005` / `006`）+ 2 个新 env 键（均有默认值）**；**无新第三方依赖、无 unit 或站点改动** | **ROLLBACK-022 ~ 031** | **R18 逆操作**（详见 **§15.4**；逆序执行）。**`005` 的 `kb_default` 数据重绑不可逆 → `[MANUAL_ROLLBACK_REQUIRED]`（唯一回退 = 恢复迁移前台账备份）**，见 §15.4 / §15.6 |
 
-> **逆序纪律**：一旦某步失败，**立即停止后续步骤**，从该步向 DEPLOY-001 **逆序**回滚，并记录每一步结果。**R13 步骤（DEPLOY-011~016）同样适用**：失败即从该步逆序回滚（先 ROLLBACK-016 → … → ROLLBACK-011），**不跳步**。**R14 步骤（DEPLOY-017~021）同样适用**：失败即从该步逆序回滚（先 ROLLBACK-021 → … → ROLLBACK-017），**不跳步**；因 R14 **零迁移**，其回滚**不涉数据迁移**（见 §14.4）。
+> **逆序纪律**：一旦某步失败，**立即停止后续步骤**，从该步向 DEPLOY-001 **逆序**回滚，并记录每一步结果。**R13 步骤（DEPLOY-011~016）同样适用**：失败即从该步逆序回滚（先 ROLLBACK-016 → … → ROLLBACK-011），**不跳步**。**R14 步骤（DEPLOY-017~021）同样适用**：失败即从该步逆序回滚（先 ROLLBACK-021 → … → ROLLBACK-017），**不跳步**；因 R14 **零迁移**，其回滚**不涉数据迁移**（见 §14.4）。**R18 步骤（DEPLOY-022~031）同样适用**：失败即从该步逆序回滚（先 ROLLBACK-031 → … → ROLLBACK-022），**不跳步**；**R18 含数据迁移 ⇒ 回滚须区分「代码可回滚」与「数据归属不回退」**——`005` 的 `kb_default` 重绑**不可逆**，唯一回退为**恢复迁移前台账备份**（破坏性，`[MANUAL_ROLLBACK_REQUIRED]`），详见 §15.4 / §15.6。
 
 ### 10.2 按变更类型的回滚动作
 
@@ -1014,6 +1021,320 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 
 ---
 
+## 15. REV-18 增量：系统管理三分 + 项目 CRUD 软删 + LLM Key 管理（载体 = DB）+ 项目域资料上传（含 2 迁移，`kb_default` 数据迁移**不可逆**）
+
+> **本节为 REV-18 增量（INV-GROUP_E-INTELBASE-006），仅计划** —— **未连接、未触碰目标机 `192.168.31.133`**；**未执行任何迁移 / 备份 / 重启**；**所有命令须 PM CONFIRM 后执行**。
+> 依据：`architecture_design.md` **1.10.2/REV-18-R2**（**ADR-37** 项目注册表承载 / 软删；**ADR-38** LLM Key 载体 = DB / 装配期解析 / 0600；**ADR-39** Option C 缺 Key 非致命 / 调用期 fail-closed；**ADR-40** 运维账号 CRUD / 删除保护 / 顺序依赖；**ADR-41** `kb_id ≡ project_id` 推导 + 归属断言保留 + `kb_default` 迁移；**ADR-42** 系统管理三分 IA；**ADR-21-R1** N:1 订正；**§10.1** OI-1/OI-2 关闭·OI-3 OPEN）/ `module_design.md` **1.10.2/REV-18-R2**（**IFC-IB-366~377**，端口 17 → 19）/ `tech_stack.md` **1.4.1/REV-18（NO_CHANGE）** / `implementation_plan.md` **2.13.0/REV-18 §25** / `test_report.md` **1.14.0/REV-18 §23**（GR-D-015）/ `docs/phase_status.md` / `src/deploy/**`、`src/ib/ledger/schema.py`、`src/ibweb/**`、`src/frontend/**`（均**只读**引用）。
+
+### 15.1 R18 交付物清单
+
+| 交付物 | 路径 | 性质 / 交付方式 |
+|--------|------|-----------------|
+| 项目注册表迁移 + `kb_default` 前向数据迁移 | `src/deploy/migrations/005_projects.sql`（**IFC-IB-370 / IFC-IB-377**；单源 = `schema.py::project_registry_ddl_script()`） | 迁移脚本（**含存量数据重绑 —— 唯一不可逆步**） |
+| LLM Key 单行表 | `src/deploy/migrations/006_llm_key.sql`（**IFC-IB-371 / IFC-IB-377**；单源 = `schema.py::llm_key_ddl_script()`） | 迁移脚本（纯新增表） |
+| 后端端点族（项目 CRUD / 账户 PATCH·DELETE / LLM Key / 上传 kb 推导） | `src/ibweb/{views,urls,composition,serializers}.py`、`src/ib/ledger/{projects,llm_key,accounts}.py`、`src/ib/llm/__init__.py`、`src/ib/config/__init__.py`、`src/ib/core/{types,ports}.py` | 代码（**`git pull`** 交付） |
+| 前端三分 IA（系统管理父级 + 项目 / LLM Key / 账户三子项 + 项目域资料页） | `src/frontend/src/views/{SystemSection,ProjectsPage,LlmKeyPage,AccountsPage,UploadPage}.vue`、`src/frontend/src/router/index.ts`、`src/frontend/src/api/client.ts`、`src/frontend/src/layouts/ConsoleLayout.vue` | 代码（`git pull` 交付） |
+| 前端构建产物 | `src/frontend/dist/`（**不入 git**，`npm run build` 产出） | **构建产物**（目标机构建后发布到 nginx 静态根） |
+| 部署检查清单 R18 段 | `src/deploy/checklists.txt` **`[B21]`~`[B23]`**（含签署行 **B1–B23**） | 核对清单（本计划引用，**不改该文件**） |
+| EnvironmentFile 模板新增 2 键 | `src/deploy/env.example`（`IB_PROJECT_REGISTRY_BACKEND` / `IB_LLM_KEY_BACKEND`） | 模板（纯占位符，**均有默认值**） |
+| 离线自检 / 测试增量 | `src/scripts/selfcheck.py`（**51/51**）、`tests/unit/test_rev18_system_mgmt_unit.py`、`tests/integration/test_rev18_system_management_{int,extra_int}.py`、`src/frontend/tests/frontend.smoke.test.js`（35 例） | 测试（**不属部署动作**，CI 内跑） |
+
+### 15.2 变更类型判定 + 迁移执行的前置与判据（**关键**）
+
+| 维度 | 判定 | 依据 |
+|------|------|------|
+| **DB / schema 迁移** | **有** —— 新增 `005_projects.sql`（`projects` 前向补列 + `kbs` 登记 + **`kb_default` 数据重绑**）与 `006_llm_key.sql`（`llm_key` 单行表） | ADR-37 / ADR-38 / ADR-41；`schema.py::ensure_schema` |
+| **存量数据变更** | **有，且唯一** —— `005` 的 `kb_default` 归属重绑（`UPDATE documents/chunks/chunk_image SET kb_id = project_id WHERE kb_id='kb_default'`） | ADR-41 ③；见 §15.2(d) / §15.6 R-18-1 |
+| **新第三方依赖** | **无** —— 复用 stdlib `sqlite3`；`tech_stack.md` **1.4.1/REV-18 = NO_CHANGE**；`requirements*.txt` / `package.json` / `package-lock.json` **零改动** | `implementation_plan.md` §25.6 |
+| **新 env 键** | **2 个**（`IB_PROJECT_REGISTRY_BACKEND` / `IB_LLM_KEY_BACKEND`），**均有默认值 `sqlite`、无缺失失败模式**；二者**不进入** `IB_ENV_KEYS` 核心装配开关集合 | `src/ib/config/__init__.py`；`env.example` |
+| **systemd 单元 / nginx 站点** | **无改动** —— 四自研 unit 与 nginx 站点逐字不变；新端点由既有 `location /api/` 覆盖 | —— |
+| **后端进程形态** | **重启 `ib-web`（必需）** + **重启 `ib-worker`（推荐）** | 见 §15.3 DEPLOY-028 / DEPLOY-029 论证 |
+| **前端** | **重建 + 替换 `dist/` 静态产物** | 三分 IA + 三新视图 |
+| **交付方式** | **仅 `git pull`**（冻结决策 ⑧；**禁 scp / pscp / rsync**） | 目标机构建 `dist/`（本机发布） |
+
+#### (a) 迁移执行顺序（由 `ensure_schema()` 唯一确定）
+
+`ib-web.service` 的 `ExecStartPre = python -m ibweb.bootstrap --ensure-schema` 在每次启动前**幂等**执行；`ensure_schema()` 内的**固定顺序**为（`schema.py:573-588`）：
+
+1. `PRAGMA_STATEMENTS`（`journal_mode=WAL` + `synchronous` / `busy_timeout` / `foreign_keys`）
+2. `DDL_STATEMENTS`（001 基座：`projects` / `kbs` / `documents` / `chunks` / `chunk_image` / `rebuild_jobs`）
+3. **`_ensure_project_registry_columns`**（`PRAGMA table_info` 探测 + `ALTER TABLE projects ADD COLUMN status / updated_at`）
+4. `PROJECT_REGISTRY_DDL_STATEMENTS`（`CREATE TABLE IF NOT EXISTS projects` 最终形态 + `idx_projects_status`）
+5. **`PROJECT_KB_REBIND_STATEMENTS`**（`INSERT INTO kbs … WHERE NOT EXISTS` + `UPDATE documents/chunks/chunk_image SET kb_id=project_id WHERE kb_id='kb_default'`）
+6. `LLM_KEY_DDL_STATEMENTS`（`CREATE TABLE IF NOT EXISTS llm_key`）
+7. `ACCOUNT_DDL_STATEMENTS`（`users` / `sessions`）
+8. `CONFIG_AUDIT_DDL_STATEMENTS`（`config_audit`）
+
+> **顺序要点**：补列（3）**必须**在注册表 DDL（4）之前 —— 因为 SQLite 对既有表 `CREATE TABLE IF NOT EXISTS` 是 no-op，两列只能靠 `ALTER TABLE` 补；`CREATE INDEX … ON projects(status)`（4）在 `status` 列就位前会报错（见 (b)）。
+
+#### (b) **手工 `sqlite3 … < 005_projects.sql` 路径的坑（须写清）**
+
+- **对既有 6 列老库会失败**：老库上 `CREATE TABLE IF NOT EXISTS projects(…8 列…)` 是 **no-op**（表已存在），随后 `CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status)` 因 `status` 列**尚不存在**而报 **`no such column: status`**。SQLite **没有** `ADD COLUMN IF NOT EXISTS`，两列只由 `ensure_schema()` 的 `_ensure_project_registry_columns`（`PRAGMA table_info` + `ALTER TABLE`）落实。
+- **对空库单独跑 `005` 也会失败**：`INSERT INTO kbs`（第 52 行起）在 `kbs` 表**不存在**时报错 —— `kbs` 由 **001** 建；故手工 `005` 的前提是 **001 基座 DDL 已应用**。
+- **结论（迁移执行的前置与判据）**：
+  - **既有生产库（老 6 列库）的唯一正确路径 = `--ensure-schema`（由 `ExecStartPre` 自动 / 或受控手工触发）**；**不得**以手工 `sqlite3 … < 005_projects.sql` 代替。
+  - `005` 的**手工路径仅对「已是最终形态」的库（复核 / 重放）有效** —— 即该库已含 `projects.status` / `updated_at` 且 `kbs` 已存在。
+  - `006` 手工路径无依赖（纯 `CREATE TABLE IF NOT EXISTS`），但对齐纪律仍**统一走 `--ensure-schema`**。
+
+#### (c) 幂等性（可前向、可重放）
+
+- 全部 DDL 为 `CREATE TABLE / INDEX IF NOT EXISTS`；补列为 **探测后** `ALTER TABLE`（缺则补、有则跳过）。
+- `INSERT INTO kbs … WHERE NOT EXISTS (SELECT 1 FROM kbs k WHERE k.kb_id = p.project_id)` 收敛：已登记的 KB 行不重复插入。
+- `UPDATE … WHERE kb_id = 'kb_default'` 收敛：**重绑一次后**该条件不再命中任何行（无 `kb_default` 残留）→ 重放无副作用。
+- **判据（B21）**：`--ensure-schema` **连跑两次**均 `exit 0`；第二次后 `SELECT COUNT(*) FROM documents WHERE kb_id='kb_default'` = **0**，`kbs` 无重复行。
+
+#### (d) 在既有生产数据上的行为（**最高风险步，不一笔带过**）
+
+- 生产库 `projects` 表（既有 6 列）在应用 `005` 后：`status` 取默认 `'active'`、`updated_at` 取默认 `''`（既有行**不被改写**）；`upsert_project` 的旧 6 列 INSERT 在补列后**继续有效**（两列有默认值）。
+- **唯一存量数据变更 = `kb_default` 归属重绑**：既有落在 `kb_default` 的 `documents` / `chunks` / `chunk_image` 行，其 `kb_id` 被改写为该行的 `project_id`；并为每个项目补登记一行 `kbs`（`kb_id == project_id`）。
+- **不可逆性（须显式声明）**：`UPDATE` **丢失「原为 kb_default」的信息** —— 改后**无法凭库内信息逆向推断**某行此前是否属于 `kb_default`。故**数据重绑不可逆**；唯一回退 = **恢复迁移前备份**（见 §15.6 R-18-1 / §15.3 DEPLOY-024）。
+- **与既有纪律的关系（非对称，须声明）**：R1~R14 的迁移家族纪律为「**纯前向放大，回滚 = 代码回滚、数据保留不回退**」。R18 **代码仍可回滚**（回退 commit 即可），但 **`kb_id` 归属不回退** —— 即「**代码可回滚、数据归属不回退**」这一**非对称**在本轮**首次出现**，与 ADR-41 Consequences 的「回滚 = 代码回滚 + 数据保留」一致。
+
+### 15.3 正向部署步骤（DEPLOY-022 ~ DEPLOY-031）
+
+> 前置：DEPLOY-001~021 已按 §10.1 / §13.6 / §14.3 完成且全绿。**每步失败即从该步逆序回滚**（§15.4）。**不在本轮执行** —— 须 PM 的 `PRODUCTION_DEPLOY_CONFIRM=true`；**生产后端重启与首次环境变量配置由用户执行**。
+
+---
+**DEPLOY-022: 代码交付（`git pull` 到含 REV-18 的 commit）**
+- **组件**：全部（后端 + 前端源码 + 迁移脚本 + 部署交付物）
+- **操作**：`cd /opt/intelligentbase && sudo git fetch --prune origin && sudo git checkout main && sudo git pull --ff-only`；随后 `git -C /opt/intelligentbase rev-parse HEAD` 核对 commit（含 `c1ce029`）。
+- **预期结果**：`HEAD` == 预期 REV-18 commit（可追溯，§8）；`git status` 工作树干净；`src/deploy/migrations/` 下可见 `005_projects.sql` / `006_llm_key.sql`。
+- **对应回滚**：ROLLBACK-022
+- **备注**：**仅 `git pull`** —— 禁 scp / pscp / rsync（冻结决策 ⑧）。`dist/` 不入 git。
+
+---
+**DEPLOY-023: 后端 venv 依赖核对（**应无新增**）**
+- **组件**：`ib-web` / `ib-worker`（`src/requirements*.txt`）
+- **操作**：`sudo PYTHONUTF8=1 /opt/intelligentbase/venv/bin/pip install -r /opt/intelligentbase/src/requirements.txt --dry-run 2>&1 | tail -5`；`/opt/intelligentbase/venv/bin/pip show bcrypt`；`/opt/intelligentbase/venv/bin/pip show` 核对无 `torch` / 无 `+cuXXX` 变体。
+- **预期结果**：`--dry-run` **无待装项**（证明 REV-18 未新增第三方依赖，与 §25.6 一致）；`bcrypt` 版本 ∈ `[4,5)`。
+- **对应回滚**：ROLLBACK-023（无待装项则无副作用）
+- **备注**：R18 **零新增 pip 依赖**（复用 stdlib `sqlite3`）—— 本步为**核验步**，非安装步。**若 `--dry-run` 出现待装项 → 暂停并上报 PM**（意味着依赖面与设计不符）。
+
+---
+**DEPLOY-024: 迁移前备份 + 受影响行数核算（**硬前置，先备份再执行**）**
+- **组件**：SQLite 台账（`IB_LEDGER_PATH=/var/lib/intelligentbase/ledger/ledger.sqlite3`）
+- **操作**（**本机文件操作，非跨机传输**；须 PM CONFIRM 后执行；备份与核算均为**只读 / 快照**，不对库作写变更）：
+  ```bash
+  # 1) 一致快照：优先 sqlite3 .backup（WAL 下安全，不需停写）；若无 sqlite3 CLI 则先停 ib-web/ib-worker 再冷拷
+  sudo sqlite3 /var/lib/intelligentbase/ledger/ledger.sqlite3 ".backup '/var/lib/intelligentbase/ledger/ledger.sqlite3.pre-rev18.bak'"
+  # 2) 受影响行数核算（只读 SELECT）—— 记录到部署记录
+  sudo sqlite3 /var/lib/intelligentbase/ledger/ledger.sqlite3 \
+    "SELECT 'documents', COUNT(*) FROM documents WHERE kb_id='kb_default' \
+     UNION ALL SELECT 'chunks', COUNT(*) FROM chunks WHERE kb_id='kb_default' \
+     UNION ALL SELECT 'chunk_image', COUNT(*) FROM chunk_image WHERE kb_id='kb_default' \
+     UNION ALL SELECT 'projects', COUNT(*) FROM projects \
+     UNION ALL SELECT 'kbs', COUNT(*) FROM kbs;"
+  ```
+- **预期结果**：备份文件 `ledger.sqlite3.pre-rev18.bak` 生成（**WAL/SHM 口径**：`.backup` 产出一致性快照，含已提交数据，不受未 checkpoint 的 WAL 影响；若用冷拷，须**先停写**并同拷 `-wal` / `-shm`）；受影响行数（`kb_default` 三表 + projects + kbs）被**记录留痕**。
+- **对应回滚**：ROLLBACK-024（删备份文件，无副作用）
+- **备注**：**备份未成功 ⇒ 不得进入 DEPLOY-025**（`005` 数据重绑不可逆，唯一回退依赖此备份）。备份文件含原文件字节引用关系属**台账**，权限须与库文件同级对齐、**不入 git**。
+
+---
+**DEPLOY-025: 迁移应用（`--ensure-schema`，**幂等**）**
+- **组件**：SQLite 台账（`005` 注册表补列 + `kbs` 登记 + `kb_default` 重绑；`006` `llm_key` 表）
+- **操作**：以**运行账户身份**执行同一 `ExecStartPre` 代码路径：`sudo -u ib-web PYTHONUTF8=1 /opt/intelligentbase/venv/bin/python -m ibweb.bootstrap --ensure-schema`（须带同一 `EnvironmentFile` 的 `IB_LEDGER_PATH` 等）；**连跑两次**验幂等。（若 PM 选择仅由 `ib-web` 重启的 `ExecStartPre` 顺带执行，则可省略本步的手工执行，但**仍须完成 DEPLOY-024 的备份 + 核算**。）
+- **预期结果**：两次均 `exit 0`；`projects` 含 `status`（默认 `'active'`）与 `updated_at`，`idx_projects_status` 存在；`kbs` 每个项目一行（`kb_id == project_id`）；`SELECT COUNT(*) FROM documents WHERE kb_id='kb_default'` = **0**；`llm_key` 表存在（单行表 `CHECK (id=1)`，`0` 行 —— Key 尚未写入）；文件属主/权限**仍对齐运行账户**（B22）。
+- **对应回滚**：ROLLBACK-025
+- **备注**：**本步含唯一不可逆数据变更**；`--ensure-schema` 走的是**同一代码路径**（非 `sqlite3 < 005` 手工路径 —— 后者对老库会 `no such column: status`，见 §15.2(b)）。以 `ib-web` 身份执行是**为保持文件属主/权限 0600 + 服务账户对齐**（B22）。
+
+---
+**DEPLOY-026: 前端重建（`npm ci` + `npm run build`）**
+- **组件**：前端（MOD-IB-24）
+- **操作**：`cd /opt/intelligentbase/src/frontend && npm ci && npm run build`（`build` = `vue-tsc --noEmit && vite build`）。
+- **预期结果**：`vue-tsc` **零错**；`vite build` 成功；`dist/index.html` + `dist/assets/*` 产出。
+- **对应回滚**：ROLLBACK-026
+- **备注**：`package.json` / `package-lock.json` **零改动** → `npm ci` 仅按既有锁复现，**不新增依赖**；目标机 `npm ci` 与 `npm run build` 在既有部署（`deployment_report.md` §8/§10）已实证可用。**前置**：PHASE_11 预检确认 `node -v` / `npm -v` 可用。
+
+---
+**DEPLOY-027: 发布新 `dist/` 到 nginx 静态根（原子目录替换）**
+- **组件**：系统 nginx 静态根（C-02；`/var/www/intelligentbase/`）
+- **操作**（**本机文件操作，非跨机传输**）：
+  ```bash
+  sudo rm -rf /var/www/intelligentbase.prev && sudo mv /var/www/intelligentbase /var/www/intelligentbase.prev
+  sudo install -d -o www-data -g www-data /var/www/intelligentbase
+  sudo cp -a /opt/intelligentbase/src/frontend/dist/. /var/www/intelligentbase/
+  ```
+- **预期结果**：`/var/www/intelligentbase/index.html` 与 `assets/` 为新构建；旧产物留存于 `/var/www/intelligentbase.prev`（回滚用）。
+- **对应回滚**：ROLLBACK-027
+- **备注**：**不用 rsync / scp**（冻结决策 ⑧）；站点文件未改 → **不涉 `nginx -t`**（若同批动了站点则须先 `nginx -t`，见 D-2）。
+
+---
+**DEPLOY-028: 重启 `ib-web.service`（Waitress）**（**含 `ExecStartPre` 幂等再跑迁移**）
+- **组件**：`ib-web`（MOD-IB-23；承载项目 CRUD / 账户 PATCH·DELETE / LLM Key 端点 / 上传 kb 推导）
+- **操作**：`sudo systemctl restart ib-web`（**由用户执行**）；随后 `systemctl is-active ib-web` 与 `journalctl -u ib-web -n 40 --no-pager` 抽查启动日志。
+- **预期结果**：`ib-web` **active**；启动日志含 `{"outcome": "succeeded", "stage": "startup"}` 且含 `llm_configured=false`（**此时期望 Key 未配置**，ADR-39）与 `Serving on http://127.0.0.1:18080`；**不出现** `path_not_configured_using_in_memory_default`（定义文档路径）；**无迁移 / 装配报错**；`GET /healthz` = 200。
+- **对应回滚**：ROLLBACK-028
+- **备注**：`ExecStartPre` 的 `--ensure-schema` 会**再跑一次** DEPLOY-025 的迁移（幂等，无副作用）；故 DEPLOY-025 与 DEPLOY-028 不冲突。**重启由用户手工执行**（沿用历史；本代理不执行）。
+
+---
+**DEPLOY-029: 重启 `ib-worker.service`（**推荐**）**
+- **组件**：`ib-worker`（MOD-IB-23 入口 `ibweb.worker`；入库 / 删除重放 / 索引重建）
+- **操作**：`sudo systemctl restart ib-worker`（**由用户执行**）；`systemctl is-active ib-worker`。
+- **预期结果**：`ib-worker` **active**（常驻轮询，`Restart=always`）。
+- **对应回滚**：ROLLBACK-029
+- **备注（据实判定：推荐重启）**：REV-18 的 commit `c1ce029` **未改** `src/ibweb/worker.py`，但**改了 `ib-worker` 运行期 import 的共享模块** —— `src/ibweb/composition.py`（`get_deps()` 新增 `project_registry` / `llm_key_store` 装配 + `llm_configured` 启动日志）、`src/ib/ledger/__init__.py`（惰性导出）、`src/ib/config/__init__.py`、`src/ib/llm/__init__.py`。故：**① 就「入库 / 重建」功能路径而言，R18 变更均为加成式、无行为变化 ⇒ 不重启亦无正确性缺陷（该判定与 §14.3 DEPLOY-020 的 R14 结论同构）**；**② 但为消除「运行中进程代码 ≠ HEAD」的混版歧义（§8 可追溯纪律），推荐一并重启 `ib-worker`**（成本低：`ib-worker` 重启不影响 HTTP 面；在飞任务由台账租约在超时后重新认领）。**此为推荐项，最终是否重启由 PM 裁决**（若 PM 以最小影响原则决定不重启，须在部署记录中显式留痕该决策与理由）。
+
+---
+**DEPLOY-030: 部署后验证（§15.5 全部条目）**
+- **组件**：端到端（HTTP / 前端 / 迁移结果）
+- **操作**：逐条执行 §15.5 验证清单（含 `GET /api/projects` 数据源切换、`kb_default` 归零、`POST /api/projects` → `GET /api/projects` 可见、软删、`PUT /api/llm-key` 前 `configured=false`）。
+- **预期结果**：§15.5 全部条目标注 SUCCESS（**除 LLM Key 生效项属 DEPLOY-031**）。
+- **对应回滚**：ROLLBACK-030（验证失败 → 按 §15.4 逆序回滚）
+- **备注**：验证须**离线可判**（curl / 服务端读取，不依赖浏览器 UI 手测）。
+
+---
+**DEPLOY-031: LLM Key 从 `.env` 迁移到 DB（**用户执行**）+ 生效验证**
+- **组件**：LLM Key 载体（`.env` 0600 → DB 单行表 `llm_key`）+ 组合根装配
+- **操作**：
+  1. 由**管理员**在界面（`SystemSection → LLM Key 管理`）提交现有 Key —— 经 **`PUT /api/llm-key`**（**明文绝不进命令行 / 文件 / shell history**）；
+  2. 提交后由**用户手工重启** `ib-web`（ADR-32 / ADR-38：生效 = 保存 + 服务重启重装配）；
+  3. 重启后 `GET /api/llm-key` → `configured=true`；
+  4. **处置 `.env` 里的旧 `IB_LLM_API_KEY`**（**移除，理由见 §15.7**）。
+- **预期结果**：`GET /api/llm-key` → `configured=true`；启动日志 `llm_configured=true`；`.env` 内 `IB_LLM_API_KEY` **零命中**；日志 / 命令行 / shell history **无 Key 明文**。
+- **对应回滚**：ROLLBACK-031
+- **备注**：**顺序安全（须显式声明）**：依 **ADR-39 Option C**，**缺 Key 非致命** —— 服务照常启动、非 LLM 路径正常、LLM 路径**调用期 fail-closed**。故「**先部署后配 Key**」**是允许且安全的顺序**，但在**配 Key 并重启的窗口期内，LLM 功能不可用**（判据：`GET /api/llm-key` → `configured=false`；启动日志 `llm_configured=false`；LLM 相关调用返回可读的 fail-closed 错误，**非静默空答案**）。
+
+---
+### 15.4 回滚步骤（ROLLBACK-022 ~ ROLLBACK-031；**逆序执行**）
+
+> **逆序**：最后一个部署的组件最先回滚（031 → 030 → … → 022）。**R18 含数据迁移 ⇒ 回滚须区分「代码可回滚」与「数据归属不回退」**（§15.2(d)）。
+
+---
+**ROLLBACK-031: 撤销 LLM Key 迁移（逆 DEPLOY-031）**
+- **回滚操作**：`DELETE /api/llm-key`（清空单行）→ 用户手工重启 `ib-web`（回到未配置态，ADR-39 Option C：仍可启动）；若曾保留 `.env` 的 `IB_LLM_API_KEY` 为兜底，则恢复该文件（**不推荐**，见 §15.7）。
+- **预期结果**：`GET /api/llm-key` → `configured=false`；服务可启动、非 LLM 路径正常。
+- **备注**：`[MANUAL_ROLLBACK_REQUIRED: 若 Key 已轮换 / 下线，删除 DB 行属凭据处置动作，须人工确认]`。Key 明文一经写入 DB 即**不可从日志反向恢复**；回退 = 重新提交或按 §15.7 处置。
+
+---
+**ROLLBACK-030: 撤销验证（逆 DEPLOY-030）**
+- **回滚操作**：**无独立副作用** —— 随 ROLLBACK-022~029 一并回退。
+- **预期结果**：系统回到上一版行为。
+
+---
+**ROLLBACK-029: 回退 `ib-worker`（逆 DEPLOY-029）**
+- **回滚操作**：`git checkout <上一版已部署 commit>`（见 ROLLBACK-022）后 `sudo systemctl restart ib-worker`；或若 PM 未重启则**无需动作**。
+- **预期结果**：`ib-worker` active；运行与上一版一致。
+
+---
+**ROLLBACK-028: 回退 `ib-web` 至上一版（逆 DEPLOY-028）**
+- **回滚操作**：`git checkout <上一版已部署 commit>`（见 ROLLBACK-022）后 `sudo systemctl restart ib-web`。
+- **预期结果**：`ib-web` active 且运行**上一版代码**；新端点（项目 CRUD / LLM Key / 账户 PATCH·DELETE）在旧代码下返回 **404**（端点不存在，旧行为）。
+- **备注**：与 ROLLBACK-022 联动（先回代码再重启）。
+
+---
+**ROLLBACK-027: 恢复上一版 `dist/`（逆 DEPLOY-027）**
+- **回滚操作**：`sudo rm -rf /var/www/intelligentbase && sudo mv /var/www/intelligentbase.prev /var/www/intelligentbase`。
+- **预期结果**：nginx 静态根回到上一版产物（资源与 `index.html` 同版，不白屏）。
+- **备注**：**不动 nginx 站点文件** → **无需 `nginx -t` / `reload`**。
+
+---
+**ROLLBACK-026: 丢弃新构建产物（逆 DEPLOY-026）**
+- **回滚操作**：`rm -rf /opt/intelligentbase/src/frontend/dist`（构建产物，可重生成）。
+- **预期结果**：无遗留新产物。
+
+---
+**ROLLBACK-025: 回退迁移应用（逆 DEPLOY-025）**
+- **回滚操作**：**代码回滚**（`git checkout <上一版 commit>`；旧代码不引用新列 / `llm_key` 表，可直接启动）。**数据归属不回退** —— `projects.status` / `updated_at` 与 `kb_id` 重绑**保留**（前向兼容纪律）；`llm_key` 表若为空可 `DROP TABLE llm_key`（**未投产**且确需清空时）。
+- **预期结果**：旧代码正常启动；新增列 / 表不被引用。
+- **备注**：`[MANUAL_ROLLBACK_REQUIRED: 若须把 kb_id 归属恢复到迁移前（`kb_default`），唯一手段 = 用 DEPLOY-024 的备份整体恢复台账；该恢复为破坏性操作（覆盖当前数据），须人工确认 + 先备份当前态]`；`DROP TABLE llm_key` 丢凭据，须单独审批留痕。
+
+---
+**ROLLBACK-024: 撤销备份 / 核算（逆 DEPLOY-024）**
+- **回滚操作**：删除备份文件 `ledger.sqlite3.pre-rev18.bak`（无库副作用）；**注意**：若 DEPLOY-025 已执行且须数据回退，**该备份是唯一回退源 ⇒ 删除前务必确认**。
+- **预期结果**：无残留备份文件。
+
+---
+**ROLLBACK-023: 回退依赖核对（逆 DEPLOY-023）**
+- **回滚操作**：**无副作用**（核验步未安装任何包）。
+- **预期结果**：依赖面不变。
+
+---
+**ROLLBACK-022: 代码回退到上一版已部署 commit（逆 DEPLOY-022）**
+- **回滚操作**：`cd /opt/intelligentbase && sudo git checkout <上一版已部署 commit>` → `sudo systemctl restart ib-web`（+ 必要时 `ib-worker`）。
+- **预期结果**：`git rev-parse HEAD` == 上一版 commit；旧代码运行。
+- **备注**：旧代码不依赖 `005` / `006` 的**新列 / 新表**（`status` / `updated_at` / `llm_key`）—— 补列与建表是**加成式**，旧代码可直接启动；但 `kb_id` 重绑（数据）**不回退**（见 ROLLBACK-025 / §15.2(d)）。
+
+---
+> **回滚数据安全结论（非对称，须显式）**：R18 **代码可整体回滚**（`git checkout` + 重启），但 **`005` 的 `kb_id` 归属重绑不可逆** —— 恢复归属的唯一手段是 **DEPLOY-024 的迁移前备份**（破坏性，`[MANUAL_ROLLBACK_REQUIRED]`）。故 **`先备份再执行` 是硬前置**。
+
+### 15.5 部署后验证清单（V18-1 ~ V18-10；**实测口径**）
+
+> 全部为**离线可判**（curl / 服务端读取 / sqlite3 只读查询）；`<host>` 与 `<令牌>` 由执行人注入（令牌**不回显、不入日志**，checklists B14）。
+
+| # | 检查项 | 检查方法（命令 / URL） | 成功标准 | 对齐 |
+|---|--------|----------------------|----------|------|
+| **V18-1** | **服务健康** | `curl -sS -o /dev/null -w '%{http_code}' https://<host>/healthz` | **200** | B12 |
+| **V18-2** | **迁移结果（表 / 列 / 索引）** | `sqlite3 …ledger.sqlite3 ".schema projects" \| grep -E 'status\|updated_at'`；`.schema llm_key \| grep -i 'CHECK (id = 1)'` | `projects` 含 `status`（默认 `'active'`）与 `updated_at`，`idx_projects_status` 存在；`llm_key` 单行表存在 | **B21 / B22** |
+| **V18-3** | **`kb_default` 归零（迁移收敛）** | `sqlite3 … "SELECT COUNT(*) FROM documents WHERE kb_id='kb_default';"`（对 `chunks` / `chunk_image` 同查） | **均为 0**（归属已重绑到各 `project_id`）；`kbs` 每项目一行（`kb_id == project_id`） | **B21** |
+| **V18-4** | **迁移幂等复验** | `python -m ibweb.bootstrap --ensure-schema` **再跑一次** | `exit 0`；无副作用（V18-2 / V18-3 结果不变） | **B21** |
+| **V18-5** | **项目 CRUD** | admin 令牌 `POST /api/projects`（新 `project_id`）→ `GET /api/projects`；`POST /api/projects`（重复） | 新建 201 且可枚举；重复 → **409**（`ConflictError`）；ops 令牌 → **403** | ADR-37 / IFC-IB-372 |
+| **V18-6** | **软删语义** | `DELETE /api/projects/{id}`（`confirm_project_id` 一致）→ `GET /api/projects` | 目标从活动列表消失；行**仍在**（`status='disabled'`，数据保留可恢复）；`confirm_project_id` 不符 → 400 | ADR-37 ④ |
+| **V18-7** | **账户顺序依赖 + 删除保护** | `POST /api/accounts`（目标 `project_id` 非 active）→ 观察；ops 令牌 `DELETE /api/accounts/{admin_id}` | 目标项目不存在 / 非 active → **422 `project_not_active`**；`DELETE … confirm_username` 不符 → **400**；`DELETE` admin → **409**；软删 ops → `status=disabled` 且撤销其会话 | ADR-40；**落 AC-IB-38-03 替代证据（§15.8）** |
+| **V18-8** | **LLM Key 端点（未配置态）** | `GET /api/llm-key`（admin） | `configured=false`、`masked` 为固定占位（**无明文**）、`updated_at=null`；`?token=` → 4xx；非 admin → 403 | ADR-38 / ADR-39 |
+| **V18-9** | **前端三分 IA 可用（人工）** | 浏览器 `https://<host>/`：登录 → 「系统管理」父级下见**账户 / 项目 / LLM Key** 三子项；「资料管理」为**项目域** | 三分 IA 出现；资料页**无「知识库标识」输入**；旧 `#/accounts` 深链重定向至新路由；刷新无 404 | ADR-42；NV-07 |
+| **V18-10** | **认证契约零破坏** | 登录 → `/api/auth/me`；各端点附 `?token=`；检查响应头 | 登录 200 且 **零 `Set-Cookie`**；`?token=` **全 4xx**；改密态仍 **403 `password_change_required`** | ADR-42（UI 分组不替代服务端 403） |
+
+> **口径纪律**：V18-5 / V18-6 / V18-7 的授权口径以**服务端**为准（`AuthzPolicy`），UI 分组的可见性**不是**权限机制（ADR-42）。V18-8 的 **未配置态**属 **ADR-39 Option C** 的**预期行为**（非缺陷）。
+
+### 15.6 风险清单（R18 增量）
+
+| # | 风险 | 级别 | 触发条件 | 缓解 | 回滚可行性 |
+|---|------|------|----------|------|-----------|
+| **R-18-1** | **`005` 的 `kb_default` 数据重绑不可逆** | **高** | 生产库存在 `kb_default` 归属行（存量数据） | **DEPLOY-024 硬前置：先备份 + 先核算行数**；DEPLOY-025 用 `--ensure-schema`（**非**手工 `sqlite3 < 005`）；连跑两次验幂等（V18-3 / V18-4） | **不可逆** —— 唯一回退 = 恢复迁移前备份（破坏性，`[MANUAL_ROLLBACK_REQUIRED]`） |
+| **R-18-2** | **老库手工跑 `005_projects.sql` 失败**（`CREATE INDEX … ON projects(status)` → `no such column: status`；SQLite 无 `ADD COLUMN IF NOT EXISTS`） | **中** | 运维误用 `sqlite3 … < 005_projects.sql` 于既有 6 列库 | **一律走 `--ensure-schema`**（补列由 `_ensure_project_registry_columns` 落实）；手工路径仅对最终形态库有效 | **可恢复**（失败即中止，库未变更；改用 `--ensure-schema`） |
+| **R-18-3** | **空库单独跑 `005` 失败**（`INSERT INTO kbs` 缺 `kbs` 表） | **低** | 对空库手工跑 `005`（`kbs` 由 001 建） | 手工 `005` 的前提 = 001 已应用；正常路径走 `--ensure-schema` | **可恢复**（无副作用） |
+| **R-18-4** | **LLM Key 明文处置不当**（误回显 / 误留 `.env` / 误进 shell history） | **高** | 迁移时以命令行传 Key、或把 Key 写回 `.env` 明文 | **唯一写入口 = `PUT /api/llm-key`**；明文**绝不进命令行 / 文件 / history**（B23）；**移除** `.env` 旧 `IB_LLM_API_KEY`（§15.7） | **可恢复**（`DELETE /api/llm-key` + 重启；但明文一经泄露须**认定泄露并轮换**） |
+| **R-18-5** | **`memory` 误配（`IB_PROJECT_REGISTRY_BACKEND` / `IB_LLM_KEY_BACKEND`）** | **中** | 二键**有默认值 `sqlite`，无缺失失败模式**；但若误设 `memory` | 项目注册表 / LLM Key **在进程重启后消失**（写清失败模式）：表现为「项目全部消失、账号绑定失效」/「Key 每次重启都要重设」，**而非报错** | **可恢复**（改回 `sqlite` + 重启；但 memory 期间写入的数据**已丢**） |
+| **R-18-6** | **`ib-worker` 未重启 → 混版进程** | **低** | 仅重启 `ib-web` 而不重启 `ib-worker` | DEPLOY-029 **推荐**重启 `ib-worker`（消除混版歧义）；若 PM 决定不重启，须在记录留痕（功能路径无变化，判定与 R14 同构） | **可恢复**（随时可重启补齐） |
+| **R-18-7** | **运行期新建项目尚未可用**（D-R18-01） | **低（已裁决交付边界）** | 经 `POST /api/projects` 新建的项目可建账号、可枚举，但**检索 / 上传**须在配置侧登记 + **重启**后才完全可用（`load_project_record` 对未在配置文件中的项目抛 `ConfigError`） | 与 ADR-32「生效 = 保存 + 重启重装配」同构；**已由用户裁决为交付边界、非缺陷**（`test_report.md` §23.4） | **可恢复**（在配置侧登记 + 重启） |
+| **R-18-8** | **CI 迁移门未覆盖 `005` / `006`** | **低（登记）** | `.github/workflows/ci.yml` 的 §3.2 迁移门**当前只覆盖 `003_accounts.sql`** | **如实登记**（见 `cicd_pipeline.md` §9）；建议随下轮扩展 CI（**改 `ci.yml` 超本轮授权面**）。`005` 的门需先应用 001 基座 DDL（`kbs` 表）方可重放 | **不适用**（CI 侧登记项） |
+
+### 15.7 LLM Key 迁移专项（`.env` 0600 → **DB 单行表**）
+
+> 依据：ADR-38 / REQ-NFR-IB-20 / **`C-IB-42`**（**修订**：凭据载体由「一律经环境变量」收窄为「**除外 LLM Key**」—— 对其它密钥，环境变量纪律**仍有效**）/ checklists **B22 / B23**。
+
+1. **生产若已有 Key 在 `/etc/intelligentbase/*.env`（`IB_LLM_API_KEY`）→ 如何迁移到 DB**：
+   - **唯一写入口 = `PUT /api/llm-key`**，由**管理员在界面（`系统管理 → LLM Key 管理`）提交**；
+   - **明文绝不进命令行 / 文件 / shell history**（不在终端粘贴、不写入任何临时文件、不 `curl -d '{...key...}'` 直接构造）；
+   - 提交后由**用户手工重启** `ib-web`（ADR-32：生效 = 保存 + 重启重装配）；
+   - 验证：`GET /api/llm-key` → `configured=true`；启动日志 `llm_configured=true`。
+2. **迁移后 `.env` 里那份的处置（推荐 = 移除）**：
+   - **推荐移除 `.env` 里的 `IB_LLM_API_KEY`**（理由）：依 ADR-38 / `C-IB-42`，`IB_LLM_API_KEY` **已不再是 Key 来源**（`build_llm_provider(cfg)` 不传 `api_key` 时走的是**历史 / 兼容回退** `read_secret(api_key_env)`，生产经组合根装配，Key 由 `LlmKeyStore.get()` 解析后注入）—— **保留一份失效明文 = 净增凭据面**（同机可读者仍能读到该 Key，且 Key 已在 DB 中另存一份，形成**双处明文**）。故倾向**移除**。
+   - **替代（不推荐）**：若 PM 要求保留「失效兜底」，须显式标注该键**已不作为 Key 来源**且须在**下一次密钥轮换时一并删除**；但**不推荐** —— 与 REQ-NFR-IB-20「`.env` 仅保留非 LLM Key 的其他密钥」直接冲突。
+3. **ADR-39 Option C —— 「先部署后配 Key」是否安全**：
+   - **是，安全**。缺 Key **非致命**：服务正常启动（`llm_configured=false` 入启动日志）、**非 LLM 路径照常**、**LLM 路径在调用期 fail-closed**（可读错误、不含任何 Key 信息、**不回落到静默空答案**）；
+   - **须显式声明**：在**配 Key 并重启的窗口期内，LLM 功能不可用**（问答 / 路由 LLM 档 / 聚合不可用）；**判据** = `GET /api/llm-key` → `configured=false`、启动日志 `llm_configured=false`、`/healthz/deps` 的 `llm` 字段显式声明未配置（`health.ok=false`）；其余必填项**仍 fail-fast**（仅 LLM Key 放宽）。
+
+### 15.8 PHASE_11「由用户在目标机闭合」清单（GROUP_D §23.5 的不可验证项 → 逐条验收步骤 + 判据）
+
+> 本节把 `test_report.md` §23.5 登记的 **6 项不可验证（1×NOT_TESTABLE + 5×DEPLOY_REQUIRED/PARTIAL）** + **CRED-01 结转** + **`bcrypt` 版本对齐**，转化为**可执行验收步骤 + 判据**。**均由用户在目标机执行**。
+
+| # | 项（test_report §23.5 编号） | 类型 | 验收步骤 | 判据 |
+|---|------|------|----------|------|
+| **AC-IB-39-02-a** | 服务**重启**后 LLM Key 生效（§23.5 第 2 项） | DEPLOY_REQUIRED | ① 用户在界面 `PUT /api/llm-key` 提交 Key；② 用户**手工重启** `ib-web`；③ `GET /api/llm-key` | `configured=true`；启动日志 `llm_configured=true`；`.env` 内 `IB_LLM_API_KEY` 零命中 |
+| **AC-IB-39-02-b** | 承载库文件 **0600** 且属主对齐服务账号（§23.5 第 3 项） | DEPLOY_REQUIRED | `stat -c '%a %U:%G' /var/lib/intelligentbase/ledger/ledger.sqlite3` | = **`600 <run-user>:<group>`**（`<run-user>` = `ib-web` / `ib-worker` 服务账号；**属主对齐须由用户执行**，代理不执行生产变更）—— checklists **B22** |
+| **AC-IB-39-03** | 提交 Key 后 **shell history 与命令行不留明文**（§23.5 第 4 项） | PARTIAL | ① `grep -c -iE 'llm[-_]?key\|secret\|sk-' <(journalctl -u ib-web -n 5000 --no-pager)`；② `grep -c -iE 'IB_LLM_API_KEY\|sk-' /etc/intelligentbase/ib-web.env`；③ `git grep -nE 'sk-[A-Za-z0-9]\|IB_LLM_API_KEY=' -- .` | ① = **0**；② = **0**；③ **无命中** —— checklists **B23** |
+| **ADR-39 调用期 fail-closed** | 「LLM 路径调用期 fail-closed 文本」（§23.5 第 5 项） | PARTIAL | **未配 Key** 时：服务起得来 + 触发一次 LLM 路径调用 | 启动日志 `llm_configured=false` 且出现 `{"outcome":"succeeded","stage":"startup"}`；非 LLM 路径正常；LLM 路径给**清晰可读错误**（`DependencyUnavailableError`-类，**非崩溃、非静默空答案**）；其余必填项仍 fail-fast |
+| **TBD-T26** | 容量 / 时延真机结论（§23.5 第 6 项）—— 项目注册表 | DEPLOY_REQUIRED | 目标机实测（**未实测前不得给结论**）：`projects` 表行数上界；`GET /api/projects` 与 CRUD 端点耗时；**装配期播种**（`_registry_seed_entries`）耗时 | **登记为实测项**；给出探针命令（`time curl` + `sqlite3 "SELECT COUNT(*) FROM projects"`），实测值回填部署记录 |
+| **TBD-T27** | 容量 / 时延真机结论（§23.5 第 6 项）—— LLM Key 承载库 | DEPLOY_REQUIRED | 目标机实测：承载库文件实际 `mode` / `owner`；`busy_timeout` 写耗时；`SqliteLlmKeyStore` 读写争用 | **登记为实测项**；探针（`stat` + 并发读写计时），实测值回填部署记录 |
+| **AC-IB-38-03** | 「禁止删除最后一个管理员」作为**独立**分支（§23.5 第 1 项） | **NOT_TESTABLE** | **为何无法单独验证**：v1 **只有一个 `admin`**（`POST /api/accounts` 仅接受 `role=ops`，否则 400），「最后一个管理员」与「admin」在实现上**同一代码分支**（`target.role == "admin"` → 409），**无独立分支可测**。 | **替代证据**：既有 **TC-INT-150**（禁删 admin → **409**）；`DELETE /api/accounts/{id}` 二次确认 `confirm_username` 不符 → **400** |
+| **CRED-01** | 未提交工作包不得原样提交（**非阻塞结转**） | —— | PHASE_11 前置 = 先提交并 push；提交时**不得**把未跟踪的工作包（含含口令字面量的 apply package）**原样纳入** | 提交清单审核通过 |
+| **MINOR-R13-03 / `bcrypt` 对齐** | 本机 5.0.0 vs `requirements.txt` 钉 `bcrypt>=4,<5` | PHASE_11 前置 | 核对部署前是否已闭合：CI 阶段 8 **已在跑 bcrypt 门**；目标机须落到 **4.x**（`pip show bcrypt`）或由 PM 裁决放宽 pin | `pip show bcrypt` 版本 ∈ `[4,5)`；**不得**以「API 兼容子集可用」代替版本门（R13-D1） |
+
+> **生效判据（沿用既有口径）**：**重启生效** = 启动日志出现 `{"outcome": "succeeded", "stage": "startup"}` 且**不**出现 `path_not_configured_using_in_memory_default`；**不要用 `.pyc`** 判断线上代码版本，**正确判据** = 「目标 commit + 该 commit 涉及源文件 mtime **早于** `systemctl show -p ActiveEnterTimestamp ib-web`」；`systemctl restart` 的 `daemon-reload` pending 警告是**既有长期状态**、**不属本次引入**。
+> **执行主体**：生产 `ib-web` / `ib-worker` 重启、首次 `IB_*` 环境变量配置、迁移执行、LLM Key 提交 —— **均由用户执行**（沿用历史，本轮延续）。
+
+### 15.9 R18 变更面对既有文档的不一致登记（**如实登记，不静默改历史**）
+
+| # | 不一致处 | 事实 | 处置 |
+|---|----------|------|------|
+| 1 | **`deployment_plan.md` §1.1 的 B-01~B-06 为 v1.0.0 历史登记** | 实务上 B-01（git 仓库 / remote）已由 `REV-04-5` 闭合（GitHub 私有仓库）；**B-04（`FND-GROUP-D-03`）已由 GR-C-004 判 CLOSED_VERIFIED**（R4 修复 + 独立复跑），但 §14.6 的 **R14-P1-1 仍写「未闭合」** —— 经协调者 2026-10-07 复核：`phase_status.md` 确记「`FND-GROUP-D-03` 已修复并经独立 verifier 复核判 CLOSED_VERIFIED（GR-C-004 = PASS）」，而 §1.1 与 §14.6 **两节文字互相一致**（都写「未闭合」），属**共同落后于 `phase_status.md`**；原登记称「二者同源不同步」措辞不准确（二者并非彼此冲突） | **登记为待澄清 / 开放项**；**不擅改** §1.1 / §14.6 历史节（B-01~B-06 原始登记保留）；建议由 PM 归口统一 B-04 状态 |
+| 2 | ~~**`implementation_plan.md` 头部 `<inputs>` 版本陈旧**~~ **【协调者 2026-10-07 复核后撤回：本条不成立】** | **实测**：该头部 `<inputs>` 六项**全部已是 REV-18 当前版本** —— `architecture_design.md` 1.10.2/REV-18-R2、`module_design.md` 1.10.2/REV-18-R2、`tech_stack.md` 1.4.1/REV-18、`requirements_spec.md` 1.10.0/REV-18-2、`user_stories.md` 1.10.0/REV-18-2、`ib_embed_service_contract.md` 1.0.0/R2；**无任何陈旧版本残留**。原登记称「仍列旧版本，落后于本轮 REV-18 设计侧版本」，与实测不符（其举例的 `architecture_design.md` 1.10.2/REV-18-R2 恰恰就是文件里已写着的版本） | **撤回本条**（GR-E-006 协调者复核）；无可处置项，`implementation_plan.md` **无需改动** |
+| 3 | ~~**`checklists.txt` `[B12]` 仍写 `dist/` 由 ib-web 托管**（GR-E-002 遗留 **F-1**）~~ **【协调者 2026-10-07 复核后撤回：本条不成立】** | **实测**：`[B12]` 现写「前端构建产物已就位，由 **nginx** 托管（/var/www/intelligentbase，**非 ib-web**）」—— **明确否定 ib-web，与 C-02 一致，不存在冲突**；且上一版 `b1513af` 亦已是 nginx 措辞 ⇒ 该 F-1 在 GR-E-002 之后**早已被修掉，登记却未随之撤回**（陈旧登记被照抄） | **撤回本条**（GR-E-006 协调者复核）；`checklists.txt` **无需改动** |
+| 4 | **CI 迁移门未覆盖 `005` / `006`** | `.github/workflows/ci.yml` 的 §3.2 迁移门**当前只覆盖 `003_accounts.sql`**；`005` 的门需先应用 001 基座 DDL（`kbs` 表）方可重放 | **如实登记于 `cicd_pipeline.md` §9**；建议随下轮扩展（**改 `ci.yml` 超本轮授权面，须另一轮授权**）—— 本轮**只登记不改** |
+
+---
+
 ## 附：本轮的自我约束声明
 
 - 本文件为**计划**，**未执行任何目标机写操作**；**未连接** `192.168.31.133`；**未** SSH / rsync / scp / apt / pip / systemctl；**未触碰** `tests/`、`architecture/`、`requirements/`、`docs/phase_status.md`（PM 独占）、FreeArk 仓库（严格只读）。
@@ -1022,7 +1343,8 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 - 全文**不含任何真实凭据 / 口令 / 令牌**；SSH 口令以「日后经环境变量注入」表述；主机指纹为**非 secret** 的 host key 校验值，按任务要求登记。
 - **PHASE_11（实际生产部署）保持 PENDING，禁止执行**，直至收到 PM 的 `PRODUCTION_DEPLOY_CONFIRM=true`（且建议先闭合 `FND-GROUP-D-03`）。
 - **REV-13 增量边界（前轮，INV-GROUP_E-INTELBASE-004）**：本代理**未连接、未触碰** `192.168.31.133`；**未执行**任何 SSH / 写操作 / 安装 / 服务启停 / `nginx` 写；**未 commit / push**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md`；**未触发 PHASE_11**（**未**自赋 `PRODUCTION_DEPLOY_CONFIRM`）。§13 **只登记计划与回滚**，全部命令须 PM CONFIRM 后执行。
-- **REV-14 增量边界（本轮，INV-GROUP_E-INTELBASE-005）**：本代理**未连接、未触碰** `192.168.31.133`；**未执行**任何 SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码（含 R14 交付物，全程只读）/ `tests/**` / 设计真源四文档 / `docs/phase_status.md` / `docs/test_*.md`；**未触发 PHASE_11**，且**本轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（本代理**未**、也**不得**自赋）。**本轮仅改两个文档**：本文件（`deployment_plan.md` 1.2.0 → **1.3.0/REV-14**）与 `docs/cicd_pipeline.md`（1.2.0 → **1.3.0/REV-14**），另同步 `.github/workflows/ci.yml` 的**注释基线标签**（239 → 245 / 123 → 129 / 13 → 21，纯注释、不改 step 逻辑）。§14 **只登记计划与回滚**，全部命令须 PM CONFIRM 后执行。
+- **REV-14 增量边界（前轮，INV-GROUP_E-INTELBASE-005）**：本代理**未连接、未触碰** `192.168.31.133`；**未执行**任何 SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码（含 R14 交付物，全程只读）/ `tests/**` / 设计真源四文档 / `docs/phase_status.md` / `docs/test_*.md`；**未触发 PHASE_11**，且**该轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（本代理**未**、也**不得**自赋）。**该轮仅改两个文档**：本文件（`deployment_plan.md` 1.2.0 → **1.3.0/REV-14**）与 `docs/cicd_pipeline.md`（1.2.0 → **1.3.0/REV-14**），另同步 `.github/workflows/ci.yml` 的**注释基线标签**（239 → 245 / 123 → 129 / 13 → 21，纯注释、不改 step 逻辑）。§14 **只登记计划与回滚**，全部命令须 PM CONFIRM 后执行。
+- **REV-18 增量边界（本轮，INV-GROUP_E-INTELBASE-006）**：本代理**未连接、未触碰** `192.168.31.133`；**未执行**任何 SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传 / 迁移 / 备份；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码（含 R18 交付物，全程只读引用）/ `tests/**` / `docs/architecture_design.md` / `docs/module_design.md` / `docs/tech_stack.md` / `docs/requirements_spec.md` / `docs/user_stories.md` / `docs/implementation_plan.md` / `docs/test_report.md` / `docs/phase_status.md`（PM 独占）/ `.github/workflows/ci.yml`；**未触发 PHASE_11**，且**本轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（本代理**未**、也**不得**自赋）。**本轮仅改两个文档**：本文件（`deployment_plan.md` 1.3.0 → **1.4.0/REV-18**）与 `docs/cicd_pipeline.md`（1.3.0 → **1.4.0/REV-18**）。§15 **只登记计划与回滚**（含 `005` 的 `kb_default` 数据迁移**不可逆**的显式声明），全部命令须 PM CONFIRM 后执行。
 
 ---
 
@@ -1034,7 +1356,9 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 | 1.1.0 | GROUP_E / R4（REV-04-3） | 2026-09-26 | INV-GROUP_E-INTELBASE-002 | **C-02**：§7 改题 + 新增 §7.5 nginx（第 5 交付组件）；§10.1 DEPLOY-009 与 §10.2 补 nginx 行。**C-03**：§7.4 / §7.6 改用新增的 `ib-worker.env.example`。**C-04**：§7.1 / §3.2 / §3.5 统一 Qdrant 二进制路径。**C-05**：新增 §8.1 软链方案。**C-06**：§6.1 重写为有序决策树。**B-05**：§1.1 / §2.2 / §4.2 反映 `src/requirements-embed.txt`。§1.2 C-02~C-06 标状态；§11 / §12 更新；status → REVISED_PENDING_REVIEW | `settings.py` 无 `STATIC_ROOT`（已核验）；`vite.config.ts` 生产注释（反代 127.0.0.1:18080）；`ib-worker.service:42`；`qdrant.service:35`；`ib-embed.service`（WorkingDirectory/ExecStart）；`src/requirements-embed.txt` |
 | **1.2.0** | **GROUP_E / REV-13** | **2026-10-06** | **INV-GROUP_E-INTELBASE-004** | **REV-13 增量（认证 / 会话 / 多项目运维账户 / Claude 风格可商用前端 / HTTPS）**：① header 补 revision=REV-13、上游输入升 R13、新增「REV-13 增量声明 + 门控前置备注」；② 新增 **§1.3**（R13 部署前实测项 R13-D1~D5）；③ 新增 **§7.5.1**（HTTPS/TLS 终止站点，以 `src/deploy/nginx/intelligentbase.conf.example` 为准 + 8 项新增硬条件 + HSTS 纪律）；④ §10.1 补 DEPLOY-011~016 / ROLLBACK-011~016 行（明细见 §13）；⑤ 新增 **§13**「REV-13 增量部署面」（13.1 交付物 / 13.2 bcrypt+003 迁移 / 13.3 九键环境变量（0600 注入，含 `IB_DEFAULT_ADMIN_PASSWORD`）/ 13.4 nginx HTTPS / 13.5 令牌纪律 / 13.6 正向步骤 DEPLOY-011~016 / 13.7 回滚 ROLLBACK-011~016 / 13.8 验证 V13-1~12 / 13.9 风险 R13-R1~R6）；⑥ 附自检补 R13 边界；status → REVISED_PENDING_REVIEW | `architecture_design.md` 1.5.0/REV-13（ADR-18~27）；`module_design.md` 1.5.0/REV-13（IFC-IB-309~332）；`tech_stack.md` 1.4.0/REV-13（§1.4 / §2.2 / §4.5）；`test_report.md` 1.9.0/§18；`src/deploy/migrations/003_accounts.sql`；`src/deploy/nginx/intelligentbase.conf.example`；`src/deploy/env.example`（R13 键）；`src/deploy/checklists.txt` [B15]~[B20]；`src/requirements.txt`（`bcrypt>=4,<5`）；`docs/phase_status.md`（GR-B-006 / GR-C-009 / GR-D-010） |
 | **1.3.0** | **GROUP_E / REV-14** | **2026-10-06** | **INV-GROUP_E-INTELBASE-005** | **REV-14 增量（R13 回归缺陷修复：全局管理员「当前项目」选择与 `X-IB-Project` 传播）**：① header 补 revision=REV-14、版本 1.2.0→**1.3.0**、上游输入升 R14、新增「REV-14 增量声明 + R14 变更面 + 门控前置备注」；② §10.1 补 DEPLOY-017~021 / ROLLBACK-017~021 行 + 逆序纪律补 R14 句；③ 新增 **§14**「REV-14 增量部署面」（14.1 交付物 / **14.2 变更类型判定：无迁移·无新依赖·无新 env 键·无 unit/站点改动** / 14.3 正向步骤 DEPLOY-017~021（`git pull` → `npm ci && npm run build` → 发布新 `dist/` → 重启 `ib-web`，**不重启 `ib-worker`/`ib-embed`/`qdrant` 并给理由**）/ 14.4 回滚 ROLLBACK-017~021（逆序，**不涉数据迁移**）/ **14.5 验证 V14-1~9（含 admin 选项目后 `/api/config/definition` 503→200 直接验收；未选项目逐端点实测口径：config/definition 503 / files 200 空 / chat/stream 与 rebuild 500，不得笼统「全部 503」）** / 14.6 风险与前置（CRED-01 结转 + B-01~B-03 实务已闭合 + B-04/B-05/B-06 承前 + R14-OBS + OPEN ITEM））；④ 附自检补 R14 边界；status → REVISED_PENDING_REVIEW（待 GR-E-005） | `architecture_design.md` 1.6.0/REV-14（ADR-28 / §2.0.5）；`module_design.md` 1.6.0/REV-14（IFC-IB-333~336）；`tech_stack.md` 1.4.0/REV-13（NO_CHANGE）；`implementation_plan.md` 2.9.0/R14；`test_report.md` 1.10.0/R14 §19（Python 245 / 前端 21 / selfcheck 47）；`docs/phase_status.md`（GR-B-007 / GR-C-010 / GR-D-011）；`src/ibweb/{views,urls}.py`；`src/frontend/src/{stores/project.ts,api/client.ts,app/env.ts,layouts/ConsoleLayout.vue,main.ts}` |
+| **1.4.0** | **GROUP_E / REV-18** | **2026-10-07** | **INV-GROUP_E-INTELBASE-006** | **REV-18 增量（系统管理三分：项目管理 / 账户管理 / LLM Key 管理 + 项目 CRUD 软删 + LLM Key 载体 = DB + 项目域资料上传；含 2 迁移，`kb_default` 数据迁移不可逆）**：① header 补 revision=REV-18、版本 1.3.0→**1.4.0**、上游输入升 REV-18 四文档、新增「REV-18 增量声明 + R18 变更面 + R18 门控前置备注」；② §10.1 补 **DEPLOY-022~031 / ROLLBACK-022~031** 行 + 逆序纪律补 R18 句（**代码可回滚 / 数据归属不回退**）；③ 新增 **§15**「REV-18 增量部署面」（15.1 交付物 / **15.2 变更类型判定 + 迁移执行的前置与判据：`ensure_schema` 顺序 / 手工 `005` 路径的坑（老库 `no such column: status`、空库缺 `kbs`）/ 幂等性 / 既有生产数据行为 + 不可逆性声明** / 15.3 正向步骤 DEPLOY-022~031（`git pull` → venv 依赖核对 → **迁移前备份 + 行数核算** → `--ensure-schema` 迁移应用 → 前端重建 → `dist/` 原子发布 → 重启 `ib-web` → 重启 `ib-worker`（推荐）→ 部署后验证 → LLM Key 迁移（用户执行））/ 15.4 回滚 ROLLBACK-022~031（逆序，`005` 不可逆 + `[MANUAL_ROLLBACK_REQUIRED]`）/ 15.5 验证 V18-1~10 / 15.6 风险 R-18-1~8 / **15.7 LLM Key 迁移专项（`.env`→DB）** / **15.8 PHASE_11 用户验收清单（§23.5 六项 + CRED-01 + bcrypt 对齐）** / 15.9 不一致登记）；④ 附自检补 R18 边界；status → REVISED_PENDING_REVIEW（待 GR-E-006） | `architecture_design.md` 1.10.2/REV-18-R2（ADR-37~42 / ADR-21-R1）；`module_design.md` 1.10.2/REV-18-R2（IFC-IB-366~377）；`tech_stack.md` 1.4.1/REV-18（NO_CHANGE）；`implementation_plan.md` 2.13.0/REV-18 §25；`test_report.md` 1.14.0/REV-18 §23（GR-D-015；Python 351 / 前端 35 / selfcheck 51）；`docs/phase_status.md`（GR-D-015）；`src/deploy/migrations/{005_projects,006_llm_key}.sql`；`src/ib/ledger/schema.py`（`ensure_schema` 单源）；`src/deploy/checklists.txt` `[B21]~[B23]`；`src/deploy/env.example`（R18 两键）；`src/ib/{config,llm}/__init__.py`、`src/ibweb/{views,urls,composition}.py`、`src/frontend/src/views/{SystemSection,ProjectsPage,LlmKeyPage,AccountsPage,UploadPage}.vue` |
 
 > 本修订为**纯文档 / 部署产物修订**：**未执行**任何部署步骤，**未连接、未触碰**目标机 `192.168.31.133`。
 > **1.2.0（REV-13）本轮边界**：**未连接、未触碰**目标机；**未 commit / push**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md`；**未触发 PHASE_11**。R13 轮次**未改任何 `src/` 交付物**（R13 交付物由 GROUP_C 产出，本代理只读引用）。
-> **1.3.0（REV-14）本轮边界（INV-GROUP_E-INTELBASE-005）**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何 SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md` / `docs/test_*.md`；**未触发 PHASE_11**，**本轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（PHASE_11 保持冻结）。本轮**仅改两个文档**（`deployment_plan.md` / `cicd_pipeline.md`，均 1.2.0 → **1.3.0/REV-14**）+ 同步 `.github/workflows/ci.yml` 的**注释基线标签**（纯注释，不改 step 逻辑）。
+> **1.3.0（REV-14）本轮边界（INV-GROUP_E-INTELBASE-005）**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何 SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md` / `docs/test_*.md`；**未触发 PHASE_11**，**该轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（PHASE_11 保持冻结）。该轮**仅改两个文档**（`deployment_plan.md` / `cicd_pipeline.md`，均 1.2.0 → **1.3.0/REV-14**）+ 同步 `.github/workflows/ci.yml` 的**注释基线标签**（纯注释，不改 step 逻辑）。
+> **1.4.0（REV-18）本轮边界（INV-GROUP_E-INTELBASE-006）**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何 SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传 / 迁移 / 备份；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码（R18 交付物全程只读引用） / `tests/**` / 设计真源文档 / `docs/{implementation_plan,test_report,phase_status}.md` / `.github/workflows/ci.yml`；**未触发 PHASE_11**，**本轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（PHASE_11 保持冻结）。本轮**仅改两个文档**（`deployment_plan.md` / `cicd_pipeline.md`，均 1.3.0 → **1.4.0/REV-18**），**未改 `.github/workflows/ci.yml`**（R18 无 CI 逻辑改动，仅如实登记 §3.2 迁移门未覆盖 `005`/`006`）。§15 **只登记计划与回滚**，全部命令须 PM CONFIRM 后执行。
