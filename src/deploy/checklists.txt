@@ -345,14 +345,16 @@
     说明：`005_projects.sql` 由既有 `ExecStartPre` 统一应用；软删 = 置 `status='disabled'`（不删行，OOS-19）。
 
 [B22] LLM Key 承载库**及其 WAL 边车**权限 0660（组 `ib` 共享）且属主对齐服务账号（REV-18 / ADR-38 / REQ-NFR-IB-20；
-      0600 → 0660 由 DEFECT-R18-01 订正；**边车纳入判据**由 DEFECT-R18-02 订正，2026-10-07 生产复现）
-    $ sudo ls -la /var/lib/intelligentbase/ledger   # 期望 ledger.sqlite3 / -wal / -shm 三行均 rw-rw---- 且 ib-web ib
+      0600 → 0660 由 DEFECT-R18-01 订正；**边车纳入判据**由 DEFECT-R18-02 订正；**判据改为「凡存在者」+ 排除冷备 +
+      约束查询时机**由 DEFECT-R18-03 订正 —— 三处均于 2026-10-07 经生产复现 / 验收）
+    $ systemctl is-active ib-web                     # 先确认服务装配完成再查文件（见下方「时序」警告）
+    $ sudo ls -la /var/lib/intelligentbase/ledger    # 除 *.pre-rev18.bak* 外，凡存在的 ledger.sqlite3* 均须 rw-rw---- ib-web ib
     $ systemctl is-failed ib-worker
     $ journalctl -u ib-worker --since "<重启时刻>" -g "unable to open database file" --no-pager
     $ sqlite3 /var/lib/intelligentbase/ledger/ledger.sqlite3 ".schema llm_key" | grep -i 'CHECK (id = 1)'
-    [ ] `ledger.sqlite3`、`ledger.sqlite3-wal`、`ledger.sqlite3-shm` **三者** mode 均为 **660**
-        （**不是 600** —— 见下方两块警告）
-    [ ] 三者属主均为 `ib-web`、组为 `ib`
+    [ ] 目录下**除 `*.pre-rev18.bak*` 外**的每个 `ledger.sqlite3*` —— **凡存在者**（主库，以及服务在跑时
+        会出现的 `-wal` / `-shm`）—— mode 均为 **660**（**不是 600** —— 见下方警告块）
+    [ ] 上述各文件属主均为 `ib-web`、组为 `ib`
     [ ] `ib-web` 与 `ib-worker` **两个**服务账号**均**属组 `ib`（`id ib-web; id ib-worker` 可复查）
     [ ] `systemctl is-failed ib-worker` 非 `failed`，且上面 `journalctl` 一条不匹配（见下方撤回说明）
     [ ] `llm_key` 为单行表（`CHECK (id = 1)`），全局唯一一个 Key（OQ-IB-26；多供应商 = OOS-18）
@@ -368,6 +370,24 @@
        故障原样复现**。2026-10-07 DEFECT-R18-02 的生产复现正是此形：主库与 `-wal` 已 660、
        `-shm` 停在 600，ib-worker 依旧「unable to open database file」（新版代码已生效、
        主库已修好，故障却一模一样）。
+    !! 别把「边车不在」读成失败 !! `-wal` / `-shm` 是**易失**文件：最后一条连接干净关闭时
+       SQLite 会 checkpoint 并**删除**它们。故**正常状态**下也可能只看到主库一行。判据因此写成
+       「**凡存在者**必须 660」，而非「必须三行俱在」—— 本项原文写死「三行」，2026-10-07 生产上
+       照字面读，恰好把一次**正确**的重启判成 FAIL（DEFECT-R18-03）。真正决定性的是下面两条
+       服务态 / 日志判据，它们不依赖文件此刻在不在。
+    !! 时序：`systemctl restart` 返回 **≠** 装配完成 !! `ib-web.service` 是 `Type=simple`
+       （`src/deploy/systemd/ib-web.service:37`），该命令在**进程被拉起**时即返回；而台账由装配期
+       `build_llm_key_store` 打开、边车随之创建。2026-10-07 实测：紧接着 restart 跑的 `ls` 读到
+       边车缺席（`total 328`），而边车 mtime 显示它们就创建在**同一分钟**，其后读数即为三件套齐备、
+       `total 360` —— 同一次正确的重启，两种读数，差别只在查询时机。故先 `is-active`，隔几秒再查。
+    !! `*.pre-rev18.bak*` 三行是 600，**这是对的，不要改** !! 它们是 REV-18 迁移前的冷备
+       （`ledger.sqlite3.pre-rev18.bak` 及同名 `-shm` / `-wal`），**没有任何服务会打开它**；600 比
+       660 **更严**，不违反 REQ-NFR-IB-20。判据已把它排除在外。**但它有个陷阱**：将来若从它
+       **还原**，还原出的主库是 600 → **DEFECT-R18-01 / R18-02 原样重演**（新代码下次装配能把主
+       文件改回 660，但若 `ib-worker` 先于 `ib-web` 启动，它仍会先撞上打不开）——
+       **还原后必须手工 `sudo chmod 0660` 主库**。顺带：该冷备的 `-bak-wal` 为 **0 字节**
+       ⇒ 备份当时已 checkpoint 干净，**单独还原那个 `.bak` 主文件即完整**，无数据滞留在 WAL 里。
+       验收通过后可将冷备归档或删除（它含一份 Key 密文副本，留着即多一处凭据面）。
     说明：权限位由 `SqliteLlmKeyStore._harden_file_permissions` 在 POSIX 上 best-effort
     收紧至 **0660**（**只去 other 位、保留 group 位**），**主库与两个边车逐个覆盖**；
     chmod 失败会发结构化 WARN（`error_code=ledger_chmod_failed:*` + `kind=db|wal|shm`），
@@ -380,6 +400,8 @@
     一个**已是 0660、属主 ib-web:ib** 的主文件同样报 FAIL（`$?` = 1），属假阴性；疑因
     `sudo -u` 未携带目标用户的附加组。判据改用上面三条（模式 / 服务态 / 日志），它们不依赖
     sudo 的组语义。如需逐进程复核可改用 `sudo runuser -u ib-worker -- test -r <库文件>`。
+    实测：2026-10-07 生产验收 —— 主库与两枚边车均 `-rw-rw---- ib-web ib`（660）、`ib-worker`
+    为 `active`、`journalctl -g "unable to open database file"` 零命中；本节各项**全通过**。
 
 [B23] LLM Key 不入 `.env` / 不进 git / 不进命令行（REV-18 / C-IB-42）
     $ grep -c -iE 'IB_LLM_API_KEY|sk-' /etc/intelligentbase/ib-web.env ; echo "exit=$?"   # 期望 0
