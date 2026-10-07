@@ -33,7 +33,9 @@ LLM Key 的持久化（REV-18 增量；module_design.md §3 MOD-IB-11；ADR-38 /
 **由此推出一条硬约束**：这个文件不是单一进程的私有文件 —— 它由**两个** systemd
 服务账号共享读写（`ib-web` = 属主，`ib-worker` = 非属主，靠共同组 `ib`）。故其权限位
 **必须保留 group 位**；任何把它收成 `0600` 的动作都会让 `ib-worker` 打不开台账。
-详见 `_harden_file_permissions` 的 docstring。
+**WAL 边车 `-wal` / `-shm` 同受此约束**（`-shm` 打开时**必须**读写），且它们**不是**
+按 umask 创建、而是由 SQLite 复制库文件创建时的 mode —— 故只对齐主文件不够。
+详情与生产复现见 `_harden_file_permissions` 的 docstring。
 """
 
 from __future__ import annotations
@@ -67,6 +69,22 @@ __all__ = [
 #: 下**无限重启**（DEFECT-R18-01，2026-10-07 生产事故）。
 #: 详见 `SqliteLlmKeyStore._harden_file_permissions` 的 docstring 与 `checklists.txt` B22。
 LEDGER_FILE_MODE = 0o660
+
+#: WAL 边车后缀：台账开 WAL 后，SQLite 还会同时用到这两个同级文件。
+#:
+#: `-shm` 打开时**必须读写**，故其 mode 与主库文件**同等承重** —— 只 chmod 主文件不够。
+#: 生产已实测（DEFECT-R18-01 复现）：主库 `0660`、`-wal` `0660`，而 `-shm` 卡在 `0600`，
+#: `ib-worker` 依旧 `unable to open database file`。
+LEDGER_SIDECAR_SUFFIXES = ("-wal", "-shm")
+
+
+def _harden_targets(path: str) -> tuple[tuple[str, str], ...]:
+    """返回 `_harden_file_permissions` 需逐一收紧的 `(路径, kind)`。
+
+    `kind` 是结构化 WARN 的诊断字段（`db` / `wal` / `shm`）—— 日志白名单里**没有**
+    `path`，故用 `kind` 区分失败的是哪一个，避免又出现「知道失败了但不知道失败在哪」。
+    """
+    return ((path, "db"), *((f"{path}{suffix}", suffix.lstrip("-")) for suffix in LEDGER_SIDECAR_SUFFIXES))
 
 
 def _status_of(record: LlmKeyRecord | None) -> LlmKeyStatus:
@@ -147,7 +165,7 @@ class SqliteLlmKeyStore:
         self._harden_file_permissions()
 
     def _harden_file_permissions(self) -> None:
-        """best-effort 收紧承载库文件权限位至 `0660`（REQ-NFR-IB-20 / B22）。
+        """best-effort 收紧承载库**及其 WAL 边车**权限位至 `0660`（REQ-NFR-IB-20 / B22）。
 
         ## 为什么是 `0660` 而不是 `0600`（DEFECT-R18-01，2026-10-07 生产事故）
 
@@ -162,23 +180,52 @@ class SqliteLlmKeyStore:
         二者分属不同 systemd 用户」留过注释并对齐 `0664`。
 
         故此处**只去掉 other 位、保留 group 位**：非 `ib` 账号读不到，两个服务账号
-        仍共享。机密边界是**两道**：① 目录 `/var/lib/intelligentbase`（`0770 ib-web:ib`
-        —— 非 `ib` 账号根本无法进入，这是**第一道也是主要的一道**）；② 本 chmod
-        （目录被误配宽松时的纵深防御）。WAL 边车 `-wal` / `-shm` 由 sqlite 按部署机
-        umask 创建，不受本方法管辖，同样由第 ① 道兜住。
+        仍共享。机密边界是**两道**：① 目录 `/var/lib/intelligentbase` 与
+        `/var/lib/intelligentbase/ledger`（均 `0770 ib-web:ib`）—— 非 `ib` 账号根本
+        无法进入；② 本 chmod（目录被误配宽松时的纵深防御）。
+
+        ## 为什么必须连 WAL 边车一起 chmod（DEFECT-R18-01 生产复现，同日）
+
+        台账开 WAL，SQLite 还会用到同级文件 `-wal` 与 `-shm`；**`-shm` 打开时必须
+        读写**，故它的 mode 与主库文件**同等承重**。**只 chmod 主文件是不够的** ——
+        生产实测：主库已是 `0660`、`-wal` 也是 `0660`，而 `-shm` 停在 `0600`，
+        `ib-worker` 依旧报同一个 `unable to open database file`（新版代码已生效、
+        主库已修好，故障却原样复现）。
+
+        边车的 mode **不是**由部署机 umask 决定，而是由 SQLite **在创建时复制库文件
+        当时的 mode**。这就制造了一个顺序陷阱：`sqlite3.connect()` 发生在 `_bootstrap`
+        开头，**早于本方法**；若库文件那一刻还是 `0600`，SQLite 就把 `-shm` 建成
+        `0600`，而本方法随后只修好了主文件 —— 边车被漏下，故障照旧。故本方法**必须**
+        逐个覆盖 `-wal` / `-shm` 自身，不能指望「主文件对了边车就对」。
+
+        边车**可能尚不存在**（`-wal` 常在首次写入后才出现）：那是**正常**情形，跳过
+        即可 —— 它稍后创建时会复制库文件**彼时**的 mode，而主库文件已由本方法对齐。
+        反过来说，正因为创建时机不确定，逐个覆盖边车才是唯一稳妥的做法。
 
         `os.chmod` 只对**属主**（或 root）生效 —— `ib-worker` 侧调用会 `EPERM`，被
-        下方 `except OSError` 静默吸收，不影响其启动。
+        下方 `except OSError` 吸收，不影响其启动；但**不再静默**：失败会发一条结构化
+        WARN（`error_code=ledger_chmod_failed:<异常类>`，`kind` 标出 db / wal / shm）。
+        否则「收紧失败」与「收紧成功」在日志里无从区分 —— 这正是本次事故迟迟定不到
+        位的直接原因。
 
         **属主对齐服务账号**由**用户**在部署期执行（本模块无法在不改变运行身份的前提下
         完成属主变更）；失败**不**阻断启动（权限的最终判据是部署检查清单 B22 的人工核对）。
         """
         if os.name == "nt" or self._path == ":memory:":
             return
-        try:
-            os.chmod(self._path, LEDGER_FILE_MODE)
-        except OSError:
-            pass
+        for target, kind in _harden_targets(self._path):
+            try:
+                os.chmod(target, LEDGER_FILE_MODE)
+            except FileNotFoundError:
+                continue  # 边车尚未创建：正常情形，见 docstring
+            except OSError as exc:
+                from ib.observability import get_logger  # noqa: PLC0415  (同 sqlite_repo 的局部导入)
+
+                get_logger("ledger").warn(
+                    "warned",
+                    error_code=f"ledger_chmod_failed:{type(exc).__name__}",
+                    kind=kind,
+                )
 
     def close(self) -> None:
         with self._connections_lock:

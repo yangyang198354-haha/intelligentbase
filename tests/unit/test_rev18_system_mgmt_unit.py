@@ -423,7 +423,7 @@ def test_TC_UNIT_R18_009_ledger_mode_keeps_group_share(tmp_path) -> None:
     这里必红。权限位先按**常量**核（任何平台都真跑），再在 POSIX 上核对文件系统上的
     实际位（Windows 的 `os.chmod` 只有只读位语义，表达不了 `0660`）。
     """
-    from ib.ledger.llm_key import LEDGER_FILE_MODE, SqliteLlmKeyStore
+    from ib.ledger.llm_key import LEDGER_FILE_MODE, SqliteLlmKeyStore, _harden_targets
 
     mode = LEDGER_FILE_MODE
     assert mode == 0o660, f"台账权限位常量应为 0660，实得 {oct(mode)}"
@@ -433,6 +433,14 @@ def test_TC_UNIT_R18_009_ledger_mode_keeps_group_share(tmp_path) -> None:
     assert not mode & stat.S_IROTH, "other 位应被去掉（REQ-NFR-IB-20 的收紧意图）"
     assert mode != 0o600, "台账不可为 0600（DEFECT-R18-01）"
 
+    # 覆盖面：主库**与两个 WAL 边车**都必须在收紧名单里。只修主文件正是生产复现时
+    # 漏掉 `-shm` 的那一步 —— 主库已 0660、`-shm` 停在 0600，故障原样复现。
+    assert _harden_targets("/x/ledger.sqlite3") == (
+        ("/x/ledger.sqlite3", "db"),
+        ("/x/ledger.sqlite3-wal", "wal"),
+        ("/x/ledger.sqlite3-shm", "shm"),
+    ), "收紧名单漏了 WAL 边车（DEFECT-R18-01 生产复现）"
+
     if os.name != "posix":
         pytest.skip("POSIX 权限位语义：Windows 的 chmod 表达不了 0660（常量断言已在上方跑过）")
 
@@ -441,8 +449,59 @@ def test_TC_UNIT_R18_009_ledger_mode_keeps_group_share(tmp_path) -> None:
     try:
         on_disk = stat.S_IMODE(os.stat(db_path).st_mode)
         assert on_disk == 0o660, f"台账实际权限位应为 0660，实得 {oct(on_disk)}"
+        # 边车若已存在，必须同样保留组位（生产就是 `-shm` 停在 0600 卡住 ib-worker）
+        for suffix in ("-wal", "-shm"):
+            sidecar = db_path.with_name(db_path.name + suffix)
+            if sidecar.exists():
+                sidecar_mode = stat.S_IMODE(os.stat(sidecar).st_mode)
+                assert sidecar_mode == 0o660, (
+                    f"{sidecar.name} 权限位应为 0660（组 `ib` 共享），实得 {oct(sidecar_mode)} —— "
+                    "`-shm` 打开时必须读写，它停在 0600 则 ib-worker 一样打不开台账"
+                )
         # 幂等：二次构造不得翻转模式（ib-worker 侧 chmod 会 EPERM 静默吸收）
         SqliteLlmKeyStore(str(db_path)).close()
         assert stat.S_IMODE(os.stat(db_path).st_mode) == 0o660, "二次装配翻转了台账权限位"
+    finally:
+        store.close()
+
+
+def test_TC_UNIT_R18_010_chmod_failure_is_not_silent(tmp_path, monkeypatch) -> None:
+    """DEFECT-R18-01 的另一半：`os.chmod` 失败**必须留痕**，不得静默吞掉。
+
+    事故里 `except OSError: pass` 让「收紧失败」与「收紧成功」在日志里无从区分 ——
+    这是迟迟定不到位的直接原因（主库看着已修好，故障却原样复现）。本用例钉住：
+    有目标收紧失败时，必发一条结构化 WARN 并带上 `kind`。
+    """
+    if os.name == "nt":
+        pytest.skip("`_harden_file_permissions` 在 Windows 直接返回，不会有 chmod 与日志")
+
+    import ib.observability as observability
+    from ib.ledger import llm_key as llm_key_mod
+
+    seen: list[dict] = []
+
+    class _SpyLogger:
+        def warn(self, outcome: str, **fields) -> None:
+            seen.append({"outcome": outcome, **fields})
+
+    monkeypatch.setattr(observability, "get_logger", lambda stage: _SpyLogger())
+
+    real_chmod = os.chmod
+
+    def fake_chmod(path, mode, *args, **kwargs):
+        if str(path).endswith("-shm"):
+            raise PermissionError(13, "Operation not permitted")
+        return real_chmod(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(llm_key_mod.os, "chmod", fake_chmod)
+
+    store = llm_key_mod.SqliteLlmKeyStore(str(tmp_path / "ledger.sqlite3"))
+    try:
+        assert seen, "`-shm` 收紧失败却未发任何 WARN —— 失败被静默吞掉（DEFECT-R18-01）"
+        assert all(entry["outcome"] == "warned" for entry in seen), f"WARN 的 outcome 应为 warned：{seen}"
+        assert any(entry.get("kind") == "shm" for entry in seen), f"WARN 未标出失败的是哪一个：{seen}"
+        assert any("ledger_chmod_failed" in str(entry.get("error_code")) for entry in seen), (
+            f"WARN 未带 error_code：{seen}"
+        )
     finally:
         store.close()

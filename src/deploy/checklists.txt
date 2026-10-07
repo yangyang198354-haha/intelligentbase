@@ -344,25 +344,42 @@
     [ ] 回滚策略确认：本迁移**纯前向放大** → 回滚 = **代码回滚**（数据保留；不执行破坏性 DDL）
     说明：`005_projects.sql` 由既有 `ExecStartPre` 统一应用；软删 = 置 `status='disabled'`（不删行，OOS-19）。
 
-[B22] LLM Key 承载库文件权限 0660（组 `ib` 共享）且属主对齐服务账号（REV-18 / ADR-38 / REQ-NFR-IB-20；
-      0600 → 0660 由 DEFECT-R18-01 订正，2026-10-07 生产事故）
-    $ stat -c '%a %U:%G %n' /var/lib/intelligentbase/ledger/ledger.sqlite3   # 期望 660 ib-web:ib
-    $ sudo -u ib-worker test -r /var/lib/intelligentbase/ledger/ledger.sqlite3; echo "ib-worker 可读=$?"
+[B22] LLM Key 承载库**及其 WAL 边车**权限 0660（组 `ib` 共享）且属主对齐服务账号（REV-18 / ADR-38 / REQ-NFR-IB-20；
+      0600 → 0660 由 DEFECT-R18-01 订正；**边车纳入判据**由 DEFECT-R18-02 订正，2026-10-07 生产复现）
+    $ sudo ls -la /var/lib/intelligentbase/ledger   # 期望 ledger.sqlite3 / -wal / -shm 三行均 rw-rw---- 且 ib-web ib
+    $ systemctl is-failed ib-worker
+    $ journalctl -u ib-worker --since "<重启时刻>" -g "unable to open database file" --no-pager
     $ sqlite3 /var/lib/intelligentbase/ledger/ledger.sqlite3 ".schema llm_key" | grep -i 'CHECK (id = 1)'
-    [ ] 承载库文件（含 `llm_key` 表的 `ledger.sqlite3`）mode 为 **660**（**不是 600** —— 见下方警告块）
-    [ ] 该文件属主为 `ib-web`、组为 `ib`
+    [ ] `ledger.sqlite3`、`ledger.sqlite3-wal`、`ledger.sqlite3-shm` **三者** mode 均为 **660**
+        （**不是 600** —— 见下方两块警告）
+    [ ] 三者属主均为 `ib-web`、组为 `ib`
     [ ] `ib-web` 与 `ib-worker` **两个**服务账号**均**属组 `ib`（`id ib-web; id ib-worker` 可复查）
+    [ ] `systemctl is-failed ib-worker` 非 `failed`，且上面 `journalctl` 一条不匹配（见下方撤回说明）
     [ ] `llm_key` 为单行表（`CHECK (id = 1)`），全局唯一一个 Key（OQ-IB-26；多供应商 = OOS-18）
     !! 绝不要 chmod 600 !! 台账由**两个**服务账号共享：ib-web 是属主，ib-worker **不是**，
        靠共同组 `ib` 读写。chmod 600 只留属主位 → ib-worker 启动即
        「sqlite3.OperationalError: unable to open database file」；因其单元为 Restart=always，
        表现为**无限重启**，而 ib-web 与 /healthz **全部正常** —— 症状极具迷惑性。
        2026-10-07 生产事故 DEFECT-R18-01 即此因（当时本项写的是 600，且代码把它硬执行了）。
+    !! 别漏了 `-shm` !! 台账开 WAL，SQLite 还用同级文件 `-wal` 与 `-shm`；**`-shm` 打开时
+       必须读写**，故其 mode 与主库**同等承重**。且**边车的 mode 不由 umask 决定**，而是
+       SQLite 在**创建时复制库文件当时的 mode** —— 于是有个顺序陷阱：`sqlite3.connect()`
+       早于代码里的 chmod，若那一刻主库还是 600，`-shm` 就被建成 600，此后**只修主文件则
+       故障原样复现**。2026-10-07 DEFECT-R18-02 的生产复现正是此形：主库与 `-wal` 已 660、
+       `-shm` 停在 600，ib-worker 依旧「unable to open database file」（新版代码已生效、
+       主库已修好，故障却一模一样）。
     说明：权限位由 `SqliteLlmKeyStore._harden_file_permissions` 在 POSIX 上 best-effort
-    收紧至 **0660**（**只去 other 位、保留 group 位**）；**属主变更须由用户在部署期执行**。
-    机密边界是**两道**：① 目录 `/var/lib/intelligentbase` 为 `0770 ib-web:ib` —— 非 `ib` 账号
-    根本无法进入（**主要的一道**）；② 文件 0660（目录被误配宽松时的纵深防御）。WAL 边车
-    `-wal` / `-shm` 由部署机 umask 决定、不受该 chmod 管辖，同样由第 ① 道兜住。
+    收紧至 **0660**（**只去 other 位、保留 group 位**），**主库与两个边车逐个覆盖**；
+    chmod 失败会发结构化 WARN（`error_code=ledger_chmod_failed:*` + `kind=db|wal|shm`），
+    不再静默吞掉。**属主变更须由用户在部署期执行**。
+    机密边界是**两道**：① 目录 `/var/lib/intelligentbase` 与 `/var/lib/intelligentbase/ledger`
+    均为 `0770 ib-web:ib` —— 非 `ib` 账号根本无法进入（**主要的一道**）；② 文件 0660
+    （目录被误配宽松时的纵深防御）。**注意目录是 `0770`、组员进得去，所以边车自身的 mode
+    是承重的，不能靠目录兜底**（本项曾写「边车由第 ① 道兜住」，该论断已证伪）。
+    撤回：`sudo -u ib-worker test -r <库文件>` 一法**不再作为判据** —— 2026-10-07 实测它对
+    一个**已是 0660、属主 ib-web:ib** 的主文件同样报 FAIL（`$?` = 1），属假阴性；疑因
+    `sudo -u` 未携带目标用户的附加组。判据改用上面三条（模式 / 服务态 / 日志），它们不依赖
+    sudo 的组语义。如需逐进程复核可改用 `sudo runuser -u ib-worker -- test -r <库文件>`。
 
 [B23] LLM Key 不入 `.env` / 不进 git / 不进命令行（REV-18 / C-IB-42）
     $ grep -c -iE 'IB_LLM_API_KEY|sk-' /etc/intelligentbase/ib-web.env ; echo "exit=$?"   # 期望 0
