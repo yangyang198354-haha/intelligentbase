@@ -154,8 +154,8 @@ async function start(): Promise<void> {
 }
 button {
   padding: 8px 16px;
-  border: 1px solid #0969da;
-  background: #0969da;
+  border: 1px solid var(--ib-accent);
+  background: var(--ib-accent);
   color: #fff;
   border-radius: 6px;
   cursor: pointer;
@@ -169,42 +169,42 @@ button:disabled {
 }
 .bar {
   height: 10px;
-  background: #eaeef2;
+  background: var(--ib-bg-sunken);
   border-radius: 5px;
   overflow: hidden;
 }
 .bar span {
   display: block;
   height: 100%;
-  background: #0969da;
+  background: var(--ib-accent);
   transition: width 0.3s ease;
 }
 .hint {
-  color: #57606a;
+  color: var(--ib-text-muted);
   font-size: 13px;
 }
 .warn {
-  background: #fff8c5;
-  border: 1px solid #d4a72c;
+  background: var(--ib-warning-soft);
+  border: 1px solid var(--ib-warning);
   border-radius: 6px;
   padding: 8px 12px;
 }
 .ok {
-  background: #dafbe1;
-  border: 1px solid #1a7f37;
+  background: var(--ib-accent-green-soft);
+  border: 1px solid var(--ib-accent-green);
   border-radius: 6px;
   padding: 8px 12px;
-  color: #1a7f37;
+  color: var(--ib-accent-green);
 }
 .error {
-  background: #ffebe9;
-  border: 1px solid #cf222e;
+  background: var(--ib-danger-soft);
+  border: 1px solid var(--ib-danger);
   border-radius: 6px;
   padding: 8px 12px;
-  color: #cf222e;
+  color: var(--ib-danger);
 }
 code {
-  background: #f6f8fa;
+  background: var(--ib-bg-sunken);
   padding: 1px 5px;
   border-radius: 4px;
 }

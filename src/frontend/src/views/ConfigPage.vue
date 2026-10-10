@@ -1020,12 +1020,12 @@ h3 {
   margin: 12px 0 4px;
 }
 .hint {
-  color: #57606a;
+  color: var(--ib-text-muted);
   font-size: 13px;
 }
 .notice {
-  background: #fff8c5;
-  border: 1px solid #d4a72c;
+  background: var(--ib-warning-soft);
+  border: 1px solid var(--ib-warning);
   border-radius: 6px;
   padding: 8px 12px;
 }
@@ -1035,28 +1035,28 @@ h3 {
   font-weight: 600;
 }
 .draft-flag {
-  background: #ddf4ff;
-  border: 1px solid #0969da;
+  background: var(--ib-accent-blue-soft);
+  border: 1px solid var(--ib-accent-blue);
   border-radius: 6px;
   padding: 8px 12px;
-  color: #0969da;
+  color: var(--ib-accent-blue);
 }
 .errors {
-  background: #ffebe9;
-  border: 1px solid #cf222e;
+  background: var(--ib-danger-soft);
+  border: 1px solid var(--ib-danger);
   border-radius: 6px;
   padding: 8px 12px 8px 28px;
-  color: #cf222e;
+  color: var(--ib-danger);
 }
 .blocked {
-  background: #fff1e5;
-  border: 1px solid #bc4c00;
+  background: var(--ib-accent-soft);
+  border: 1px solid var(--ib-accent-hover);
   border-radius: 6px;
   padding: 8px 12px;
 }
 .graph {
   height: 280px;
-  border: 1px solid #d8dee4;
+  border: 1px solid var(--ib-border);
   border-radius: 6px;
 }
 .legend {
@@ -1065,7 +1065,7 @@ h3 {
   gap: 16px;
   margin: 0 0 8px;
   font-size: 12px;
-  color: #57606a;
+  color: var(--ib-text-muted);
 }
 .legend-item {
   display: inline-flex;
@@ -1075,7 +1075,7 @@ h3 {
 .legend-line {
   display: inline-block;
   width: 26px;
-  border-top: 2px solid #6b7280;
+  border-top: 2px solid var(--ib-text-faint);
 }
 .legend-line.dashed {
   border-top-style: dashed;
@@ -1084,14 +1084,14 @@ h3 {
   display: inline-block;
   width: 16px;
   height: 12px;
-  border: 1px dashed #6b7280;
+  border: 1px dashed var(--ib-text-faint);
   border-radius: 3px;
 }
 /* 节点元素由 Vue Flow 在运行期创建，scoped 样式需经 :deep 才能命中自定义 class。 */
 .graph :deep(.graph-endpoint) {
   border-style: dashed;
-  background: #f6f8fa;
-  color: #57606a;
+  background: var(--ib-bg-sunken);
+  color: var(--ib-text-muted);
 }
 .grid {
   display: flex;
@@ -1110,12 +1110,12 @@ table {
 }
 th,
 td {
-  border: 1px solid #d8dee4;
+  border: 1px solid var(--ib-border);
   padding: 4px 6px;
   font-size: 13px;
 }
 th {
-  background: #f6f8fa;
+  background: var(--ib-bg-sunken);
 }
 td input {
   width: 100%;
@@ -1131,8 +1131,8 @@ td input {
 }
 /* 代码内置兜底回显：**只读**，视觉上区别于可编辑的两层文本域（REV-17 / ADR-36）。 */
 .prompt textarea.readonly {
-  background: #f6f8fa;
-  color: #57606a;
+  background: var(--ib-bg-sunken);
+  color: var(--ib-text-muted);
   cursor: default;
 }
 .prompt-head {
@@ -1142,13 +1142,13 @@ td input {
   font-size: 13px;
 }
 .resolved {
-  background: #ddf4ff;
+  background: var(--ib-accent-blue-soft);
   border-radius: 4px;
   padding: 1px 6px;
-  color: #0969da;
+  color: var(--ib-accent-blue);
 }
 .draft-flag-inline {
-  color: #bc4c00;
+  color: var(--ib-accent-hover);
   font-size: 12px;
 }
 .tool-check {
@@ -1171,7 +1171,7 @@ td input {
 }
 .tool-param-tool {
   font-size: 12px;
-  color: #57606a;
+  color: var(--ib-text-muted);
 }
 .tool-param {
   display: inline-flex;
@@ -1180,7 +1180,7 @@ td input {
   font-size: 13px;
 }
 .keys code {
-  background: #f6f8fa;
+  background: var(--ib-bg-sunken);
   border-radius: 4px;
   padding: 1px 6px;
 }
@@ -1193,7 +1193,7 @@ td input {
 button.link {
   background: none;
   border: none;
-  color: #cf222e;
+  color: var(--ib-danger);
   cursor: pointer;
 }
 </style>

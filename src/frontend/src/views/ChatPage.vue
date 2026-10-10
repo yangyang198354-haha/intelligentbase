@@ -426,28 +426,28 @@ onBeforeUnmount(() => {
 .ask input {
   flex: 1;
   padding: 8px;
-  border: 1px solid #d8dee4;
+  border: 1px solid var(--ib-border);
   border-radius: 6px;
 }
 button {
   padding: 6px 14px;
-  border: 1px solid #0969da;
-  background: #0969da;
+  border: 1px solid var(--ib-accent);
+  background: var(--ib-accent);
   color: #fff;
   border-radius: 6px;
   cursor: pointer;
 }
 button.stop {
-  background: #fff;
-  color: #cf222e;
-  border-color: #cf222e;
+  background: var(--ib-bg-elevated);
+  color: var(--ib-danger);
+  border-color: var(--ib-danger);
 }
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 .turn {
-  border-top: 1px solid #eaeef2;
+  border-top: 1px solid var(--ib-border);
   padding: 16px 0;
 }
 .question {
@@ -459,13 +459,13 @@ button:disabled {
   word-break: break-word;
   font-family: inherit;
   margin: 8px 0;
-  background: #f6f8fa;
+  background: var(--ib-bg-sunken);
   border-radius: 6px;
   padding: 12px;
 }
 .degraded {
-  background: #fff8c5;
-  border: 1px solid #d4a72c;
+  background: var(--ib-warning-soft);
+  border: 1px solid var(--ib-warning);
   border-radius: 6px;
   padding: 8px 12px;
   margin: 0 0 8px;
@@ -478,8 +478,8 @@ button:disabled {
 }
 .thumb {
   padding: 0;
-  border: 1px solid #d8dee4;
-  background: #fff;
+  border: 1px solid var(--ib-border);
+  background: var(--ib-bg-elevated);
   border-radius: 6px;
   cursor: zoom-in;
   overflow: hidden;
@@ -492,15 +492,15 @@ button:disabled {
   object-fit: cover;
 }
 .error {
-  background: #ffebe9;
-  border: 1px solid #cf222e;
+  background: var(--ib-danger-soft);
+  border: 1px solid var(--ib-danger);
   border-radius: 6px;
   padding: 8px 12px;
-  color: #cf222e;
+  color: var(--ib-danger);
 }
 .reasoning {
   font-size: 13px;
-  color: #57606a;
+  color: var(--ib-text-muted);
   margin: 8px 0;
 }
 .reasoning pre {
@@ -508,19 +508,19 @@ button:disabled {
   font-family: inherit;
 }
 .hint {
-  color: #57606a;
+  color: var(--ib-text-muted);
   font-size: 13px;
 }
 .session {
   width: 120px;
   padding: 3px 6px;
-  border: 1px solid #d8dee4;
+  border: 1px solid var(--ib-border);
   border-radius: 4px;
 }
 /* R8（IFC-IB-308）：确认区与答复区**视觉可区分**（独立边框/底色，绝不与正文混排）。 */
 .confirm {
-  border: 1px solid #d4a72c;
-  background: #fff8c5;
+  border: 1px solid var(--ib-warning);
+  background: var(--ib-warning-soft);
   border-radius: 6px;
   padding: 12px;
   margin: 8px 0;
@@ -539,12 +539,12 @@ button:disabled {
   gap: 8px;
 }
 .confirm-actions .reject {
-  background: #fff;
-  color: #cf222e;
-  border-color: #cf222e;
+  background: var(--ib-bg-elevated);
+  color: var(--ib-danger);
+  border-color: var(--ib-danger);
 }
 .done-mark {
-  color: #57606a;
+  color: var(--ib-text-muted);
   font-size: 12px;
   margin: 8px 0 0;
 }

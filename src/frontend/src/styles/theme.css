@@ -27,38 +27,62 @@
 /* 浅色（默认）                                                        */
 /* ------------------------------------------------------------------ */
 :root {
-  /* 主色：克制的暖橙（Claude 风格），与「企业知识库」的冷静中性底形成对比 */
+  /* ---------------------------------------------------------------- */
+  /* Anthropic 官方品牌色（brand-guidelines skill）                    */
+  /* Dark #141413 / Light #faf9f5 / MidGray #b0aea5 / LightGray #e8e6dc */
+  /* Orange #d97757 / Blue #6a9bcc / Green #788c5d                    */
+  /* ---------------------------------------------------------------- */
   --ib-accent: #d97757;
   --ib-accent-hover: #c96543;
   --ib-accent-soft: #fdf3ef;
 
-  --ib-bg: #f7f6f3;
+  /* 次级 / 三级强调色：Anthropic 蓝 #6a9bcc、绿 #788c5d 为品牌填充色。
+     本项目把它们用作「软底徽章 / 边框上的文字」，WCAG 要求 4.5:1，
+     故采用同色系的「文字级」加深变体，保证可读性（brand-guidelines: 蓝绿基色）。 */
+  --ib-accent-blue: #3d6ea0;
+  --ib-accent-blue-soft: #eaf1f7;
+  --ib-accent-green: #576b3a;
+  --ib-accent-green-soft: #eef0e6;
+
+  --ib-bg: #faf9f5;
   --ib-bg-elevated: #ffffff;
-  --ib-bg-sunken: #efece6;
-  --ib-sidebar-bg: #f0ede7;
+  --ib-bg-sunken: #e8e6dc;
+  --ib-sidebar-bg: #f2f0e9;
 
-  --ib-text: #262625;
-  --ib-text-muted: #6b6862;
-  --ib-text-faint: #9a968e;
+  --ib-text: #141413;
+  --ib-text-muted: #6e6c64;
+  --ib-text-faint: #b0aea5;
 
-  --ib-border: #e0dcd4;
-  --ib-border-strong: #cfc9be;
+  --ib-mid-gray: #b0aea5;
+  --ib-light-gray: #e8e6dc;
 
-  --ib-danger: #c0392b;
-  --ib-success: #3f8f5f;
-  --ib-warning: #b8860b;
+  --ib-border: #d8d4c8;
+  --ib-border-strong: #b8b3a4;
+
+  --ib-danger: #8a3329;
+  --ib-danger-soft: #f6e6e2;
+  --ib-success: #576b3a;
+  --ib-success-soft: #eef0e6;
+  --ib-warning: #7a5414;
+  --ib-warning-soft: #f6ecd6;
+  --ib-info: #3d6ea0;
+  --ib-info-soft: #eaf1f7;
 
   --ib-radius: 10px;
   --ib-radius-sm: 6px;
   --ib-gap: 16px;
   --ib-sidebar-width: 232px;
 
-  --ib-shadow-sm: 0 1px 2px rgba(38, 38, 37, 0.06);
-  --ib-shadow-md: 0 4px 16px rgba(38, 38, 37, 0.08);
+  --ib-shadow-sm: 0 1px 2px rgba(20, 20, 19, 0.06);
+  --ib-shadow-md: 0 4px 16px rgba(20, 20, 19, 0.08);
 
-  /* 系统字体栈：中文优先，不外链任何字体文件 */
-  --ib-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', 'Source Han Sans SC', 'Noto Sans CJK SC', sans-serif;
+  /* 字体：Anthropic 官方为 Poppins（标题）+ Lora（正文）。
+     本项目运行于内网，不能外链字体，故优先使用本机已装的 Poppins / Lora，
+     缺失时回退到系统中文优先字体栈，保证断网可用（REQ-NFR-IB-08 / AC-IB-17-06）。 */
+  --ib-font-heading: 'Poppins', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Source Han Sans SC', 'Noto Sans CJK SC', Arial, sans-serif;
+  --ib-font: 'Lora', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Source Han Sans SC',
+    'Noto Sans CJK SC', Georgia, 'Times New Roman', serif;
   --ib-font-mono: ui-monospace, SFMono-Regular, 'JetBrains Mono', Consolas, 'Liberation Mono',
     monospace;
 }
@@ -67,25 +91,39 @@
 /* 深色                                                                */
 /* ------------------------------------------------------------------ */
 :root[data-theme='dark'] {
+  /* 深色沿用 Anthropic Dark #141413 为基色，强调色提亮以保证对比度 */
   --ib-accent: #e08a6b;
   --ib-accent-hover: #eda283;
   --ib-accent-soft: #3a2b25;
 
-  --ib-bg: #1c1b19;
-  --ib-bg-elevated: #262523;
-  --ib-bg-sunken: #141312;
-  --ib-sidebar-bg: #201f1d;
+  --ib-accent-blue: #8fb8dc;
+  --ib-accent-blue-soft: #1f2a33;
+  --ib-accent-green: #9ab07a;
+  --ib-accent-green-soft: #232a1d;
 
-  --ib-text: #eceae5;
-  --ib-text-muted: #a8a49c;
+  --ib-bg: #141413;
+  --ib-bg-elevated: #1f1e1c;
+  --ib-bg-sunken: #0e0e0d;
+  --ib-sidebar-bg: #1a1918;
+
+  --ib-text: #faf9f5;
+  --ib-text-muted: #b0aea5;
   --ib-text-faint: #7c7871;
 
-  --ib-border: #35332f;
-  --ib-border-strong: #474440;
+  --ib-mid-gray: #b0aea5;
+  --ib-light-gray: #2a2926;
 
-  --ib-danger: #e2776a;
-  --ib-success: #6fbf8e;
-  --ib-warning: #d9b25a;
+  --ib-border: #2e2d2a;
+  --ib-border-strong: #44423d;
+
+  --ib-danger: #d77265;
+  --ib-danger-soft: #2e1d1a;
+  --ib-success: #9ab07a;
+  --ib-success-soft: #232a1d;
+  --ib-warning: #d4a45c;
+  --ib-warning-soft: #2e2616;
+  --ib-info: #8fb8dc;
+  --ib-info-soft: #1f2a33;
 
   --ib-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --ib-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
@@ -141,6 +179,8 @@ h1,
 h2,
 h3,
 h4 {
+  /* 标题使用 Anthropic 官方字体 Poppins（缺失时回退到中文系统字体 / Arial） */
+  font-family: var(--ib-font-heading);
   font-weight: 600;
   letter-spacing: -0.01em;
   margin: 0 0 0.5em;

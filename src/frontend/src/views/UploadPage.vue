@@ -278,13 +278,13 @@ label {
 input[type='text'],
 select {
   padding: 6px;
-  border: 1px solid #d8dee4;
+  border: 1px solid var(--ib-border);
   border-radius: 6px;
 }
 button {
   padding: 6px 12px;
-  border: 1px solid #0969da;
-  background: #0969da;
+  border: 1px solid var(--ib-accent);
+  background: var(--ib-accent);
   color: #fff;
   border-radius: 6px;
   cursor: pointer;
@@ -294,8 +294,8 @@ button:disabled {
   cursor: not-allowed;
 }
 .toolbar button {
-  background: #fff;
-  color: #0969da;
+  background: var(--ib-bg-elevated);
+  color: var(--ib-accent);
 }
 table {
   width: 100%;
@@ -304,7 +304,7 @@ table {
 }
 th,
 td {
-  border-bottom: 1px solid #eaeef2;
+  border-bottom: 1px solid var(--ib-border);
   padding: 8px;
   text-align: left;
 }
@@ -319,20 +319,20 @@ td {
   padding: 1px 8px;
   border-radius: 10px;
   font-size: 12px;
-  background: #eaeef2;
+  background: var(--ib-bg-sunken);
 }
 .badge.indexed {
-  background: #dafbe1;
-  color: #1a7f37;
+  background: var(--ib-accent-green-soft);
+  color: var(--ib-accent-green);
 }
 .badge.failed {
-  background: #ffebe9;
-  color: #cf222e;
+  background: var(--ib-danger-soft);
+  color: var(--ib-danger);
 }
 .badge.parsing,
 .badge.pending {
-  background: #fff8c5;
-  color: #7d4e00;
+  background: var(--ib-warning-soft);
+  color: var(--ib-warning);
 }
 .actions {
   display: flex;
@@ -344,18 +344,18 @@ td {
 }
 .empty {
   text-align: center;
-  color: #57606a;
+  color: var(--ib-text-muted);
   padding: 24px;
 }
 .hint {
-  color: #57606a;
+  color: var(--ib-text-muted);
   font-size: 13px;
 }
 .error {
-  background: #ffebe9;
-  border: 1px solid #cf222e;
+  background: var(--ib-danger-soft);
+  border: 1px solid var(--ib-danger);
   border-radius: 6px;
   padding: 8px 12px;
-  color: #cf222e;
+  color: var(--ib-danger);
 }
 </style>
