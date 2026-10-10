@@ -174,6 +174,14 @@ class Deps:
         self._lock = threading.Lock()
         self._orchestrators: dict[str, Any] = {}
 
+    def reload_projects(self) -> None:
+        """热重载项目快照：CRUD 后立即刷新并重建编排器缓存，无需重启服务。"""
+        fresh = _projects_from_registry(self.cfg, self.ledger, self.project_registry)
+        _ensure_collections(self.vectors, self.collections, fresh)
+        with self._lock:
+            self.projects = fresh
+            self._orchestrators = {}
+
     # ------------------------------------------------------------------ #
     # 每项目一份编排器（工具按项目绑定）
     # ------------------------------------------------------------------ #

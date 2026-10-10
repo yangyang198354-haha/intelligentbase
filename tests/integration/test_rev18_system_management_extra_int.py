@@ -377,15 +377,11 @@ def test_TC_INT_160_no_response_body_contains_plaintext_key(accounts_app):
 
 
 def test_TC_INT_161_runtime_project_usable_only_after_config_registration_and_restart(accounts_app):
-    """US-IB-36 / US-IB-37 / US-IB-44；**D-R18-01（已裁决的交付边界）** / ADR-32 / ADR-37 / ADR-41。
+    """US-IB-36 / US-IB-37 / US-IB-44；ADR-32 / ADR-37 / ADR-41。
 
-    运行期经 `POST /api/projects` 新建的项目：**可建账号、可被 `GET /api/projects` 枚举**；
-    但**检索 / 上传须等「配置侧登记 + 由用户手工重启服务」后才完全可用**
-    （`load_project_record` 对不在配置文件中的项目抛 `ConfigError` 类错误；`kb_id ≡ project_id`
-    时上传路径拿不到归属登记）。用户已明确接受此能力边界 —— **登记为交付边界，非缺陷**。
-
-    本用例断言的是**清晰的边界错误**（HTTP 层面为 `scope_violation` / `startup_error`，
-    均带可读消息），**不是**崩溃、也不是静默的错误结果。
+    运行期经 `POST /api/projects` 新建的项目：**热重载后立即可用于知识问答**
+    （`deps.projects` 刷新 + 编排器缓存清空，无需重启 ib-web）。
+    上传路径仍须 kb 归属登记（`assert_kb_in_project`），属台账侧独立约束。
     """
     deps, _ = accounts_app
     client = _client(accounts_app)
@@ -401,6 +397,9 @@ def test_TC_INT_161_runtime_project_usable_only_after_config_registration_and_re
     assert created.status_code == 201, created.content
     assert json.loads(created.content)["status"] == "active"
 
+    # 热重载：deps.projects 立即含新项目（无需重启服务）。
+    assert "p_gamma" in deps.projects, "建项目后 deps.projects 未热重载"
+
     # 边界内的能力：可建账号。
     account = _create_ops(client, token, "ops_g", "p_gamma")
     assert account.status_code == 201, account.content
@@ -410,30 +409,24 @@ def test_TC_INT_161_runtime_project_usable_only_after_config_registration_and_re
     listed = json.loads(client.get("/api/projects", **h).content)["items"]
     assert "p_gamma" in {i["project_id"] for i in listed}
 
-    # 边界之外：上传 fail-closed（kb 归属登记须由配置侧播种 + 重启）—— 403，可读错误。
+    # 热重载后知识问答立即可用：chat/stream 返回 200（不再 500 startup_error）。
+    chat = client.get(
+        "/api/chat/stream?q=%E4%BD%A0%E5%A5%BD&session_id=d-r18-01", HTTP_X_IB_PROJECT="p_gamma", **h
+    )
+    assert chat.status_code == 200, _body(chat)
+
+    # 上传路径仍须 kb 归属登记（台账侧独立约束，不受 deps.projects 热重载影响）—— 403。
     up = SimpleUploadedFile("g.txt", "内容".encode("utf-8"))
     upload = client.post("/api/files", {"file": up}, HTTP_X_IB_PROJECT="p_gamma", **h)
     assert upload.status_code == 403, upload.content
     assert json.loads(upload.content)["error"]["code"] == "scope_violation"
 
-    # 边界之外：检索路径在**调用期** fail-closed —— 清晰边界错误（点名项目未登记），非静默。
-    chat = client.get(
-        "/api/chat/stream?q=%E4%BD%A0%E5%A5%BD&session_id=d-r18-01", HTTP_X_IB_PROJECT="p_gamma", **h
-    )
-    assert chat.status_code == 500, _body(chat)
-    chat_body = json.loads(_body(chat))
-    assert chat_body["error"]["code"] == "startup_error", chat_body
-    assert "p_gamma" in chat_body["error"]["message"], chat_body
-
-    # 对照：已登记项目（配置侧播种）上传正常 —— 边界确实只在「未登记项目」上。
+    # 对照：已登记项目（配置侧播种）上传正常。
     ok = client.post(
         "/api/files", {"file": SimpleUploadedFile("a.txt", "内容".encode("utf-8"))},
         HTTP_X_IB_PROJECT="p_alpha", **h,
     )
     assert ok.status_code == 201, ok.content
-
-    # 注册表侧确为「配置快照 + 运行期状态」两源：Deps.projects 仍只有配置登记的两个项目。
-    assert set(getattr(deps, "projects", {}).keys()) == {"p_alpha", "p_beta"}
 
 
 # --------------------------------------------------------------------------- #

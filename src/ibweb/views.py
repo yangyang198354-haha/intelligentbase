@@ -1486,6 +1486,7 @@ def projects_endpoint(request: Any) -> Any:
                 )
             )
             audit("project", outcome="created", status="ok", project_id=project_id)
+            deps.reload_projects()
             return _json(ProjectRegistryEntrySerializer(created).data, status.HTTP_201_CREATED)
         return _json(
             {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
@@ -1507,6 +1508,7 @@ def project_detail_endpoint(request: Any, project_id: str) -> Any:
     """
     try:
         _require_admin(request)
+        deps = composition.get_deps()
         registry = _project_registry()
         existing = registry.load(project_id)
         if existing is None:
@@ -1539,6 +1541,7 @@ def project_detail_endpoint(request: Any, project_id: str) -> Any:
             if updated is None:
                 raise NotFoundError("项目不存在或不在可见范围内")
             audit("project", outcome="updated", status="ok", project_id=project_id)
+            deps.reload_projects()
             return _json(ProjectRegistryEntrySerializer(updated).data, status.HTTP_200_OK)
         if request.method == "DELETE":
             payload = _json_body(request)
@@ -1549,6 +1552,7 @@ def project_detail_endpoint(request: Any, project_id: str) -> Any:
             if disabled is None:
                 raise NotFoundError("项目不存在或不在可见范围内")
             audit("project", outcome="disabled", status="ok", project_id=project_id)
+            deps.reload_projects()
             return _json(ProjectRegistryEntrySerializer(disabled).data, status.HTTP_200_OK)
         return _json(
             {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},

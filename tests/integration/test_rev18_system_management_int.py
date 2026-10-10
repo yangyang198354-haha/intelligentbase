@@ -411,3 +411,46 @@ def test_TC_INT_153_llm_key_admin_only_and_no_cookie(accounts_app):
         ),
     ):
         assert "Set-Cookie" not in resp.headers
+
+
+# --------------------------------------------------------------------------- #
+# TC-INT-154 项目热重载：建项目后 deps.projects 立即刷新、orchestrator_for 不抛
+# --------------------------------------------------------------------------- #
+
+
+def test_TC_INT_154_project_hot_reload_after_create(accounts_app):
+    """DEFECT-R18-05：POST /api/projects 建项目后须热重载 deps.projects，
+    无需重启 ib-web 即可用于知识问答（orchestrator_for 不再抛 StartupError）。
+    """
+    deps, Client = accounts_app
+    client = Client()
+    token = _login_admin(client)
+    h = bearer(token)
+
+    new_pid = "p_hotreload"
+    assert new_pid not in deps.projects, "测试前置：新项目不应已存在"
+
+    created = client.post(
+        "/api/projects",
+        data=json.dumps({"project_id": new_pid, "name": "热重载验证"}),
+        content_type="application/json",
+        **h,
+    )
+    assert created.status_code == 201, created.content
+
+    # 热重载：deps.projects 立即含新项目（无需重启服务）
+    assert new_pid in deps.projects, "建项目后 deps.projects 未热重载（需重启才能生效）"
+
+    # 编排器可构建：不再抛 StartupError（项目已登记）
+    graph = deps.orchestrator_for(new_pid)
+    assert graph is not None, "orchestrator_for 返回 None"
+
+    # 软删后热重载：项目从 deps.projects 移除
+    disabled = client.delete(
+        f"/api/projects/{new_pid}",
+        data=json.dumps({"confirm_project_id": new_pid}),
+        content_type="application/json",
+        **h,
+    )
+    assert disabled.status_code == 200, disabled.content
+    assert new_pid not in deps.projects, "软删后 deps.projects 未移除项目"
