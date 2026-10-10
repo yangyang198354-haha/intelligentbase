@@ -165,6 +165,16 @@ function humanSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+// 后端返回 UTC ISO（如 2026-10-07T09:46:52Z），界面按本地时区显示为
+// yyyy-mm-dd hh:mm:ss（Anthropic 风格：表格时间一律本地、可读）。
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
 onMounted(load);
 </script>
 
@@ -230,7 +240,7 @@ onMounted(load);
             <!-- 失败原因只显示错误码，不回显解析器原文（可能含文件内容片段） -->
             <span v-if="file.error_code" class="hint">（{{ file.error_code }}）</span>
           </td>
-          <td>{{ file.updated_at }}</td>
+          <td>{{ fmtDate(file.updated_at) }}</td>
           <td class="actions">
             <button
               v-if="file.status === 'failed'"

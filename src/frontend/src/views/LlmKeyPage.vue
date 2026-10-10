@@ -44,6 +44,16 @@ function messageOf(err: unknown, fallback: string): string {
   return '无法连接服务，请确认服务已启动。';
 }
 
+// 后端返回 UTC ISO（如 2026-10-07T09:46:52Z），界面按本地时区显示为
+// yyyy-mm-dd hh:mm:ss（Anthropic 风格：时间一律本地、可读）。
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
 async function load(): Promise<void> {
   loading.value = true;
   loadError.value = '';
@@ -131,7 +141,7 @@ onMounted(load);
       </div>
       <div class="status-row">
         <span class="label">最后更新</span>
-        <span class="mono">{{ status?.updated_at || '—' }}</span>
+        <span class="mono">{{ fmtDate(status?.updated_at) }}</span>
       </div>
 
       <el-divider />
