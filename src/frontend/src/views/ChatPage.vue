@@ -46,7 +46,7 @@
  * 大小差异纯粹是 CSS。因此点击就是打开这张字节本身，无需第二次请求，也不会出现
  * 「缩略图与原图不一致」这类只有两个端点才会有的漂移。
  */
-import { onBeforeUnmount, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, reactive, ref } from 'vue';
 
 import {
   ApiClientError,
@@ -87,6 +87,7 @@ type Turn = {
 const createdUrls = new Set<string>();
 
 const query = ref('');
+const isStreaming = computed(() => turns.value.some(t => t.streaming));
 // FND-R11-01 / AC-IB-20-01：**不得**预填字面量 'default' —— 预填等于「用户没填也照发」，
 // 与后端「缺会话标识即显式 4xx」的纪律自相矛盾（且多标签页会静默共用一个会话）。
 // 留空由用户在下方输入；`client.chatStream/chatResume` 对空标识提前拒绝并给出可读回执。
@@ -246,7 +247,7 @@ function openOriginal(image: TurnImage): void {
 
 async function ask(): Promise<void> {
   const text = query.value.trim();
-  if (!text || controller) return;
+  if (!text || isStreaming.value) return;
   // turn 必须 reactive：apply()/finally 直接改裸对象不会触发 Vue 响应式（绕过 Proxy 的
   // set 拦截），界面会永久停在「生成中…」——即便 content/done 事件都已正确写入数据（R15 根因）。
   const turn = reactive<Turn>({
@@ -284,7 +285,7 @@ async function ask(): Promise<void> {
  */
 async function decide(turn: Turn, approved: boolean): Promise<void> {
   const prompt = turn.confirmation;
-  if (!prompt || !prompt.gate_id || controller) return;
+  if (!prompt || !prompt.gate_id || isStreaming.value) return;
   turn.decided = true;
   turn.error = '';
   turn.streaming = true;
@@ -338,9 +339,9 @@ onBeforeUnmount(() => {
         type="text"
         placeholder="输入问题，例如：本项目的验收标准是什么？"
         aria-label="问题"
-        :disabled="!!controller"
+        :disabled="isStreaming"
       />
-      <button v-if="!controller" type="submit" :disabled="!query.trim()">提问</button>
+      <button v-if="!isStreaming" type="submit" :disabled="!query.trim()">提问</button>
       <button v-else type="button" class="stop" @click="stop">停止</button>
     </form>
 
@@ -362,9 +363,9 @@ onBeforeUnmount(() => {
       <!-- 降级横幅：置于正文之前，正文始终带着这个限定语 -->
       <p v-if="turn.degraded" class="degraded" role="status">{{ turn.degraded }}</p>
 
-      <details v-if="turn.reasoning.length" :open="showReasoning" class="reasoning">
-        <summary>处理过程（{{ turn.reasoning.length }} 步）</summary>
-        <p v-for="(line, i) in turn.reasoning" :key="i">{{ line }}</p>
+      <details v-if="turn.reasoning.length" :open="showReasoning" class="reasoning" :class="{ done: !turn.streaming }">
+        <summary>处理过程（{{ turn.reasoning.length }} 步）{{ !turn.streaming ? '·已完成' : '' }}</summary>
+        <p v-for="(line, i) in turn.reasoning" :key="i" :class="{ 'step-done': !turn.streaming }">{{ line }}</p>
       </details>
 
       <pre v-if="turn.answer" class="answer">{{ turn.answer }}</pre>
@@ -506,6 +507,13 @@ button:disabled {
 .reasoning pre {
   white-space: pre-wrap;
   font-family: inherit;
+}
+.reasoning .step-done::before {
+  content: '\2713\00a0';
+  color: var(--ib-accent);
+}
+.reasoning.done summary {
+  color: var(--ib-text-muted);
 }
 .hint {
   color: var(--ib-text-muted);
