@@ -6,16 +6,16 @@
 | 文档 ID | DOC-IB-DP-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 生产部署计划 |
 | 产出代理 | devops-engineer (author_agent) |
-| 调用 ID | INV-GROUP_E-INTELBASE-006（**REV-18 增量**；前序 -005 / -004 / -002 / -003） |
+| 调用 ID | INV-GROUP_E-INTELBASE-007（**REV-19 增量**；前序 -006 / -005 / -004 / -002 / -003） |
 | 项目 | intelligentbase |
 | 阶段 | GROUP_E / **PHASE_10（部署计划，仅计划）**；PHASE_11（实际部署）**PENDING，禁止执行** |
-| revision | **REV-18**（系统管理三分：项目注册表 CRUD（软删）/ 唯一运维账号（N:1）/ LLM Key 管理（载体 = DB）/ 项目域资料上传（`kb_id ≡ project_id` 推导）；**含 2 个新迁移 `005_projects.sql` / `006_llm_key.sql` + `kb_default` 前向数据迁移**） |
-| 版本 | **1.4.0**（REV-18 增量；在 1.3.0/REV-14 之上追加 R18 部署面，见 §15） |
-| status | **APPROVED**（**GR-E-006 = PASS_WITH_CONDITIONS**，经协调者独立核验并由用户 2026-10-07 接受；GR-E-001 对 R4 前版本有效、GR-E-002 对 1.1.0 有效、GR-E-003 对 1.1.1/R10 有效、GR-E-004 对 1.2.0/REV-13 有效、GR-E-005 对 1.3.0/REV-14 有效）。**GR-E-006 协调者复核订正了 3 处**（`cicd_pipeline.md` 前端增量 `+14` → `+6`；§15.9 登记②③经实测不成立已撤回）。**PHASE_11 实际部署仍 PENDING/冻结**，须用户明确 `PRODUCTION_DEPLOY_CONFIRM=true` |
+| revision | **REV-19**（每项目专家集隔离（IFC-IB-379/380/381）/ 定义文档**目录化**（`IB_DEFINITION_DOC_PATH` 语义 **文件 → 目录**，C-IB-46，IFC-IB-383/384，ADR-44）/ 新项目创建期种子（IFC-IB-385）/ 三专家属 `demo`（C-IB-47，IFC-IB-386）/ 前端项目域闭环（IFC-IB-387）；**无新 SQL 迁移 / 无新 env 键 / 无新第三方依赖**；含**文件级** `C-IB-46` 迁移（CI 不可测、须用户手工执行 + 先备份 + 失败回滚），及**前向条款** `C-IB-47`（**当前无持久化迁移对象**）） |
+| 版本 | **1.5.1**（REV-19 增量 + 用户裁决回填 / `checklists.txt` B24 订正；在 1.5.0/REV-19 之上追加，见 §16 与 §16.2(b) 订正注） |
+| status | **REVISED_PENDING_REVIEW**（**1.5.1/REV-19 用户裁决回填待复核**；**1.5.0 已经 GR-E-007 = PASS_WITH_CONDITIONS、PHASE_10 计划层**；1.5.1 未过门控，故不置 APPROVED）。前序：**APPROVED**（**GR-E-006 = PASS_WITH_CONDITIONS**，经协调者独立核验并由用户 2026-10-07 接受；GR-E-001 对 R4 前版本有效、GR-E-002 对 1.1.0 有效、GR-E-003 对 1.1.1/R10 有效、GR-E-004 对 1.2.0/REV-13 有效、GR-E-005 对 1.3.0/REV-14 有效）。**GR-E-006 协调者复核订正了 3 处**（`cicd_pipeline.md` 前端增量 `+14` → `+6`；§15.9 登记②③经实测不成立已撤回）。**PHASE_11 实际部署仍 PENDING/冻结**，须用户明确 `PRODUCTION_DEPLOY_CONFIRM=true` |
 | 创建日期 | 2026-09-26 |
-| 更新日期 | 2026-10-07（REV-18 增量） |
+| 更新日期 | 2026-10-11（REV-19 增量） |
 | 目标机 | `192.168.31.133`（Ubuntu 26.04 LTS / x86_64 / i7-3770S 4C8T / 11 GiB / 78 GiB 可用 / GTX 960 弃用） |
-| 上游输入 | `docs/architecture_design.md`(**1.10.2/REV-18-R2**，ADR-37/38/39/40/41/42 + ADR-21-R1 + §10.1 OI-1/OI-2 关闭·OI-3 OPEN)、`docs/module_design.md`(**1.10.2/REV-18-R2**，IFC-IB-366~377，端口 17→19)、`docs/tech_stack.md`(**1.4.1/REV-18**，**NO_CHANGE**)、`docs/ib_embed_service_contract.md`(1.0.0/R2)、`docs/requirements_spec.md`(**1.10.0/REV-18-2**)、`docs/user_stories.md`(**1.10.0/REV-18-2**)、`docs/implementation_plan.md`(**2.13.0/REV-18**，§25)、`docs/test_report.md`(**1.14.0/REV-18**，§23；GR-D-015)、`docs/phase_status.md`（GR-D-015 = PASS_WITH_CONDITIONS，用户 2026-10-07 接受）、`src/deploy/**`（**`migrations/005_projects.sql` / `006_llm_key.sql`**、**`checklists.txt` B21/B22/B23**、**`env.example` 新增 2 键**）、`src/ib/ledger/schema.py`（**迁移单源**）、`src/ibweb/{views,urls,composition,serializers}.py`、`src/frontend/**`（均**只读**） |
+| 上游输入 | `docs/architecture_design.md`(**1.11.0/REV-19**，ADR-43/44/45/46/47 + §2.0.10 REV-19 影响复核表；tech_stack NO_CHANGE)、`docs/module_design.md`(**1.11.0/REV-19**，IFC-IB-378~388，端口 **19 不变**)、`docs/tech_stack.md`(**1.4.1/REV-18**，**NO_CHANGE**)、`docs/ib_embed_service_contract.md`(1.0.0/R2)、`docs/requirements_spec.md`(**1.11.0/REV-19**，§2.12 / DR-22 / DR-23 / C-IB-44~47)、`docs/user_stories.md`(**1.11.0/REV-19**，US-IB-41~45 / AC-IB-45-04)、`docs/implementation_plan.md`(**2.14.0/REV-19**，§26)、`docs/test_report.md`(**1.15.0/REV-19**，§24；GR-D-016 / GR-D-017)、`docs/phase_status.md`（**GR-A-011 / GR-B-011 / GR-C-014 + GR-C-015（DEFECT-R19-D-01 闭合）/ GR-D-016 + GR-D-017**，均 APPROVED；REV-19，2026-10-11）、`src/deploy/**`（**`checklists.txt` B24/B25**；**R19 无新增迁移 `.sql`**）、`src/ib/config/definition.py`（`FileDefinitionDocumentStore._path_for` / `migrate_legacy_definition_file`）、`src/ib/experts/__init__.py`（`ExpertRegistryView` / `resolve_expert_registry` / `builtin_default_registry`）、`src/ib/streaming/__init__.py`（`migrate_expert_history` / `MemorySessionStore`）、`src/ibweb/{views,urls,composition}.py`、`src/frontend/**`（均**只读**）；**前序输入（历史）**：`architecture_design.md` 1.10.2/REV-18-R2（ADR-37~42）、`module_design.md` 1.10.2/REV-18-R2（IFC-IB-366~377）、`test_report.md` 1.14.0/REV-18 §23（GR-D-015）、`src/deploy/migrations/{005_projects,006_llm_key}.sql` |
 | 凭据纪律 | 本文件**不含任何真实凭据 / 口令 / 令牌**；凡涉及凭据一律写「经环境变量 / EnvironmentFile 注入」；目标机 SSH 口令**不记录** |
 | 执行门控 | 任何目标机写操作（SSH 写 / rsync / scp / apt / pip / systemctl / 服务启动）**在收到 PM 的 `PRODUCTION_DEPLOY_CONFIRM=true` 之前一律禁止**；本轮为纯文档产出，**未连接、未触碰目标机** |
 
@@ -33,6 +33,14 @@
 >
 > **R18 门控前置备注（如实登记，待 PM 归口）**：本轮读取时，`docs/phase_status.md`（权威控制文档）记载 **GROUP_B = APPROVED（GR-B-010，REV-18-R1 由 PASS_WITH_CONDITIONS 升为 PASS）**、**GROUP_C = APPROVED（GR-C-013 = PASS_WITH_CONDITIONS）**、**GROUP_D = APPROVED（GR-D-015 = PASS_WITH_CONDITIONS，经用户 2026-10-07 接受）**。设计真源 `architecture_design.md` / `module_design.md` 已落盘 **1.10.2/REV-18-R2**（`tech_stack.md` NO_CHANGE 保持 1.4.1/REV-18）。**测试基线以此为准 = Python 351/351（unit 157 / integration 170 / e2e 24，0 skip/xfail）+ 前端冒烟 35/35 + `selfcheck.py` 51/51**（`test_report.md` 1.14.0 §23；其 `file_header.status` 对 §23 标 APPROVED）。**CRED-01**（未提交工作包不得原样提交）自 GR-B-007 起连续结转，见 §15.6。
 >
+> **REV-19 增量声明（本轮，INV-GROUP_E-INTELBASE-007）**：本文件为 **PHASE_10 计划层增量**——**仅更新计划，未执行任何部署**。**未连接、未触碰目标机 `192.168.31.133`**；**未执行任何 SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传 / 数据库或文件迁移 / 备份**；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改 `src/**` 实现代码 / `tests/**` / 设计真源文档 / `docs/phase_status.md` / `docs/test_*.md` / `docs/implementation_plan.md` / `.github/workflows/ci.yml`**；**未触发 PHASE_11**；**未收到、也未自赋 `PRODUCTION_DEPLOY_CONFIRM`**（本轮 `special_instructions` 明确「仅 PHASE_10 计划层；PHASE_11 保持冻结」）。R19 增量内容见 **§16**，**所有命令须 PM CONFIRM 后执行**。
+>
+> **R19 变更面（一句话）**：后端**每项目专家集隔离**（`ExpertRegistryView` / `resolve_expert_registry` / `builtin_default_registry`）+ **定义文档物理载体目录化**（`IB_DEFINITION_DOC_PATH` 语义 **文件 → 目录**，`<dir>/<project_id>.json`）+ **新项目创建期种子**（`seed_project`）+ **三专家历史迁移工具**（`migrate_expert_history`，**前向条款**）+ 前端**项目域闭环**（复用既有 `projectContext` / `client.ts`，**零代码**）——**零新第三方依赖（`tech_stack.md` NO_CHANGE，维持 1.4.1/REV-18）、零新增模块（仍 26）、零新增端口（仍 19）、零新增依赖边、零新 env 键、零新 SQL 迁移、无 unit / nginx 站点改动**。故 R19 部署面 = **`git pull` → 后端依赖核对（应无新增）→ 前端构建 + 测试（首次实跑）→ 发布 `dist/`（原子替换）→ 【维护窗口】停服 + 备份旧定义文档 → C-IB-46 定义文档目录化迁移（用户手工执行）→ 更新 `.env` `IB_DEFINITION_DOC_PATH` 为目录根 → 重启 `ib-web`（+ 推荐 `ib-worker`）→ 部署后验证**（见 §16.3）。**其中 C-IB-46 是本轮唯一「语义变更 + 文件迁移」步，不可 CI 测、须用户手工执行 + 先备份 + 失败回滚；C-IB-47 当前无可执行内容、登记为前向条款**（见 §16.4）。
+>
+> **R19 门控前置备注（如实登记，待 PM 归口）**：本轮读取时，`docs/phase_status.md`（权威控制文档）记载 **GROUP_A = APPROVED（GR-A-011）**、**GROUP_B = APPROVED（GR-B-011 = PASS_WITH_CONDITIONS，REV-19 设计增量；`tech_stack.md` NO_CHANGE 保持 1.4.1/REV-18）**、**GROUP_C = APPROVED（GR-C-014 = PASS_WITH_CONDITIONS + GR-C-015 = DEFECT-R19-D-01 闭合）**、**GROUP_D = APPROVED（GR-D-016 = PASS_WITH_CONDITIONS + GR-D-017 = 断言加强复跑）**。设计真源 `architecture_design.md` / `module_design.md` 已落盘 **1.11.0/REV-19**。**测试基线以此为准 = Python 采集 382（unit 174 / integration 181 / e2e 27）、380 passed / 2 skipped / 0 failed（缺陷闭合后）+ 前端冒烟 35（计数未变、本轮未实跑）+ `selfcheck.py` 52/52**（`test_report.md` 1.15.0 §24 记 379 passed / 1 failed / 2 skipped，唯一 FAIL = TC-INT-R19-006 = DEFECT-R19-D-01，**已由 GR-C-015 闭合**；**本轮独立复跑为 380 / 2 / 0**，详见 §16.2）。**两处同源不同步（登记为 P1 待澄清项，不阻塞计划层）**：① `test_report.md` `file_header.status` 对 **§24（REV-19）** 仍标「待 PM 门控 / PARTIAL_SUCCESS」，滞后于 phase_status 的 **GR-D-016 / GR-D-017 已签发**；② 设计真源文档 `file_header.status` 实测仍为 **`DRAFT_FOR_GATE_REVIEW`**，与 phase_status 的组级 APPROVED 不一致（**沿 R13 / R14 / R18 既有先例**；`tests/**`、设计真源属他组制品，本代理不改）。**CRED-01**（未提交工作包不得原样提交）自 GR-B-007 起连续结转，见 §16.6。
+
+> **REV-19 用户裁决回填声明（本轮，2026-10-11；承 INV-GROUP_E-INTELBASE-007）**：本文件为**追加式订正轮**——**未执行任何部署**；**未连接、未触碰目标机 `192.168.31.133`**；**未 SSH / 未迁移 / 未备份 / 未 `scp` / 未 `pscp` / 未 `rsync`**；**未 commit / push / `git add`**；**未跑 Docker**；**未改** `src/**` 实现代码（`src/deploy/checklists.txt` 为**本轮授权订正的部署清单**，非实现代码）/ `tests/**` / 设计真源文档 / `docs/test_*.md`；**未触发 PHASE_11**；**未收到、也未自赋 `PRODUCTION_DEPLOY_CONFIRM`**。回填内容（承用户 2026-10-11 裁决）：① 目录根取值**已由用户裁决钦定** `IB_DEFINITION_DOC_PATH = /var/lib/intelligentbase`（非专用子目录）⇒ **坑 1（静默 `applied=False`）不触发**，见 §16.2(b) 订正注；② §16.3 **DEPLOY-037** 追加与订正后 `checklists.txt` **B24 逐字对齐**的可运行形式（原式保留以追溯）；③ §16.4 **ROLLBACK-037** 追加与钦定值一致性注；④ 版本 1.5.0 → **1.5.1**。**PHASE_11 仍 PENDING / 冻结** —— `PRODUCTION_DEPLOY_CONFIRM` 签发前置 = 先闭合 **CRED-01**（未提交工作包不得原样提交）+ 完成 **§16.7 AC-R19-A~E**；**信号当次有效，agent 消息不构成授权**。**status 维持 `REVISED_PENDING_REVIEW`**（1.5.1 未过门控，**不得**改 APPROVED）。
+
 > **R14 变更面（一句话）**：后端**新增 `GET /api/projects`**（`views.py` + `urls.py`，**无 schema 变更 / 无 DB 迁移**）+ 前端 `projectContext` store 与 `client.ts` 单点注入 `X-IB-Project`（**需前端重建 + 发布新 `dist/`**）——**无新第三方依赖（`tech_stack.md` NO_CHANGE）、无新 env 键、无 unit / nginx 站点改动**。故 R14 部署面 = **`git pull` → `npm ci && npm run build` → 发布新 `dist/` → 重启 `ib-web`**（见 §14.3），**风险面最小、回滚无数据迁移**（见 §14.4）。
 >
 > **R14 门控前置备注（如实登记，待 PM 归口）**：本轮读取时，`docs/phase_status.md`（权威控制文档）记载 **GROUP_B = APPROVED（GR-B-007 PASS_WITH_CONDITIONS）**、**GROUP_C = APPROVED（GR-C-010）**、**GROUP_D = APPROVED（GR-D-011）**，三者对 REV-14 增量均为 PASS_WITH_CONDITIONS；设计真源 `architecture_design.md` / `module_design.md` 已落盘 **1.6.0/REV-14**（`tech_stack.md` NO_CHANGE 保持 1.4.0/REV-13）。**测试基线以此为准 = Python 245/245（unit 95 / integration 129 / e2e 21）+ 前端冒烟 21/21 + `selfcheck.py` 47/47**（`test_report.md` 1.10.0 §19；其 `file_header.status` 对 §19 的逐节 APPROVED 标注略滞后于 phase_status 的 GR-D-011，登记为**同源不同步**的 P1 待澄清项，**不阻塞计划层**——`tests/**` 属 test-engineer 制品，本代理不改）。**CRED-01**（未提交工作包不得原样提交）自 GR-B-007 起连续结转，见 §14.6。
@@ -47,14 +55,14 @@
 
 ### 1.1 阻塞级（P0 — 未闭合则不得进入 PHASE_11）
 
-| # | 前置 | 当前实际状态（已核验） | 影响 | 闭合责任方 |
-|---|------|------------------------|------|-----------|
-| **B-01** | **intelligentbase 须存在 git 仓库与 remote** | **未建立**。实测 `git remote -v` → `fatal: not a git repository (or any of the parent directories): .git`；项目根目录**无 `.git`**。代码当前仅存在于工作目录（`docs/`、`src/`、`tests/`） | 冻结决策 ⑧ 要求目标机以 **`git pull`** 交付代码。无仓库 / 无 remote 则**第 8 节整套交付流程不可执行**；若绕道用 rsync/scp 即为**违反冻结决策** | 用户 / PM：`git init` + 建远端（内网 Git 或 VPS 裸仓库）+ 首次 push |
-| **B-02** | **目标机 SSH 凭据注入方式须确定** | SSH 用户 `yangyang198354` 已实测回填；**口令值未提供、且不得写入任何入库文件** | 无凭据 → 任何远程操作（含只读）都无法执行 | 用户：日后经**环境变量**注入（如 `FREEARK_/IB_SSH_PASS` 类）；**不得**回填到本文件或任何被 git 跟踪的文件 |
-| **B-03** | **目标机 apt / pip 外网或内网源可达性须确认** | 未实测。Ubuntu 26.04 为较新发行版 | 不可达则 `apt install`（python3.12、build-essential、libgl1 等）与 `pip install -r requirements.txt` 全部失败 | 用户 / PM：确认 apt 源与 PyPI 镜像可达；若隔离网需预置离线 wheel 缓存 |
-| **B-04** | **`FND-GROUP-D-03`（MAJOR）处置裁决** | **未闭合**。`docs/phase_status.md` 与 `docs/test_report.md` §10.6 记载：生产 HTTP 删除路径下 `DeleteReport.blob_deleted` **恒 False** → 原文件字节成孤儿（隐私 / 磁盘泄漏，不影响检索正确性）。verifier 已独立复现。**phase_status 明确「建议阻塞 PHASE_11」** | 属生产写路径缺陷，部署前应修或由 PM 显式接受风险 | PM：路由 developer 修复，或书面接受 |
-| **B-05** | **`ib-embed` 推理运行时三选一未定**（**部分闭合**：清单与来源已定；运行时三选一仍须目标机实测锁定，属 PHASE_11 前置） | `IB_EMBED_BACKEND` 运行时选型（FlagEmbedding / sentence-transformers / onnxruntime 直载）**须目标机实测 [TBD-T1/T3/T4/T18] 后定**（**本轮未锁定**）。依赖清单**已补**：`src/requirements-embed.txt`（R4）给出 FlagEmbedding（首选）+ `torch`(CPU) + `transformers` 的**保守区间**、bge-m3 双源（HuggingFace / ModelScope）与「权重不进 git」约定；基座 `src/requirements.txt` 仍**刻意不含** torch/FlagEmbedding（进程隔离 C8）。**区间不是锁定值** | 第 4 节安装清单的**来源**已唯一确定（`src/requirements-embed.txt`）；但**精确版本**仍须目标机 `pip install` 后以 `pip freeze` 回填（**区间不得当锁定值上线**）；若选 onnxruntime 直载，还须自备 bge-m3 的 ONNX 导出与 tokenizer | PM：授权在目标机做选型实测并在部署时锁定；锁定后**以 `pip freeze` 回填锁文件**（属 PHASE_11 前置） |
-| **B-06** | **bge-m3 模型权重获取方式与来源须定** | 权重约 2.3 GB，**不得进 git**。契约 §9 要求 `IB_EMBED_MODEL_PATH` 指向**本地权重目录**、**离线加载**（不联网下载） | 无权重 → Embedder 冷启动失败 → 检索**静默降级**为「无知识库」而问答照常出答案（最危险的静默事故） | 用户 / PM：确定 offline 拷入路径（U 盘 / 内网制品库）；本计划只登记「权重不进 git」 |
+| # | 前置 | 当前实际状态（已核验） | 影响 | 闭合责任方 | 已核验状态（2026-10-11 重审实测） |
+|---|------|------------------------|------|-----------|------ |
+| **B-01** | **intelligentbase 须存在 git 仓库与 remote** | **未建立**。实测 `git remote -v` → `fatal: not a git repository (or any of the parent directories): .git`；项目根目录**无 `.git`**。代码当前仅存在于工作目录（`docs/`、`src/`、`tests/`） | 冻结决策 ⑧ 要求目标机以 **`git pull`** 交付代码。无仓库 / 无 remote 则**第 8 节整套交付流程不可执行**；若绕道用 rsync/scp 即为**违反冻结决策** | 用户 / PM：`git init` + 建远端（内网 Git 或 VPS 裸仓库）+ 首次 push | **【已证伪 / 已闭合】**（2026-10-11 实测）仓库与远端**已存在** —— `git remote` 含 `origin`，`origin/main` == 本地 HEAD == 目标机 HEAD == `4e492f7cda70a2e0e69221f5c1bab547fa51e357`（三方零差集）。原文「未建立」不成立。 |
+| **B-02** | **目标机 SSH 凭据注入方式须确定** | SSH 用户 `yangyang198354` 已实测回填；**口令值未提供、且不得写入任何入库文件** | 无凭据 → 任何远程操作（含只读）都无法执行 | 用户：日后经**环境变量**注入（如 `FREEARK_/IB_SSH_PASS` 类）；**不得**回填到本文件或任何被 git 跟踪的文件 | **【实质已闭合】**（2026-10-11 实测）免密公钥认证**已可用**（`ssh -i ~/.ssh/ib_prod_ed25519 -o BatchMode=yes` 只读成功）⇒「口令值未提供」**不再阻塞**。本文件**不写任何口令 / Key 字面量**；仅登记「免密公钥认证已可用」与该密钥**路径**（`~/.ssh/ib_prod_ed25519`）。 |
+| **B-03** | **目标机 apt / pip 外网或内网源可达性须确认** | 未实测。Ubuntu 26.04 为较新发行版 | 不可达则 `apt install`（python3.12、build-essential、libgl1 等）与 `pip install -r requirements.txt` 全部失败 | 用户 / PM：确认 apt 源与 PyPI 镜像可达；若隔离网需预置离线 wheel 缓存 | **【部分闭合 / 对 REV-19 已闭合】**（2026-10-11 实测）`/opt/intelligentbase/venv` **已存在**且 `venv/bin/python -c "import ib.config"` 成功 ⇒ pip install 已做过；REV-19 **零新增第三方依赖**（`tech_stack.md` NO_CHANGE）⇒ 对 REV-19 部署**不阻塞**。全量 apt/pip 源可达性属目标机事实，PM **本轮未复测**。 |
+| **B-04** | **`FND-GROUP-D-03`（MAJOR）处置裁决** | **未闭合**。`docs/phase_status.md` 与 `docs/test_report.md` §10.6 记载：生产 HTTP 删除路径下 `DeleteReport.blob_deleted` **恒 False** → 原文件字节成孤儿（隐私 / 磁盘泄漏，不影响检索正确性）。verifier 已独立复现。**phase_status 明确「建议阻塞 PHASE_11」** | 属生产写路径缺陷，部署前应修或由 PM 显式接受风险 | PM：路由 developer 修复，或书面接受 | **【CLOSED_VERIFIED / 账本已闭合】**（2026-10-11 重审，只读 `phase_status.md` + `test_report.md` 含历史轮）两处**均载** `FND-GROUP-D-03` = **CLOSED_VERIFIED**（R4：真实 Django HTTP `DELETE` + 真实 `FsBlobStore` ⇒ `blob_deleted=True`、磁盘 0 残留；见 `test_report.md` **§11.3** 与 `phase_status.md` GR-C-004，经独立 verifier 复核）。原文「未闭合 / 建议阻塞 PHASE_11」**已落后于账本**（同源不同步，GR-E-006 condition_3 已登记）⇒ 本项**不再阻塞** PHASE_11。 |
+| **B-05** | **`ib-embed` 推理运行时三选一未定**（**部分闭合**：清单与来源已定；运行时三选一仍须目标机实测锁定，属 PHASE_11 前置） | `IB_EMBED_BACKEND` 运行时选型（FlagEmbedding / sentence-transformers / onnxruntime 直载）**须目标机实测 [TBD-T1/T3/T4/T18] 后定**（**本轮未锁定**）。依赖清单**已补**：`src/requirements-embed.txt`（R4）给出 FlagEmbedding（首选）+ `torch`(CPU) + `transformers` 的**保守区间**、bge-m3 双源（HuggingFace / ModelScope）与「权重不进 git」约定；基座 `src/requirements.txt` 仍**刻意不含** torch/FlagEmbedding（进程隔离 C8）。**区间不是锁定值** | 第 4 节安装清单的**来源**已唯一确定（`src/requirements-embed.txt`）；但**精确版本**仍须目标机 `pip install` 后以 `pip freeze` 回填（**区间不得当锁定值上线**）；若选 onnxruntime 直载，还须自备 bge-m3 的 ONNX 导出与 tokenizer | PM：授权在目标机做选型实测并在部署时锁定；锁定后**以 `pip freeze` 回填锁文件**（属 PHASE_11 前置） | **【维持原文 / 本轮未复测】** 无测量依据（PM 未做目标机实测、用户未提供事实）⇒ **不得标为已闭合**；IB_EMBED 运行时三选一仍须目标机实测锁定，属 PHASE_11 前置。 |
+| **B-06** | **bge-m3 模型权重获取方式与来源须定** | 权重约 2.3 GB，**不得进 git**。契约 §9 要求 `IB_EMBED_MODEL_PATH` 指向**本地权重目录**、**离线加载**（不联网下载） | 无权重 → Embedder 冷启动失败 → 检索**静默降级**为「无知识库」而问答照常出答案（最危险的静默事故） | 用户 / PM：确定 offline 拷入路径（U 盘 / 内网制品库）；本计划只登记「权重不进 git」 | **【维持原文 / 本轮未复测】** 无测量依据 ⇒ **不得标为已闭合**；bge-m3 权重获取方式仍须用户确定。 |
 
 ### 1.2 待确认级（P1 — 不阻塞规划，但执行前须澄清）
 
@@ -602,8 +610,9 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 | **DEPLOY-011 ~ 016** | **REV-13 增量步骤**（bcrypt 依赖 / 003 迁移 / R13 环境变量 / 默认管理员播种 / nginx HTTPS / 令牌纪律校验）—— 正向定义见 **§13.6** | **ROLLBACK-011 ~ 016** | **R13 逆操作**（详见 **§13.7**；逆序执行，含 `[MANUAL_ROLLBACK_REQUIRED]` 项） |
 | **DEPLOY-017 ~ 021** | **REV-14 增量步骤**（`git pull` / 前端重建 `npm ci && npm run build` / 发布新 `dist/` / 重启 `ib-web` / 部署后验证）—— 正向定义见 **§14.3**。**无 DB 迁移、无新依赖、无新 env 键、无 unit 或站点改动** | **ROLLBACK-017 ~ 021** | **R14 逆操作**（详见 **§14.4**；逆序执行，**不涉数据迁移**，无 `[MANUAL_ROLLBACK_REQUIRED]` 项） |
 | **DEPLOY-022 ~ 031** | **REV-18 增量步骤**（`git pull` / 后端 venv 依赖核对 / **迁移前备份 + 受影响行数核算（硬前置）** / **迁移应用（`005` 的 `kb_default` 归属重绑不可逆）** / 前端重建 / 发布新 `dist/`（原子替换）/ 重启 `ib-web` / 重启 `ib-worker`（推荐）/ 部署后验证 / **LLM Key 从 `.env` 迁移到 DB（用户执行）**）—— 正向定义见 **§15.3**。**含 2 个新迁移（`005` / `006`）+ 2 个新 env 键（均有默认值）**；**无新第三方依赖、无 unit 或站点改动** | **ROLLBACK-022 ~ 031** | **R18 逆操作**（详见 **§15.4**；逆序执行）。**`005` 的 `kb_default` 数据重绑不可逆 → `[MANUAL_ROLLBACK_REQUIRED]`（唯一回退 = 恢复迁移前台账备份）**，见 §15.4 / §15.6 |
+| **DEPLOY-032 ~ 040** | **REV-19 增量步骤**（`git pull` / 后端 venv 依赖核对（应无新增）/ **前端构建 + 测试（首次实跑 `npm run typecheck / test / build`）** / 发布新 `dist/`（原子替换、**无需重启**）/ **【维护窗口】停服 + 备份旧定义文档** / **C-IB-46 定义文档目录化迁移（`IB_DEFINITION_DOC_PATH` 文件 → 目录；用户手工执行）** / 更新 `.env` 为目录根 / 重启 `ib-web`（+ 推荐 `ib-worker`）/ 部署后验证）—— 正向定义见 **§16.3**。**零新 SQL 迁移 / 零新 env 键 / 零新第三方依赖 / 无 unit 或站点改动**；**含文件级 C-IB-46 语义变更（须用户手工执行 + 先备份 + 失败回滚）** | **ROLLBACK-032 ~ 040** | **R19 逆操作**（详见 **§16.4**；逆序执行 + **C-IB-46 三件套 {037,038,039} 耦合回退**）。**C-IB-46 文件迁移非破坏性（移动而非删除），回退 = 原位还原 + `git checkout` + `.env` 还原**，见 §16.4 / §16.6 |
 
-> **逆序纪律**：一旦某步失败，**立即停止后续步骤**，从该步向 DEPLOY-001 **逆序**回滚，并记录每一步结果。**R13 步骤（DEPLOY-011~016）同样适用**：失败即从该步逆序回滚（先 ROLLBACK-016 → … → ROLLBACK-011），**不跳步**。**R14 步骤（DEPLOY-017~021）同样适用**：失败即从该步逆序回滚（先 ROLLBACK-021 → … → ROLLBACK-017），**不跳步**；因 R14 **零迁移**，其回滚**不涉数据迁移**（见 §14.4）。**R18 步骤（DEPLOY-022~031）同样适用**：失败即从该步逆序回滚（先 ROLLBACK-031 → … → ROLLBACK-022），**不跳步**；**R18 含数据迁移 ⇒ 回滚须区分「代码可回滚」与「数据归属不回退」**——`005` 的 `kb_default` 重绑**不可逆**，唯一回退为**恢复迁移前台账备份**（破坏性，`[MANUAL_ROLLBACK_REQUIRED]`），详见 §15.4 / §15.6。
+> **逆序纪律**：一旦某步失败，**立即停止后续步骤**，从该步向 DEPLOY-001 **逆序**回滚，并记录每一步结果。**R13 步骤（DEPLOY-011~016）同样适用**：失败即从该步逆序回滚（先 ROLLBACK-016 → … → ROLLBACK-011），**不跳步**。**R14 步骤（DEPLOY-017~021）同样适用**：失败即从该步逆序回滚（先 ROLLBACK-021 → … → ROLLBACK-017），**不跳步**；因 R14 **零迁移**，其回滚**不涉数据迁移**（见 §14.4）。**R18 步骤（DEPLOY-022~031）同样适用**：失败即从该步逆序回滚（先 ROLLBACK-031 → … → ROLLBACK-022），**不跳步**；**R18 含数据迁移 ⇒ 回滚须区分「代码可回滚」与「数据归属不回退」**——`005` 的 `kb_default` 重绑**不可逆**，唯一回退为**恢复迁移前台账备份**（破坏性，`[MANUAL_ROLLBACK_REQUIRED]`），详见 §15.4 / §15.6。**R19 步骤（DEPLOY-032~040）同样适用**：失败即从该步逆序回滚（先 ROLLBACK-040 → … → ROLLBACK-032），**不跳步**；**R19 的 C-IB-46 涉及「语义变更 + 文件迁移 + `.env` 变更」三件套 ⇒ 回滚须把 ROLLBACK-037（还原文件）/ ROLLBACK-038（还原 `.env`）/ ROLLBACK-039（回退代码并重启）作为「停服状态下的一个原子序列」执行**（详见 §16.4 回滚编排）；**C-IB-46 文件迁移是「移动而非删除」⇒ 文件可原位还原（非破坏性）**。
 
 ### 10.2 按变更类型的回滚动作
 
@@ -677,6 +686,7 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 | R-05 | **单点故障** | 目标机单机承载全部四组件；无 HA | 备份策略（Qdrant 快照 + SQLite + Blob 同批）；`Restart` 策略保证进程级自愈；跨机容灾**非本期范围** |
 | R-06 | **静默降级被发现得太晚** | 权重/OCR 未就绪时系统「看起来正常」 | 靠 §11 的**显式直连验证**（不看「问答能出字」，看 `/healthz.model_loaded`、`RapidOcrEngine.available()`） |
 | R-07 | **`FND-GROUP-D-03`（MAJOR，未闭合）** | 删除路径下原文件字节成孤儿 | PM 裁决：修复或书面接受（**phase_status 建议阻塞 PHASE_11**） |
+| **【订正注 · 2026-10-11 实测回填】（R-07）** | **`FND-GROUP-D-03` 已 `CLOSED_VERIFIED`** —— 本表 R-07 原文「MAJOR，未闭合」结论**作废**；原文逐字保留以追溯 | 删除路径下原文件字节**已被清理**（无孤儿 blob） | 证据 = `docs/test_report.md` **§11.3** + TC-INT-074/075（真 Django HTTP `DELETE` + 真 `FsBlobStore` → `blob_deleted=True`，0 磁盘残留）+ 加强后的 TC-INT-041 / TC-E2E-003 / TC-UNIT-055 + 原始输出 `docs/evidence/groupd_r4_all.log`（`148 passed in 13.74s`，EXIT=0） |
 
 ### 12.2 开放项（须 PM / 用户裁决或 PHASE_11 实测闭合）
 
@@ -686,6 +696,7 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 | O-02 | 目标机 SSH 凭据注入方式（B-02） | **阻塞** |
 | O-03 | apt/pip 源可达性（B-03） | **阻塞** |
 | O-04 | `FND-GROUP-D-03` 处置（B-04） | **阻塞** |
+| **【订正注 · 2026-10-11 实测回填】（O-04）** | `FND-GROUP-D-03` 处置（B-04）—— 已 **`CLOSED_VERIFIED`**；原文「**阻塞**」结论**作废**，原文逐字保留以追溯 | **已闭合**（不再是阻塞项） |
 | O-05 | `ib-embed` 运行时三选一 + 补 requirements（B-05） | **部分闭合（R4）**：清单/来源已定（`src/requirements-embed.txt`）；**运行时三选一仍须目标机实测锁定** |
 | O-06 | bge-m3 权重离线获取方式（B-06，**权重不进 git**） | **阻塞** |
 | O-07 | DNS/防火墙对外端口（**C-01，仍待 PM 定**）；**C-02~C-06 已于 R4 处置**（nginx 归属 / `ib-worker.env` 模板 / Qdrant 二进制路径 / `ib_embed` 包落点 / 无 AVX2 决策树） | C-01 待澄清；C-02~C-06 已闭合 |
@@ -1028,6 +1039,7 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 | **R14-P0-2** | **git remote 与目标机可达性（原 B-01~B-03）** | 既有部署（`deployment_report.md` §7/§8/§9/§10）已**实证** `git pull --ff-only` 与 `systemctl restart` 在目标机可用 → 原 §1.1 的 **B-01 / B-02 / B-03 在实务上已闭合**（本计划仍**保留其原始登记、不擅改**）。**前置**：R14 的 commit **须已 push 到目标机所拉取的 remote/main**，否则 `git pull` 拉不到 R14。 |
 | **R14-P0-3** | **目标机 Node / npm 可用性** | 既有部署（§8/§10）已在目标机执行 `npm ci && npm run build` 成功 → Node 可用。**前置**：PHASE_11 预检确认 `node -v` / `npm -v` 仍可用（若目标机环境变更则须先补装）。 |
 | **R14-P1-1** | **B-04 `FND-GROUP-D-03`（MAJOR，blob 孤儿）** | **未闭合**（`docs/phase_status.md` 建议阻塞 PHASE_11）。R14 **不涉及**该路径；但作为 PHASE_11 的**总前置**须由 PM 裁决（修复或书面接受风险），**不因 R14 而被掩盖**。 |
+| **【订正注 · 2026-10-11 实测回填】（R14-P1-1）** | **B-04 `FND-GROUP-D-03`（MAJOR，blob 孤儿）** 已 **`CLOSED_VERIFIED`**；原文「**未闭合**」结论**作废**，原文逐字保留以追溯 | 证据 = `docs/test_report.md` **§11.3** + TC-INT-074/075（真 Django HTTP `DELETE` + 真 `FsBlobStore` → `blob_deleted=True`，0 磁盘残留）+ 加强后的 TC-INT-041 / TC-E2E-003 / TC-UNIT-055 + 原始输出 `docs/evidence/groupd_r4_all.log`（`148 passed in 13.74s`，EXIT=0）；**不再是 PHASE_11 总前置阻塞** |
 | **R14-P1-2** | **B-05 / B-06（`ib-embed` 运行时三选一 / bge-m3 权重）** | **部分闭合 / 未闭合**（承前）。R14 **不涉及** embedding 链路；PHASE_11 的总前置不变。 |
 | **R14-P1-3** | **R14-OBS-01 / 02 / 03**（LOW） | 承 GROUP_D 登记：① `headers()` 的 `extra` 透传不变式**仅在 provider 非空时成立**（**无生产调用点触发**）；② 未选项目时部分端点 **500**（R13 既有，见 V14-6 口径）；③ 其余观测。**均非阻塞**，登记不修。 |
 | **R14-P1-4** | **R14 OPEN ITEM（需求侧缺口）** | 「项目选择 UX」与「`GET /api/projects`」**无独立 REQ / AC**（ADR-28 / `architecture_design.md` §10.1 R14 行 / `module_design.md` §9.8）——**登记不发明**，待 **GROUP_A** 裁决；**不阻塞部署**（可映射至 AC-IB-24-03 / AC-IB-24-02 / REQ-FUNC-IB-31 / REQ-FUNC-IB-23）。 |
@@ -1344,9 +1356,312 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 | # | 不一致处 | 事实 | 处置 |
 |---|----------|------|------|
 | 1 | **`deployment_plan.md` §1.1 的 B-01~B-06 为 v1.0.0 历史登记** | 实务上 B-01（git 仓库 / remote）已由 `REV-04-5` 闭合（GitHub 私有仓库）；**B-04（`FND-GROUP-D-03`）已由 GR-C-004 判 CLOSED_VERIFIED**（R4 修复 + 独立复跑），但 §14.6 的 **R14-P1-1 仍写「未闭合」** —— 经协调者 2026-10-07 复核：`phase_status.md` 确记「`FND-GROUP-D-03` 已修复并经独立 verifier 复核判 CLOSED_VERIFIED（GR-C-004 = PASS）」，而 §1.1 与 §14.6 **两节文字互相一致**（都写「未闭合」），属**共同落后于 `phase_status.md`**；原登记称「二者同源不同步」措辞不准确（二者并非彼此冲突） | **登记为待澄清 / 开放项**；**不擅改** §1.1 / §14.6 历史节（B-01~B-06 原始登记保留）；建议由 PM 归口统一 B-04 状态 |
+| **【订正注 · 2026-10-11 实测回填】（第 1 项；A 项 `FND-GROUP-D-03` + B 项仓库可见性合并）** | **A（FND-GROUP-D-03）**：已 **`CLOSED_VERIFIED`** —— 本行原文已记「B-04 已由 GR-C-004 判 CLOSED_VERIFIED」属实；本轮再以 `docs/test_report.md` **§11.3** + TC-INT-074/075（真 Django HTTP `DELETE` + 真 `FsBlobStore` → `blob_deleted=True`，0 磁盘残留）+ 加强后的 TC-INT-041 / TC-E2E-003 / TC-UNIT-055 + 原始输出 `docs/evidence/groupd_r4_all.log`（`148 passed in 13.74s`，EXIT=0）**复核确认**；本行原「登记为待澄清 / 开放项、建议由 PM 归口统一 B-04 状态」由此**收口**（§14.6 / §1.1 的「未闭合」侧表述已由本页对应订正注作废）。**B（仓库可见性）**：本行引述的「GitHub 私有仓库」为**错误**表述 —— 用户 2026-10-11 明文裁决：`intelligentbase` 与 `FreeArk` **均为公开仓库**（引述原文逐字保留以追溯） | **A：已闭合**（不再待澄清）**B：已更正**（仓库公开，非私有） | **B 项为何不是小事**：仓库**公开** ⇒ **任何提交的内容全世界可读**；文档里留「私有」会诱导后来者把口令 / 令牌 / 内网地址 / 主机信息提进去，故须显式更正（同步见 `docs/phase_status.md` 的 2026-10-11 追加记录） |
 | 2 | ~~**`implementation_plan.md` 头部 `<inputs>` 版本陈旧**~~ **【协调者 2026-10-07 复核后撤回：本条不成立】** | **实测**：该头部 `<inputs>` 六项**全部已是 REV-18 当前版本** —— `architecture_design.md` 1.10.2/REV-18-R2、`module_design.md` 1.10.2/REV-18-R2、`tech_stack.md` 1.4.1/REV-18、`requirements_spec.md` 1.10.0/REV-18-2、`user_stories.md` 1.10.0/REV-18-2、`ib_embed_service_contract.md` 1.0.0/R2；**无任何陈旧版本残留**。原登记称「仍列旧版本，落后于本轮 REV-18 设计侧版本」，与实测不符（其举例的 `architecture_design.md` 1.10.2/REV-18-R2 恰恰就是文件里已写着的版本） | **撤回本条**（GR-E-006 协调者复核）；无可处置项，`implementation_plan.md` **无需改动** |
 | 3 | ~~**`checklists.txt` `[B12]` 仍写 `dist/` 由 ib-web 托管**（GR-E-002 遗留 **F-1**）~~ **【协调者 2026-10-07 复核后撤回：本条不成立】** | **实测**：`[B12]` 现写「前端构建产物已就位，由 **nginx** 托管（/var/www/intelligentbase，**非 ib-web**）」—— **明确否定 ib-web，与 C-02 一致，不存在冲突**；且上一版 `b1513af` 亦已是 nginx 措辞 ⇒ 该 F-1 在 GR-E-002 之后**早已被修掉，登记却未随之撤回**（陈旧登记被照抄） | **撤回本条**（GR-E-006 协调者复核）；`checklists.txt` **无需改动** |
 | 4 | **CI 迁移门未覆盖 `005` / `006`** | `.github/workflows/ci.yml` 的 §3.2 迁移门**当前只覆盖 `003_accounts.sql`**；`005` 的门需先应用 001 基座 DDL（`kbs` 表）方可重放 | **如实登记于 `cicd_pipeline.md` §9**；建议随下轮扩展（**改 `ci.yml` 超本轮授权面，须另一轮授权**）—— 本轮**只登记不改** |
+
+---
+
+## 16. REV-19 增量：每项目专家集隔离 + 定义文档目录化（C-IB-46）+ 新项目种子 + 三专家属 `demo`（C-IB-47，**前向条款**）
+
+> **本节为 REV-19 增量（INV-GROUP_E-INTELBASE-007），仅计划** —— **未连接、未触碰目标机 `192.168.31.133`**；**未执行任何迁移 / 备份 / 重启 / 构建**；**所有命令须 PM CONFIRM 后执行**。
+> 依据：`architecture_design.md` **1.11.0/REV-19**（**ADR-43** 每项目专家注册表解析与 C-IB-45 不变量结构保证；**ADR-44** 定义文档物理载体目录化 `IB_DEFINITION_DOC_PATH` **文件 → 目录** + **C-IB-46 部署迁移**；**ADR-45** 新项目默认种子与「三专家属 `demo`」；**ADR-46** 三专家既有会话 / 历史 / 引用归属数据迁移 **C-IB-47 / DR-23**；**ADR-47** 专家域解析 fail-closed 与可观测 REQ-NFR-IB-21；**§2.0.10** REV-19 影响复核表）/ `module_design.md` **1.11.0/REV-19**（**IFC-IB-378~388**，端口 **19 不变**）/ `tech_stack.md` **1.4.1/REV-18（NO_CHANGE）** / `implementation_plan.md` **2.14.0/REV-19 §26** / `test_report.md` **1.15.0/REV-19 §24**（GR-D-016 / GR-D-017）/ `docs/phase_status.md` / `src/deploy/checklists.txt`（**B24 / B25**）、`src/ib/{config/definition,experts/__init__,streaming/__init__}.py`、`src/ibweb/**`、`src/frontend/**`（均**只读**引用）。
+
+### 16.1 R19 交付物清单
+
+| 交付物 | 路径 | 性质 / 交付方式 |
+|--------|------|-----------------|
+| 每项目专家集视图 / 解析 / 内置默认单例 | `src/ib/experts/__init__.py`（**IFC-IB-379 / 380 / 381**；`ExpertRegistryView` / `resolve_expert_registry` / `builtin_default_registry`） | 代码（**`git pull`** 交付；**装配期派生，无独立存储**） |
+| 定义文档**目录化**存储 | `src/ib/config/definition.py`（**IFC-IB-383**；`FileDefinitionDocumentStore` `path` 语义 = **目录根** + `_path_for(project_id)`） | 代码（`git pull`）；**语义变更**（见 §16.2） |
+| **C-IB-46 迁移工具** | `src/ib/config/definition.py::migrate_legacy_definition_file`（**IFC-IB-384**） | 工具函数（**用户手工执行**；见 §16.3 DEPLOY-037） |
+| 新项目创建期种子 | `src/ibweb/{views,composition}.py`（**IFC-IB-385**；`seed_project`，`POST /api/projects` 成功后同步播种） | 代码（`git pull`） |
+| 三专家历史迁移工具 | `src/ib/streaming/__init__.py::migrate_expert_history`（**IFC-IB-386**） | 工具函数（**前向条款，当前无可执行内容**；见 §16.4） |
+| 前端项目域闭环 | `src/frontend/**`（**IFC-IB-387**，**零代码**；复用既有 `projectContext` / `client.ts`） | **无源码改动**；**仍需构建 + 测试（首次实跑）** |
+| 部署检查清单 R19 段 | `src/deploy/checklists.txt` **`[B24]` / `[B25]`**（含签署行 **B1–B25**） | 核对清单（本计划引用，**不改该文件**） |
+| 离线自检 / 测试增量 | `src/scripts/selfcheck.py`（**52/52**）、`tests/unit/test_rev19_expert_isolation_unit.py`、`tests/integration/test_rev19_project_expert_isolation_int.py`、`tests/e2e/test_rev19_project_expert_journeys.py` | 测试（**不属部署动作**，CI 内跑） |
+
+### 16.2 变更类型判定（**关键**）
+
+| 维度 | 判定 | 依据 |
+|------|------|------|
+| **SQL / schema 迁移** | **无** —— R19 **不新增表 / 列 / 迁移 `.sql`**；`ensure_schema()` 顺序**不变** | ADR-43 / ADR-44；`src/ib/ledger/schema.py` |
+| **文件级迁移（非 SQL）** | **有，且为本轮唯一语义变更** —— `IB_DEFINITION_DOC_PATH` 语义由「**文件路径**」改为「**目录根**」；旧单文件 `/var/lib/intelligentbase/definition.json` → `<dir>/demo.json` | ADR-44 / **C-IB-46** / IFC-IB-384 |
+| **存量数据变更（台账 / 会话）** | **本轮无** —— C-IB-47（三专家历史归属改写）**当前无持久化迁移对象**（见 §16.4） | ADR-46 / C-IB-47 / `GR-C-014.open_item_3` |
+| **新第三方依赖** | **无** —— 复用 stdlib `os` / `json`；`tech_stack.md` **NO_CHANGE（1.4.1/REV-18）**；`requirements*.txt` / `package.json` / `package-lock.json` **零改动** | `rev19_groupb_apply_package` §10.2「许可面未变」 |
+| **新 env 键** | **无**（`IB_DEFINITION_DOC_PATH` / `IB_EXPERT_PROMPT_DIR` **键名不变**，仅前者**取值语义**变化） | ADR-44 |
+| **systemd 单元 / nginx 站点** | **无改动** | —— |
+| **后端进程形态** | **重启 `ib-web`（必需）** + **重启 `ib-worker`（推荐）**；**`ib-embed` / `qdrant` 不涉本轮** | 见 §16.3 DEPLOY-039 论证 |
+| **前端** | **无源码改动（IFC-IB-387 零代码）；但仍须 `npm run typecheck / test / build` 首次实跑 + 发布 `dist/`** | 承 `GR-C-014.condition_3`；见 §16.3 DEPLOY-034 |
+| **交付方式** | **仅 `git pull`**（冻结决策 ⑧；**禁 scp / pscp / rsync**） | 目标机构建 `dist/`（本机发布） |
+
+#### (a) C-IB-46 的失败模式（**为何必须给时序**）
+
+新代码 `FileDefinitionDocumentStore.load(project_id)` 读 **`<dir>/<project_id>.json`**；`self._dir` **为空**或目标**不是常规文件** → 抛 **`ConfigError(...)`（key=`IB_DEFINITION_DOC_PATH`）** —— 即 **装配期 fail-closed、可读报错、不静默当空文档**（`src/ib/config/definition.py:892-903`）。据此，三种中间态**均**导致启动失败：
+
+- **态 1**：代码先生效、`.env` 仍指向旧「**文件**」路径 → `_path_for("demo")` = `<旧文件路径>/demo.json`（把文件当目录拼）→ 目标不存在 → **启动 fail-closed**（服务起不来，日志含可读 `ConfigError`）。
+- **态 2**：文件已迁移、`.env` **未改** → 旧文件路径此时已不存在（`os.path.isfile` 为假）→ **启动 fail-closed**。
+- **态 3**：`.env` 已改为目录根、但 `<dir>/demo.json` **尚未迁移出来** → **启动 fail-closed**。
+
+> **结论（时序铁律）**：**「代码生效」「文件迁移」「`.env` 改目录根」三者必须收敛在同一维护窗口内**，且**在服务停止状态下完成切换**；**不得**让任一种中间态暴露给运行中的服务（`ExecStartPre` 自动重启 / 崩溃重启均可能触发）。**推荐时序 = T1（先停服 → 备份 → 迁移 → 改 `.env` → 启服）**；**禁止时序 = T2（先改 `.env` 并重启，再迁移）**——中间态必 fail-closed（见 §16.4 分支 E）。
+
+#### (b) 目录根取值（**具体值 + 两个坑**）
+
+- **拟定 `IB_DEFINITION_DOC_PATH`（新值）= `/var/lib/intelligentbase`**（既有状态目录；`definition.json` 就地迁移为 `demo.json`）。**理由**：`migrate_legacy_definition_file(dir_root)` 的**默认旧文件名** = `<dir_root>/definition.json`（常量 `LEGACY_DEFINITION_FILENAME`），取该目录根时**无需传 `legacy_file` 覆盖**即自然命中生产旧文件；且与 checklists **B24** 的 `<dir>` 占位与备份落点（`$IB_DEFINITION_DOC_PATH.pre-rev19.bak`）自洽。`FileDefinitionDocumentStore` 只读写 `<dir>/<project_id>.json`、**不枚举目录** ⇒ 同目录下的 `prompts/` / `ledger/` / `*.pre-rev19.bak` **不受影响、不会被误读**。
+- **坑 1（静默 no-op）**：若 PM 改选**专用子目录**（如 `/var/lib/intelligentbase/definitions`），则**必须显式传 `legacy_file`** 指向真旧文件 —— 否则工具的默认旧文件名解析为 `<新目录>/definition.json`（**不存在**）→ 返回 **`applied=False` + `notes=("legacy_file_absent",)`**（**不报错**），运维会**误以为迁移成功**，随后改 `.env` 重启即 fail-closed（§16.4 分支 E）。**本计划以 `/var/lib/intelligentbase` 为拟定值**；**改为专用子目录时，DEPLOY-037 须带 `legacy_file='/var/lib/intelligentbase/definition.json'`**。
+- **坑 2（命令不可 `python -m`）**：checklists **B24** 写的 `python -m ib.config.migrate_legacy_definition_file <dir> --target-project demo` **不可直接运行** —— `src/ib/config/` 下**没有** `migrate_legacy_definition_file.py` 模块（函数在 `__init__.py` / `definition.py`）。**可运行形式**见 DEPLOY-037（`python -c` 导入调用）。B24 原文亦附「或在应用内调用同名函数」，**以本节命令为准**。
+- **【订正注 · 2026-10-11 用户裁决回填】目录根取值已由用户裁决钦定 = `/var/lib/intelligentbase`**（**非**专用子目录）——即上文「拟定值」获用户裁决确认。**因钦定值走工具默认旧文件名路径**（`LEGACY_DEFINITION_FILENAME`，即 `<dir_root>/definition.json` = 生产旧文件真身），**坑 1（静默 `applied=False`）不触发**：DEPLOY-037 / B24 **无需显式传 `legacy_file`**，默认解析即命中。§16.8 第 5 项「待 PM / 用户确认」由此**闭合**。旧单文件 `/var/lib/intelligentbase/definition.json` **就地迁移**为 `/var/lib/intelligentbase/demo.json`。
+
+### 16.3 正向部署步骤（DEPLOY-032 ~ DEPLOY-040）
+
+> 前置：DEPLOY-001~031 已按 §10.1 / §13.6 / §14.3 / §15.3 完成且全绿。**每步失败即从该步逆序回滚**（§16.4）。**不在本轮执行** —— 须 PM 的 `PRODUCTION_DEPLOY_CONFIRM=true`；**生产后端重启、`.env` 变更、定义文档迁移由用户执行**。
+
+---
+**DEPLOY-032: 代码交付（`git pull` 到含 REV-19 的 commit）**
+- **组件**：全部（后端 + 前端源码 + 交付物）
+- **操作**：`cd /opt/intelligentbase && sudo git fetch --prune origin && sudo git checkout main && sudo git pull --ff-only`；随后 `git -C /opt/intelligentbase rev-parse HEAD` 核对 commit。
+- **预期结果**：`HEAD` == 预期 REV-19 commit（可追溯，§8）；`git status` 工作树干净；`src/deploy/migrations/` **无新增 `.sql`**（R19 无 SQL 迁移）。
+- **对应回滚**：ROLLBACK-032
+- **备注**：**仅 `git pull`** —— 禁 scp / pscp / rsync（冻结决策 ⑧）。`dist/` 不入 git。
+
+---
+**DEPLOY-033: 后端 venv 依赖核对（**应无新增**）**
+- **组件**：`ib-web` / `ib-worker`（`src/requirements*.txt`）
+- **操作**：`sudo PYTHONUTF8=1 /opt/intelligentbase/venv/bin/pip install -r /opt/intelligentbase/src/requirements.txt --dry-run 2>&1 | tail -5`；`/opt/intelligentbase/venv/bin/pip show bcrypt`。
+- **预期结果**：`--dry-run` **无待装项**（证明 REV-19 未新增第三方依赖，与 §16.2 一致）；`bcrypt` 版本 ∈ `[4,5)`。
+- **对应回滚**：ROLLBACK-033（无待装项则无副作用）
+- **备注**：R19 **零新增 pip 依赖** —— 本步为**核验步**，非安装步。**若 `--dry-run` 出现待装项 → 暂停并上报 PM**。
+
+---
+**DEPLOY-034: 前端构建 + 测试（**首次实跑**，承 `GR-C-014.condition_3`）**
+- **组件**：前端（MOD-IB-24；IFC-IB-387 **零代码**，但构建从未实跑）
+- **操作**：`cd /opt/intelligentbase/src/frontend && npm ci && npm run typecheck && npm test && npm run build`（`typecheck` = `vue-tsc --noEmit`；`test` = `node --test`；`build` = `vue-tsc --noEmit && vite build`；scripts 取自仓库 `package.json`）。
+- **预期结果**：`npm ci` EXIT 0（锁同步）；`vue-tsc --noEmit` **零错**；`npm test` **35/35 通过**（前端冒烟层）；`vite build` 成功，产出 `dist/index.html` + `dist/assets/*`。
+- **对应回滚**：ROLLBACK-034
+- **备注**：本步是 **`GR-C-014.condition_3`「前端 `npm run typecheck / test / build` 本轮未执行」的闭合点**（PHASE_11 首次实跑）；`package.json` / `package-lock.json` **零改动** → `npm ci` 仅按既有锁复现。**前置**：PHASE_11 预检确认 `node -v` / `npm -v` 可用（生产机 node v22 / npm 9）。
+
+---
+**DEPLOY-035: 发布新 `dist/` 到 nginx 静态根（原子目录替换；**无需重启**）**
+- **组件**：系统 nginx 静态根（/var/www/intelligentbase/，属主 `yangyang198354`，**免 sudo**）
+- **操作**（**本机文件操作，非跨机传输**）：
+  ```bash
+  rm -rf /var/www/intelligentbase.prev && mv /var/www/intelligentbase /var/www/intelligentbase.prev
+  mkdir -p /var/www/intelligentbase
+  cp -a /opt/intelligentbase/src/frontend/dist/. /var/www/intelligentbase/
+  ```
+- **预期结果**：`/var/www/intelligentbase/index.html` 与 `assets/` 为新构建；旧产物留存于 `/var/www/intelligentbase.prev`（回滚用）。
+- **对应回滚**：ROLLBACK-035
+- **备注**：**前端是纯静态文件、nginx 直读磁盘 ⇒ 改前端无需重启任何服务**（硬指标见 §16.5 V19-7）；**不用 rsync / scp**（冻结决策 ⑧）；站点文件未改 → **不涉 `nginx -t`**。
+
+---
+**DEPLOY-036: 【维护窗口】停服（`ib-web` + `ib-worker`）+ 备份旧定义文档**
+- **组件**：`ib-web` / `ib-worker`；定义文档（`/var/lib/intelligentbase/definition.json`）；状态目录 `/var/lib/intelligentbase`（`drwxrws--- ib-web:ib`）
+- **操作**（**用户执行**；须带同一 `EnvironmentFile` 以取 `IB_DEFINITION_DOC_PATH` **旧值**）：
+  ```bash
+  sudo systemctl stop ib-web ib-worker                                   # 先停服：避免装配期读写旧文件 + 冻结写窗口
+  sudo cp -a "$IB_DEFINITION_DOC_PATH" "${IB_DEFINITION_DOC_PATH}.pre-rev19.bak"   # 先备份（含属主 / 时间 / 模式）
+  sudo ls -l "${IB_DEFINITION_DOC_PATH}.pre-rev19.bak" ; echo "exit=$?"             # 期望存在且非空
+  ```
+- **预期结果**：`ib-web` / `ib-worker` 均 stopped；备份 `/var/lib/intelligentbase/definition.json.pre-rev19.bak` 生成；**状态目录属主 / 权限不变**。
+- **对应回滚**：ROLLBACK-036（**启动服务 + 删备份**）
+- **备注**：**备份未成功 ⇒ 不得进入 DEPLOY-037**（旧文件唯一副本 = 备份）。备份可能为**冷文件**（无服务打开），其 mode 可严于主文件，**不要据此判 FAIL**（checklists **B24** 同注）。
+
+---
+**DEPLOY-037: C-IB-46 定义文档目录化迁移（**用户手工执行 + 先备份 + 失败即回滚**）**
+- **组件**：定义文档存储（`FileDefinitionDocumentStore` 目录语义；ADR-44 / IFC-IB-384）
+- **操作**（**服务处于 stopped 状态**；`<dir>` 拟定 = `/var/lib/intelligentbase`；以**运行账户身份**执行以保属主 / 权限对齐；**不删除任何历史数据**）：
+  ```bash
+  # 显式传 legacy_file，规避「默认旧文件名解析失败 -> 静默 applied=False」的坑（§16.2(b) 坑 1）
+  sudo -u ib-web PYTHONUTF8=1 /opt/intelligentbase/venv/bin/python -c \
+    "from ib.config import migrate_legacy_definition_file as m; \
+     print(m('/var/lib/intelligentbase', target_project_id='demo', backup=False, \
+             legacy_file='/var/lib/intelligentbase/definition.json'))"
+  ls -l /var/lib/intelligentbase/demo.json ; echo "exit=$?"      # 期望存在且非空
+  ```
+  - **【订正注 · 2026-10-11 用户裁决回填（B 项：统一 backup 语义 + 订正「等价」措辞），与订正后 `checklists.txt` B24 逐字一致】** 目录根已钦定为 `/var/lib/intelligentbase`（非专用子目录）⇒ **坑 1 不触发**，`legacy_file` **不再需要**。**与订正后 B24 逐字对齐的可运行形式**：
+    ```bash
+    sudo /opt/intelligentbase/venv/bin/python -c "from ib.config import migrate_legacy_definition_file as f; print(f('/var/lib/intelligentbase', target_project_id='demo', backup=False))"
+    ```
+    - **准确性说明（取代原「等价」措辞）**：上式与本节原命令在**两式都显式 `backup=False`** 后，于 `demo.json` 的**产出（字节 = 原 `definition.json`）、属主、模式**及**幂等 / fail-closed 行为**上**一致**；`backup` 输出现已**统一**（两式均**不再**产工具自带 `.bak`）。依据：工具搬移用 `os.replace`（纯 rename），**保留原属主与模式**，故以 root 而非 `ib-web` 身份运行不改变 `demo.json` 属主；原命令额外显式传 `legacy_file`（现属**冗余但无害**）。**本节保留原命令以追溯；两式择一即可。**
+    - **原「等价」措辞为何被订正**：原注曾称两式「**等价**」，但当时订正后形式**未带 `backup=False`**，实测走工具默认 `backup=True`，会**多产一份** root 属主的 `/var/lib/intelligentbase/definition.json.bak`（对 `demo.json` 属主 / 模式无影响，故功能无害，但「等价」表述**失真**）。本轮统一为 `backup=False` 已消除该差异。
+  - `backup=False` 是**有意**的：因 DEPLOY-036 / B24 已独立备份，显式关掉工具自带备份以避免重复 `.bak`（工具默认 `backup=True`）。
+  - **幂等**：旧文件已不存在（已迁移）→ 返 `applied=False` + `notes=("legacy_file_absent",)`，**无副作用**（可安全重跑）。
+  - **fail-closed**：目标 `<dir>/demo.json` **已存在** → 返 `applied=False` + `notes=("target_exists_fail_closed",)`，**不覆盖**（**不静默合并**）。
+- **预期结果**：`/var/lib/intelligentbase/demo.json` 存在且非空（内容 = 原 `definition.json` 字节）；旧单文件**已被移动**（原路径不再有 `definition.json`，仅余 `*.pre-rev19.bak`）；**未删除任何历史数据**。
+- **对应回滚**：ROLLBACK-037
+- **备注**：`[MANUAL_ROLLBACK_REQUIRED: 本步为语义变更类文件迁移，回滚 = 原位还原（见 ROLLBACK-037），须人工确认]`。**迁移严禁自动执行** —— 本步**只由用户手工执行**（C-IB-38 / C-IB-46 纪律）。**若迁移工具报错**（如 `<dir>` 实为文件 → `ConfigError`）：**立即停止，转 §16.4 分支 B**，不得强行改 `.env` 继续。
+
+---
+**DEPLOY-038: 更新 `.env`：`IB_DEFINITION_DOC_PATH` → 目录根（**全部 `*.env`**）**
+- **组件**：EnvironmentFile（`/etc/intelligentbase/*.env`，0600）
+- **操作**（**用户执行**）：
+  ```bash
+  sudo grep -l '^[[:space:]]*IB_DEFINITION_DOC_PATH=' /etc/intelligentbase/*.env    # 先枚举所有含该键的文件
+  sudo sed -i 's#^[[:space:]]*IB_DEFINITION_DOC_PATH=.*#IB_DEFINITION_DOC_PATH=/var/lib/intelligentbase#' <该文件>
+  sudo stat -c '%a %U:%G %n' <该文件>                                                # 复核仍为 600
+  ```
+- **预期结果**：**全部**含该键的 `*.env` 中 `IB_DEFINITION_DOC_PATH` = **`/var/lib/intelligentbase`**（**目录**，不再是 `.../definition.json` 文件）；文件 mode **仍为 600**（`sed -i` 会重写，须复核）。
+- **对应回滚**：ROLLBACK-038
+- **备注**：生产**只有 `/etc/intelligentbase/ib-web.env` 配了该键**（`ib-worker.env` / `ib-embed.env` 无该键，`ibweb/worker.py` 不读定义文档）—— **但仍须逐份枚举核对**（防未来新增）。**键名不变**，仅取值语义变化。
+
+---
+**DEPLOY-039: 重启 `ib-web.service`（Waitress）+ 推荐重启 `ib-worker.service`**
+- **组件**：`ib-web`（装配期加载定义文档 / 派生每项目专家集）；`ib-worker`（MOD-IB-23 入口 `ibweb.worker`）
+- **操作**：`sudo systemctl restart ib-web`（**由用户执行**）；随后 `systemctl is-active ib-web`、`journalctl -u ib-web -n 60 --no-pager` 抽查启动日志；按需 `sudo systemctl restart ib-worker`。
+- **预期结果**：`ib-web` **active**；启动日志含 `{"outcome": "succeeded", "stage": "startup"}` 且含 `Serving on http://127.0.0.1:18080`；**不出现** `path_not_configured_using_in_memory_default`（`stage":"definition_doc"`）；**不出现** `ConfigError`（定义文档目录化后的可读错误）；`GET /healthz` = 200。
+- **对应回滚**：ROLLBACK-039（**与 ROLLBACK-037 / 038 耦合**）
+- **备注（据实判定：`ib-web` 必需 / `ib-worker` 推荐）**：REV-19 **改了 `ib-web` 装配主路径**（`src/ib/experts/__init__.py`、`src/ib/config/definition.py`、`src/ib/streaming/__init__.py`、`src/ibweb/{views,composition}.py`）⇒ **`ib-web` 必须重启**。**`ib-worker`**：R19 未改 `src/ibweb/worker.py` 的功能路径（入库 / 重建行为不变）—— **就正确性而言不重启亦无缺陷**；但 `ib-worker` 经 `composition.get_deps()` 装配、**import 了共享模块**（`ib.experts` / `ib.config.definition` / `ib.streaming`）⇒ **为消除「运行中进程代码 ≠ HEAD」的混版歧义（§8 可追溯纪律），推荐一并重启**（成本低：不影响 HTTP 面；在飞任务由台账租约超时后重认领）。**`ib-embed` / `qdrant` 不涉本轮、不重启。**（`daemon-reload` pending 警告是既有长期状态、不属本次引入。）
+
+---
+**DEPLOY-040: 部署后验证（§16.5 全部条目）**
+- **组件**：端到端（HTTP / 前端 / 定义文档目录化结果 / 每项目专家集）
+- **操作**：逐条执行 §16.5 验证清单。
+- **预期结果**：§16.5 全部条目标注 SUCCESS。
+- **对应回滚**：ROLLBACK-040（验证失败 → 按 §16.4 逆序回滚）
+- **备注**：验证须**离线可判**（curl / 服务端读取 / `ls`，不依赖浏览器 UI 手测）。
+
+---
+> **C-IB-47 无对应正向步骤（治理声明）**：REV-19 的**三专家历史迁移**（`migrate_expert_history`，IFC-IB-386）**当前无可执行内容** —— **不设 DEPLOY-NNN**。理由与判据见 **§16.4**（**前向条款**）。
+
+### 16.4 回滚步骤（ROLLBACK-032 ~ ROLLBACK-040；**逆序执行**）
+
+> **逆序**：最后一个部署的组件最先回滚（040 → 039 → … → 032）。**R19 的 C-IB-46 三件套 ⇒ 回滚须把 {037, 038, 039} 视为「停服状态下的一个原子序列」**（见下「回滚编排」）。
+
+---
+**ROLLBACK-040: 撤销验证（逆 DEPLOY-040）**
+- **回滚操作**：**无独立副作用** —— 随 ROLLBACK-032~039 一并回退。
+- **预期结果**：系统回到上一版行为。
+
+---
+**ROLLBACK-039: 回退 `ib-web`（+ `ib-worker`）至上一版（逆 DEPLOY-039）** —— **须与 ROLLBACK-037 / 038 耦合**
+- **回滚操作**：在**服务停止**状态下：`cd /opt/intelligentbase && sudo git checkout <上一版已部署 commit>`（见 ROLLBACK-032）→ 完成 ROLLBACK-038（`.env` 回旧文件值）与 ROLLBACK-037（文件原位还原）后 → `sudo systemctl start ib-web`（+ `ib-worker`）。
+- **预期结果**：`ib-web` active 且运行**上一版代码**；新行为（每项目专家集 / 目录化）在旧代码下回到旧语义（`IB_DEFINITION_DOC_PATH` 按旧代码 = **文件路径**）。
+- **备注**：**不得**在「代码回旧、`.env` 仍为目录根」或「`.env` 回旧文件值、文件未还」的中间态重启。**故 037 / 038 / 039 必须同一停服窗口内完成。**
+
+---
+**ROLLBACK-038: 撤销 `.env` 改动（逆 DEPLOY-038）**
+- **回滚操作**：把**全部** `*.env` 中 `IB_DEFINITION_DOC_PATH` 改回**旧文件值** `/var/lib/intelligentbase/definition.json`；复核 mode 仍为 600。
+- **预期结果**：`.env` 恢复旧**文件路径**语义（与旧代码 + 还原后的旧文件一致）。
+
+---
+**ROLLBACK-037: 撤销定义文档目录化迁移（逆 DEPLOY-037）**
+- **回滚操作**（**服务 stopped**）：优先**原位还原** —— `sudo mv <dir>/demo.json <dir>/definition.json`（`demo.json` 即原旧文件、字节未变）；或用备份 —— `sudo cp -a <dir>/definition.json.pre-rev19.bak <dir>/definition.json`，随后移除残留 `<dir>/demo.json`。
+- **预期结果**：旧单文件 `/var/lib/intelligentbase/definition.json` 复现（内容 = 迁移前）；`<dir>/demo.json` 不再存在。
+- **备注**：`[MANUAL_ROLLBACK_REQUIRED: 文件级还原，须人工确认目标路径 + 先确认服务已停]`。**非破坏性**（迁移是移动，非删除）—— 但**仍须在服务停止状态下操作**，避免与运行进程竞争。
+- **【订正注 · 2026-10-11 用户裁决回填】** 本回滚逻辑**与钦定目录根 `/var/lib/intelligentbase` 及订正后 DEPLOY-037 / `checklists.txt` B24 保持一致**：`<dir>` = `/var/lib/intelligentbase`，「原位还原 `demo.json` → `definition.json`」（或备份法）语义不变，**无需改动**。**（B 项补充）** `backup=False` 语义统一**仅影响迁移步是否多产工具自带 `.bak`**，不影响本回滚 —— 回滚所用备份源 `definition.json.pre-rev19.bak` 由 **DEPLOY-036 / B24 独立产生**，与迁移工具是否备份无关。
+
+---
+**ROLLBACK-036: 退出维护窗口（逆 DEPLOY-036）**
+- **回滚操作**：确认 ROLLBACK-037 / 038 已完成（文件 + `.env` 均已原位还原）后 `sudo systemctl start ib-web ib-worker`；**确认无需再回滚后**再删除备份 `sudo rm -f <dir>/definition.json.pre-rev19.bak`。
+- **预期结果**：`ib-web` / `ib-worker` active；备份清理（**仅在确信不再需要回滚时**）。
+
+---
+**ROLLBACK-035: 恢复上一版 `dist/`（逆 DEPLOY-035）**
+- **回滚操作**：`rm -rf /var/www/intelligentbase && mv /var/www/intelligentbase.prev /var/www/intelligentbase`。
+- **预期结果**：nginx 静态根回到上一版产物（资源与 `index.html` 同版，不白屏）。
+- **备注**：**不动 nginx 站点文件** → **无需 `nginx -t` / `reload`**；**无需重启服务**。
+
+---
+**ROLLBACK-034: 丢弃新构建产物（逆 DEPLOY-034）**
+- **回滚操作**：`rm -rf /opt/intelligentbase/src/frontend/dist`（构建产物，可重生成）。
+- **预期结果**：无遗留新产物。
+
+---
+**ROLLBACK-033: 回退依赖核对（逆 DEPLOY-033）**
+- **回滚操作**：**无副作用**（核验步未安装任何包）。
+- **预期结果**：依赖面不变。
+
+---
+**ROLLBACK-032: 代码回退到上一版已部署 commit（逆 DEPLOY-032）**
+- **回滚操作**：`cd /opt/intelligentbase && sudo git checkout <上一版已部署 commit>` → 按需重启（见 ROLLBACK-039）。
+- **预期结果**：`git rev-parse HEAD` == 上一版 commit；旧代码运行。
+- **备注**：R19 **无 SQL 迁移** ⇒ 旧代码**无需任何 schema 兼容处理**即可启动（与 R18「加成式补列」不同，R19 是**零 schema 变更**）。**但 C-IB-46 的文件 / `.env` 还原必须与代码回退同批完成**（见 ROLLBACK-039）。
+
+---
+> **R19 回滚编排（C-IB-46 三件套的原子序列，须显式）**：`ROLLBACK-039`（代码）与 `ROLLBACK-037`（文件）、`ROLLBACK-038`（`.env`）**互相依赖**，逆序编号 ≠ 可任意次序执行。**正确执行序**（全程服务 stopped）：
+> ① `sudo systemctl stop ib-web ib-worker`（若尚未停）
+> ② **ROLLBACK-038**：`.env` 的 `IB_DEFINITION_DOC_PATH` 改回旧**文件**值
+> ③ **ROLLBACK-037**：`<dir>/demo.json` 原位还原为 `<dir>/definition.json`
+> ④ **ROLLBACK-032 + ROLLBACK-039**：`git checkout <上一版 commit>`
+> ⑤ `sudo systemctl start ib-web ib-worker`（= ROLLBACK-036 的服务恢复部分）
+> **判据**：启动日志出现 `{"outcome":"succeeded","stage":"startup"}` 且**无** `ConfigError`。
+>
+> **「迁移与部署之间失败」的分支处置（逐分支给处置）**：
+>
+> | 分支 | 失败时点 | 系统中间态 | 处置 |
+> |------|----------|-----------|------|
+> | **A** | **备份失败**（DEPLOY-036 内） | 尚未迁移；服务已停；旧文件完好 | **不进入 DEPLOY-037**；直接 **ROLLBACK-036**（`systemctl start ib-web ib-worker`）→ 回到旧态。**无数据风险** |
+> | **B** | **迁移工具报错**（DEPLOY-037 内，如 `<dir>` 实为文件 → `ConfigError`） | 服务已停；旧文件**可能已被移动**（视报错点） | 先 `ls -l <dir>` 判定：`definition.json` 仍在 → **无副作用**，转 **ROLLBACK-036** 启服；已被移动（`demo.json` 已生成）→ 按 **ROLLBACK-037 → 038 → 036** 还原后启服。**不得**改 `.env` 后重启 |
+> | **C** | **迁移成功 + `.env` 已改 + 重启 fail-closed**（DEPLOY-038 / 039 之间或 039 内） | 新代码 + 目录根 `.env`；`<dir>/demo.json` 已在；启动报可读 `ConfigError` | **先诊断**（`journalctl -u ib-web -g "definition\|ConfigError" -n 200`）。若 `demo.json` 缺失 / 不可解析 → 用备份 `cp -a *.pre-rev19.bak <dir>/definition.json` 且**保持目录根 `.env`** 后重试（**前向修复**，最小动作）；若不可前向修复 → **完整回退**：**ROLLBACK-038 → 037 → 032 / 039 → 036** |
+> | **D** | **迁移成功 + `.env` 已改 + 重启成功 + 验证失败**（DEPLOY-040） | 服务已起（新代码 / 目录根）；某 V19-N 项不过 | **不停服即可前向修复的**（如前端产物 → ROLLBACK-035）→ 走对应单步回滚；**涉定义文档语义的**（V19-1 / V19-2 不过）→ 按 **分支 C** 处置 |
+> | **E** | **迁移成功，但「未改 `.env` 就重启了」**（违反时序铁律 T1） | 新代码 + **旧文件值** `.env`；`definition.json` 已被移走 | 启动必 fail-closed。**处置二选一（由用户决定）**：**前向完成** = 改 `.env` 为目录根（DEPLOY-038）→ 重启（DEPLOY-039）；**或完整回退** = ROLLBACK-038 → 037 → 032 / 039 → 036。**不得**让服务停留在 fail-closed 态对外 |
+>
+> **回滚数据安全结论（须显式）**：R19 **代码 + 文件 + `.env` 三者均可整体回退**（`git checkout` + 原位还原 + `.env` 还原），**无不可逆数据变更**（与 R18 的 `kb_default` 重绑不可逆形成对比）。**C-IB-47 未执行 ⇒ 无会话归属改写 ⇒ 无不可逆面。**
+>
+> **C-IB-47 登记为「前向条款」（**不得写成可执行步骤误导用户**）**：`migrate_expert_history(target_project_id='demo', …)` 虽已实现（IFC-IB-386），但**当前无任何持久化迁移对象** —— ① `SessionStore` **唯一实现** = `MemorySessionStore`（进程内，重启即失）；② `persistence_policy` 默认 `in_process`；③ 台账**无消息历史 / 引用（citations）表**；④ 该工具**不写盘 / 不读环境变量 / 不碰 SQLite**、`backup_path` **恒为 `None`**（如实回报，不伪造路径）；⑤ **无生产调用点**。**故本轮「三专家历史归拢」无可执行内容**（已登记 `GR-C-014.open_item_3`、checklists **B25** 为「待会话持久化落地后」的手工步骤）。**若日后误当可执行步骤运行**：因无协作者对象，工具按「该面无可迁移对象」处理、**空跑不报错**（但**不得**据此断言「已迁移」）。**待会话持久化（`SessionStore` 落盘）落地后**，方按 B25 手工执行（**先备份台账 + 会话 + 失败即回滚**）。
+
+### 16.5 部署后验证清单（V19-1 ~ V19-9；**实测口径**）
+
+> 全部为**离线可判**（curl / 服务端读取 / `ls` / `journalctl`）；`<host>` 与 `<令牌>` 由执行人注入（令牌**不回显、不入日志**，checklists B14）。
+
+| # | 检查项 | 检查方法（命令 / URL） | 成功标准 | 对齐 |
+|---|--------|----------------------|----------|------|
+| **V19-1** | **定义文档目录化生效** | `ls -l /var/lib/intelligentbase/demo.json`；`sudo grep -h '^[[:space:]]*IB_DEFINITION_DOC_PATH=' /etc/intelligentbase/*.env` | `demo.json` 存在且非空；**全部** `*.env` 中该键 = **`/var/lib/intelligentbase`**（**目录**，非 `.../definition.json` 文件）；`definition.json` 不在原路径 | **B24** |
+| **V19-2** | **装配期读入成功（非 fail-closed）** | `journalctl -u ib-web --since "<重启时刻>" -g "definition\|ConfigError\|path_not_configured" --no-pager` | **零** `ConfigError`、**零** `path_not_configured_using_in_memory_default`；见 `{"outcome":"succeeded","stage":"startup"}` | **B24** |
+| **V19-3** | **服务健康** | `curl -sS -o /dev/null -w '%{http_code}' https://<host>/healthz` | **200** | B12 |
+| **V19-4** | **每项目专家集隔离（服务端为准）** | admin 令牌 `GET /api/config/definition`（含 `X-IB-Project: demo`）→ 观察专家集；再以**未登记项目**头试探 | `demo` 返回其专家集（三对齐专家）；**未登记项目** → 解析 **fail-closed**（可读错误，**不跨项目回退**） | ADR-43 / ADR-47 / IFC-IB-380 |
+| **V19-5** | **新项目创建期种子** | admin 令牌 `POST /api/projects`（新 `project_id`）→ `GET /api/config/definition`（带新项目头） | 新项目**同步播种**：内置默认 **1 个 KB 问答 agent（`is_default=True`、不可删）+ 1 个默认编排流**；**无跨项目专家泄漏** | ADR-45 / IFC-IB-385 |
+| **V19-6** | **前端项目域闭环（人工）** | 浏览器 `https://<host>/`：登录 → 切项目 → 知识问答页提问 → 可视化配置页 | 页面按**当前项目**加载；知识问答在**项目内闭环**；刷新无 404（**硬刷新**；`assets/*` 新 hash 自动加载） | IFC-IB-387（NV-07 类） |
+| **V19-7** | **前端静态产物免重启（硬指标）** | 记录 `DEPLOY-035` 前后的 `systemctl show -p ActiveEnterTimestamp ib-web` | 发布 `dist/` **未触发任何服务重启** —— `ActiveEnterTimestamp` 在发布前后**不变** | 见下判据 |
+| **V19-8** | **混版判据（正确判据，非 `.pyc`）** | `git -C /opt/intelligentbase rev-parse HEAD`；对比 `systemctl show -p ActiveEnterTimestamp ib-web` 与关键源文件 `mtime` | HEAD == 目标 commit **且** 该 commit 涉及源文件 `mtime` **早于** `ActiveEnterTimestamp` | §15.8（**勿用 `.pyc`**） |
+| **V19-9** | **认证契约零破坏（回归）** | 登录 → `/api/auth/me`；各端点附 `?token=`；检查响应头 | 登录 200 且 **零 `Set-Cookie`**；`?token=` **全 4xx** | ADR-42（回归守卫；R19 未改认证但须复验） |
+
+> **「改前端无需重启服务」的判据（硬指标）**：前端是**纯静态文件**、由 **nginx 直读磁盘**（root `/var/www/intelligentbase/`）；后端 `ib-web` **不经手静态产物** ⇒ `DEPLOY-035` 发布 `dist/` **不改变 `ib-web` 的 `ActiveEnterTimestamp`**（V19-7）。**仅当后端 Python 变更**（`src/ibweb/**` / `src/ib/**`）**才需重启 `ib-web`**；`ibweb/worker.py` / 入库路径变更才需重启 `ib-worker`；`.env` 变更才需重启**对应**服务；**迁移由 `ib-web` 的 `ExecStartPre`（`--ensure-schema`，幂等）自动落实**。
+>
+> **口径纪律**：V19-4 / V19-5 的授权口径以**服务端**（`AuthzPolicy` / `resolve_expert_registry`）为准，**UI 可见性不是权限机制**（ADR-42）。V19-5 的新项目播种为**创建期同步**行为（ADR-45 Option A），**非**装配期惰性。
+
+### 16.6 风险清单（R19 增量）
+
+| # | 风险 | 级别 | 触发条件 | 缓解 | 回滚可行性 |
+|---|------|------|----------|------|-----------|
+| **R-19-1** | **C-IB-46 时序错配 → 装配期 fail-closed** | **高** | 「代码生效」「文件迁移」「`.env` 改目录根」三者未在同一停服窗口收敛（尤其 T2） | **§16.2(a) 时序铁律 + DEPLOY-036~039 同窗口**；§16.4 分支处置 A~E | **可恢复**（fail-closed 是可读错误，非静默；按 §16.4 前向修复或完整回退） |
+| **R-19-2** | **迁移工具「静默 no-op」误判**（默认旧文件名解析失败 → `applied=False` + `legacy_file_absent`，**不报错**） | **中** | 选用**专用子目录**且**未传 `legacy_file`** | **§16.2(b) 坑 1**；DEPLOY-037 命令**显式传 `legacy_file`**；迁移后 `ls -l <dir>/demo.json` 判据 | **可恢复**（未迁移，无副作用；补传 `legacy_file` 重跑） |
+| **R-19-3** | **`<dir>/demo.json` 已存在 → fail-closed 拒绝覆盖** | **低** | 目标文件残留（前次迁移未清） | 工具 fail-closed（`target_exists_fail_closed`，**不合并**）；先人工核验目标内容 | **可恢复**（人工裁决保留哪份） |
+| **R-19-4** | **误以为 B24 命令可直接 `python -m`** | **低** | 直跑 `python -m ib.config.migrate_legacy_definition_file`（**无此模块**） | **§16.2(b) 坑 2**；以 `python -c "from ib.config import migrate_legacy_definition_file …"` 为准 | **可恢复**（命令报 `No module named …`，无副作用） |
+| **R-19-5** | **前端构建从未实跑**（`GR-C-014.condition_3`） | **中** | `npm ci` / `vue-tsc` / `vite build` 在目标机首跑失败（锁漂移 / 环境） | DEPLOY-034 前置核对 `node -v`（v22）/ `npm -v`（9）；`npm ci` 按既有锁；失败即 abort（**不以旧 `dist/` 覆盖**） | **可恢复**（`dist` 可重生成；ROLLBACK-034 / 035） |
+| **R-19-6** | **`.env` 变更未覆盖全部 `*.env`** | **低** | 只改 `ib-web.env`（生产**仅**该份含此键，但未来可能新增） | DEPLOY-038 **先 `grep -l` 枚举**再逐份改；`stat` 复核 mode 600 | **可恢复**（补改 + 重启） |
+| **R-19-7** | **C-IB-47 被误当可执行步骤**（**当前无持久化迁移对象**） | **中（治理）** | 有执行人照 B25 直跑 `migrate_expert_history` 期待「历史归拢」 | **§16.4 前向条款登记**：`SessionStore` 唯一实现 = `MemorySessionStore`、`persistence_policy` 默认 `in_process`、台账无消息历史 / 引用表 ⇒ **无可迁移对象**；工具**不写盘 / 不读 env / 不碰 SQLite**、`backup_path` 恒 `None` | **不适用**（无对象可迁；执行亦无副作用，但**不得**据此断言「已迁移」） |
+| **R-19-8** | **备份法还原残留 `demo.json`**（与旧文件并存 → 后续迁移报 `target_exists_fail_closed`） | **低** | ROLLBACK-037 用 `cp -a *.pre-rev19.bak` 且**未清理**残留 `demo.json` | ROLLBACK-037 **优先原位 `mv <dir>/demo.json <dir>/definition.json`**；用备份法须**先移走** `<dir>/demo.json` | **可恢复**（人工清理 + 重试） |
+| **R-19-9** | **CI 无 SQL 迁移门增量 + C-IB-46 不可 CI 测** | **低（登记）** | 误以为 R19 迁移已被 CI 覆盖 | **如实登记**（见 `cicd_pipeline.md` §3.2 / §10.3）：R19 零新增 SQL 迁移；**承前结转** R18 缺口（`005` / `006` 仍未纳入）；C-IB-46 为**文件级迁移，CI 不可测** | **不适用**（CI 侧登记项） |
+| **R-19-10** | **`ib-worker` 未重启 → 混版进程** | **低** | 仅重启 `ib-web` 而不重启 `ib-worker` | DEPLOY-039 **推荐**重启 `ib-worker`（消除混版歧义）；若不重启须在记录留痕（功能路径无变化） | **可恢复**（随时可重启补齐） |
+
+### 16.7 PHASE_11「由用户在目标机闭合」清单（R19 增量项）
+
+| # | 项 | 类型 | 验收步骤 | 判据 |
+|---|----|------|----------|------|
+| **AC-R19-A** | **前端 `npm run typecheck / test / build` 首次实跑**（`GR-C-014.condition_3`） | DEPLOY_REQUIRED | ① `node -v && npm -v`；② `npm ci`；③ `npm run typecheck`；④ `npm test`；⑤ `npm run build` | 全部 EXIT 0；`vue-tsc` 零错；`npm test` **35/35**；`dist/` 产出（`index.html` + `assets/*`） |
+| **AC-R19-B** | **C-IB-46 定义文档目录化迁移**（checklists **B24**） | DEPLOY_REQUIRED | ① 停服 + 备份（DEPLOY-036）；② 运行迁移（DEPLOY-037）；③ 改 `.env`（DEPLOY-038）；④ 重启（DEPLOY-039）；⑤ 验证（V19-1 / V19-2） | `demo.json` 存在；`.env` = 目录根；启动无 `ConfigError`；`definition.json` 不在原路径；**未删除任何历史数据** |
+| **AC-R19-C** | **每项目专家集隔离 + 新项目种子** | DEPLOY_REQUIRED | admin 令牌：`GET /api/config/definition`（demo）→ `POST /api/projects`（新）→ `GET`（新项目） | `demo` = 三对齐专家；新项目 = 1 KB agent + 1 默认编排流；**跨项目零泄漏 / 未登记项目 fail-closed** |
+| **AC-R19-D** | **C-IB-47 三专家历史迁移**（checklists **B25**） | **NOT_APPLICABLE（本轮）** | **当前无持久化迁移对象**（`SessionStore` 仅 `MemorySessionStore`；`persistence_policy` 默认 `in_process`；台账无消息历史 / 引用表）⇒ **本步当前无可执行内容** | **登记为前向条款**（`GR-C-014.open_item_3`）；**待会话持久化落地后**再据 B25 手工执行（先备份 + 失败回滚） |
+| **AC-R19-E** | **TBD-T28 / TBD-T29 成本 / 一致性真机结论** | DEPLOY_REQUIRED | 目标机实测：`seed_project` 写盘耗时；`migrate_legacy_definition_file` 实测；`migrate_expert_history`（若届时落地）一致性窗口 | **未实测前不得给结论**；探针命令 + 实测值回填部署记录 |
+| **CRED-01** | 未提交工作包不得原样提交（**非阻塞结转**） | —— | PHASE_11 前置 = 先提交并 push；提交时**不得**把未跟踪的工作包（含含口令字面量的 apply package）**原样纳入** | 提交清单审核通过 |
+
+### 16.8 R19 变更面对既有文档的不一致登记（**如实登记，不静默改历史**）
+
+| # | 不一致处 | 事实 | 处置 |
+|---|----------|------|------|
+| 1 | **`test_report.md` `file_header.status` 对 §24（REV-19）标「待 PM 门控 / PARTIAL_SUCCESS」** | phase_status 已签发 **GR-D-016 / GR-D-017**（REV-19 GROUP_D 门控）⇒ 文件头 status **滞后于**权威控制文档（**同源不同步**）；`tests/**` 属 test-engineer 制品 | **登记为 P1 待澄清项**（不阻塞计划层）；建议由 PM / test-engineer 归口回写 |
+| 2 | **设计真源文档 `file_header.status` = `DRAFT_FOR_GATE_REVIEW`** | phase_status 记 GROUP_A / GROUP_B 对 REV-19 均 APPROVED（GR-A-011 / GR-B-011）⇒ 文件头 status 与组级 APPROVED 不一致（**沿 R13 / R14 / R18 既有先例**） | **登记为 P1 待澄清项**（不阻塞计划层）；本代理**不改**设计真源（他组制品） |
+| 3 | **checklists B24 的迁移命令 `python -m ib.config.migrate_legacy_definition_file` 不可直接运行** | `src/ib/config/` 无同名模块（函数在 `__init__.py` / `definition.py`） | **如实登记**（§16.2(b) 坑 2）；本计划以 `python -c "from ib.config import …"` 为准；**不改** checklists（他组 / 越权面） |
+| 4 | **R18 登记基线 351 vs R19 改前实测 352 passed / 2 skipped（354 采集）** | `test_report.md` §24 记「改动前整套 352 passed / 2 skipped」⇒ 磁盘实际比 R18 登记值多 3（登记滞后） | **如实登记**；R19 基线以**缺陷闭合后实测**为准（采集 382 / 380 passed / 2 skipped） |
+| 5 | **C-IB-46 目录根取值未由架构文档钦定** | ADR-44 只定「`<dir>/<project_id>.json`」，未指定生产 `<dir>` 字面值 | **本计划拟定 `/var/lib/intelligentbase`**（与工具默认旧文件名 + B24 自洽）；**待 PM / 用户确认**（见 §16.2(b)）；若改专用子目录**须显式 `legacy_file`**。**【2026-10-11 用户裁决回填：已闭合 —— 钦定 `/var/lib/intelligentbase`（非专用子目录），坑 1 不触发；见 §16.2(b) 订正注。原处置文字保留以追溯】** |
+
+### 16.9 R19 未改项（**边界声明**）
+
+- **不引 Docker / 容器化**（DR-03 不变）：R19 **零容器交付物**，本计划**无任何 Docker step**。
+- **不引运行期热重载**：专家集 / 种子 / 迁移**一律经「保存 + 服务重启重装配」生效**（ADR-32 / C-IB-40 / OOS-16）—— DEPLOY-039 的重启即装配点。
+- **不改认证 / 会话 / HTTPS / 令牌纪律**：V19-9 仅为**回归复验**（R19 未触碰该面）。
+- **不新增第三方依赖 / 模块 / 端口 / 依赖边 / env 键**（`tech_stack.md` NO_CHANGE）。
 
 ---
 
@@ -1357,9 +1672,11 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 - 所有命令均为**计划内容**，标注「须 PM CONFIRM 后执行」。
 - 全文**不含任何真实凭据 / 口令 / 令牌**；SSH 口令以「日后经环境变量注入」表述；主机指纹为**非 secret** 的 host key 校验值，按任务要求登记。
 - **PHASE_11（实际生产部署）保持 PENDING，禁止执行**，直至收到 PM 的 `PRODUCTION_DEPLOY_CONFIRM=true`（且建议先闭合 `FND-GROUP-D-03`）。
+- **【订正注 · 2026-10-11 FND-GROUP-D-03 实测回填】** 上文「（且建议先闭合 `FND-GROUP-D-03`）」**已过期** —— **`FND-GROUP-D-03` 已判 `CLOSED_VERIFIED`**，**不再是 PHASE_11 的前置阻塞**；**照该句原读会得出「不可部署」的错误结论**，故订正。证据 = `docs/test_report.md` **§11.3** + TC-INT-074/075（真 Django HTTP `DELETE` + 真 `FsBlobStore` → `blob_deleted=True`，0 磁盘残留）+ 加强后的 TC-INT-041 / TC-E2E-003 / TC-UNIT-055 + 原始输出 `docs/evidence/groupd_r4_all.log`（`148 passed in 13.74s`，EXIT=0）。**PHASE_11 本身仍 PENDING / 冻结**，须用户明确下达 `PRODUCTION_DEPLOY_CONFIRM=true`（本条**不构成**任何部署授权）。
 - **REV-13 增量边界（前轮，INV-GROUP_E-INTELBASE-004）**：本代理**未连接、未触碰** `192.168.31.133`；**未执行**任何 SSH / 写操作 / 安装 / 服务启停 / `nginx` 写；**未 commit / push**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md`；**未触发 PHASE_11**（**未**自赋 `PRODUCTION_DEPLOY_CONFIRM`）。§13 **只登记计划与回滚**，全部命令须 PM CONFIRM 后执行。
 - **REV-14 增量边界（前轮，INV-GROUP_E-INTELBASE-005）**：本代理**未连接、未触碰** `192.168.31.133`；**未执行**任何 SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码（含 R14 交付物，全程只读）/ `tests/**` / 设计真源四文档 / `docs/phase_status.md` / `docs/test_*.md`；**未触发 PHASE_11**，且**该轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（本代理**未**、也**不得**自赋）。**该轮仅改两个文档**：本文件（`deployment_plan.md` 1.2.0 → **1.3.0/REV-14**）与 `docs/cicd_pipeline.md`（1.2.0 → **1.3.0/REV-14**），另同步 `.github/workflows/ci.yml` 的**注释基线标签**（239 → 245 / 123 → 129 / 13 → 21，纯注释、不改 step 逻辑）。§14 **只登记计划与回滚**，全部命令须 PM CONFIRM 后执行。
 - **REV-18 增量边界（本轮，INV-GROUP_E-INTELBASE-006）**：本代理**未连接、未触碰** `192.168.31.133`；**未执行**任何 SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传 / 迁移 / 备份；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码（含 R18 交付物，全程只读引用）/ `tests/**` / `docs/architecture_design.md` / `docs/module_design.md` / `docs/tech_stack.md` / `docs/requirements_spec.md` / `docs/user_stories.md` / `docs/implementation_plan.md` / `docs/test_report.md` / `docs/phase_status.md`（PM 独占）/ `.github/workflows/ci.yml`；**未触发 PHASE_11**，且**本轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（本代理**未**、也**不得**自赋）。**本轮仅改两个文档**：本文件（`deployment_plan.md` 1.3.0 → **1.4.0/REV-18**）与 `docs/cicd_pipeline.md`（1.3.0 → **1.4.0/REV-18**）。§15 **只登记计划与回滚**（含 `005` 的 `kb_default` 数据迁移**不可逆**的显式声明），全部命令须 PM CONFIRM 后执行。
+- **REV-19 增量边界（本轮，INV-GROUP_E-INTELBASE-007）**：本代理**未连接、未触碰** `192.168.31.133`；**未执行**任何 SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传 / **迁移 / 备份**；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码（含 R19 交付物，全程只读引用）/ `tests/**` / `docs/architecture_design.md` / `docs/module_design.md` / `docs/tech_stack.md` / `docs/requirements_spec.md` / `docs/user_stories.md` / `docs/implementation_plan.md` / `docs/test_report.md` / `docs/phase_status.md`（PM 独占）/ `src/deploy/checklists.txt` / `.github/workflows/ci.yml`；**未跑 Docker**（忠实 DR-03）。**未触发 PHASE_11**，且**本轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（本代理**未**、也**不得**自赋）。**本轮仅改两个文档**：本文件（`deployment_plan.md` 1.4.0 → **1.5.0/REV-19**）与 `docs/cicd_pipeline.md`（1.4.0 → **1.5.0/REV-19**）。§16 **只登记计划与回滚**（含 **C-IB-46 定义文档目录化的时序铁律 + 迁移严禁自动执行 + 迁移与部署之间失败的逐分支处置 A~E**，以及 **C-IB-47 登记为「前向条款 / 当前无可执行内容」而非可执行步骤**），全部命令须 PM CONFIRM 后执行。
 
 ---
 
@@ -1373,7 +1690,13 @@ curl -sS -N -H "Authorization: Bearer <令牌>" \
 | **1.3.0** | **GROUP_E / REV-14** | **2026-10-06** | **INV-GROUP_E-INTELBASE-005** | **REV-14 增量（R13 回归缺陷修复：全局管理员「当前项目」选择与 `X-IB-Project` 传播）**：① header 补 revision=REV-14、版本 1.2.0→**1.3.0**、上游输入升 R14、新增「REV-14 增量声明 + R14 变更面 + 门控前置备注」；② §10.1 补 DEPLOY-017~021 / ROLLBACK-017~021 行 + 逆序纪律补 R14 句；③ 新增 **§14**「REV-14 增量部署面」（14.1 交付物 / **14.2 变更类型判定：无迁移·无新依赖·无新 env 键·无 unit/站点改动** / 14.3 正向步骤 DEPLOY-017~021（`git pull` → `npm ci && npm run build` → 发布新 `dist/` → 重启 `ib-web`，**不重启 `ib-worker`/`ib-embed`/`qdrant` 并给理由**）/ 14.4 回滚 ROLLBACK-017~021（逆序，**不涉数据迁移**）/ **14.5 验证 V14-1~9（含 admin 选项目后 `/api/config/definition` 503→200 直接验收；未选项目逐端点实测口径：config/definition 503 / files 200 空 / chat/stream 与 rebuild 500，不得笼统「全部 503」）** / 14.6 风险与前置（CRED-01 结转 + B-01~B-03 实务已闭合 + B-04/B-05/B-06 承前 + R14-OBS + OPEN ITEM））；④ 附自检补 R14 边界；status → REVISED_PENDING_REVIEW（待 GR-E-005） | `architecture_design.md` 1.6.0/REV-14（ADR-28 / §2.0.5）；`module_design.md` 1.6.0/REV-14（IFC-IB-333~336）；`tech_stack.md` 1.4.0/REV-13（NO_CHANGE）；`implementation_plan.md` 2.9.0/R14；`test_report.md` 1.10.0/R14 §19（Python 245 / 前端 21 / selfcheck 47）；`docs/phase_status.md`（GR-B-007 / GR-C-010 / GR-D-011）；`src/ibweb/{views,urls}.py`；`src/frontend/src/{stores/project.ts,api/client.ts,app/env.ts,layouts/ConsoleLayout.vue,main.ts}` |
 | **1.4.0** | **GROUP_E / REV-18** | **2026-10-07** | **INV-GROUP_E-INTELBASE-006** | **REV-18 增量（系统管理三分：项目管理 / 账户管理 / LLM Key 管理 + 项目 CRUD 软删 + LLM Key 载体 = DB + 项目域资料上传；含 2 迁移，`kb_default` 数据迁移不可逆）**：① header 补 revision=REV-18、版本 1.3.0→**1.4.0**、上游输入升 REV-18 四文档、新增「REV-18 增量声明 + R18 变更面 + R18 门控前置备注」；② §10.1 补 **DEPLOY-022~031 / ROLLBACK-022~031** 行 + 逆序纪律补 R18 句（**代码可回滚 / 数据归属不回退**）；③ 新增 **§15**「REV-18 增量部署面」（15.1 交付物 / **15.2 变更类型判定 + 迁移执行的前置与判据：`ensure_schema` 顺序 / 手工 `005` 路径的坑（老库 `no such column: status`、空库缺 `kbs`）/ 幂等性 / 既有生产数据行为 + 不可逆性声明** / 15.3 正向步骤 DEPLOY-022~031（`git pull` → venv 依赖核对 → **迁移前备份 + 行数核算** → `--ensure-schema` 迁移应用 → 前端重建 → `dist/` 原子发布 → 重启 `ib-web` → 重启 `ib-worker`（推荐）→ 部署后验证 → LLM Key 迁移（用户执行））/ 15.4 回滚 ROLLBACK-022~031（逆序，`005` 不可逆 + `[MANUAL_ROLLBACK_REQUIRED]`）/ 15.5 验证 V18-1~10 / 15.6 风险 R-18-1~8 / **15.7 LLM Key 迁移专项（`.env`→DB）** / **15.8 PHASE_11 用户验收清单（§23.5 六项 + CRED-01 + bcrypt 对齐）** / 15.9 不一致登记）；④ 附自检补 R18 边界；status → REVISED_PENDING_REVIEW（待 GR-E-006） | `architecture_design.md` 1.10.2/REV-18-R2（ADR-37~42 / ADR-21-R1）；`module_design.md` 1.10.2/REV-18-R2（IFC-IB-366~377）；`tech_stack.md` 1.4.1/REV-18（NO_CHANGE）；`implementation_plan.md` 2.13.0/REV-18 §25；`test_report.md` 1.14.0/REV-18 §23（GR-D-015；Python 351 / 前端 35 / selfcheck 51）；`docs/phase_status.md`（GR-D-015）；`src/deploy/migrations/{005_projects,006_llm_key}.sql`；`src/ib/ledger/schema.py`（`ensure_schema` 单源）；`src/deploy/checklists.txt` `[B21]~[B23]`；`src/deploy/env.example`（R18 两键）；`src/ib/{config,llm}/__init__.py`、`src/ibweb/{views,urls,composition}.py`、`src/frontend/src/views/{SystemSection,ProjectsPage,LlmKeyPage,AccountsPage,UploadPage}.vue` |
 
+| **1.5.0** | **GROUP_E / REV-19** | **2026-10-11** | **INV-GROUP_E-INTELBASE-007** | **REV-19 增量（每项目专家集隔离 / 定义文档目录化 C-IB-46 / 新项目创建期种子 / 三专家属 `demo` C-IB-47 / 前端项目域闭环）**：① header 补 revision=REV-19、版本 1.4.0→**1.5.0**、上游输入升 REV-19 文档（含 `test_report.md` 1.15.0/§24，GR-D-016/017）+ R19 门控前置备注；② 「REV-19 增量声明 + R19 变更面 + 门控前置备注」块；③ §10.1 补 **DEPLOY-032~040 / ROLLBACK-032~040** 行 + 逆序纪律补 R19 句（**C-IB-46 三件套 {037,038,039} 耦合原子回滚**）；④ 新增 **§16**「REV-19 增量部署面」（16.1 交付物 / **16.2 变更类型判定（无 SQL 迁移·无新依赖·无新 env 键·无 unit/站点改动；唯一语义变更 = C-IB-46 文件级迁移）+ (a) C-IB-46 失败模式与时序铁律 T1（三段中间态均 fail-closed，禁 T2）+ (b) 目录根取值拟定 `/var/lib/intelligentbase` + 坑 1 静默 no-op + 坑 2 `python -m` 不可运行** / 16.3 正向步骤 DEPLOY-032~040（`git pull` → venv 依赖核对（应无新增）→ **前端构建+测试首次实跑 `npm ci && npm run typecheck && npm test && npm run build`** → `dist/` 原子发布（**无需重启**）→ 【维护窗口】停服+备份 → **C-IB-46 迁移（用户手工）** → 改 `.env` 目录根 → 重启 `ib-web`（+ 推荐 `ib-worker`）→ 部署后验证）/ **16.4 回滚 ROLLBACK-032~040（逆序 + C-IB-46 三件套原子序列编排 + 「迁移与部署之间失败」逐分支处置 A~E + C-IB-47 前向条款登记）** / **16.5 验证 V19-1~9（含 V19-7 前端免重启硬指标 / V19-8 混版判据勿用 `.pyc`）** / 16.6 风险 R-19-1~10 / **16.7 PHASE_11 用户验收清单 AC-R19-A~E + CRED-01（AC-R19-D = C-IB-47 NOT_APPLICABLE）** / 16.8 不一致登记 5 项 / 16.9 未改项）；⑤ 附自检补 R19 边界；status → REVISED_PENDING_REVIEW（待 GR-E-007） | `architecture_design.md` 1.11.0/REV-19（ADR-43~47 / §2.0.10）；`module_design.md` 1.11.0/REV-19（IFC-IB-378~388）；`tech_stack.md` 1.4.1/REV-18（NO_CHANGE）；`implementation_plan.md` 2.14.0/REV-19 §26；`test_report.md` 1.15.0/REV-19 §24（GR-D-016/017）；`docs/phase_status.md`（GR-A-011 / GR-B-011 / GR-C-014+015 / GR-D-016+017）；`src/deploy/checklists.txt` `[B24]`/`[B25]`；`src/ib/experts/__init__.py`、`src/ib/config/definition.py`（`FileDefinitionDocumentStore` / `migrate_legacy_definition_file` / `LEGACY_DEFINITION_FILENAME`）、`src/ib/streaming/__init__.py`（`MemorySessionStore` / `migrate_expert_history`）、`src/ibweb/{views,composition}.py`、`src/ib/{config,experts,streaming}/__init__.py`、`src/frontend/package.json`（scripts） |
+
+| **1.5.1** | **GROUP_E / REV-19（用户裁决回填轮）** | **2026-10-11** | **INV-GROUP_E-INTELBASE-007（承）** | **用户 2026-10-11 裁决回填 `GR-E-007` 三项开放项 + `checklists.txt` B24 订正（文书回填 + 交付物订正，非门控变更）**：① §16.2(b) 追加「目录根取值已由用户裁决钦定 `/var/lib/intelligentbase`（非专用子目录）⇒ 坑 1 不触发」条目；② §16.3 **DEPLOY-037** 追加与订正后 B24 **逐字对齐**的可运行形式（`sudo /opt/intelligentbase/venv/bin/python -c "from ib.config import migrate_legacy_definition_file as f; print(f('/var/lib/intelligentbase', target_project_id='demo'))"`；原式显式 `legacy_file` 保留以追溯）；③ §16.4 **ROLLBACK-037** 追加与钦定值一致性注；④ header 版本 1.5.0 → **1.5.1**、新增裁决回填声明；status **维持 `REVISED_PENDING_REVIEW`**（1.5.1 未过门控）。配套：`docs/phase_status.md` `GR-E-007` 追加 `open_item_1_status` / `open_item_2_status` / `open_item_3_status`（=CLOSED），原四条 open_item 与 condition_1 原文一字未动；`src/deploy/checklists.txt` B24 追加式订正（原三行保留 + 订正后可运行形式 + demo.json 属主 / 模式核对项 + 「须在 DEPLOY-032 `git pull` 之后方可用」）。PHASE_11 仍冻结 | `docs/phase_status.md`（`GR-E-007.open_item_1_status / open_item_2_status / open_item_3_status`）；用户裁决（2026-10-11）；`src/ib/config/definition.py:957`（`migrate_legacy_definition_file` 签名）；`src/deploy/checklists.txt` `[B24]` |
+
 > 本修订为**纯文档 / 部署产物修订**：**未执行**任何部署步骤，**未连接、未触碰**目标机 `192.168.31.133`。
 > **1.2.0（REV-13）本轮边界**：**未连接、未触碰**目标机；**未 commit / push**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md`；**未触发 PHASE_11**。R13 轮次**未改任何 `src/` 交付物**（R13 交付物由 GROUP_C 产出，本代理只读引用）。
 > **1.3.0（REV-14）本轮边界（INV-GROUP_E-INTELBASE-005）**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何 SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md` / `docs/test_*.md`；**未触发 PHASE_11**，**该轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（PHASE_11 保持冻结）。该轮**仅改两个文档**（`deployment_plan.md` / `cicd_pipeline.md`，均 1.2.0 → **1.3.0/REV-14**）+ 同步 `.github/workflows/ci.yml` 的**注释基线标签**（纯注释，不改 step 逻辑）。
 > **1.4.0（REV-18）本轮边界（INV-GROUP_E-INTELBASE-006）**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何 SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传 / 迁移 / 备份；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码（R18 交付物全程只读引用） / `tests/**` / 设计真源文档 / `docs/{implementation_plan,test_report,phase_status}.md` / `.github/workflows/ci.yml`；**未触发 PHASE_11**，**本轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（PHASE_11 保持冻结）。本轮**仅改两个文档**（`deployment_plan.md` / `cicd_pipeline.md`，均 1.3.0 → **1.4.0/REV-18**），**未改 `.github/workflows/ci.yml`**（R18 无 CI 逻辑改动，仅如实登记 §3.2 迁移门未覆盖 `005`/`006`）。§15 **只登记计划与回滚**，全部命令须 PM CONFIRM 后执行。
+> **1.5.0（REV-19）本轮边界（INV-GROUP_E-INTELBASE-007）**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何 SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传 / **迁移 / 备份**；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未跑 Docker**（忠实 DR-03）；**未改** `src/**` 实现代码（R19 交付物全程只读引用）/ `tests/**` / 设计真源文档 / `docs/{implementation_plan,test_report,phase_status}.md` / `src/deploy/checklists.txt` / `.github/workflows/ci.yml`；**未触发 PHASE_11**，**本轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（PHASE_11 保持冻结）。本轮**仅改两个文档**（`deployment_plan.md` / `cicd_pipeline.md`，均 1.4.0 → **1.5.0/REV-19**）。§16 **只登记计划与回滚**（含 C-IB-46 时序铁律 + 迁移严禁自动执行 + 迁移与部署之间失败逐分支处置 A~E；C-IB-47 登记为前向条款），全部命令须 PM CONFIRM 后执行。
+> **1.5.1（REV-19 用户裁决回填轮）本轮边界**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何 SSH / 写操作 / 迁移 / 备份 / `scp` / `pscp` / `rsync`；**未 commit / push / `git add`**；**未跑 Docker**；**未改** `src/**` 实现代码（`src/deploy/checklists.txt` 为**本轮授权订正的部署清单**，属部署清单非实现代码）/ `tests/**` / 设计真源文档 / `docs/test_*.md`；**未触发 PHASE_11**、**未自赋 `PRODUCTION_DEPLOY_CONFIRM`**。本轮**仅改三个文件**：`docs/phase_status.md`（追加式回填）、`docs/deployment_plan.md`（1.5.0 → **1.5.1**）、`src/deploy/checklists.txt`（B24 追加式订正）。

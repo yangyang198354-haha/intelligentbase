@@ -64,6 +64,7 @@ __all__ = [
     "content_hash_conflict_item",
     "FileDefinitionDocumentStore",
     "InMemoryDefinitionDocumentStore",
+    "migrate_legacy_definition_file",
     "NON_EDITABLE_FIELDS",
     # REV-16-2 提示词域数据层（IFC-IB-343 ~ 348）
     "EXPERT_PROMPT_DIR_KEY",
@@ -883,6 +884,7 @@ from .definition import (  # noqa: E402  (循环导入防护：置于模块末�
     document_from_json,
     document_to_json,
     editable_field_whitelist,
+    migrate_legacy_definition_file,
     non_editable_changes,
     semantic_hash,
     validate,

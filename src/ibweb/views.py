@@ -1485,6 +1485,11 @@ def projects_endpoint(request: Any) -> Any:
                     updated_at=now,
                 )
             )
+            # REV-19（ADR-45 / IFC-IB-385；REQ-FUNC-IB-52 / IB-53）：**创建期同步播种** ——
+            # 写 `<dir>/<project_id>.json`（专家集 + 单一默认编排流）+ 提示词目录骨架。
+            # 种子真源：`demo` = 三对齐专家；其余 = 内置默认单例（1 个 KB 问答 agent）。
+            # **原子回滚**：播种失败 → 软删注册表项 + 删除半成品，返回明确错误（不静默）。
+            _seed_created_project(project_id)
             audit("project", outcome="created", status="ok", project_id=project_id)
             deps.reload_projects()
             return _json(ProjectRegistryEntrySerializer(created).data, status.HTTP_201_CREATED)
@@ -1649,6 +1654,27 @@ def _project_registry() -> Any:
     if registry is None:
         raise DependencyUnavailableError("项目注册表不可用", dependency="ledger")
     return registry
+
+
+def _seed_created_project(project_id: str) -> Any:
+    """REV-19 创建期播种（ADR-45 / IFC-IB-385；REQ-FUNC-IB-52 / IB-53）。
+
+    调用组合根 `seed_project`（内置默认单例 = 1 个 KB 问答 agent；`demo` = 三对齐专家）。
+    播种失败 → **原子回滚**（软删注册表项）并抛明确错误（**不静默**）。
+    """
+    from ib.experts import builtin_default_registry
+
+    try:
+        result = composition.seed_project(project_id, registry_view=builtin_default_registry())
+        log_event("project", "seeded", project_id=project_id, created=int(bool(result.created)))
+        return result
+    except Exception as exc:  # noqa: BLE001 - 播种失败须回滚，不静默
+        try:
+            _project_registry().disable(project_id)
+        except Exception:  # noqa: BLE001 - 回滚尽力而为
+            pass
+        log_event("project", "seed_failed", project_id=project_id, error_type=type(exc).__name__)
+        raise IbError("项目默认种子写入失败，已回滚创建；请重试或联系管理员", code="project_seed_failed") from exc
 
 
 def _llm_key_store() -> Any:

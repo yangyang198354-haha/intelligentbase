@@ -109,8 +109,9 @@ def _doc(project_id: str = "p_alpha", **overrides):
 
 
 def _file_store(tmp_path, *, project_id: str = "p1") -> FileDefinitionDocumentStore:
+    # REV-19（ADR-44 / IFC-IB-383）：构造形参语义 = **目录根**（一项目一文档 `<dir>/<pid>.json`）。
     return FileDefinitionDocumentStore(
-        str(tmp_path / f"{project_id}.definition.json"), known_tools=frozenset({"search_knowledge"})
+        str(tmp_path), known_tools=frozenset({"search_knowledge"})
     )
 
 
@@ -141,10 +142,10 @@ def test_TC_INT_079_definition_store_is_single_persistent_source(tmp_path):
 
     # 目录内**恰好一个**文件：无临时文件残留、无第二份持久化副本
     files = sorted(p.name for p in tmp_path.iterdir())
-    assert files == ["p1.definition.json"], f"定义文档目录出现多余文件（第二副本/临时残留）：{files}"
+    assert files == ["p1.json"], f"定义文档目录出现多余文件（第二副本/临时残留）：{files}"
 
     # 文件内容即文档序列化（稳定键序），可人读 diff
-    assert (tmp_path / "p1.definition.json").read_text(encoding="utf-8") == document_to_json(doc)
+    assert (tmp_path / "p1.json").read_text(encoding="utf-8") == document_to_json(doc)
 
     # 重载逐字一致（无漂移）
     reloaded = store.load("p1")
@@ -154,7 +155,7 @@ def test_TC_INT_079_definition_store_is_single_persistent_source(tmp_path):
     # 覆盖写（新内容）后仍只有一份文件，且内容已更新
     updated = _doc("p1", route=RouteSpecInput(0.72, 0.05, 8, "a"))
     assert store.save("p1", updated, expected_content_hash=reloaded.content_hash).ok is True
-    assert sorted(p.name for p in tmp_path.iterdir()) == ["p1.definition.json"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["p1.json"]
     assert store.load("p1").route.tau == 0.72
 
 
@@ -199,7 +200,7 @@ def test_TC_INT_081_document_is_authoritative_and_conflicts_are_rejected(tmp_pat
 
     # 模拟「界面之外被改动」：直接改写定义文档文件
     v2 = _doc("p1", route=RouteSpecInput(0.80, 0.05, 8, "a"))
-    (tmp_path / "p1.definition.json").write_text(document_to_json(v2), encoding="utf-8")
+    (tmp_path / "p1.json").write_text(document_to_json(v2), encoding="utf-8")
     assert store.load("p1").route.tau == 0.80, "重载未以文档为准"
 
     # 带**陈旧**基线回写 → 冲突：不覆盖、不落盘，给可读回执
@@ -207,7 +208,7 @@ def test_TC_INT_081_document_is_authoritative_and_conflicts_are_rejected(tmp_pat
     assert stale.ok is False and stale.conflict is True
     assert stale.errors and all(i.path and i.code and i.message for i in stale.errors)
     assert any(i.code == "content_hash_conflict" for i in stale.errors)
-    assert json.loads((tmp_path / "p1.definition.json").read_text(encoding="utf-8"))["route"]["tau"] == 0.80
+    assert json.loads((tmp_path / "p1.json").read_text(encoding="utf-8"))["route"]["tau"] == 0.80
 
     # 带**当前**基线回写 → 成功，落盘为新内容
     v3 = _doc("p1", route=RouteSpecInput(0.30, 0.05, 8, "a"))
@@ -268,7 +269,7 @@ def test_TC_INT_083_missing_or_corrupt_document_never_silently_falls_back(tmp_pa
 
     若静默回退为空文档，装配会「成功」但配置全部丢失 —— 这正是 fail-fast 要杜绝的形态。
     """
-    missing = FileDefinitionDocumentStore(str(tmp_path / "absent.json"))
+    missing = FileDefinitionDocumentStore(str(tmp_path / "absent_defs"))
     for loader in (missing.load,):
         try:
             loader("p1")
@@ -276,19 +277,22 @@ def test_TC_INT_083_missing_or_corrupt_document_never_silently_falls_back(tmp_pa
         except ConfigError as exc:
             assert "IB_DEFINITION_DOC_PATH" in str(exc) or "IB_DEFINITION_DOC_PATH" in getattr(exc, "key", "")
 
-    corrupt = tmp_path / "corrupt.json"
-    corrupt.write_text("{ 这不是 JSON", encoding="utf-8")
+    # REV-19：目录根 + `<pid>.json`；损坏内容落在该项目的文档文件上。
+    corrupt_dir = tmp_path / "corrupt_defs"
+    corrupt_dir.mkdir()
+    (corrupt_dir / "p1.json").write_text("{ 这不是 JSON", encoding="utf-8")
     try:
-        FileDefinitionDocumentStore(str(corrupt)).load("p1")
+        FileDefinitionDocumentStore(str(corrupt_dir)).load("p1")
         raise AssertionError("损坏文档竟未报错")
     except ConfigError:
         pass
 
     # 结构合法但非对象（JSON 数组）→ 亦按不可解析处理
-    array_json = tmp_path / "array.json"
-    array_json.write_text("[1, 2, 3]", encoding="utf-8")
+    array_dir = tmp_path / "array_defs"
+    array_dir.mkdir()
+    (array_dir / "p1.json").write_text("[1, 2, 3]", encoding="utf-8")
     try:
-        FileDefinitionDocumentStore(str(array_json)).load("p1")
+        FileDefinitionDocumentStore(str(array_dir)).load("p1")
         raise AssertionError("非对象文档竟未报错")
     except ConfigError:
         pass

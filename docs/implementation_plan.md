@@ -3,14 +3,14 @@
   <artifact>implementation_plan</artifact>
   <path>docs/implementation_plan.md</path>
   <doc_id>IMPL-INTELBASE-001</doc_id>
-  <version>2.13.0</version>
+  <version>2.14.0</version>
   <status>DRAFT</status>
-  <phase>GROUP_C / PHASE_05 实现计划（R7 定义外置增量 + R8 缺陷修复增量 + R10 前端构建阻断修复增量 + R11 IB-20 流式/会话增量 + R13 账户/会话/商用界面增量 + R13.1 回修增量 DEFECT-R13-01 来源 IP 限速修复 + R14 回归缺陷修复增量 全局管理员「当前项目」选择与 X-IB-Project 传播 + REV-16-2 提示词分层与工具可视化配置增量 + REV-16-4 回归缺陷修复增量 DEFECT-R16-01/02 与 GAP-R16-03/04 配置审计与存储态 + REV-17 提示词兜底层重定位增量 提示词文本移出定义文档 / 合并结果进 system 位 / 通用内置安全网破新增专家死锁 + REV-18 系统管理三分增量 项目注册表 CRUD / LLM Key 管理 / 项目域资料上传 / 顺序依赖与二次确认）</phase>
+  <phase>GROUP_C / PHASE_05 实现计划（R7 定义外置增量 + R8 缺陷修复增量 + R10 前端构建阻断修复增量 + R11 IB-20 流式/会话增量 + R13 账户/会话/商用界面增量 + R13.1 回修增量 DEFECT-R13-01 来源 IP 限速修复 + R14 回归缺陷修复增量 全局管理员「当前项目」选择与 X-IB-Project 传播 + REV-16-2 提示词分层与工具可视化配置增量 + REV-16-4 回归缺陷修复增量 DEFECT-R16-01/02 与 GAP-R16-03/04 配置审计与存储态 + REV-17 提示词兜底层重定位增量 提示词文本移出定义文档 / 合并结果进 system 位 / 通用内置安全网破新增专家死锁 + REV-18 系统管理三分增量 项目注册表 CRUD / LLM Key 管理 / 项目域资料上传 / 顺序依赖与二次确认 + REV-19 项目域专家集隔离增量 每项目专家集隔离 / 定义文档目录化 / 新项目种子 1 KB agent / 三专家归属 demo / 迁移脚本与检查清单 B24 B25）</phase>
   <author>software-developer</author>
-  <invocation_id>INV-GROUP_C-INTELBASE-019</invocation_id>
-  <latest_invocation_id>INV-GROUP_C-INTELBASE-019</latest_invocation_id>
+  <invocation_id>INV-GROUP_C-INTELBASE-020</invocation_id>
+  <latest_invocation_id>INV-GROUP_C-INTELBASE-020</latest_invocation_id>
   <created_at>2026-09-25</created_at>
-  <updated_at>2026-10-07</updated_at>
+  <updated_at>2026-10-11</updated_at>
   <revision_note>R1（v1.0.0）为 GROUP_C 首轮交付（69 文件 / 16,396 行 / 25 模块）。
     R2（v2.0.0）为**增量**：只做两件事 ——（L-03）实现 MOD-IB-26 `ib-embed` 服务端 + 进程内第三种 Embedder 形态；
     （M-02）实现页面图关联的生产与读路径（related_images）。**R1 内容一律保留**，本轮只追加与最小改动（见 §12）。
@@ -41,14 +41,15 @@
     REV-16-4（v2.11.0，invocation INV-GROUP_C-INTELBASE-016；设计侧口径 **REV-16-4**）为 **GROUP_C 回归缺陷修复增量**（输入 = `docs/module_design.md` **1.8.0/REV-16-4** §2.2.7（IFC-IB-355~363）+ §3 MOD-IB-01/02/11/23/24 增补 + `docs/architecture_design.md` **1.8.0/REV-16-4** ADR-33/34/35 + §2.0.7；上游 gate GR-A-009 = PASS / GR-B-009 = PASS）。**修两缺陷 + 补两缺口，共四件事**：①**DEFECT-R16-01**（`src/ibweb/serializers.py::_ToolGrantSpecSerializer` 只声明 `expert_name`/`tool_names`，漏 `param_values` ⇒ GET→PUT 原样读回**静默丢参**）：改为与该文件既有纪律同构的**手写 `to_representation`**（同 `_EdgeSpecSerializer`），保序输出 `param_values` 为 `[{"name","value"}, …]`，**不改任何其它字段的线形**；②**DEFECT-R16-02**（保存路径只跑 `validate`（290），漏掉工具参数校验（346），致「保存期接受、装配期拒绝」的漂移）：新增**合成纯函数** `validate_definition_full`（MOD-IB-02，IFC-IB-355）= 290 ∪ 346，**保存路径**（`_put_definition_config`）与**装配路径**（`admit_two_domains`）**共用同一入口**（ADR-33）；被拒保存返回文档化 4xx 且**在用配置逐字节不变**（fail-safe）；`ValidationReport` 仍不含 `force`/`ignore`/`warn_only`；**未改 `validate()` / `store.validate()` / 任何既有 IFC 的签名**；③**GAP-R16-03**（ADR-35）：落地 `StorageState`（MOD-IB-01，IFC-IB-361）与只读端点 `GET /api/config/storage-state` → `get_storage_state`（MOD-IB-23，IFC-IB-362，**单一来源 = 装配期实际选用的存储实现**，非从环境变量再推导）+ 配置页**内存态非静默提示**（MOD-IB-24，IFC-IB-363）；**不改变**「保存 + 服务重启重装配」生效口径、**不引入**运行期热重载；④**GAP-R16-04**（ADR-34）：落地只读审计 `ConfigAuditEntry`（IFC-IB-356）/ 第 **17** 个端口 `ConfigAuditStore`（IFC-IB-357，**恰好 2 方法** `record`/`list_by_project`，**无 update/delete**）/ `SqliteConfigAuditStore`（IFC-IB-358，同一 SQLite 台账，手写迁移 `004_config_audit.sql`）/ `record_config_audit` + 保存路径审计挂钩（IFC-IB-360，顺序 = 校验 → 落盘 → 审计写；**审计写与配置写非事务耦合**，失败不改变保存结果但发结构化 `WARN config_audit_write_failed`）/ `GET /api/config/audit` → `list_config_audit`（IFC-IB-359）；成功与失败**均**记录（`result ∈ {"saved","rejected"}`，失败带 `detail_code` 只含字段名/码）。**未新增模块（仍 26，MOD-IB-01~26）/ 端口 16 → 17（纯追加）/ 未改任何既有 IFC-IB 号或签名文本（`IFC-IB-001~354` 一字未改）/ 未改模块边界 / 未新增 §4.1 依赖边（DAG 不变）/ 未改既有配置键名与默认值 / 未新增第三方依赖（仅 stdlib `sqlite3`）**，只追加（见 §23）。正文 §1~§22 为 R1~REV-16-2 的**历史记录，未改写**。
     [元数据订正 — 无领域变更]（2026-10-07，PM 机械落盘；回链 phase_status.md 审计日志）：file_header 的 inputs 块此前仍声明 R2 期版本（architecture_design / module_design / tech_stack 1.2.0/R2、ib_embed_service_contract 1.1.0/R2、requirements_spec 1.1.0），早已不是事实；现按各文档头部实测版本订正为 architecture_design.md 1.8.0/REV-16-4、module_design.md 1.8.0/REV-16-4、tech_stack.md 1.4.0/REV-13、ib_embed_service_contract.md 1.0.0/R2（原声明 1.1.0 本身即笔误）、requirements_spec.md 1.7.0/REV-16-3，并新增 user_stories.md 1.8.0/REV-16-4 一条。**本文件版本号不递增**（无领域变更；依 file_header inputs 指针元数据订正的既有先例，避免向 test_report.md / test_plan.md 的『上游输入』as-of 记录级联引入新陈旧引用）。正文与 §1~§23 一字未改。
     REV-17（v2.12.0，invocation INV-GROUP_C-INTELBASE-018；设计侧口径 **REV-17**）为**提示词兜底层重定位增量**（输入 = `docs/architecture_design.md` **1.9.0/REV-17** 的 **ADR-36** + **ADR-15-R2** + 经修订的 ADR-29 / ADR-31 / ADR-33 与 §2.0.8 R17 影响复核表；`docs/module_design.md` **1.9.0/REV-17** 的 **IFC-IB-364 / IFC-IB-365** 与 §2.2.8 REV-17 文字修订索引；`docs/requirements_spec.md` **1.8.0/REV-17** 的 REQ-FUNC-IB-37/38/41 与 C-IB-41 补注）。**三件事**：①**提示词文本彻底移出定义文档** —— `ExpertSpecInput` 删 `fallback_prompt`（`ExpertSpec.fallback_prompt` **原样保留**为安全网本体）、可编辑白名单删 `experts[].fallback_prompt`、`_semantic_payload` 同步（既有文档 `content_hash` 因此**一次性全变**）、legacy 键**分级处置**（与内置逐字相同 → 静默丢弃；不同 → `ConfigError` 并指明迁移目标 `fallback.md`，**只报长度不回显正文**）；②**合并结果进 system 位** —— `LlmProvider.build_expert(spec, *, system_prompt: str | None = None)`（IFC-IB-212 补形参，**消解** llm/__init__.py 那条「可按 spec.name 加载后经 system_prompt 覆盖」的**假陈述 docstring**），编排层改传 `system_prompt=prompt or None` 且 human 位只留用户问题；③**通用内置安全网破死锁** —— 新增 IFC-IB-365（`BUILTIN_FALLBACK_DEFAULT` / `BUILTIN_FALLBACKS` / `builtin_fallback_for` / `builtin_fallbacks_for`，快照**由 `_DEFAULT_SPECS` 派生**，**不取** `EXPERT_SPECS` —— `install_derived` 会 rebind 而 `build_deps(force=True)` 不回滚全局 `EXPERT_SPECS`）+ 新增 IFC-IB-364 `validate_two_domains`（= `validate_definition_full` ∪ `validate_prompt_directory`，域序固定：定义域 → 工具域 → 提示词域），使**保存期与装配期共用同一校验入口**。**本文件沿用自身版本线 2.11.0 → 2.12.0**（R2=2.0.0 → … → R14=2.9.0 → REV-16-2=2.10.0 → REV-16-4=2.11.0 → REV-17=2.12.0），**与 GROUP_B 文档的 1.9.0/REV-17 属各自独立版本线**。**未新增模块（仍 26）/ 未改端口数（仍 17）/ 未新增第三方依赖 / 未改模块边界 / 未改依赖边（DAG 不变）/ 未改配置键名与默认值 / 未 bump `schema_version`**（无迁移机制；bump 会让所有 v1 文档在 `load()` 阶段硬失败致服务起不来）；`IFC-IB-001~363` 中**被修订的 10 条**（IB-212 / 287 / 290 / 292 / 338 / 339 / 343 / 345 / 347 / 355）**编号与签名名一字不改**，只改口径并在两处索引逐条登记。只追加（见 §24）。正文 §1~§23 为 R1~R17 之前各轮的**历史记录，未改写**。
-    REV-18（v2.13.0，invocation INV-GROUP_C-INTELBASE-019；设计侧口径 **REV-18 / REV-18-R2**）为**系统管理三分增量**（输入 = `docs/architecture_design.md` **1.10.2/REV-18-R2** 的 ADR-37~ADR-42 + ADR-21-R1；`docs/module_design.md` **1.10.2/REV-18-R2** 的 IFC-IB-366~377 与 §2.2.9；`docs/tech_stack.md` **1.4.1/REV-18** **NO_CHANGE**；`docs/requirements_spec.md` **1.10.0/REV-18-2** 的 REQ-FUNC-IB-43~48 / REQ-NFR-IB-20 / C-IB-42~43 / OOS-18~19 / DR-21；`docs/user_stories.md` **1.10.0/REV-18-2** 的 US-IB-35~40）。**五件事**：①**项目注册表**（ADR-37，Option B：同库 `projects` 表 + 软删）—— 第 **18** 个端口 `ProjectRegistryStore`（IFC-IB-367，5 方法）+ `SqliteProjectRegistryStore` / `MemoryProjectRegistryStore`（IFC-IB-370）+ 手写迁移 `005_projects.sql`；`GET /api/projects` **数据源切换为注册表**（端点号 / 名 / 签名与 fail-closed 语义一字不动），新增 `POST` / `PATCH` / `DELETE`（二次确认 `confirm_project_id`，仅 admin）；②**账户扩展**（ADR-40）—— `AccountStore.update_user`（IFC-IB-366，**加成式扩展**，端口 13 → 14）+ `PATCH|DELETE /api/accounts/{user_id}`（IFC-IB-373：二次确认 `confirm_username`；禁删 admin / 最后管理员 → 409；软删复用 `set_status`）+ `POST /api/accounts` **顺序依赖前置**（目标项目须存在且 active，否则 **422**；REQ-FUNC-IB-45）+ **1:N 零迁移**（**不加** `users.project_id` UNIQUE；ADR-21-R1 订正 N:1，关闭 OI-1）；③**LLM Key 管理**（ADR-38 / ADR-39 Option C）—— 第 **19** 个端口 `LlmKeyStore`（IFC-IB-368，3 方法）+ 单行表 `llm_key`（`CHECK (id=1)`；IFC-IB-371）+ 手写迁移 `006_llm_key.sql` + `GET|PUT|DELETE /api/llm-key`（IFC-IB-374；**唯一写入口** = PUT；HTTP 只回 `LlmKeyStatus(configured, masked, updated_at)`，**类型层不含明文**；载体 = DB，**不入 `.env` / git / 命令行**）；**缺 Key 非致命**（启动照常、`llm_configured` 入启动日志、LLM 路径调用期 fail-closed 且错误不含 Key 信息）；④**项目域资料上传**（ADR-41，Option B）—— `kb_id ≡ project_id` 由已认证主体推导，上传请求体**不再接收 kb 字段**，**保留** `assert_kb_in_project` 归属断言（失败仍 **403**，不削弱 `architecture_design.md:120`），`kb_default` 一次性幂等前向迁移；⑤**UI 三分 IA**（ADR-42，Option B）—— 父级「系统管理」+ 三子项（账户 / 项目 / LLM Key），`资料管理` 保持独立顶级并改为「项目域」视图；**「UI 分组不是权限机制」**（授权唯一经服务端 `AuthzPolicy`；非 admin 一律 403）；保留 hash 路由，旧 `#/accounts` 深链重定向。**本文件沿用自身版本线 2.12.0 → 2.13.0**（R2=2.0.0 → … → REV-17=2.12.0 → REV-18=2.13.0），**与 GROUP_B 文档的 1.10.2/REV-18-R2 属各自独立版本线**。**未新增模块（仍 26）/ 端口 17 → 19（纯追加）/ 未新增第三方依赖（复用 stdlib `sqlite3`）/ 未改模块边界 / 未新增 §4.1 依赖边（DAG 不变）/ 未改既有配置键名与默认值（仅新增 `IB_PROJECT_REGISTRY_BACKEND` / `IB_LLM_KEY_BACKEND`，不入 `IB_ENV_KEYS`）/ 未改任何既有 ADR 正文（ADR-21 一字未动，N:1 全落 ADR-21-R1）/ 未 bump `schema_version`**；`IFC-IB-001~365` 中**被修订的 7 条**（IB-024 / 242 / 243 / 262 / 263 / 321 / 333）编号与签名名一字不改，只改取值口径。**3 条架构偏差**（D-R18-01~03）在 §25.4 逐条登记。只追加（见 §25）。正文 §1~§24 为 R1~REV-17 各轮的**历史记录，未改写**。</revision_note>
+    REV-18（v2.13.0，invocation INV-GROUP_C-INTELBASE-019；设计侧口径 **REV-18 / REV-18-R2**）为**系统管理三分增量**（输入 = `docs/architecture_design.md` **1.10.2/REV-18-R2** 的 ADR-37~ADR-42 + ADR-21-R1；`docs/module_design.md` **1.10.2/REV-18-R2** 的 IFC-IB-366~377 与 §2.2.9；`docs/tech_stack.md` **1.4.1/REV-18** **NO_CHANGE**；`docs/requirements_spec.md` **1.10.0/REV-18-2** 的 REQ-FUNC-IB-43~48 / REQ-NFR-IB-20 / C-IB-42~43 / OOS-18~19 / DR-21；`docs/user_stories.md` **1.10.0/REV-18-2** 的 US-IB-35~40）。**五件事**：①**项目注册表**（ADR-37，Option B：同库 `projects` 表 + 软删）—— 第 **18** 个端口 `ProjectRegistryStore`（IFC-IB-367，5 方法）+ `SqliteProjectRegistryStore` / `MemoryProjectRegistryStore`（IFC-IB-370）+ 手写迁移 `005_projects.sql`；`GET /api/projects` **数据源切换为注册表**（端点号 / 名 / 签名与 fail-closed 语义一字不动），新增 `POST` / `PATCH` / `DELETE`（二次确认 `confirm_project_id`，仅 admin）；②**账户扩展**（ADR-40）—— `AccountStore.update_user`（IFC-IB-366，**加成式扩展**，端口 13 → 14）+ `PATCH|DELETE /api/accounts/{user_id}`（IFC-IB-373：二次确认 `confirm_username`；禁删 admin / 最后管理员 → 409；软删复用 `set_status`）+ `POST /api/accounts` **顺序依赖前置**（目标项目须存在且 active，否则 **422**；REQ-FUNC-IB-45）+ **1:N 零迁移**（**不加** `users.project_id` UNIQUE；ADR-21-R1 订正 N:1，关闭 OI-1）；③**LLM Key 管理**（ADR-38 / ADR-39 Option C）—— 第 **19** 个端口 `LlmKeyStore`（IFC-IB-368，3 方法）+ 单行表 `llm_key`（`CHECK (id=1)`；IFC-IB-371）+ 手写迁移 `006_llm_key.sql` + `GET|PUT|DELETE /api/llm-key`（IFC-IB-374；**唯一写入口** = PUT；HTTP 只回 `LlmKeyStatus(configured, masked, updated_at)`，**类型层不含明文**；载体 = DB，**不入 `.env` / git / 命令行**）；**缺 Key 非致命**（启动照常、`llm_configured` 入启动日志、LLM 路径调用期 fail-closed 且错误不含 Key 信息）；④**项目域资料上传**（ADR-41，Option B）—— `kb_id ≡ project_id` 由已认证主体推导，上传请求体**不再接收 kb 字段**，**保留** `assert_kb_in_project` 归属断言（失败仍 **403**，不削弱 `architecture_design.md:120`），`kb_default` 一次性幂等前向迁移；⑤**UI 三分 IA**（ADR-42，Option B）—— 父级「系统管理」+ 三子项（账户 / 项目 / LLM Key），`资料管理` 保持独立顶级并改为「项目域」视图；**「UI 分组不是权限机制」**（授权唯一经服务端 `AuthzPolicy`；非 admin 一律 403）；保留 hash 路由，旧 `#/accounts` 深链重定向。**本文件沿用自身版本线 2.12.0 → 2.13.0**（R2=2.0.0 → … → REV-17=2.12.0 → REV-18=2.13.0），**与 GROUP_B 文档的 1.10.2/REV-18-R2 属各自独立版本线**。**未新增模块（仍 26）/ 端口 17 → 19（纯追加）/ 未新增第三方依赖（复用 stdlib `sqlite3`）/ 未改模块边界 / 未新增 §4.1 依赖边（DAG 不变）/ 未改既有配置键名与默认值（仅新增 `IB_PROJECT_REGISTRY_BACKEND` / `IB_LLM_KEY_BACKEND`，不入 `IB_ENV_KEYS`）/ 未改任何既有 ADR 正文（ADR-21 一字未动，N:1 全落 ADR-21-R1）/ 未 bump `schema_version`**；`IFC-IB-001~365` 中**被修订的 7 条**（IB-024 / 242 / 243 / 262 / 263 / 321 / 333）编号与签名名一字不改，只改取值口径。**3 条架构偏差**（D-R18-01~03）在 §25.4 逐条登记。只追加（见 §25）。正文 §1~§24 为 R1~REV-17 各轮的**历史记录，未改写**。
+    REV-19（v2.14.0，invocation INV-GROUP_C-INTELBASE-020；设计侧口径 **REV-19**）为**项目域专家集隔离增量**（输入 = `docs/architecture_design.md` **1.11.0/REV-19** 的 **ADR-43~ADR-47** + §2.0.9 R19 影响复核；`docs/module_design.md` **1.11.0/REV-19** 的 **IFC-IB-378~388** 与 §2.2.10；`docs/tech_stack.md` **1.4.1/REV-18** **NO_CHANGE**；`docs/requirements_spec.md` **1.11.0/REV-19** 的 REQ-FUNC-IB-49~53 / REQ-NFR-IB-21 / C-IB-44~47 / OOS-20~21 / DR-22~23；`docs/user_stories.md` **1.11.0/REV-19** 的 US-IB-41~45；上游 GROUP_A 门控 **GR-A-011 = PASS_WITH_CONDITIONS**、GROUP_B 门控 **GR-B-011 = PASS_WITH_CONDITIONS**）。**五件事**：①**每项目专家集隔离**（ADR-43）—— `ExpertRegistryView`（IFC-IB-379，frozen 值对象）+ `resolve_expert_registry`（IFC-IB-380，**fail-closed**：空集 / 缺默认 / 默认非唯一 → `ExpertRegistryError`）+ 内置默认单例语义澄清与 `builtin_default_registry`（IFC-IB-381）并入 **MOD-IB-16**；`IntentRouter` 增 keyword-only 可选 `experts`（IFC-IB-382，**append-only**，缺省逐位等价既有）并入 **MOD-IB-19**；组合根 `orchestrator_for` 改为**按项目解析**（无跨项目回退）；②**定义文档目录化**（ADR-44）—— `FileDefinitionDocumentStore` 目录化 + `_path_for(project_id)`（IFC-IB-383）+ `migrate_legacy_definition_file`（IFC-IB-384，**C-IB-46**，旧单文件 → `&lt;dir&gt;/demo.json`，目标已存在即 fail-closed）并入 **MOD-IB-02**；③**新项目默认种子**（ADR-45）—— `seed_project`（IFC-IB-385，**恰 1 个** KB agent + 1 默认编排流；`demo` 或三专家视图 → 三对齐专家）并入 **MOD-IB-23**，创建期经 `POST /api/projects` 调用，失败即回滚创建；④**三专家历史迁移**（ADR-46 / C-IB-47 / DR-23）—— `migrate_expert_history`（IFC-IB-386，**手工执行 + 先备份 + 失败回滚**；归属判据 fail-closed；幂等；记录保留）并入 **MOD-IB-21**（会话状态）；⑤**前端项目域闭环**（IFC-IB-387，**REV-14 既有基建已满足，零新增前端代码**）+ **检查清单 B24 / B25**（IFC-IB-388）并入 **MOD-IB-24 / MOD-IB-25**。**迁移结果值对象** `MigrationResult` / `MigrationReport` / `SeedResult`（IFC-IB-378）并入 **MOD-IB-01**。**本文件沿用自身版本线 2.13.0 → 2.14.0**（R2=2.0.0 → … → REV-18=2.13.0 → REV-19=2.14.0），**与 GROUP_B 文档的 1.11.0/REV-19 属各自独立版本线**。**未新增模块（仍 26）/ 未新增端口（仍 19）/ 未新增第三方依赖 / 未改模块边界 / 未新增 §4.1 依赖边（DAG 不变）/ 未改既有配置键名与默认值 / 未改任何既有 IFC 号与签名名（`IFC-IB-001~377` 一字不动，新增 378~388）/ 未 bump `schema_version`**。**本轮唯一就地的测试契约同步**：`tests/integration/test_definition_config_r7.py` 因 ADR-44 目录化（`&lt;dir&gt;/&lt;pid&gt;.json`）就地订正 3 处断言（**非放宽**）。**2 条架构偏差 / 决策登记**（D-R19-01~02）在 §26.4 逐条登记。只追加（见 §26）。正文 §1~§25 为 R1~REV-18 各轮的**历史记录，未改写**。</revision_note>
   <inputs>
-    <input path="docs/architecture_design.md" version="1.10.2" revision="REV-18-R2" status="APPROVED（以 phase_status.md 为权威；文件头 status 字段仍为 DRAFT_FOR_GATE_REVIEW；REV-18/R2 新增 ADR-37~ADR-42 与 ADR-21-R1（N:1 订正，关闭 OI-1））"/>
-    <input path="docs/module_design.md" version="1.10.2" revision="REV-18-R2" status="APPROVED（同上；REV-18 增补 IFC-IB-366~377 与 §2.2.9 REV-18 IFC 段号索引与文字修订索引，端口 17 → 19 纯追加）"/>
-    <input path="docs/tech_stack.md" version="1.4.1" revision="REV-18" status="APPROVED（同上；REV-13 / REV-16-2 / REV-16-4 / REV-17 / REV-18 均判 NO_CHANGE —— 零新增第三方依赖）"/>
+    <input path="docs/architecture_design.md" version="1.11.0" revision="REV-19" status="APPROVED（以 phase_status.md 为权威；文件头 status 字段仍为 DRAFT_FOR_GATE_REVIEW；REV-19 新增 ADR-43~ADR-47；上游 GROUP_B 门控 GR-B-011 = PASS_WITH_CONDITIONS）"/>
+    <input path="docs/module_design.md" version="1.11.0" revision="REV-19" status="APPROVED（同上；REV-19 增补 IFC-IB-378~388 与 §2.2.10；不新增模块 / 不新增端口 / 不新增依赖边）"/>
+    <input path="docs/tech_stack.md" version="1.4.1" revision="REV-18" status="APPROVED（同上；REV-13 / REV-16-2 / REV-16-4 / REV-17 / REV-18 / REV-19 均判 NO_CHANGE —— 零新增第三方依赖）"/>
     <input path="docs/ib_embed_service_contract.md" version="1.0.0" revision="R2" status="APPROVED"/>
-    <input path="docs/requirements_spec.md" version="1.10.0" revision="REV-18-2" status="APPROVED（REV-18 新增 REQ-FUNC-IB-43~48 / REQ-NFR-IB-20 / C-IB-42~43 / OOS-18~19 / DR-21；REV-18-2 为用户裁决确认轮）"/>
-    <input path="docs/user_stories.md" version="1.10.0" revision="REV-18-2" status="APPROVED（REV-18 新增 US-IB-35~40 及 AC-IB-35-01~40-04）"/>
+    <input path="docs/requirements_spec.md" version="1.11.0" revision="REV-19" status="APPROVED（REV-19 新增 REQ-FUNC-IB-49~53 / REQ-NFR-IB-21 / C-IB-44~47 / OOS-20~21 / DR-22~23；GR-A-011 = PASS_WITH_CONDITIONS，唯一条件 OQ-IB-40 已闭合）"/>
+    <input path="docs/user_stories.md" version="1.11.0" revision="REV-19" status="APPROVED（REV-19 新增 US-IB-41~45 及 AC-IB-41-*~45-*）"/>
   </inputs>
   <frozen_constraints>
     <constraint>Django + DRF + Waitress/Gunicorn（WSGI）；禁止 FastAPI/Uvicorn 作为 Web 载体</constraint>
@@ -1822,3 +1823,116 @@ MOD-IB-25（deploy：手写迁移 003 + nginx TLS 模板 + 检查清单 B15~B20�
 ### 25.6 冻结约束复核（REV-18）
 
 未新增模块（仍 **26**）/ 端口 **17 → 19**（纯追加，`ProjectRegistryStore` + `LlmKeyStore`，均定义于 MOD-IB-01 L0）/ 未新增第三方依赖（复用 stdlib `sqlite3`；前端依赖集不变）/ 未改模块边界 / **未新增 §4.1 依赖边（DAG 不变，构造性无环证明不受影响）** / 未改既有配置键名与默认值（**仅新增** `IB_PROJECT_REGISTRY_BACKEND` / `IB_LLM_KEY_BACKEND`，且**不进入** `IB_ENV_KEYS` 核心装配开关集合）/ 未改 `IFC-IB-001~365` 中除已登记 7 条（`IFC-IB-024` / 242 / 243 / 262 / 263 / 321 / 333）口径外的任何编号与签名名 / 未改任何既有 ADR 正文（ADR-21 正文**一字未动**，N:1 订正全落 **ADR-21-R1**）/ 未 bump `schema_version` / 未 commit / 未 push / 未 deploy / FreeArk 参考仓**只读** / **无任何口令、令牌或密钥字面量**（测试内 LLM Key 为 `sk-rev18-placeholder-not-a-real-key-0000` 占位值，性质同 `groupd-offline-token`）/ **不引运行期热重载**；**生产后端重启与首次环境变量配置须由用户执行**（本代理不执行，文档只写「由用户执行」）。
+
+---
+
+## §26 REV-19 项目域专家集隔离增量（v2.14.0；invocation INV-GROUP_C-INTELBASE-020）
+
+**本轮性质**：**增量**。只做 5 件事（REQ-FUNC-IB-49~53 + REQ-NFR-IB-21），**不新增模块 / 不新增端口 / 不新增依赖边**（模块数仍 26 / 端口数仍 19 / §4.1 依赖边清单逐行未改）。§1~§25 为历史记录，未改写。
+
+### 26.1 交付范围与落点
+
+| 序号 | 交付物 | 落点模块 | IFC | 需求 |
+|------|--------|---------|-----|------|
+| 1 | 每项目专家集隔离（`ExpertRegistryView` / `resolve_expert_registry` / 内置默认单例） | MOD-IB-16（ib/experts） | IFC-IB-379 / 380 / 381 | REQ-FUNC-IB-49 / IB-53、REQ-NFR-IB-21 |
+| 2 | `IntentRouter` 注入本项目专家集（append-only 可选形参） | MOD-IB-19（ib/routing） | IFC-IB-382 | REQ-FUNC-IB-49 / IB-51 |
+| 3 | 定义文档目录化 + C-IB-46 迁移脚本 | MOD-IB-02（ib/config） | IFC-IB-383 / 384 | REQ-FUNC-IB-50、C-IB-46 |
+| 4 | 新项目创建期种子（1 KB agent + 1 默认编排流） | MOD-IB-23（ibweb/composition + views） | IFC-IB-385 | REQ-FUNC-IB-52 / IB-53 |
+| 5 | 三专家历史迁移工具（手工执行） | MOD-IB-21（ib/streaming） | IFC-IB-386 | C-IB-47 / DR-23 |
+| 6 | 前端项目域闭环（复用既有基建，零新增代码） | MOD-IB-24（frontend） | IFC-IB-387 | REQ-FUNC-IB-50 / IB-51 |
+| 7 | 检查清单 B24 / B25 + 自检 | MOD-IB-25（deploy） | IFC-IB-388 | C-IB-46 / C-IB-47 |
+| 8 | 迁移 / 播种结果值对象 | MOD-IB-01（ib/core） | IFC-IB-378 | 支撑上述 |
+
+### 26.2 模块实现计划（按拓扑顺序；被依赖者先实现）
+
+| 序号 | MOD-ID | 模块名 | 文件路径 | 依赖前置 | 复杂度 | 状态 |
+|------|--------|--------|---------|---------|--------|------|
+| 1 | MOD-IB-01 | 核心类型 / 错误 | `src/ib/core/types.py`、`src/ib/core/errors.py`、`src/ib/core/__init__.py` | — | L | DONE |
+| 2 | MOD-IB-16 | 专家域 | `src/ib/experts/__init__.py` | 01 | H | DONE |
+| 3 | MOD-IB-19 | 路由 | `src/ib/routing/intent.py` | 01 / 16 | M | DONE |
+| 4 | MOD-IB-02 | 定义文档存储 | `src/ib/config/definition.py`、`src/ib/config/__init__.py` | 01 | M | DONE |
+| 5 | MOD-IB-21 | 会话状态 / 流式 | `src/ib/streaming/__init__.py` | 01 / 02 / 04 | M | DONE |
+| 6 | MOD-IB-23 | 组合根 / 端点 | `src/ibweb/composition.py`、`src/ibweb/views.py` | 01 / 02 / 16 / 19 / 21 | H | DONE |
+| 7 | MOD-IB-25 | 部署检查清单 | `src/deploy/checklists.txt` | — | L | DONE |
+| 8 | （自检） | 离线自检 | `src/scripts/selfcheck.py` | 全部 | M | DONE |
+
+### 26.3 变更文件清单（真实 `git status --porcelain -- src tests` 输出）
+
+```
+ M src/deploy/checklists.txt
+ M src/ib/config/__init__.py
+ M src/ib/config/definition.py
+ M src/ib/core/__init__.py
+ M src/ib/core/errors.py
+ M src/ib/core/types.py
+ M src/ib/experts/__init__.py
+ M src/ib/routing/intent.py
+ M src/ib/streaming/__init__.py
+ M src/ibweb/composition.py
+ M src/ibweb/views.py
+ M src/scripts/selfcheck.py
+ M tests/integration/test_definition_config_r7.py
+```
+
+`git diff --stat`：13 文件变更，+906 / −64。**未新增**任何文件（零新建源码文件）。**未 commit / 未 push / 未部署**。
+
+### 26.4 架构偏差 / 决策登记
+
+| 偏差 ID | 偏差描述 | 原 ADR / IFC 决策 | 偏差原因与处置 |
+|---------|---------|-------------------|----------------|
+| D-R19-01 | `migrate_expert_history`（IFC-IB-386）载体**只覆盖 MOD-IB-21 会话状态**；**不**改写 MOD-IB-11 台账 `sessions` 表（认证会话） | IFC-IB-386 载体声明含「MOD-IB-11 `sessions` 表（`SessionRecord.project_id`）」 | 台账 `sessions` 表是**认证会话**（`token_digest` 键），其 `project_id` 是**账户归属**而非「专家历史归属」。改写它会把用户认证会话错划到 `demo`，属**不可逆的越权面**，违反 fail-closed 纪律。故实现取**保守裁量**：会话状态面**已实现**（归属改写 + 记录保留 + 幂等）；台账问答历史面以**可选注入**（`ledger.iter_expert_history` / `update_expert_history_project` 鸭子类型）承载，**未注入即跳过并如实登记 notes**，绝不误改认证会话。**提请 PM / 架构复核该口径**（是否需要为问答历史单独引入台账改写方法）。 |
+| D-R19-02 | 新建项目默认 KB agent 的 `cn_label` 取 **`知识库助手`** | IFC-IB-381（name / cn_label 字面由施工期 / 用户指定，[ARCH-ASSUMPTION-A13]） | ADR-31 已把旧标签 `知识库问答` / `数据管家` 列为**仓库级 grep 归零**项（`test_TC_UNIT_122`）。默认种子标签**不得与退场旧标签同字**，故取 `知识库助手`（`name` 仍为 `kb-agent`）。 |
+
+### 26.5 自验证据（实际执行结果，命令可被第三方重跑）
+
+**测试基线双证据（改动前 / 改动后，均在 `cwd = 仓库根`、`PYTHONIOENCODING=utf-8` 下执行，`-p no:cacheprovider` 关闭缓存）**
+
+改动**前**（在 `HEAD`（`4e492f7`）的干净 `git worktree` 内执行，即 REV-19 全部改动之前的基线）：
+
+```
+$ cd /tmp/ib-before && PYTHONIOENCODING=utf-8 python -m pytest tests -q -p no:cacheprovider
+........................................................................ [ 20%]
+........................................................................ [ 40%]
+........................................................................ [ 61%]
+........................................................................ [ 81%]
+................................ss................................       [100%]
+352 passed, 2 skipped in 63.75s (0:01:03)
+$ PYTHONIOENCODING=utf-8 python -m pytest tests --collect-only -q -p no:cacheprovider | tail -1
+354 tests collected in 0.16s
+```
+
+改动**后**（本增量全部代码 / 测试 / 自检改动已落盘）：
+
+```
+$ PYTHONIOENCODING=utf-8 python -m pytest tests -q -p no:cacheprovider
+........................................................................ [ 20%]
+........................................................................ [ 40%]
+........................................................................ [ 61%]
+........................................................................ [ 81%]
+................................ss................................       [100%]
+352 passed, 2 skipped in 61.37s (0:01:01)
+$ PYTHONIOENCODING=utf-8 python -m pytest tests --collect-only -q -p no:cacheprovider | tail -1
+354 tests collected in 0.15s
+```
+
+**结论**：**收集 354 / 通过 352 / 跳过 2 / 失败 0**，**前后逐位一致，零回归**（EXIT 0）。
+
+**精确可重跑命令**：`cd "C:\Users\胖子熊\MyProject\intelligentbase" && PYTHONIOENCODING=utf-8 python -m pytest tests -q -p no:cacheprovider`
+
+**测试文件增删说明**：本轮**未新增 / 未删除任何测试文件**（改动前后均为 `find tests -name "test_*.py" | wc -l` = **43**、`find tests -name "*.py" | wc -l` = **44**；任务书所称「44 文件」= 全部 `.py` 计数，「43」= `test_*.py` 计数，二者一致无矛盾）。**唯一的测试文件改动**是**就地订正** `tests/integration/test_definition_config_r7.py` 的 3 处断言以适配 ADR-44 **有意的**目录化契约变更（`<dir>/<pid>.json`，非 `<pid>.definition.json`）：`_file_store` 传目录根、`TC-INT-079` / `TC-INT-081` 文件名 `p1.definition.json`→`p1.json`、`TC-INT-083` 改用目录根。**非放宽断言**（同一不变量在目录语义下重新表达）。
+
+**离线自检**：
+
+```
+$ PYTHONIOENCODING=utf-8 python src/scripts/selfcheck.py
+...
+PASS  r19_project_expert_isolation：每项目专家集隔离 / 种子 / 目录化 / 历史迁移（IFC-IB-378~388）
+------------------------------------------------------------------------
+自检结果：52/52 通过
+```
+
+（REV-18 为 51/51；本轮**新增** 1 条 `r19_project_expert_isolation`，覆盖 IFC-IB-379~388 全链路离线验证：三专家三处同值、`builtin_default_registry` 恰 1 个 `is_default`、`resolve_expert_registry` 三例 fail-closed、`IntentRouter` 注入视图路由、目录化 + C-IB-46 迁移 + fail-closed、`migrate_expert_history` 归属改写 / 记录保留 / 幂等 / 非 demo 失去可见、IFC-IB-387 前端纪律；同时 `r13_deploy_discipline` 的检查清单断言由 B15~B23 扩到 B15~**B25**、签署行 `B1–B25`。）
+
+### 26.6 冻结约束复核（REV-19）
+
+未新增模块（仍 **26**）/ **未新增端口（仍 19，逐行未改）** / 未新增第三方依赖（纯 stdlib）/ 未改模块边界 / **未新增 §4.1 依赖边** —— `ib.streaming` 中的三专家字面量**刻意重复而不 import `ib.experts`**，以守住 MOD-IB-21 既有依赖边界（同值由 `r19_project_expert_isolation` 断言兜底）/ 未改既有配置键名与默认值 / `IFC-IB-001~377` 一字不动（仅新增 378~388）/ 未 bump `schema_version` / **不引运行期热重载**（生效口径 = 保存 + 重启重装配，ADR-32）/ **未运行任何生产迁移**（C-IB-46 / C-IB-47 仅交付脚本与清单，**由用户手工执行 + 先备份 + 失败回滚**）/ **无任何口令 / Key / token / 证书字面量**（`migrate_expert_history` 的 `backup_path` 恒为 `None`，不写盘、不读环境变量、不碰 SQLite）/ 未 commit / 未 push / 未部署 / FreeArk 参考仓只读。

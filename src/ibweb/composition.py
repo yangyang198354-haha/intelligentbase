@@ -9,6 +9,9 @@
             IFC-IB-355（REV-16-4）：装配路径改用 `validate_definition_full`（ADR-33 单一入口）
             IFC-IB-360（REV-16-4）：`record_config_audit` 服务 / 用例（第 17 个端口装配注入）
             IFC-IB-362（REV-16-4）：`get_storage_state`（装配期存储态快照）
+            REV-19（AC-IB-41-04 / ADR-47 / IFC-IB-380）：`orchestrator_for` 的专家域
+                fail-closed 路径**并发结构化日志** `log_event("expert_domain", …)`（含
+                项目标识与原因；不含任何凭据 / 提示词正文）；**fail-closed 语义一字不动**
 @depends MOD-IB-01 ~ MOD-IB-22
 @author software-developer
 
@@ -193,11 +196,25 @@ class Deps:
             if existing is not None:
                 return existing
         if project_id not in self.projects:
+            # REV-19（AC-IB-41-04 / module_design §13 / ADR-47）：专家域 fail-closed **拒绝**时
+            # **并发结构化日志**（含项目标识与原因，**不含任何凭据 / 提示词正文**），
+            # 级别 ERROR（§13 明列）。`reason` 为**结构化短码**而非自由正文。
+            # 打点**不改** fail-closed 语义：仍抛 `StartupError`、**不回退**其他项目作用域。
+            from ib.observability import log_event
+
+            log_event(
+                "expert_domain",
+                "failclosed",
+                project_id=project_id,
+                reason="unregistered_project",
+                level="ERROR",
+            )
             raise StartupError(f"项目未在配置中登记：{project_id}（不得回退到其他项目的作用域）")
         scope = Scope(project_id=project_id)
         bound_tools = self.bind_tools(scope)
 
-        from ib.experts import EXPERT_SPECS
+        from ib.core import ExpertRegistryError
+        from ib.experts import resolve_expert_registry
         from ib.orchestration import build_graph
         from ib.routing import IntentRouter
 
@@ -205,18 +222,48 @@ class Deps:
         #     未装配定义文档时回退既有常量（与 R1~R6 行为逐位一致）。
         route = getattr(self.definitions.get(project_id), "route", None)
 
+        # REV-19（ADR-43 / ADR-47）：**本项目**专家集取自本项目派生视图 —— 进程级全局
+        # `EXPERT_SPECS` **退出生产装配主路径**（消除跨项目泄漏）。未见派生视图（防御性 /
+        # 离线）时回退既有全局默认，行为与 R1~R18 逐位一致。解析 fail-closed（IFC-IB-380）。
+        project_view = self.derived_views.get(project_id)
+        if project_view is not None:
+            try:
+                registry = resolve_expert_registry(project_id, view=project_view)
+            except ExpertRegistryError as exc:
+                # IFC-IB-380 fail-closed：**构造 `ExpertRegistryView` 失败**（空专家集 /
+                # 默认专家缺失或非唯一）→ **结构化日志 + 原样重抛**（fail-closed 语义一字不动，
+                # **不回退**全局默认、**不回退**其他项目）。`reason` 取异常自带的结构化短码。
+                from ib.observability import log_event
+
+                log_event(
+                    "expert_domain",
+                    "failclosed",
+                    project_id=project_id,
+                    reason=str(getattr(exc, "reason", "") or "expert_registry_invalid"),
+                    level="ERROR",
+                )
+                raise
+            expert_specs = registry.experts
+            expert_names = registry.names()
+        else:
+            from ib.experts import EXPERT_SPECS
+
+            registry = None
+            expert_specs = tuple(EXPERT_SPECS)
+            expert_names = _expert_names()
+
         # L1 语义路由的向量化走 embedding 热路径；失败时 SemanticRouter 自己吞掉（fail-open）
         semantic = _build_semantic_router(self.embedder, project_id, route)
-        router = IntentRouter(llm_provider=self.llm, semantic=semantic)
+        router = IntentRouter(llm_provider=self.llm, semantic=semantic, experts=registry)
         graph = build_graph(
             llm=self.llm,
-            experts=EXPERT_SPECS,
+            experts=expert_specs,
             tools=bound_tools,
             sessions=self.sessions,
             config=_graph_config(self.cfg, route),
             router=router,
             scope=scope,
-            tools_by_expert={name: bound_tools for name in _expert_names()},
+            tools_by_expert={name: bound_tools for name in expert_names},
             # R2（M-02 读路径）：命中 → 页面图的映射在**组合根**注入（编排层不认识知识库）
             related_images_provider=_make_related_images_provider(self.ledger, scope),
         )
@@ -1194,6 +1241,23 @@ def _default_definition_document(project_id: str, cfg: Any) -> Any:
     内置默认），路由阈值取自 `ib.routing.DEFAULT_TAU/MARGIN`，`max_expert_steps=8`，
     工具授权对全部专家授予 `search_knowledge` —— 与 `Deps.bind_tools` 的实际绑定逐位一致，
     故派生结果 == 既有默认注册表，**不引入行为变化**。
+
+    **REV-19（ADR-45 Option C 保留）**：本函数是**装配期兜底**（对未落盘项目构造内置默认
+    种子），语义**等价既有逐项目种子**（取「内置默认专家集」= 代码安全网）。**新建项目**的
+    创建期播种不走此处 —— 走 `seed_project`（IFC-IB-385，种子 = 内置默认单例 1 个 KB agent）。
+    """
+    from ib.experts import EXPERT_SPECS, default_expert
+
+    return _definition_document_from_specs(
+        project_id, specs=tuple(EXPERT_SPECS), default_name=default_expert()
+    )
+
+
+def _definition_document_from_specs(project_id: str, *, specs: Any, default_name: str) -> Any:
+    """由一组专家规格构造定义文档（**单一编排流**，OOS-21）。
+
+    复用者：装配期兜底 `_default_definition_document`（内置默认专家集）与创建期播种
+    `seed_project`（IFC-IB-385：非 demo = 内置默认单例；demo = 三对齐专家）。
     """
     from ib.config import build_definition_document
     from ib.core import (
@@ -1204,7 +1268,6 @@ def _default_definition_document(project_id: str, cfg: Any) -> Any:
         RouteSpecInput,
         ToolGrantSpec,
     )
-    from ib.experts import EXPERT_SPECS, default_expert
     from ib.routing import DEFAULT_MARGIN, DEFAULT_TAU
 
     exemplars_map = _load_exemplars(project_id)
@@ -1218,13 +1281,13 @@ def _default_definition_document(project_id: str, cfg: Any) -> Any:
             is_delegating=spec.is_delegating,
             is_default=spec.is_default,
         )
-        for spec in EXPERT_SPECS
+        for spec in specs
     )
     route = RouteSpecInput(
         tau=DEFAULT_TAU,
         margin=DEFAULT_MARGIN,
         max_expert_steps=8,
-        default_expert=default_expert(),
+        default_expert=default_name,
     )
     orchestration = OrchestrationSpecInput(
         nodes=("route", "expert", "general", "gate", "aggregate"),
@@ -1248,7 +1311,7 @@ def _default_definition_document(project_id: str, cfg: Any) -> Any:
         ),
     )
     grants = tuple(
-        ToolGrantSpec(expert_name=spec.name, tool_names=("search_knowledge",)) for spec in EXPERT_SPECS
+        ToolGrantSpec(expert_name=spec.name, tool_names=("search_knowledge",)) for spec in specs
     )
     return build_definition_document(
         project_id=project_id,
@@ -1257,6 +1320,103 @@ def _default_definition_document(project_id: str, cfg: Any) -> Any:
         orchestration=orchestration,
         tool_grants=grants,
     )
+
+
+def seed_project(
+    project_id: str,
+    *,
+    registry_view: Any = None,
+    definition_dir: str | None = None,
+    prompt_root: str | None = None,
+) -> Any:
+    """**项目创建播种**（IFC-IB-385；REQ-FUNC-IB-52 / IB-53；ADR-45）。
+
+    在项目注册表写入成功后由 `POST /api/projects` **同步**调用：
+
+      * 写 `<definition_dir>/<project_id>.json`（该项目专家集 + **单一默认编排流**，OOS-21）；
+      * 建提示词目录骨架 `<prompt_root>/<project_id>/<expert>/`（每专家一子目录）。
+
+    **种子真源**：`demo` 项目 = **三对齐专家**（`DEMO_EXPERT_NAMES`，REQ-FUNC-IB-53）；
+    其余项目 = **内置默认单例**（1 个 KB 问答 agent，IFC-IB-381 / REQ-FUNC-IB-52）。
+    `registry_view` 省略时取内置默认单例视图。
+
+    **幂等**（文档已存在不覆盖）；**原子回滚**（任一子步失败 → 删除已写入的半成品 + 明确
+    异常，**不静默**）。离线 / 未配置载体（`definition_dir` 与 `prompt_root` 均不可用）→
+    不落盘，返回 `created=False`（装配期兜底仍生效，等价既有逐项目种子）。
+    """
+    import os as _os
+
+    from ib.core import SeedResult
+    from ib.experts import DEMO_EXPERT_NAMES, builtin_default_registry, builtin_expert_registry
+
+    if definition_dir is None:
+        definition_dir = _os.environ.get("IB_DEFINITION_DOC_PATH", "").strip()
+    if prompt_root is None:
+        prompt_root = _os.environ.get("IB_EXPERT_PROMPT_DIR", "").strip()
+
+    demo = builtin_expert_registry()
+    default = registry_view if registry_view is not None else builtin_default_registry()
+    if project_id == "demo" or tuple(default.names()) == DEMO_EXPERT_NAMES:
+        chosen = demo
+        seed_note = "demo_three_experts_seed"
+    else:
+        chosen = default
+        seed_note = "builtin_default_seed"
+    names = tuple(chosen.names())
+
+    written_doc: str | None = None
+    created_dirs: list[str] = []
+    try:
+        if definition_dir:
+            from ib.config import FileDefinitionDocumentStore
+            from ib.experts import BUILTIN_FALLBACKS
+
+            store = FileDefinitionDocumentStore(
+                definition_dir, known_tools=_known_tool_names(), builtin_fallbacks=BUILTIN_FALLBACKS
+            )
+            target = store._path_for(project_id)
+            if _os.path.isfile(target):
+                return SeedResult(
+                    created=False,
+                    document_path=target,
+                    prompt_root=prompt_root or "",
+                    expert_names=names,
+                    orchestration="default",
+                    notes=("already_seeded", "not_overwritten"),
+                )
+            doc = _definition_document_from_specs(
+                project_id, specs=tuple(chosen.experts), default_name=chosen.default_name()
+            )
+            store.save(project_id, doc, expected_content_hash=None)
+            written_doc = target
+
+        if prompt_root:
+            for expert in names:
+                d = _os.path.join(prompt_root, project_id, expert)
+                _os.makedirs(d, exist_ok=True)
+                created_dirs.append(d)
+
+        return SeedResult(
+            created=True,
+            document_path=written_doc or "",
+            prompt_root=prompt_root or "",
+            expert_names=names,
+            orchestration="default",
+            notes=(seed_note,),
+        )
+    except BaseException:
+        # 原子回滚：删除半成品（不静默 —— 异常向上传播由调用方回滚注册表项）。
+        if written_doc and _os.path.isfile(written_doc):
+            try:
+                _os.remove(written_doc)
+            except OSError:
+                pass
+        for d in created_dirs:
+            try:
+                _os.removedirs(d)
+            except OSError:
+                pass
+        raise
 
 
 def build_definition_store(cfg: Any, projects: dict[str, ProjectRecord]) -> Any:

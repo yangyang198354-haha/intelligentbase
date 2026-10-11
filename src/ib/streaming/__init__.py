@@ -5,6 +5,7 @@
             IFC-IB-282（R2）`related_images` 事件的**载荷类型化**（RelatedImagesPayload）
             IFC-IB-302（R8）`completion_event` 终态单发构造
             IFC-IB-303（R8）`is_user_visible` 可见性判据（白名单）
+            IFC-IB-386（REV-19）`migrate_expert_history` 历史归属迁移工具（手工执行）
 @depends MOD-IB-01, MOD-IB-02, MOD-IB-04
 @author software-developer
 
@@ -53,11 +54,13 @@ from __future__ import annotations
 
 import threading
 import time
+from dataclasses import replace
 from typing import Any, Sequence
 
 from ib.core import (
     CompletionPayload,
     ConfirmationGateState,
+    MigrationReport,
     RelatedImageItem,
     RelatedImagesPayload,
     SessionState,
@@ -86,6 +89,8 @@ __all__ = [
     "confirmation_required_event",
     "is_user_visible",
     "USER_VISIBLE_KINDS",
+    # REV-19（IFC-IB-386）
+    "migrate_expert_history",
 ]
 
 #: 图片字节端点的**站内相对路径模板**（IFC-IB-283）。
@@ -272,6 +277,15 @@ class MemorySessionStore:
         with self._lock:
             self._items.clear()
 
+    def iter_items(self) -> list[tuple[str, SessionState]]:
+        """运维辅助（非端口方法，IFC-IB-386 的读取面）：返回 `(key, state)` 快照。
+
+        **只读快照**：在锁内一次性取出，调用方拿到的是列表副本，遍历期间不受并发写入影响。
+        故意**不**暴露可变内部字典 —— 迁移工具需要的是「看清现状」，而不是「从外部改状态」。
+        """
+        with self._lock:
+            return [(key, state) for key, (state, _ts) in self._items.items()]
+
     # --- 内部 --- #
 
     def _evict_locked(self) -> None:
@@ -285,6 +299,115 @@ class MemorySessionStore:
             oldest = sorted(self._items.items(), key=lambda item: item[1][1])[:overflow]
             for key, _ in oldest:
                 self._items.pop(key, None)
+
+
+#: REV-19：`demo` 项目内置三专家（与 `ib.experts.DEMO_EXPERT_NAMES` **同值**）。
+#: 此处重复字面量而**不** import `ib.experts`，是为守住 MOD-IB-21 的依赖边界
+#: （模块文档声明依赖 MOD-IB-01/02/04，引入 experts 会新增一条边）。同值由自检断言兜底。
+_DEMO_EXPERT_NAMES = ("freeark-expert", "inspection-expert", "sanheng-knowledge")
+
+
+def migrate_expert_history(
+    target_project_id: str = "demo",
+    *,
+    sessions: Any = None,
+    ledger: Any = None,
+    experts: tuple[str, ...] = _DEMO_EXPERT_NAMES,
+    backup: bool = True,
+) -> MigrationReport:
+    """[IFC-IB-386] 把「引用 demo 三专家」的历史会话/问答记录**重归属**到目标项目。
+
+    ## 为什么是「工具函数」而非「启动时自动执行」
+
+    ADR-46 把这条迁移定为 **C-IB-47：用户手工执行、先备份、失败可回滚**。
+    自动执行会在一次重启里静默改写既有会话归属 —— 一旦判据写错（例如把仍需
+    独立归属的会话也划走），用户看到的是「历史突然串项目」，且**没有回滚点**。
+    故本函数**只提供能力**：谁在什么时候调用、面向哪份数据，由运维显式决定。
+
+    ## 归属判据（fail-closed，宁可少迁不可错迁）
+
+    仅当会话 **`last_expert ∈ experts`**（即其最后一轮路由到了 demo 三专家之一）且
+    当前项目前缀 **≠** `target_project_id` 时才改写。含糊不清的一律**不动**：
+    少迁一个会话只是「历史没归拢」，错迁一个会话是「权限数据被改写」——
+    后者是不可逆的越权面。
+
+    ## 幂等
+
+    改写后项目前缀即等于目标；再次运行时该会话落入「已是目标项目 → 跳过」分支，
+    `applied=False`、`affected_*=0`。**重复执行安全**（C-IB-47 回滚前重试不会翻倍）。
+
+    ## 依赖注入（不写盘、不引依赖）
+
+    `sessions` / `ledger` 由调用方注入（鸭子类型）：本函数**不**打开任何文件、
+    **不**读环境变量、**不**碰 SQLite —— 备份与持久化由运维在调用前后负责，
+    故 `backup_path` 恒为 `None`（如实回报，不伪造路径）。缺任一协作者时按
+    「该面无可迁移对象」处理并在 `notes` 说明，**不**报错（工具应可空跑）。
+    """
+    notes: list[str] = []
+    affected_sessions = 0
+    affected_references = 0
+
+    # --- 面一：内存会话状态（MOD-IB-21） --- #
+    if sessions is not None and hasattr(sessions, "iter_items"):
+        for key, state in sessions.iter_items():
+            if state is None:
+                continue
+            referenced = getattr(state, "last_expert", None) in experts
+            if not referenced:
+                continue
+            current = project_of_session_key(key)
+            if current == target_project_id:
+                # 已是目标项目 → 幂等跳过
+                continue
+            if not current:
+                # 键前缀非法（无项目归属）→ fail-closed，不动
+                continue
+            session_id = key.split(":", 1)[1]
+            new_key = f"{target_project_id}:{session_id}"
+            new_state = replace(state, project_id=target_project_id)
+            # 先写新键、再删旧键：中途失败最多留下重复，绝不丢会话。
+            sessions.save(new_key, new_state)
+            sessions.delete(key)
+            affected_sessions += 1
+        if not backup:
+            notes.append("sessions 面：备份开关关闭（由调用方自行确保回滚点）")
+    else:
+        notes.append("sessions 面：未注入会话存储，跳过（架构范围声明，非失败）")
+
+    # --- 面二：持久化问答历史/引用记录（MOD-IB-11 ledger，可选） --- #
+    if ledger is not None and hasattr(ledger, "iter_expert_history"):
+        records = list(ledger.iter_expert_history())
+        to_move = [
+            rec
+            for rec in records
+            if getattr(rec, "expert", None) in experts
+            and getattr(rec, "project_id", "") not in ("", target_project_id)
+        ]
+        if not hasattr(ledger, "update_expert_history_project"):
+            if to_move:
+                notes.append(
+                    f"ledger 面：存储不支持原位改写，{len(to_move)} 条待迁移（需运维处理）"
+                )
+        else:
+            for rec in to_move:
+                ledger.update_expert_history_project(rec, target_project_id)
+                affected_references += 1
+    elif ledger is not None:
+        notes.append("ledger 面：注入的存储未实现 iter_expert_history，跳过")
+    else:
+        notes.append("ledger 面：未注入 ledger，跳过（架构范围声明，非失败）")
+
+    applied = (affected_sessions + affected_references) > 0
+    if not applied:
+        notes.append("无符合归属判据的记录：无需迁移（幂等空跑）")
+    return MigrationReport(
+        applied=applied,
+        backup_path=None,
+        affected_sessions=affected_sessions,
+        affected_references=affected_references,
+        target_project_id=target_project_id,
+        notes=tuple(notes),
+    )
 
 
 def degraded_event(reason: Any, *, hint: str = "") -> StreamEvent:

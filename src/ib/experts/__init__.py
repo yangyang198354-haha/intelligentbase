@@ -6,6 +6,8 @@
             IFC-IB-349（REV-16-2 加成式）install_prompt_bundles / prompt_bundles / main_prompts
             IFC-IB-365（REV-17 加成式）BUILTIN_FALLBACK_DEFAULT / BUILTIN_FALLBACKS /
             builtin_fallback_for / builtin_fallbacks_for
+            IFC-IB-379（REV-19）ExpertRegistryView / 380 resolve_expert_registry /
+            381 builtin_default_registry（+ builtin_expert_registry）
 @depends MOD-IB-01
 @author software-developer
 
@@ -36,13 +38,24 @@
 `install(specs)` 允许接入方在**装配期**整体替换注册表（基座默认给出一组可直接运行的
 示例专家）。`install` 只允许在装配期调用一次，且会做唯一性校验 —— 允许运行期热改
 会让「路由关键词」在请求中途变化，产生无法复现的路由结果。
+
+## REV-19 语义澄清（ADR-43 / ADR-47；IFC-IB-381）
+
+本模块零参访问器（`names()` / `keywords_map()` / `cn_map()` / `data_experts()` /
+`delegating_experts()` / `default_expert()` / `get()` / `fallback_prompts()`）**号 / 名 /
+签名一字未改**，但语义澄清为「**内置默认专家集**（代码内置**安全网**；**非项目真源**）」
+（对齐 REV-17 对 `fallback_prompts` 的同款澄清）。**项目真源** = 每项目装配期派生的只读视图
+`ExpertRegistryView`（IFC-IB-379，`resolve_expert_registry` 构造）；生产装配主路径一律消费
+**本项目视图**，进程级 `EXPERT_SPECS` **退出生产装配主路径**（仅离线 / 未配置路径作兜底）。
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Iterator, Mapping, Sequence
 
-from ib.core import ExpertPromptBundle, ExpertSpec
+from ib.core import DerivedView, ExpertPromptBundle, ExpertRegistryError, ExpertSpec
 
 __all__ = [
     "EXPERT_SPECS",
@@ -66,6 +79,13 @@ __all__ = [
     "BUILTIN_FALLBACKS",
     "builtin_fallback_for",
     "builtin_fallbacks_for",
+    # REV-19（IFC-IB-379 ~ 381）
+    "ExpertRegistryView",
+    "resolve_expert_registry",
+    "builtin_default_registry",
+    "builtin_expert_registry",
+    "BUILTIN_DEFAULT_KB_AGENT",
+    "DEMO_EXPERT_NAMES",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -442,3 +462,153 @@ def prompt_bundles() -> dict[str, ExpertPromptBundle]:
 def main_prompts() -> dict[str, str | None]:
     """专家 `name` → 主提示词（IFC-IB-349；**可缺**，缺失为 `None`）。"""
     return {name: bundle.main_prompt for name, bundle in _PROMPT_BUNDLES.items()}
+
+
+# --------------------------------------------------------------------------- #
+# REV-19（ADR-43 / ADR-45 / ADR-47）：每项目专家注册表只读视图
+#
+# 为什么要把「专家集」做成**装配期派生的 frozen 视图**（而不是继续读进程级全局）：
+# 进程级 `EXPERT_SPECS` 是**单例**且可被 rebind —— 多项目下「后装配项目覆盖先装配项目」
+# 的专家集，是**跨项目泄漏**（REQ-FUNC-IB-49 / C-IB-44 / OOS-20 明令禁止）。把每个项目的
+# 专家集在装配期解析为一个不可变值对象，随装配产物显式注入消费点，跨项目泄漏面**结构性消除**。
+#
+# C-IB-45 两条不变量成为**类型层事实**：`default_expert` 是**必填非空字段**（不可表达为
+# `None`/缺失），故「默认专家恰好一个 / 永不无应答」不依赖任何运行期「校验放行」。
+# --------------------------------------------------------------------------- #
+
+#: `demo` 项目种子含的**三对齐专家**（REQ-FUNC-IB-53 / ADR-45；「三专家属 demo」）。
+DEMO_EXPERT_NAMES: tuple[str, ...] = ("freeark-expert", "inspection-expert", "sanheng-knowledge")
+
+
+@dataclass(frozen=True, slots=True)
+class ExpertRegistryView:
+    """**每项目专家注册表只读视图**（IFC-IB-379，ADR-43）。
+
+    * `project_id`：本视图所属项目（**唯一**上下文，无跨项目回退）；
+    * `experts`：冻结后的专家元组（**顺序 = 注册表顺序**，即契约的一部分）；
+    * `default_expert`：默认专家（**必填、非空、不可为 `None`**）；
+    * `by_name`：按名索引（`__post_init__` 派生，只读 `MappingProxyType`）。
+
+    **不变量（结构保证）**：`experts` 非空；`default_expert.name ∈ {e.name for e in experts}`。
+    """
+
+    project_id: str
+    experts: tuple[ExpertSpec, ...]
+    default_expert: ExpertSpec
+    #: 派生索引（只读；不参与 `__init__` / `__eq__`，见 `__post_init__`）。
+    by_name: Mapping[str, ExpertSpec] = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "by_name", MappingProxyType({spec.name: spec for spec in self.experts})
+        )
+
+    # --- 派生访问器（**纯函数**，IFC-IB-379） --- #
+
+    def names(self) -> tuple[str, ...]:
+        """全部专家 id（**顺序 = 注册表顺序**）。"""
+        return tuple(spec.name for spec in self.experts)
+
+    def default_name(self) -> str:
+        """默认专家 id（**恒有值** —— `default_expert` 必填非空，见 C-IB-45）。"""
+        return self.default_expert.name
+
+    def keywords_map(self) -> dict[str, tuple[str, ...]]:
+        """专家 -> 关键词。"""
+        return {spec.name: spec.keywords for spec in self.experts}
+
+    def cn_map(self) -> dict[str, str]:
+        """专家 -> 面向用户的中文标签。"""
+        return {spec.name: spec.cn_label for spec in self.experts}
+
+    def data_experts(self) -> tuple[str, ...]:
+        """持有数据工具的专家。"""
+        return tuple(spec.name for spec in self.experts if spec.is_data_expert)
+
+    def delegating_experts(self) -> tuple[str, ...]:
+        """可子委托同侪的专家。"""
+        return tuple(spec.name for spec in self.experts if spec.is_delegating)
+
+    def get(self, name: str) -> ExpertSpec | None:
+        """按名取专家；不存在返回 `None`（**不抛异常**）。"""
+        return self.by_name.get(name)
+
+
+def _spec_from_input(entry: "object") -> ExpertSpec:
+    """把定义文档派生条目（`ExpertSpecInput`）转成运行期 `ExpertSpec`。
+
+    兜底提示词按名取**代码内置安全网**（ADR-36）—— 定义文档已不承载提示词文本；
+    与 `ibweb.composition._inject_derived_experts` 的转换**同源**（单一真源）。
+    """
+    return ExpertSpec(
+        name=entry.name,  # type: ignore[attr-defined]
+        cn_label=entry.cn_label,  # type: ignore[attr-defined]
+        keywords=tuple(entry.keywords),  # type: ignore[attr-defined]
+        is_data_expert=entry.is_data_expert,  # type: ignore[attr-defined]
+        fallback_prompt=builtin_fallback_for(entry.name),  # type: ignore[attr-defined]
+        is_delegating=entry.is_delegating,  # type: ignore[attr-defined]
+        is_default=entry.is_default,  # type: ignore[attr-defined]
+    )
+
+
+def resolve_expert_registry(project_id: str, *, view: DerivedView) -> ExpertRegistryView:
+    """装配期由组合根调用，从派生视图构造该项目 `ExpertRegistryView`（IFC-IB-380）。
+
+    **纯函数**（同输入同输出，无 I/O）；**fail-closed**（ADR-47 / REQ-NFR-IB-21）：
+    专家集为空 / 默认专家缺失或非唯一 → 抛 `ExpertRegistryError(project_id, reason)`，
+    **不回退**全局默认、**不回退**其他项目（与专家集硬隔离一致）。
+    """
+    experts = tuple(_spec_from_input(e) for e in view.experts)
+    if not experts:
+        raise ExpertRegistryError(project_id, "empty_expert_set")
+    defaults = [spec for spec in experts if spec.is_default]
+    if len(defaults) != 1:
+        raise ExpertRegistryError(
+            project_id, "default_expert_not_unique" if defaults else "default_expert_missing"
+        )
+    return ExpertRegistryView(project_id=project_id, experts=experts, default_expert=defaults[0])
+
+
+#: **内置默认 KB 检索 agent**（IFC-IB-381，REQ-FUNC-IB-52 / OQ-IB-33(a)）。
+#:
+#: 新建项目的**种子真源** = **恰 1 个**知识库检索 agent（`is_default=True`，内置**不可删**）。
+#: `name` / `cn_label` 为**代码内置默认值**（[ARCH-ASSUMPTION-A13]：具体字面由施工期 /
+#: 用户指定，架构层不发明需求）—— 改这里即改新建项目的默认种子，上层零改动。
+#: **标签不得与 ADR-31 已退场的旧标签同字**（旧值见 `selfcheck.py` 的反向断言）：
+#: 仓库级 grep 归零由 `test_TC_UNIT_122_repo_grep_zero_old_slugs_and_labels` 把关。
+#: 兜底提示词保留 grounding 护栏（同 `_DEFAULT_SPECS` 纪律）：生产未配提示词目录时，
+#: 本串**就是**生效系统提示词。
+BUILTIN_DEFAULT_KB_AGENT: ExpertSpec = ExpertSpec(
+    name="kb-agent",
+    cn_label="知识库助手",
+    keywords=("知识库", "资料", "文档", "检索", "问答", "知识", "查资料"),
+    is_data_expert=True,
+    fallback_prompt=(
+        "你是项目知识库助手，严格依据检索到的资料与工具返回的数据作答，"
+        "不得编造数据、来源或结论；无法取得依据时应直接说明，并说明结论的适用边界。"
+    ),
+    is_delegating=False,
+    is_default=True,
+)
+
+
+def builtin_default_registry() -> ExpertRegistryView:
+    """**新建项目的种子视图**（IFC-IB-381，REQ-FUNC-IB-52 / OQ-IB-33(a)）。
+
+    = **恰 1 个** 内置默认 KB 问答 agent（`is_default=True`，内置**不可删**）。
+    `project_id` 取空串（本视图**与项目无关**，是「新建项目」的**模板**）。
+    """
+    return ExpertRegistryView(
+        project_id="", experts=(BUILTIN_DEFAULT_KB_AGENT,), default_expert=BUILTIN_DEFAULT_KB_AGENT
+    )
+
+
+def builtin_expert_registry() -> ExpertRegistryView:
+    """**内置默认专家集**视图（代码内置安全网，`_DEFAULT_SPECS` 派生；IFC-IB-381 语义）。
+
+    即 `demo` 项目种子含的三对齐专家（REQ-FUNC-IB-53）。它是**代码兜底安全网**，
+    **不是**任何项目的运行期真源 —— 运行期真源一律是项目自身的 `ExpertRegistryView`。
+    """
+    specs = tuple(_DEFAULT_SPECS)
+    default = next(spec for spec in specs if spec.is_default)
+    return ExpertRegistryView(project_id="", experts=specs, default_expert=default)

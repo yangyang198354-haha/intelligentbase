@@ -7,13 +7,13 @@
 | 文档 ID | DOC-IB-CR-001 |
 | 标题 | intelligentbase 智能知识库基座 —— 开发者自我代码评审报告 |
 | 产出代理 | software-developer |
-| 调用 ID | INV-GROUP_C-INTELBASE-001（R1）／ INV-GROUP_C-INTELBASE-002（R2 增量）／ INV-GROUP_C-INTELBASE-003（R3 缺陷修复增量）／ INV-GROUP_C-INTELBASE-004（R4 缺陷修复 + 依赖补齐增量）／ INV-GROUP_C-INTELBASE-005（R7 定义外置 + 可视化配置增量）／ INV-GROUP_C-INTELBASE-007（R8 FND-R7-01 校验项补齐）／ INV-GROUP_C-INTELBASE-008（R10 前端构建阻断修复）／ INV-GROUP_C-INTELBASE-010（R11 IB-20 流式 / 会话增量，协调者轮次口径 REV-12）／ **INV-GROUP_C-INTELBASE-012（R13 账户 / 会话 / 商用界面重构增量，设计侧口径 REV-13）** ／ **INV-GROUP_C-INTELBASE-013（R13.1 回修增量：DEFECT-R13-01 来源 IP 维度登录限速修复）** ／ **INV-GROUP_C-INTELBASE-014（R14 回归缺陷修复增量：全局管理员「当前项目」选择与 `X-IB-Project` 传播，设计侧口径 REV-14）** ／ **INV-GROUP_C-INTELBASE-015（REV-16-2 提示词分层 + 工具可视化配置增量，设计侧口径 REV-16-3）** ／ **INV-GROUP_C-INTELBASE-016（REV-16-4 配置审计（只读）+ 存储态暴露 + DEFECT-R16-01/02 修复增量，设计侧口径 REV-16-4）** ／ **INV-GROUP_C-INTELBASE-019（REV-18 系统管理三分 + 项目 CRUD + LLM Key 管理 + 项目域资料上传增量，设计侧口径 REV-18/REV-18-R2）** |
+| 调用 ID | INV-GROUP_C-INTELBASE-001（R1）／ INV-GROUP_C-INTELBASE-002（R2 增量）／ INV-GROUP_C-INTELBASE-003（R3 缺陷修复增量）／ INV-GROUP_C-INTELBASE-004（R4 缺陷修复 + 依赖补齐增量）／ INV-GROUP_C-INTELBASE-005（R7 定义外置 + 可视化配置增量）／ INV-GROUP_C-INTELBASE-007（R8 FND-R7-01 校验项补齐）／ INV-GROUP_C-INTELBASE-008（R10 前端构建阻断修复）／ INV-GROUP_C-INTELBASE-010（R11 IB-20 流式 / 会话增量，协调者轮次口径 REV-12）／ **INV-GROUP_C-INTELBASE-012（R13 账户 / 会话 / 商用界面重构增量，设计侧口径 REV-13）** ／ **INV-GROUP_C-INTELBASE-013（R13.1 回修增量：DEFECT-R13-01 来源 IP 维度登录限速修复）** ／ **INV-GROUP_C-INTELBASE-014（R14 回归缺陷修复增量：全局管理员「当前项目」选择与 `X-IB-Project` 传播，设计侧口径 REV-14）** ／ **INV-GROUP_C-INTELBASE-015（REV-16-2 提示词分层 + 工具可视化配置增量，设计侧口径 REV-16-3）** ／ **INV-GROUP_C-INTELBASE-016（REV-16-4 配置审计（只读）+ 存储态暴露 + DEFECT-R16-01/02 修复增量，设计侧口径 REV-16-4）** ／ **INV-GROUP_C-INTELBASE-019（REV-18 系统管理三分 + 项目 CRUD + LLM Key 管理 + 项目域资料上传增量，设计侧口径 REV-18/REV-18-R2）** ／ **INV-GROUP_C-INTELBASE-020（REV-19 项目域专家集隔离增量，设计侧口径 REV-19）** |
 | 项目 | intelligentbase |
 | 阶段 | PHASE_06b（自我代码评审） |
-| 版本 | **R13**（R1 主体 §1~§8 未改写；R2 增量见 **§9**；R3 增量见 **§10**；R4 增量见 **§11**；R7 增量见 **§12**；R8 增量见 **§13**；R10 增量见 **§14**；R11 增量见 **§15**；R13 增量见 **§16**；R13.1 回修增量见 **§17**；**R14 回归缺陷修复增量见 §18**；**REV-16-2 提示词分层与工具可视化配置增量见 §19**；**REV-16-4 配置审计（只读）与存储态暴露 + 两回归缺陷修复增量见 §20**；**REV-17 提示词兜底层重定位增量（提示词文本移出定义文档 + 合并结果进 system 位 + 通用内置安全网）见 §21**；**REV-18 系统管理三分增量（父级「系统管理」+ 三子项账户/项目/LLM Key + 项目域资料上传 + 项目注册表 CRUD 与软删 + LLM Key 管理）见 §22**） |
+| 版本 | **R13**（R1 主体 §1~§8 未改写；R2 增量见 **§9**；R3 增量见 **§10**；R4 增量见 **§11**；R7 增量见 **§12**；R8 增量见 **§13**；R10 增量见 **§14**；R11 增量见 **§15**；R13 增量见 **§16**；R13.1 回修增量见 **§17**；**R14 回归缺陷修复增量见 §18**；**REV-16-2 提示词分层与工具可视化配置增量见 §19**；**REV-16-4 配置审计（只读）与存储态暴露 + 两回归缺陷修复增量见 §20**；**REV-17 提示词兜底层重定位增量（提示词文本移出定义文档 + 合并结果进 system 位 + 通用内置安全网）见 §21**；**REV-18 系统管理三分增量（父级「系统管理」+ 三子项账户/项目/LLM Key + 项目域资料上传 + 项目注册表 CRUD 与软删 + LLM Key 管理）见 §22**；**REV-19 项目域专家集隔离增量（每项目专家集隔离 + 定义文档目录化 + 新项目种子 + 三专家归属 demo + 迁移脚本与检查清单 B24/B25）见 §23**） |
 | status | DRAFT（待 GROUP_D / PM 复核） |
-| 上游输入 | `docs/architecture_design.md`（**1.4.0 / R8**，GR-B-005 PASS_WITH_CONDITIONS）、`docs/module_design.md`（**1.4.0 / R8**）、`docs/tech_stack.md`（**1.3.1 / R10**，R8 设计轮次判 NO_CHANGE）、`docs/ib_embed_service_contract.md`（R2，权威契约）、`docs/test_report.md`（**1.7.0 / R11**，FND-R11-01 与「2 项未覆盖 + 4 项部分覆盖 AC」登记处）、`docs/user_stories.md`（**1.3.0 / R7**，US-IB-19 / US-IB-20）；**R10 触发输入** = PM 只读取证（`.github/workflows/ci.yml` 阶段9 `npm ci` 因锁不同步 EUSAGE）与 `src/frontend/package.json` / `package-lock.json` / `ConfigPage.vue` 现场（tech_stack 已随 R10 升至 1.3.1，见 §14）。**R13 触发输入** = `docs/module_design.md` **1.5.0/REV-13**（IFC-IB-309~332 / 第 15 个端口 / §2.2.4 段号索引）、`docs/architecture_design.md` **1.5.0/REV-13**（ADR-18~ADR-27）、`docs/tech_stack.md` **1.4.0/REV-13**（§1 三新行 / §1.4 客户端键登记 / §4.5 第 13~18 项）、`docs/requirements_spec.md` **1.4.0/REV-13**（REQ-FUNC-IB-28~36 / REQ-NFR-IB-15~18 / C-IB-09 / DR-09~DR-17）；上游门控 **GR-B-006 = PASS_WITH_CONDITIONS**（见 §16）；**R13.1 触发输入** = GROUP_D 门控 `condition_1` 登记的 **DEFECT-R13-01**（MEDIUM）/ `tests/integration/test_accounts_int_r13.py::TC-INT-119`（见 §17）；**R14 触发输入** = `docs/architecture_design.md` **1.6.0/REV-14**（ADR-28 项目上下文的选择与传播，Option B 选定 + §2.0.5 R14 影响复核 + §10.1 R14 OPEN ITEM）、`docs/module_design.md` **1.6.0/REV-14**（IFC-IB-333~336 / §2.2.5 段号索引 / §3 MOD-IB-23 端点与契约 / §3 MOD-IB-24 store 与传播约束 / §4.2.5 无环性再声明 / §9.8 覆盖率再声明）、`docs/tech_stack.md` **1.4.0/REV-14**（**NO_CHANGE**：无新依赖）、需求侧 US-IB-24 / AC-IB-24-02 / AC-IB-24-03 / REQ-FUNC-IB-23/31/32、`docs/phase_status.md` 的 **IC-IB-02**（REV-14 实现约束）与 REV-14-2；上游 GROUP_B **GR-B-007 = PASS_WITH_CONDITIONS**（见 §18）。**R14 现场根因** = R13 回归：全局管理员（`users.project_id IS NULL` ⇒ `effective_project == "*"`）因项目级端点 fail-closed 而无法使用任何项目级页面（问答 / 文件 / 重建 / 可视化配置一律 503），且无「选择当前项目」入口。**REV-18 触发输入** = `docs/architecture_design.md` **1.10.2/REV-18-R2**（ADR-37~ADR-42 + **ADR-21-R1**：N:1 订正，关闭 OI-1）、`docs/module_design.md` **1.10.2/REV-18-R2**（IFC-IB-366~377 + §2.2.9 REV-18 IFC 段号索引；端口 17 → 19 纯追加）、`docs/tech_stack.md` **1.4.1/REV-18**（**NO_CHANGE**：零新增第三方依赖，复用 stdlib `sqlite3`）、`docs/requirements_spec.md` **1.10.0/REV-18-2**（REQ-FUNC-IB-43~48 / REQ-NFR-IB-20 / C-IB-42~43 / OOS-18~19 / DR-21）、`docs/user_stories.md` **1.10.0/REV-18-2**（US-IB-35~40）；上游门控 **GR-B-010（+REV-18-R1/R2 收尾）= PASS**。 |
-| 覆盖范围 | MOD-IB-01 ~ MOD-IB-26（**R2 追加 MOD-IB-26**；R1 覆盖 01~25）。**R3 重评 MOD-IB-13 与 MOD-IB-23**；**R4 只重评被触及的部分**：MOD-IB-12 与 MOD-IB-13，外加依赖面新增文件 `src/requirements-embed.txt`（B-05，非模块）；**R7 只重评被触及的部分**：MOD-IB-01（端口 13 → 14 + 结构）、MOD-IB-02（定义文档数据层）、MOD-IB-16（派生注入）、MOD-IB-23（装配期闸门 + 端点）、MOD-IB-24（可视化配置页）；**R8 只重评被触及的部分**：MOD-IB-02（`ib/config/definition.py::validate` 校验项补齐）；**R10 只重评被触及的部分**：MOD-IB-24（前端构建管线：锁同步 / 源文件跟踪 / 类型错误 / 冒烟入口）；**R11 只重评被触及的部分**：MOD-IB-01（R8 类型 / 枚举 / 常量）、MOD-IB-02（键名登记与值域 + `validate` 第 3 子项）、MOD-IB-16（`is_delegating` 消费侧话术）、MOD-IB-21（终态单发 / 可见性 / 确认事件 / 会话存储逐字段复制）、MOD-IB-22（确认门装配 / `resume` fail-closed / G2 单跳交接）、MOD-IB-23（`chat_stream` 显式 4xx + `POST /api/chat/resume`）、MOD-IB-24（确认区呈递 / 决策回传 / 会话标识纪律）；**R13 只重评被触及的部分**：MOD-IB-01（账户 / 会话 / 令牌契约 + 第 15 个端口 `AccountStore`）、MOD-IB-02（IFC-IB-312 键名登记）、MOD-IB-11（bcrypt / `SqliteAccountStore` / `MemoryAccountStore` / 幂等种子）、MOD-IB-23（账户 / 会话 / 账户 CRUD 端点 + `SessionTokenResolver` + 可注入策略 + 中间件扩展 + 装配 + 条件性限速审计）、MOD-IB-24（登录页 / 首登强制改密 / 控制台外壳 / 路由守卫 / 类型化客户端 / 主题 / 组件库本地打包）、MOD-IB-25（迁移 003 / nginx TLS 模板 / 键模板 / 检查清单 B15~B20 / `bcrypt` 依赖登记）；**R13.1 只重评被触及的部分**：MOD-IB-23（`Deps.login_throttle` 应用级装配 + 登录端点判定顺序）；**R14 只重评被触及的部分**：MOD-IB-23（`projects_endpoint` + `api/projects` 路由 + `X-IB-Project` 头契约登记）、MOD-IB-24（`stores/project.ts` 新建 / `api/client.ts` 单点注入 + 项目枚举客户端 / `app/env.ts` 接线 / `layouts/ConsoleLayout.vue` 选择器与视图态重置 / `main.ts` 401 清空）；**REV-18 只重评被触及的部分**：MOD-IB-01（`ProjectRegistryEntry`/`ProjectStatus`/`LlmKeyStatus`/`LlmKeyRecord`/`LLM_KEY_MASK` + 第 18 个端口 `ProjectRegistryStore`（5 方法）/ 第 19 个端口 `LlmKeyStore`（3 方法）+ `AccountStore.update_user` 加成式扩展（13 → 14））、MOD-IB-02（`IB_PROJECT_REGISTRY_BACKEND` / `IB_LLM_KEY_BACKEND` 仅登记键名，不入 `IB_ENV_KEYS`）、MOD-IB-11（`SqliteProjectRegistryStore`/`MemoryProjectRegistryStore`/`SqliteLlmKeyStore`/`MemoryLlmKeyStore` + 迁移单源 `005_projects.sql`/`006_llm_key.sql` + `_harden_file_permissions`）、MOD-IB-20（`UnconfiguredLlmProvider` 调用期 fail-closed）、MOD-IB-23（`projects_endpoint` 数据源切换 + `POST`/`PATCH`/`DELETE /api/projects` + `PATCH|DELETE /api/accounts/{user_id}` + 建账号 422 顺序依赖 + `GET|PUT|DELETE /api/llm-key` + `_upload_file` kb 推导 + `/healthz/deps` llm 字段）、MOD-IB-24（系统管理三分 IA + `ProjectsPage`/`LlmKeyPage`/`SystemSection.vue` + 上传页去 kb + 类型化客户端）、MOD-IB-25（迁移 005/006 + 检查清单 B21~B23 + `env.example` 两新键） |
+| 上游输入 | `docs/architecture_design.md`（**1.4.0 / R8**，GR-B-005 PASS_WITH_CONDITIONS）、`docs/module_design.md`（**1.4.0 / R8**）、`docs/tech_stack.md`（**1.3.1 / R10**，R8 设计轮次判 NO_CHANGE）、`docs/ib_embed_service_contract.md`（R2，权威契约）、`docs/test_report.md`（**1.7.0 / R11**，FND-R11-01 与「2 项未覆盖 + 4 项部分覆盖 AC」登记处）、`docs/user_stories.md`（**1.3.0 / R7**，US-IB-19 / US-IB-20）；**R10 触发输入** = PM 只读取证（`.github/workflows/ci.yml` 阶段9 `npm ci` 因锁不同步 EUSAGE）与 `src/frontend/package.json` / `package-lock.json` / `ConfigPage.vue` 现场（tech_stack 已随 R10 升至 1.3.1，见 §14）。**R13 触发输入** = `docs/module_design.md` **1.5.0/REV-13**（IFC-IB-309~332 / 第 15 个端口 / §2.2.4 段号索引）、`docs/architecture_design.md` **1.5.0/REV-13**（ADR-18~ADR-27）、`docs/tech_stack.md` **1.4.0/REV-13**（§1 三新行 / §1.4 客户端键登记 / §4.5 第 13~18 项）、`docs/requirements_spec.md` **1.4.0/REV-13**（REQ-FUNC-IB-28~36 / REQ-NFR-IB-15~18 / C-IB-09 / DR-09~DR-17）；上游门控 **GR-B-006 = PASS_WITH_CONDITIONS**（见 §16）；**R13.1 触发输入** = GROUP_D 门控 `condition_1` 登记的 **DEFECT-R13-01**（MEDIUM）/ `tests/integration/test_accounts_int_r13.py::TC-INT-119`（见 §17）；**R14 触发输入** = `docs/architecture_design.md` **1.6.0/REV-14**（ADR-28 项目上下文的选择与传播，Option B 选定 + §2.0.5 R14 影响复核 + §10.1 R14 OPEN ITEM）、`docs/module_design.md` **1.6.0/REV-14**（IFC-IB-333~336 / §2.2.5 段号索引 / §3 MOD-IB-23 端点与契约 / §3 MOD-IB-24 store 与传播约束 / §4.2.5 无环性再声明 / §9.8 覆盖率再声明）、`docs/tech_stack.md` **1.4.0/REV-14**（**NO_CHANGE**：无新依赖）、需求侧 US-IB-24 / AC-IB-24-02 / AC-IB-24-03 / REQ-FUNC-IB-23/31/32、`docs/phase_status.md` 的 **IC-IB-02**（REV-14 实现约束）与 REV-14-2；上游 GROUP_B **GR-B-007 = PASS_WITH_CONDITIONS**（见 §18）。**R14 现场根因** = R13 回归：全局管理员（`users.project_id IS NULL` ⇒ `effective_project == "*"`）因项目级端点 fail-closed 而无法使用任何项目级页面（问答 / 文件 / 重建 / 可视化配置一律 503），且无「选择当前项目」入口。**REV-18 触发输入** = `docs/architecture_design.md` **1.10.2/REV-18-R2**（ADR-37~ADR-42 + **ADR-21-R1**：N:1 订正，关闭 OI-1）、`docs/module_design.md` **1.10.2/REV-18-R2**（IFC-IB-366~377 + §2.2.9 REV-18 IFC 段号索引；端口 17 → 19 纯追加）、`docs/tech_stack.md` **1.4.1/REV-18**（**NO_CHANGE**：零新增第三方依赖，复用 stdlib `sqlite3`）、`docs/requirements_spec.md` **1.10.0/REV-18-2**（REQ-FUNC-IB-43~48 / REQ-NFR-IB-20 / C-IB-42~43 / OOS-18~19 / DR-21）、`docs/user_stories.md` **1.10.0/REV-18-2**（US-IB-35~40）；上游门控 **GR-B-010（+REV-18-R1/R2 收尾）= PASS**。**REV-19 触发输入** = `docs/architecture_design.md` **1.11.0/REV-19**（ADR-43~ADR-47 + §2.0.9 R19 影响复核）、`docs/module_design.md` **1.11.0/REV-19**（IFC-IB-378~388 + §2.2.10；不新增模块 / 不新增端口 / 不新增依赖边）、`docs/tech_stack.md` **1.4.1/REV-18**（**NO_CHANGE**）、`docs/requirements_spec.md` **1.11.0/REV-19**（REQ-FUNC-IB-49~53 / REQ-NFR-IB-21 / C-IB-44~47 / OOS-20~21 / DR-22~23）、`docs/user_stories.md` **1.11.0/REV-19**（US-IB-41~45）；上游门控 **GR-A-011 = PASS_WITH_CONDITIONS（唯一条件 OQ-IB-40 已闭合）/ GR-B-011 = PASS_WITH_CONDITIONS**。 |
+| 覆盖范围 | MOD-IB-01 ~ MOD-IB-26（**R2 追加 MOD-IB-26**；R1 覆盖 01~25）。**R3 重评 MOD-IB-13 与 MOD-IB-23**；**R4 只重评被触及的部分**：MOD-IB-12 与 MOD-IB-13，外加依赖面新增文件 `src/requirements-embed.txt`（B-05，非模块）；**R7 只重评被触及的部分**：MOD-IB-01（端口 13 → 14 + 结构）、MOD-IB-02（定义文档数据层）、MOD-IB-16（派生注入）、MOD-IB-23（装配期闸门 + 端点）、MOD-IB-24（可视化配置页）；**R8 只重评被触及的部分**：MOD-IB-02（`ib/config/definition.py::validate` 校验项补齐）；**R10 只重评被触及的部分**：MOD-IB-24（前端构建管线：锁同步 / 源文件跟踪 / 类型错误 / 冒烟入口）；**R11 只重评被触及的部分**：MOD-IB-01（R8 类型 / 枚举 / 常量）、MOD-IB-02（键名登记与值域 + `validate` 第 3 子项）、MOD-IB-16（`is_delegating` 消费侧话术）、MOD-IB-21（终态单发 / 可见性 / 确认事件 / 会话存储逐字段复制）、MOD-IB-22（确认门装配 / `resume` fail-closed / G2 单跳交接）、MOD-IB-23（`chat_stream` 显式 4xx + `POST /api/chat/resume`）、MOD-IB-24（确认区呈递 / 决策回传 / 会话标识纪律）；**R13 只重评被触及的部分**：MOD-IB-01（账户 / 会话 / 令牌契约 + 第 15 个端口 `AccountStore`）、MOD-IB-02（IFC-IB-312 键名登记）、MOD-IB-11（bcrypt / `SqliteAccountStore` / `MemoryAccountStore` / 幂等种子）、MOD-IB-23（账户 / 会话 / 账户 CRUD 端点 + `SessionTokenResolver` + 可注入策略 + 中间件扩展 + 装配 + 条件性限速审计）、MOD-IB-24（登录页 / 首登强制改密 / 控制台外壳 / 路由守卫 / 类型化客户端 / 主题 / 组件库本地打包）、MOD-IB-25（迁移 003 / nginx TLS 模板 / 键模板 / 检查清单 B15~B20 / `bcrypt` 依赖登记）；**R13.1 只重评被触及的部分**：MOD-IB-23（`Deps.login_throttle` 应用级装配 + 登录端点判定顺序）；**R14 只重评被触及的部分**：MOD-IB-23（`projects_endpoint` + `api/projects` 路由 + `X-IB-Project` 头契约登记）、MOD-IB-24（`stores/project.ts` 新建 / `api/client.ts` 单点注入 + 项目枚举客户端 / `app/env.ts` 接线 / `layouts/ConsoleLayout.vue` 选择器与视图态重置 / `main.ts` 401 清空）；**REV-18 只重评被触及的部分**：MOD-IB-01（`ProjectRegistryEntry`/`ProjectStatus`/`LlmKeyStatus`/`LlmKeyRecord`/`LLM_KEY_MASK` + 第 18 个端口 `ProjectRegistryStore`（5 方法）/ 第 19 个端口 `LlmKeyStore`（3 方法）+ `AccountStore.update_user` 加成式扩展（13 → 14））、MOD-IB-02（`IB_PROJECT_REGISTRY_BACKEND` / `IB_LLM_KEY_BACKEND` 仅登记键名，不入 `IB_ENV_KEYS`）、MOD-IB-11（`SqliteProjectRegistryStore`/`MemoryProjectRegistryStore`/`SqliteLlmKeyStore`/`MemoryLlmKeyStore` + 迁移单源 `005_projects.sql`/`006_llm_key.sql` + `_harden_file_permissions`）、MOD-IB-20（`UnconfiguredLlmProvider` 调用期 fail-closed）、MOD-IB-23（`projects_endpoint` 数据源切换 + `POST`/`PATCH`/`DELETE /api/projects` + `PATCH|DELETE /api/accounts/{user_id}` + 建账号 422 顺序依赖 + `GET|PUT|DELETE /api/llm-key` + `_upload_file` kb 推导 + `/healthz/deps` llm 字段）、MOD-IB-24（系统管理三分 IA + `ProjectsPage`/`LlmKeyPage`/`SystemSection.vue` + 上传页去 kb + 类型化客户端）、MOD-IB-25（迁移 005/006 + 检查清单 B21~B23 + `env.example` 两新键）；**REV-19 只重评被触及的部分**：MOD-IB-01（`MigrationResult`/`MigrationReport`/`SeedResult` + `ExpertRegistryError`）、MOD-IB-02（`FileDefinitionDocumentStore` 目录化 + `_path_for` + `migrate_legacy_definition_file` + `LEGACY_DEFINITION_FILENAME`）、MOD-IB-16（`ExpertRegistryView`/`resolve_expert_registry`/`builtin_default_registry`/`builtin_expert_registry`/`BUILTIN_DEFAULT_KB_AGENT`/`DEMO_EXPERT_NAMES`）、MOD-IB-19（`IntentRouter` 可选 `experts` + 四个来源辅助方法）、MOD-IB-21（`migrate_expert_history` + `MemorySessionStore.iter_items`）、MOD-IB-23（`orchestrator_for` 按项目解析 + `seed_project` + `_definition_document_from_specs` + `POST /api/projects` 播种挂钩）、MOD-IB-24（IFC-IB-387 复用既有基建，**零新增前端代码**）、MOD-IB-25（检查清单 B24/B25） |
 | 评审方式 | 5 维评分 + 逐条 finding（含文件:行号）+ 离线实跑证据 |
 ---
 
@@ -2806,3 +2806,129 @@ EXIT=2
 **REV-18 增量自评 = PASS_WITH_MINOR**：**CRITICAL = 0 / MAJOR = 0 / MINOR = 4**（D-R18-01 能力边界 1 项 + 设计使然 1 项 + 契约取值 1 项 + 历史结转 1 项），**四项均非阻塞**。九条红线逐条落地并取证；离线实跑 Python **334** / 前端 **34** / 自检 **51/51** 全绿，相对 REV-17 零回归。
 
 **§22.9 守约复核**：未新增模块（仍 **26**）/ 端口 **17 → 19**（纯追加，`ProjectRegistryStore` + `LlmKeyStore`）/ 未新增第三方依赖（复用 stdlib `sqlite3`）/ 未改模块边界 / **未新增 §4.1 依赖边（DAG 不变）** / 未改既有配置键名与默认值（仅新增两个后端键，不入 `IB_ENV_KEYS`）/ 未改 `IFC-IB-001~365` 中除已登记 7 条（`IFC-IB-024` / 242 / 243 / 262 / 263 / 321 / 333）口径外的任何编号与签名名 / **未改任何既有 ADR 正文**（ADR-21 一字未动，N:1 全落 **ADR-21-R1**）/ 未 bump `schema_version` / 两条顶层键红线守住（definition 顶层恰 4 键、prompts 顶层恰 5 键）/ 未 `git add` / `commit` / `push` / 部署 / FreeArk 参考仓**只读** / **无任何口令、令牌或密钥字面量**（测试内 LLM Key 为 `sk-rev18-placeholder-not-a-real-key-0000` 占位值）/ **不引运行期热重载**；**生产后端重启与首次环境变量配置须由用户执行**（本代理不执行，文档只写「由用户执行」）。
+
+---
+
+# §23 REV-19 增量自评（项目域专家集隔离：IFC-IB-378~388；设计侧口径 REV-19）
+
+**范围**：本增量**只重评被触及的部分**（见文件头「覆盖范围」行 REV-19 段）。§1~§22 为历史记录，未改写。**本轮 invocation = INV-GROUP_C-INTELBASE-020**。
+
+## 23.1 评审摘要
+
+- 评审文件：**13**（源码 12 + 测试 1），新增 / 删除行 = **+906 / −64**；**零新增源码文件**。
+- 5 维总体评分（各维平均，10 分制）：
+
+| 维度 | 均分 | 说明 |
+|------|------|------|
+| Correctness（正确性） | **8.7** | 接口契约逐条落地；fail-closed 全覆盖；`migrate_expert_history` 的 ledger 面见 D-R19-01（保守裁量） |
+| Security（安全性） | **9.0** | 无跨项目回退；`assert_kb_in_project` 保留；迁移工具不写盘 / 不读环境变量 / 不碰 SQLite；无凭据字面量 |
+| Performance（性能） | **9.2** | 纯函数 / 内存操作；`iter_items` 单次持锁快照；无 N+1、无额外 IO |
+| Maintainability（可维护性） | **8.8** | 复用既有类型与模块边界；`_spec_from_input` 与装配转换同源；`ib.streaming` 重复三专家字面量以守依赖边（有自检兜底） |
+| Test Coverage（可测试性） | **8.5** | 新增 1 条离线自检覆盖全链路；目录化契约就地订正测试；ledger 面以鸭子类型可注入、但**无生产实现**（D-R19-01） |
+
+- Finding 统计（按 **§23.2 逐条枚举**口径）：共 **16** 条 = **CRITICAL = 0**（无待修）／**MAJOR = 0**（无遗留；`FND-R19-010` 为 `MAJOR→DOCUMENTED` 关注面）／**MINOR = 15**（均非阻塞）。其中**非阻塞且需跟踪**的子集 = **4**（= **1** 条 `MAJOR→DOCUMENTED` + **3** 条 MINOR，即 §23.4 所列）；见 23.2 / 23.4。
+
+## 23.2 按模块评审详情
+
+---
+**MOD-IB-01：核心类型 / 错误（`src/ib/core/`）**
+- Correctness: 9/10　Security: 9/10　Performance: 9/10　Maintainability: 9/10　Test Coverage: 9/10
+
+| Finding ID | 级别 | 文件:行号 | 描述 | 状态 |
+|-----------|------|-----------|------|------|
+| FND-R19-001 | MINOR | `src/ib/core/types.py:1111-1158` | `MigrationResult` / `MigrationReport` / `SeedResult` 为 frozen dataclass 值对象，纯 stdlib、无实现体、无凭据；`MigrationReport.backup_path` 仅登记路径字符串 | FIXED（设计使然） |
+| FND-R19-002 | MINOR | `src/ib/core/errors.py:123-152` | `ExpertRegistryError(IbError)` 携带 `project_id` + `reason`，`code="expert_registry_error"`；不泄漏内部结构 | FIXED（设计使然） |
+---
+**MOD-IB-16：专家域（`src/ib/experts/__init__.py`）**
+- Correctness: 9/10　Security: 9/10　Performance: 9/10　Maintainability: 8/10　Test Coverage: 9/10
+
+| Finding ID | 级别 | 文件:行号 | 描述 | 状态 |
+|-----------|------|-----------|------|------|
+| FND-R19-003 | MINOR | `src/ib/experts/__init__.py:484-551` | `ExpertRegistryView` 不变量（`experts` 非空 ∧ `default_expert.name ∈ experts`）由**类型层**保证（`default_expert` 必填非空）；`by_name` 经 `object.__setattr__` 派生为 `MappingProxyType` | FIXED |
+| FND-R19-004 | MINOR | `src/ib/experts/__init__.py:554-570` | `resolve_expert_registry` fail-closed 三例（空集 / 缺默认 / 默认非唯一）→ `ExpertRegistryError`；**无跨项目回退** | FIXED |
+| FND-R19-005 | MINOR | `src/ib/experts/__init__.py:581-603` | 新建项目种子 = **恰 1 个** KB agent（`is_default=True`，不可删）；`cn_label` 取 `知识库助手`（见 D-R19-02） | FIXED |
+---
+**MOD-IB-19：路由（`src/ib/routing/intent.py`）**
+- Correctness: 9/10　Security: 8/10　Performance: 9/10　Maintainability: 8/10　Test Coverage: 8/10
+
+| Finding ID | 级别 | 文件:行号 | 描述 | 状态 |
+|-----------|------|-----------|------|------|
+| FND-R19-006 | MINOR | `src/ib/routing/intent.py:233-288` | `experts` 为 keyword-only 可选形参（append-only）；`None` 时经 `_expert_names` / `_expert_keywords` / `_default_name` / `_expert_specs` 回落内置访问器 → **既有调用点零行为变化**（已由 `test_routing_experts_tools.py` 断言不变） | FIXED |
+---
+**MOD-IB-02：定义文档存储（`src/ib/config/definition.py`）**
+- Correctness: 9/10　Security: 9/10　Performance: 9/10　Maintainability: 8/10　Test Coverage: 8/10
+
+| Finding ID | 级别 | 文件:行号 | 描述 | 状态 |
+|-----------|------|-----------|------|------|
+| FND-R19-007 | MINOR | `src/ib/config/definition.py:888-905` | `_path_for(project_id)` = `<dir>/<project_id>.json`；`_dir` 为目录根（ADR-44） | FIXED |
+| FND-R19-008 | MINOR | `src/ib/config/definition.py:957-1020` | `migrate_legacy_definition_file`：先备份再 `os.replace` 移动；**目标已存在 → fail-closed**（`applied=False` + note，**不覆盖**）；`dir_root` 是文件 → `ConfigError` 且只报键名 | FIXED |
+---
+**MOD-IB-21：会话状态（`src/ib/streaming/__init__.py`）**
+- Correctness: 8/10　Security: 9/10　Performance: 9/10　Maintainability: 8/10　Test Coverage: 8/10
+
+| Finding ID | 级别 | 文件:行号 | 描述 | 状态 |
+|-----------|------|-----------|------|------|
+| FND-R19-009 | MINOR | `src/ib/streaming/__init__.py:280-288` | `iter_items()` 单次持锁返回 `(key, state)` 快照（**只读**，不暴露可变内部字典） | FIXED |
+| FND-R19-010 | MAJOR→DOCUMENTED | `src/ib/streaming/__init__.py:310-420` | `migrate_expert_history` **只实现会话状态面**；台账 `sessions`（认证会话）**不**改写 —— 见 **D-R19-01**（保守裁量：改写认证会话归属=不可逆越权面）。ledger 面以鸭子类型（`iter_expert_history` / `update_expert_history_project`）可选注入，未注入即跳过并如实登记 notes | DOCUMENTED（提请 PM / 架构复核口径） |
+---
+**MOD-IB-23：组合根 / 端点（`src/ibweb/composition.py` / `views.py`）**
+- Correctness: 8/10　Security: 9/10　Performance: 8/10　Maintainability: 8/10　Test Coverage: 8/10
+
+| Finding ID | 级别 | 文件:行号 | 描述 | 状态 |
+|-----------|------|-----------|------|------|
+| FND-R19-011 | MINOR | `src/ibweb/composition.py:189-232` | `orchestrator_for` 按 `derived_views[project_id]` 解析 `ExpertRegistryView`（**无跨项目回退**），经 `IntentRouter(experts=registry)` + `build_graph(experts=..., tools_by_expert=...)` 构造注入 | FIXED |
+| FND-R19-012 | MINOR | `src/ibweb/composition.py:1293-1380` | `seed_project`：写 `<dir>/<project_id>.json` + 建提示词目录；**幂等**（文件已存在即 `created=False`）；失败**原子回滚**（删已写文档 / 已建目录后重抛）；离线 / 无载体 → `created=False` | FIXED |
+| FND-R19-013 | MINOR | `src/ibweb/views.py:1659-1700` | `_seed_created_project`：`POST /api/projects` 创建后播种；播种失败 → 软禁用注册记录并抛 `IbError(code="project_seed_failed")`（500），**不留下半成品项目** | FIXED |
+---
+**MOD-IB-24：前端（`src/frontend/`）**
+- Correctness: 9/10　Security: 9/10　Performance: 9/10　Maintainability: 9/10　Test Coverage: N/A（源码级纪律检查）
+
+| Finding ID | 级别 | 文件:行号 | 描述 | 状态 |
+|-----------|------|-----------|------|------|
+| FND-R19-014 | MINOR | `src/frontend/src/layouts/ConsoleLayout.vue:113,241` | IFC-IB-387 由 **REV-14 既有基建满足**：`<router-view :key="viewKey">`（`viewKey = projectContext.state.current`）切换项目即重置视图态 → ConfigPage / ChatPage 自动按当前项目域重载；`X-IB-Project` 仍由 `client.ts` 单点注入 | FIXED（零新增代码） |
+---
+**MOD-IB-25：部署检查清单（`src/deploy/checklists.txt`）**
+- Correctness: 9/10　Security: 9/10　Performance: N/A　Maintainability: 9/10　Test Coverage: 9/10
+
+| Finding ID | 级别 | 文件:行号 | 描述 | 状态 |
+|-----------|------|-----------|------|------|
+| FND-R19-015 | MINOR | `src/deploy/checklists.txt:434-468` | 新增 **B24**（定义文档目录化迁移）与 **B25**（三专家历史迁移），含先停服 / 先备份 / 失败回滚 / 幂等 / 记录保留 / 非 demo 失去历史的登记；签署行 `B1–B25` | FIXED |
+| FND-R19-016 | MINOR | `src/scripts/selfcheck.py:3429-3460` | `r13_deploy_discipline` 清单断言 B15→**B25**、签署行 `B1–B25`；新增 `r19_project_expert_isolation` 全链路离线自检 | FIXED |
+
+## 23.3 未解决的 CRITICAL 问题
+
+**无**（CRITICAL = 0）。
+
+## 23.4 遗留 MAJOR / MINOR 说明
+
+- **D-R19-01（MAJOR 级关注，已 DOCUMENTED）**：`migrate_expert_history`（IFC-IB-386）**不**改写台账 `sessions`（认证会话）表 —— 该表 `project_id` 是**账户归属**而非「专家历史归属」，改写它会把用户认证会话错划到 `demo`（不可逆越权面）。实现取**保守裁量**：会话状态面已实现；问答历史面以可选注入承载，**无生产实现**。**提请 PM / 架构裁决是否需要为问答历史单独引入台账改写方法**（若需要，属追加 IFC，不在本轮伪造）。
+- 其余 **3** 项 MINOR（即 §23.1「非阻塞且需跟踪子集（= 4）」的 MINOR 面；§23.2 逐条表 MINOR 共枚举 **15** 项）均属设计使然 / 契约取值，非阻塞。
+
+## 23.5 自验证据（真实执行，命令可被第三方重跑）
+
+| # | 命令（cwd = 仓库根；`PYTHONIOENCODING=utf-8`） | 实际结果 | EXIT |
+|---|---------------------------------------------|----------|------|
+| 1 | 改动**前**（`HEAD` 干净 worktree）：`python -m pytest tests -q -p no:cacheprovider` | **352 passed, 2 skipped**（收集 **354**） | **0** |
+| 2 | 改动**后**：`python -m pytest tests -q -p no:cacheprovider` | **352 passed, 2 skipped**（收集 **354**） | **0** |
+| 3 | `python src/scripts/selfcheck.py` | **52/52 通过**（REV-18 为 51/51；新增 `r19_project_expert_isolation`） | **0** |
+
+**测试文件增删**：**未新增 / 未删除任何测试文件**（前后 `test_*.py` = 43、全部 `.py` = 44）。唯一改动为**就地订正** `tests/integration/test_definition_config_r7.py`（3 处断言适配 ADR-44 目录化，**非放宽**）。
+
+**「无证据不下结论」自查**：本节所有数字均来自**本机实跑**（改动前后各一次完整 suite + 自检）；**未**引用任何「子代理自报」数字；**未**把「未跑」写成「通过」。前端 `npm run typecheck` / `npm test` / `npm run build` 本轮**未执行**（IFC-IB-387 零代码改动，无新建前端产物）—— 故**不宣称**前端绿灯，仅以源码级纪律断言（`r19_project_expert_isolation` §7 + `r14_frontend_project_discipline`）覆盖。
+
+## 23.6 REV-19 本地不可验证项（如实登记）
+
+| # | 项 | 为何本地不可验 | 处置 |
+|---|----|----------------|------|
+| 1 | 生产定义文档**目录化迁移**（C-IB-46 / B24）实况 | 需目标机文件系统与运行身份；本阶段禁写生产路径 | **由用户手工执行 + 先备份 + 失败回滚**；本代理只交付脚本与清单，**未运行任何生产迁移** |
+| 2 | 生产三专家**历史迁移**（C-IB-47 / B25）实况 | 同上；且 `migrate_expert_history` 的 ledger 面**无生产实现**（D-R19-01） | 同上；提请架构裁决 ledger 面口径 |
+| 3 | 迁移工具的**真实台账落盘改写** | 工具不写盘 / 不读环境变量 / 不碰 SQLite（运维在调用点负责） | 部署阶段由用户在停服 + 备份后执行 |
+| 4 | 新建项目种子的**完整可用性**（重启后检索 / 上传） | 属部署行为（ADR-32 生效口径），需用户手工重启 | 部署期实测；离线仅验证文件 / 目录产物结构 |
+
+## 23.7 §23 结论
+
+**REV-19 增量自评 = PASS_WITH_MINOR**：按 **§23.2 逐条枚举**共 **16** 条 = **CRITICAL = 0 / MAJOR = 0（`FND-R19-010` 为 `MAJOR→DOCUMENTED`）/ MINOR = 15**，均非阻塞；其中**非阻塞且需跟踪**的子集 = **4**（= 1 条 `MAJOR→DOCUMENTED` + 3 条 MINOR）（D-R19-01 与 D-R19-02 已在 `implementation_plan.md` §26.4 登记）。**未自行宣布门控通过**（GR-C-014 由 PM 出具）。
+
+## 23.8 守约复核
+
+未新增模块（仍 **26**）/ **未新增端口（仍 19）** / 未新增第三方依赖（纯 stdlib）/ 未改模块边界 / **未新增 §4.1 依赖边**（`ib.streaming` 重复三专家字面量以守边界，自检断言兜底）/ 未改既有配置键名与默认值 / `IFC-IB-001~377` 一字不动（仅新增 378~388）/ 未 bump `schema_version` / **不引运行期热重载**（ADR-32）/ **未运行任何生产迁移**（C-IB-46 / C-IB-47 仅脚本 + 清单，用户手工执行）/ **无任何口令 / Key / token / 证书字面量** / 未 `git add` / `commit` / `push` / 部署 / FreeArk 参考仓**只读**。

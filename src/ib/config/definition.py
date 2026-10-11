@@ -2,6 +2,8 @@
 @module MOD-IB-02
 @implements IFC-IB-288, IFC-IB-289, IFC-IB-290, IFC-IB-291, IFC-IB-292, IFC-IB-355
             IFC-IB-364（REV-17 新增：validate_two_domains 跨域统合校验）
+            IFC-IB-383（REV-19）FileDefinitionDocumentStore 目录化 + _path_for
+            IFC-IB-384（REV-19）migrate_legacy_definition_file（C-IB-46 部署迁移）
 @depends MOD-IB-01
 @author software-developer
 
@@ -24,6 +26,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tempfile
 from dataclasses import replace
 from hashlib import sha256
@@ -38,6 +41,7 @@ from ib.core import (
     EdgeSpec,
     ExpertPromptDocumentRef,
     ExpertSpecInput,
+    MigrationResult,
     OrchestrationSpecInput,
     RouteSpecInput,
     SaveResult,
@@ -64,6 +68,7 @@ __all__ = [
     "document_to_json",
     "FileDefinitionDocumentStore",
     "InMemoryDefinitionDocumentStore",
+    "migrate_legacy_definition_file",
     "NON_EDITABLE_FIELDS",
 ]
 
@@ -845,13 +850,20 @@ def _rehash(doc: DefinitionDocument) -> DefinitionDocument:
 
 
 class FileDefinitionDocumentStore:
-    """**生产**定义文档存储：本地文件 + 原子替换 + 语义哈希乐观并发（IFC-IB-288/289）。
+    """**生产**定义文档存储：本地**目录** + 原子替换 + 语义哈希乐观并发（IFC-IB-288/289/383）。
 
-    * `load`：读 `<path>`；缺失 / 不可解析 → `ConfigError`（不做静默空文档回退）。
-    * `save`：先写同目录临时文件 → `os.replace` **原子替换**；`expected_content_hash`
-      不匹配 → `SaveResult(conflict=True)` 且**不落盘**（拒绝覆盖）。
+    **REV-19（ADR-44 / IFC-IB-383）目录化**：构造形参语义由「**文件路径**」改为「**目录根**」，
+    每项目一文件 `<dir>/<project_id>.json`（一项目一文档，落地 [ARCH-ASSUMPTION-A6] /
+    OQ-IB-32(b)）—— 与内存版 `InMemoryDefinitionDocumentStore`（本就按 `project_id` 键控）
+    语义**收敛一致**，消除「`load(project_id)` 无视 `project_id`」的 F5 偏差。
 
-    数据不出本机（无任何网络调用），契约符合 [ARCH-ASSUMPTION-A6]「一个项目一份本地文件」。
+    * `load(project_id)`：读 `<dir>/<project_id>.json`；缺失 / 不可解析 → `ConfigError`
+      （**不静默回退空文档**）；
+    * `save(project_id, doc)`：先写同目录临时文件 → `os.replace` **原子替换**；
+      `expected_content_hash` 不匹配 → `SaveResult(conflict=True)` 且**不落盘**（拒绝覆盖）。
+
+    **端口 `DefinitionDocumentStore`（IFC-IB-287）签名不变**（`load` / `save` 本就带
+    `project_id`）；数据不出本机（无任何网络调用）。
     """
 
     def __init__(
@@ -861,7 +873,8 @@ class FileDefinitionDocumentStore:
         known_tools: frozenset[str] | set[str] | None = None,
         builtin_fallbacks: Mapping[str, str] | None = None,
     ) -> None:
-        self._path = path
+        #: REV-19：`path` 语义 = **目录根**（键名 `IB_DEFINITION_DOC_PATH` 不变）。
+        self._dir = path
         self._known_tools = frozenset(known_tools) if known_tools else None
         #: REV-17（ADR-36）：旧文档 legacy `fallback_prompt` 键的比对基准，由组合根用
         #: `ib.experts.BUILTIN_FALLBACKS` 注入（**全名域**映射，未知专家也有值）。
@@ -869,13 +882,19 @@ class FileDefinitionDocumentStore:
 
     @property
     def path(self) -> str:
-        return self._path
+        """目录根（REV-19 语义；保留属性名以兼容既有调用点）。"""
+        return self._dir
+
+    def _path_for(self, project_id: str) -> str:
+        """该项目的定义文档路径 `<dir>/<project_id>.json`（IFC-IB-383；纯字符串拼装）。"""
+        return os.path.join(self._dir, f"{project_id}.json")
 
     def load(self, project_id: str) -> DefinitionDocument:
-        if not self._path or not os.path.isfile(self._path):
+        target = self._path_for(project_id)
+        if not self._dir or not os.path.isfile(target):
             raise ConfigError("定义文档缺失或不可解析（IB_DEFINITION_DOC_PATH）", key="IB_DEFINITION_DOC_PATH")
         try:
-            with open(self._path, encoding="utf-8") as fh:
+            with open(target, encoding="utf-8") as fh:
                 text = fh.read()
         except OSError as exc:
             raise ConfigError("定义文档缺失或不可解析（IB_DEFINITION_DOC_PATH）", key="IB_DEFINITION_DOC_PATH") from exc
@@ -890,8 +909,9 @@ class FileDefinitionDocumentStore:
         *,
         expected_content_hash: str | None,
     ) -> SaveResult:
+        target = self._path_for(project_id)
         current: str | None = None
-        if os.path.isfile(self._path):
+        if os.path.isfile(target):
             try:
                 current = self.load(project_id).content_hash
             except ConfigError:
@@ -900,7 +920,7 @@ class FileDefinitionDocumentStore:
             item = content_hash_conflict_item(expected_content_hash or "", current or "")
             return SaveResult(ok=False, content_hash=current or "", conflict=True, errors=(item,))
         stored = doc if doc.content_hash == semantic_hash(doc) else _rehash(doc)
-        self._atomic_write(document_to_json(stored))
+        self._atomic_write(document_to_json(stored), target)
         return SaveResult(ok=True, content_hash=stored.content_hash, conflict=False, errors=())
 
     def validate(self, doc: DefinitionDocument) -> ValidationReport:
@@ -912,8 +932,8 @@ class FileDefinitionDocumentStore:
     def editable_field_whitelist(self) -> frozenset[str]:
         return editable_field_whitelist()
 
-    def _atomic_write(self, text: str) -> None:
-        directory = os.path.dirname(os.path.abspath(self._path)) or "."
+    def _atomic_write(self, text: str, target: str) -> None:
+        directory = os.path.dirname(os.path.abspath(target)) or "."
         os.makedirs(directory, exist_ok=True)
         fd, tmp = tempfile.mkstemp(prefix=".ib_def_", suffix=".tmp", dir=directory)
         try:
@@ -921,11 +941,67 @@ class FileDefinitionDocumentStore:
                 fh.write(text)
                 fh.flush()
                 os.fsync(fh.fileno())
-            os.replace(tmp, self._path)  # 原子替换（同目录内 rename）
+            os.replace(tmp, target)  # 原子替换（同目录内 rename）
         except BaseException:
             if os.path.exists(tmp):
                 try:
                     os.remove(tmp)
                 except OSError:
                     pass
-            raise
+
+
+#: C-IB-46 部署迁移的**默认旧单文件名**（生产旧 `IB_DEFINITION_DOC_PATH` 指向的文件）。
+LEGACY_DEFINITION_FILENAME = "definition.json"
+
+
+def migrate_legacy_definition_file(
+    dir_root: str,
+    *,
+    target_project_id: str = "demo",
+    backup: bool = True,
+    legacy_file: str | None = None,
+) -> MigrationResult:
+    """**定义文档目录化迁移**（C-IB-46 / IFC-IB-384；ADR-44；**由用户手工执行**）。
+
+    步骤（**无副作用除非前序步骤成功**；先备份、失败即回滚）：
+
+      * ① `dir_root` 不存在 → 创建（`dir_root` **本身是文件** → `ConfigError`，可读错误 +
+        指明「`IB_DEFINITION_DOC_PATH` 现语义为目录」）；
+      * ② 旧单文件（缺省 `<dir_root>/definition.json`；生产旧值为
+        `/var/lib/intelligentbase/definition.json`）存在且 `<dir_root>/<target>.json`
+        **不存在** → **备份后移动**；
+      * ③ 目标文件**已存在** → **fail-closed**（不覆盖，返回 `applied=False` + 可读 `notes`）；
+      * ④ `backup=True` 时先备份（`<旧文件>.bak`）。
+
+    **幂等**：旧文件已不存在（已迁移）→ `applied=False`，无副作用。**不删除任何行**
+    （迁移是移动而非删除）。`backup_path` 仅登记路径字符串（**不入日志 / 不回显正文**）。
+    """
+    notes: list[str] = []
+    if os.path.isfile(dir_root):
+        raise ConfigError(
+            "IB_DEFINITION_DOC_PATH 语义已由「文件路径」改为「目录根」；"
+            f"该路径当前是文件：{dir_root!r}。请将旧单文件迁移为 <dir>/{target_project_id}.json。",
+            key="IB_DEFINITION_DOC_PATH",
+        )
+    if not os.path.isdir(dir_root):
+        os.makedirs(dir_root, exist_ok=True)
+        notes.append("created_dir_root")
+
+    source = legacy_file or os.path.join(dir_root, LEGACY_DEFINITION_FILENAME)
+    target = os.path.join(dir_root, f"{target_project_id}.json")
+
+    if not os.path.isfile(source):
+        notes.append("legacy_file_absent")
+        return MigrationResult(applied=False, backup_path=None, affected=0, notes=tuple(notes))
+    if os.path.exists(target):
+        notes.append("target_exists_fail_closed")
+        return MigrationResult(applied=False, backup_path=None, affected=0, notes=tuple(notes))
+
+    backup_path: str | None = None
+    if backup:
+        backup_path = source + ".bak"
+        shutil.copy2(source, backup_path)
+        notes.append("backed_up")
+    os.replace(source, target)  # 移动（非复制）：单一真源，不留第二副本
+    notes.append("moved")
+    return MigrationResult(applied=True, backup_path=backup_path, affected=1, notes=tuple(notes))

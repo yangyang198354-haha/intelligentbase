@@ -1931,8 +1931,8 @@ def definition_store_roundtrip() -> None:
         )
 
     with tempfile.TemporaryDirectory() as d:
-        path = str(pathlib.Path(d) / "definition.json")
-        store = FileDefinitionDocumentStore(path, known_tools={"search_knowledge"})
+        # REV-19（ADR-44 / IFC-IB-383）：构造形参语义 = **目录根**（一项目一文档 `<dir>/<pid>.json`）。
+        store = FileDefinitionDocumentStore(str(pathlib.Path(d)), known_tools={"search_knowledge"})
         # 缺失 → ConfigError（**不静默回退空文档**）
         try:
             store.load("p1")
@@ -1941,7 +1941,7 @@ def definition_store_roundtrip() -> None:
             pass
         res = store.save("p1", _doc(), expected_content_hash=None)
         assert res.ok and not res.conflict, res
-        assert pathlib.Path(path).is_file()
+        assert pathlib.Path(d, "p1.json").is_file()
         loaded = store.load("p1")
         assert loaded.project_id == "p1" and loaded.content_hash == semantic_hash(loaded)
         # 乐观并发：陈旧哈希 → conflict，且**不覆盖**
@@ -1952,7 +1952,7 @@ def definition_store_roundtrip() -> None:
         ok = store.save("p1", _doc(tau=0.9), expected_content_hash=loaded.content_hash)
         assert ok.ok and store.load("p1").route.tau == 0.9
         # 原子替换：目录内不得残留任何临时文件
-        leftovers = [p.name for p in pathlib.Path(d).iterdir() if p.name != "definition.json"]
+        leftovers = [p.name for p in pathlib.Path(d).iterdir() if p.name != "p1.json"]
         assert not leftovers, f"原子写回残留临时文件：{leftovers}"
 
     # 测试替身同端口语义
@@ -2475,7 +2475,7 @@ def r8_config_keys_registered() -> None:
     ):
         assert key in IB_RUNTIME_ENV_KEYS, f"{key} 未登记为运行期配置键名"
 
-    # 安全默认：确认门关 / 思考流式关 / 会话策略进程内（ADF-17 约束 1；AC-IB-19-03）。
+    # 安全默认：确认门关 / 思考流式关 / 会话策略进程内（ADR-17 约束 1；AC-IB-19-03）。
     assert GlobalConfig.confirmation_gate_enabled is False
     assert GlobalConfig.reasoning_stream_enabled is False
     assert SessionConfig.persistence_policy == "in_process"
@@ -3426,7 +3426,7 @@ def r13_deploy_discipline() -> None:
     )
     assert "ibweb.accounts.policy" in env, "未登记内置策略模块这一取值"
 
-    # 4) 检查清单：B15 ~ B23 齐备（B21~B23 为 REV-18），且签署行已同步。
+    # 4) 检查清单：B15 ~ B25 齐备（B21~B23 为 REV-18；B24/B25 为 REV-19），且签署行已同步。
     checklists = (deploy / "checklists.txt").read_text(encoding="utf-8")
     for item in (
         "[B15]",
@@ -3438,9 +3438,11 @@ def r13_deploy_discipline() -> None:
         "[B21]",
         "[B22]",
         "[B23]",
+        "[B24]",
+        "[B25]",
     ):
         assert item in checklists, f"checklists.txt 缺少验收项 {item}"
-    assert "B1–B23" in checklists, "签署行未同步到 B23"
+    assert "B1–B25" in checklists, "签署行未同步到 B25"
 
     # 4b) REV-18 迁移：005 / 006 存在、幂等（IF EXISTS）、且**纯追加**（只建新表 / 不回改旧表）。
     for name, table in (
@@ -3966,6 +3968,152 @@ def r16_rename_alignment() -> None:
     assert not offenders, f"源码仍含旧专家 slug：{offenders}"
 
 
+@_case("r19_project_expert_isolation：每项目专家集隔离 / 种子 / 目录化 / 历史迁移（IFC-IB-378~388）")
+def r19_project_expert_isolation() -> None:
+    """REV-19 全链路**离线**验证：专家域项目级硬隔离、创建种子、定义文档目录化、三专家历史迁移。
+
+    全部在内存 / 临时目录内完成，**无外部服务**（REQ-FUNC-IB-49~53 / REQ-NFR-IB-21）。
+    """
+    import pathlib as _p
+    import tempfile
+
+    import ib.experts as experts
+    import ib.streaming as streaming
+    from ib.config import FileDefinitionDocumentStore, migrate_legacy_definition_file
+    from ib.core import (
+        DerivedView,
+        ExpertRegistryError,
+        ExpertSpecInput,
+        MigrationReport,
+        MigrationResult,
+        OrchestrationSpecInput,
+        Scope,
+    )
+    from ib.routing import IntentRouter
+
+    # 1) 三专家列表三处**同值**（ib.experts / ib.streaming / demo 语义）
+    assert experts.DEMO_EXPERT_NAMES == (
+        "freeark-expert",
+        "inspection-expert",
+        "sanheng-knowledge",
+    ), "三专家真源漂移"
+    assert streaming._DEMO_EXPERT_NAMES == experts.DEMO_EXPERT_NAMES, (
+        "ib.streaming 与 ib.experts 的三专家列表不一致（MOD-IB-21 依赖边界内重复字面量，须由本断言兜底）"
+    )
+    assert experts.names() == experts.DEMO_EXPERT_NAMES, "内置默认专家集（代码安全网）应为三对齐专家"
+
+    # 2) 新建项目种子 = **恰 1 个** KB agent（is_default=True，内置不可删）—— 类型层可测事实（C-IB-45）
+    seed_view = experts.builtin_default_registry()
+    assert len(seed_view.experts) == 1, "新建项目种子必须恰 1 个专家"
+    assert seed_view.experts[0].is_default is True, "种子专家必须 is_default=True"
+    assert seed_view.default_name() == "kb-agent", "种子默认专家名应为内置 KB agent"
+    # 不变量：默认专家 ∈ 专家集
+    assert seed_view.default_expert.name in {e.name for e in seed_view.experts}
+    # demo 视图 = 三对齐专家，默认 freeark-expert
+    demo_view = experts.builtin_expert_registry()
+    assert demo_view.names() == experts.DEMO_EXPERT_NAMES
+    assert demo_view.default_name() == "freeark-expert"
+
+    # 3) resolve_expert_registry **fail-closed**（空集 / 缺默认 / 默认非唯一）
+    graph = OrchestrationSpecInput(nodes=("START", "END"), conditional_edges=(), edges=())
+
+    def _spec(name: str, *, is_default: bool = False) -> ExpertSpecInput:
+        return ExpertSpecInput(
+            name=name,
+            cn_label=name,
+            keywords=(),
+            exemplars=(),
+            is_data_expert=False,
+            is_delegating=False,
+            is_default=is_default,
+        )
+
+    for specs, reason in (
+        ((), "empty_expert_set"),
+        ((_spec("a"), _spec("b")), "default_expert_missing"),
+        ((_spec("a", is_default=True), _spec("b", is_default=True)), "default_expert_not_unique"),
+    ):
+        view = DerivedView(
+            experts=tuple(specs), capability_digest="", graph_config=graph
+        )
+        try:
+            experts.resolve_expert_registry("p_probe", view=view)
+        except ExpertRegistryError as exc:
+            assert exc.project_id == "p_probe", "错误未携带项目上下文"
+        else:
+            raise AssertionError(f"resolve_expert_registry 未对非法派生视图 fail-closed：{reason}")
+    # 合法派生视图 → 视图不变量成立
+    ok_view = experts.resolve_expert_registry(
+        "p_ok", view=DerivedView(experts=(_spec("solo", is_default=True),), capability_digest="", graph_config=graph)
+    )
+    assert ok_view.default_name() == "solo" and ok_view.names() == ("solo",)
+
+    # 4) IntentRouter 注入视图后**只在本项目专家集内**路由（ADR-43）
+    routed = IntentRouter(experts=seed_view).classify_experts(
+        "帮我查一下知识库里的资料", scope=Scope(project_id="p_new")
+    )
+    assert routed.experts == ["kb-agent"], f"注入 KB 视图后应路由到 kb-agent，实为 {routed.experts}"
+    # 未注入视图 → 行为与 R1~R18 逐位一致（回落到内置三专家；中性问句落默认专家）
+    legacy = IntentRouter().classify_experts("随便聊聊天气", scope=Scope(project_id="p1"))
+    assert legacy.experts == ["freeark-expert"], f"缺省路由应回落 freeark-expert，实为 {legacy.experts}"
+
+    # 5) 定义文档目录化 + C-IB-46 迁移（临时目录内离线全链路）
+    with tempfile.TemporaryDirectory() as td:
+        root = _p.Path(td)
+        store = FileDefinitionDocumentStore(str(root), known_tools=frozenset())
+        # 一项目一文档：<dir>/<pid>.json
+        assert _p.Path(store._path_for("proj_x")).name == "proj_x.json"
+        assert _p.Path(store._path_for("proj_y")).parent == root
+        # 旧单文件 → <dir>/demo.json（含 fail-closed：目标已存在则拒绝）
+        legacy_file = root / "definition.json"
+        legacy_file.write_text("{}", encoding="utf-8")
+        res = migrate_legacy_definition_file(str(root), target_project_id="demo", legacy_file=str(legacy_file))
+        assert isinstance(res, MigrationResult) and res.applied is True, "迁移应成功"
+        assert (root / "demo.json").is_file(), "迁移产物应为 <dir>/demo.json"
+        assert (root / "definition.json.bak").is_file(), "应先备份旧文件"
+        # 目标已存在 → fail-closed 拒绝（不静默覆盖；以 applied=False 回报，非抛异常）
+        (root / "definition2.json").write_text("{}", encoding="utf-8")
+        res2 = migrate_legacy_definition_file(
+            str(root), target_project_id="demo", legacy_file=str(root / "definition2.json")
+        )
+        assert res2.applied is False, "目标 demo.json 已存在时，迁移必须 fail-closed（applied=False）"
+        assert "target_exists_fail_closed" in res2.notes, "fail-closed 未在 notes 中登记原因"
+
+    # 6) 三专家历史迁移：归属改写 + 记录保留 + 幂等 + 非 demo 失去可见
+    from ib.core import SessionState
+
+    store2 = streaming.MemorySessionStore()
+    store2.save("legacy:s1", SessionState(last_expert="freeark-expert", project_id="legacy"))
+    store2.save("legacy:s2", SessionState(last_expert="unrelated", project_id="legacy"))
+    store2.save("demo:s3", SessionState(last_expert="inspection-expert", project_id="demo"))
+    before = len(store2)
+    report = streaming.migrate_expert_history("demo", sessions=store2)
+    assert report.applied is True and report.affected_sessions == 1, "应恰迁移 1 个会话"
+    assert len(store2) == before, "迁移不得删除任何会话（记录保留）"
+    assert store2.load("demo:s1") is not None and store2.load("legacy:s1") is None, "归属未改写"
+    assert store2.load("legacy:s2") is not None, "未引用三专家的会话不得被迁走"
+    # 幂等：第二次空跑
+    again = streaming.migrate_expert_history("demo", sessions=store2)
+    assert again.applied is False and again.affected_sessions == 0, "迁移必须幂等"
+    assert isinstance(again, MigrationReport)
+    assert again.backup_path is None, "工具不写盘，backup_path 应如实为 None"
+
+    # 7) IFC-IB-387：配置页 / 知识问答页复用既有项目域（单一注入点 + 切换即重置视图态）
+    import re as _re
+
+    front = _p.Path(_SRC) / "frontend" / "src"
+    config_vue = (front / "views" / "ConfigPage.vue").read_text(encoding="utf-8")
+    assert "definitionConfig(" in config_vue, (
+        "配置页未按当前项目域载入定义文档（IFC-IB-387 / REQ-FUNC-IB-50）"
+    )
+    layout_vue = (front / "layouts" / "ConsoleLayout.vue").read_text(encoding="utf-8")
+    assert _re.search(r"<router-view[^>]*:key", layout_vue), (
+        "切换项目未重置项目内视图态（IFC-IB-387 / 串项显示风险）"
+    )
+    # （client.ts 的单一注入点纪律已由 r14_frontend_project_discipline 以「剥离注释后」的
+    #  判据覆盖，此处不重复 —— 原始文本里 X-IB-Project 仅出现在文档注释中。）
+
+
 def main() -> int:
     print("=" * 72)
     print("intelligentbase 离线自检（GROUP_C 自我验证；正式测试套件属 GROUP_D）")
@@ -4030,6 +4178,8 @@ def main() -> int:
         r16_rename_alignment,
         # ---- REV-17 增量（提示词兜底层重定位；ADR-36；IFC-IB-364/365） ----
         r17_build_expert_system_slot,
+        # ---- REV-19 增量（每项目专家集隔离 / 种子 / 目录化 / 历史迁移；IFC-IB-378~388） ----
+        r19_project_expert_isolation,
     ]
     for case in cases:
         case()

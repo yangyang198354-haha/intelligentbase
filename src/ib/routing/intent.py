@@ -1,6 +1,7 @@
 """
 @module MOD-IB-19
 @implements IFC-IB-201 classify_experts / 202 parse_route_output / 203 guard_against_misroute
+            IFC-IB-382（REV-19）IntentRouter 增 keyword-only 可选 `experts`（ExpertRegistryView）
 @depends MOD-IB-01, MOD-IB-16, MOD-IB-17, MOD-IB-18
 @author software-developer
 
@@ -235,10 +236,47 @@ class IntentRouter:
         llm_provider: Any = None,
         semantic: Any = None,
         max_experts: int = MAX_ROUTE_EXPERTS,
+        experts: "Any | None" = None,
     ) -> None:
         self._llm = llm_provider
         self._semantic = semantic
         self._max_experts = max(1, int(max_experts))
+        # REV-19（IFC-IB-382 / ADR-43）：**本项目**专家注册表只读视图（`ExpertRegistryView`）。
+        # `None` → 退化为既有**内置默认专家集**（进程级访问器），行为与 R1~R18 **逐位一致**
+        # —— 这正是「append-only 可选形参」的意义：既有调用点（未注入视图者）零行为变化。
+        self._experts = experts
+
+    # ------------------------------------------------------------------ #
+    # REV-19：专家集来源（注入视图优先；缺省回落既有内置默认专家集）
+    # ------------------------------------------------------------------ #
+
+    def _expert_names(self) -> tuple[str, ...]:
+        if self._experts is not None:
+            return tuple(self._experts.names())
+        from ib.experts import names
+
+        return names()
+
+    def _expert_keywords(self) -> dict[str, tuple[str, ...]]:
+        if self._experts is not None:
+            return dict(self._experts.keywords_map())
+        from ib.experts import keywords_map
+
+        return keywords_map()
+
+    def _default_name(self) -> str:
+        if self._experts is not None:
+            return str(self._experts.default_name())
+        from ib.experts import default_expert
+
+        return default_expert()
+
+    def _expert_specs(self) -> Sequence[Any]:
+        if self._experts is not None:
+            return tuple(self._experts.experts)
+        from ib.experts import EXPERT_SPECS
+
+        return EXPERT_SPECS
 
     # ------------------------------------------------------------------ #
 
@@ -255,11 +293,9 @@ class IntentRouter:
         `allow_ood=True` 时允许返回 `experts=[]`（交给通用应答节点）；
         默认 `False` 表示「空结果按默认专家处理」（保守：宁可多用一个专家，也不要无人应答）。
         """
-        from ib.experts import default_expert, names as expert_names
-
         try:
             text = current_query(query)
-            valid = set(expert_names())
+            valid = set(self._expert_names())
 
             # --- L0/L1：关键词唯一命中 → 语义高置信（都是「不必问 LLM」的快速路径） ---
             keyword_hits = self._keyword_hits(text)
@@ -316,24 +352,26 @@ class IntentRouter:
                 return RouteDecision(experts=[], tier=RouteTier.OOD, confidence=0.0)
 
             # --- 默认专家（确定性兜底，绝不留「无人应答」） ---
-            fallback = default_expert()
+            fallback = self._default_name()
             return RouteDecision(experts=[fallback], tier=RouteTier.DEFAULT, confidence=0.0)
         except Exception:  # noqa: BLE001 - IFC-IB-201 要求无异常出口
-            from ib.experts import default_expert
+            try:
+                fallback = self._default_name()
+            except Exception:  # noqa: BLE001 - 视图注入残缺时的最后防线
+                from ib.experts import default_expert
 
+                fallback = default_expert()
             return RouteDecision(
-                experts=[default_expert()], tier=RouteTier.DEFAULT, confidence=0.0
+                experts=[fallback], tier=RouteTier.DEFAULT, confidence=0.0
             )
 
     # ------------------------------------------------------------------ #
 
     def _keyword_hits(self, text: str) -> list[str]:
         """按注册表关键词命中的专家（保注册表顺序，确定性）。"""
-        from ib.experts import keywords_map
-
         lowered = text.lower()
         hits: list[str] = []
-        for expert, keywords in keywords_map().items():
+        for expert, keywords in self._expert_keywords().items():
             if any(keyword.lower() in lowered for keyword in keywords):
                 hits.append(expert)
         return hits
@@ -400,13 +438,10 @@ class IntentRouter:
         except Exception:  # noqa: BLE001 - 路由分类失败必须降级而非中断
             return ""
 
-    @staticmethod
-    def _expert_lines() -> str:
-        from ib.experts import EXPERT_SPECS
-
+    def _expert_lines(self) -> str:
         return "\n".join(
             f"- {spec.name}（{spec.cn_label}）：关键词 {'/'.join(spec.keywords[:8])}"
-            for spec in EXPERT_SPECS
+            for spec in self._expert_specs()
         )
 
     @staticmethod
@@ -415,11 +450,8 @@ class IntentRouter:
 
         return build_capability_digest() or "（无可用工具）"
 
-    @staticmethod
-    def _first_expert() -> str:
-        from ib.experts import names
-
-        return names()[0]
+    def _first_expert(self) -> str:
+        return self._expert_names()[0]
 
 
 def _text_of(result: Any) -> str:

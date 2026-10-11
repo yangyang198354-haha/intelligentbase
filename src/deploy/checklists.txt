@@ -431,10 +431,71 @@
     警告：本仓库**不得**出现任何真实 Key 值（含示例 / 注释 / 测试 / 提交历史）。
     若曾误写入，删除文件**不足以**消除影响 —— 必须同时认定该 Key 已泄露并轮换处置。
 
+[B24] 定义文档目录化迁移（REV-19 / C-IB-46；IFC-IB-383 / 384；**用户手工执行 + 先备份 + 失败回滚**）
+    语义变化：`IB_DEFINITION_DOC_PATH` 由「**指向单个文件**」改为「**指向一个目录**」，
+    每个项目一份 `<dir>/<project_id>.json`（ADR-44）。生产旧值 `/var/lib/intelligentbase/definition.json`
+    须迁移为 `<dir>/demo.json`（旧单文件按惯例归属 `demo`）。
+    $ sudo systemctl stop ib-web ib-worker                                              # 先停服，避免装配期读写旧文件
+    【订正前 · 不可运行，保留以追溯】（原三行，逐字保留；**勿照抄执行** —— 见下方「订正后 · 可运行」）
+    $ sudo cp -a "$IB_DEFINITION_DOC_PATH" "${IB_DEFINITION_DOC_PATH}.pre-rev19.bak"    # 原样保留：$IB_DEFINITION_DOC_PATH 在交互式 shell 为空展开 → cp: missing operand
+    $ sudo python -m ib.config.migrate_legacy_definition_file <dir> --target-project demo # 原样保留：无此顶层模块（ModuleNotFoundError）；参数亦非 --target-project
+    $ ls -l "<dir>/demo.json" ; echo "exit=$?"                                           # 原样保留：同样受空展开影响
+    【订正后 · 可运行】（2026-10-11 用户裁决：IB_DEFINITION_DOC_PATH 钦定为目录根 /var/lib/intelligentbase）
+    $ sudo cp -a /var/lib/intelligentbase/definition.json /var/lib/intelligentbase/definition.json.pre-rev19.bak
+        # 备份一律用**显式字面路径**（勿用 $IB_DEFINITION_DOC_PATH：该键仅在 systemd EnvironmentFile 中、未导出到交互 shell）
+    $ sudo /opt/intelligentbase/venv/bin/python -c "from ib.config import migrate_legacy_definition_file as f; print(f('/var/lib/intelligentbase', target_project_id='demo', backup=False))"
+        # 因 DEPLOY-036 / B24 已独立备份，显式关掉工具自带备份以避免重复 `.bak`（工具默认 backup=True）
+        # 解释器用 /opt/intelligentbase/venv/bin/python（3.12）—— **不要**写 python3.12 或裸 python；
+        # venv 经 .pth 注入 src 与 /etc/intelligentbase ⇒ ib 在任何 cwd 均可导入，**无需** PYTHONPATH
+    $ ls -l /var/lib/intelligentbase/demo.json ; echo "exit=$?"
+        # 校验亦用**显式字面路径**；期望存在且非空
+    [ ] demo.json 属主 / 模式核对（**核对项，非风险项** —— 已核实无风险）：`sudo stat -c "%A %U:%G" /var/lib/intelligentbase/demo.json` 应与原 definition.json 一致。
+        依据：工具搬移用 os.replace（纯 rename）⇒ **保留原属主与模式**；仅 .bak 由 root 经 shutil.copy2 产生（组继承 ib）。故迁移后 demo.json 属主不变。
+    [ ] 上述命令**须在 DEPLOY-032 `git pull` 之后**才可用 —— 迁移前目标机代码**尚无** migrate_legacy_definition_file（REV-19 未部署，hasattr → False）。
+    [ ] `.env`（**全部** `*.env`）中 `IB_DEFINITION_DOC_PATH` 已改为**目录**路径（不是文件路径）
+    [ ] 旧单文件已迁移为 `<dir>/demo.json`；目标已存在时迁移**fail-closed 拒绝覆盖**（不静默合并）
+    [ ] 备份文件在验收通过前**保留**；失败时用备份**原位还原**并恢复 `.env` 旧值后再重启
+    !! 旧值「指向文件」**不再合法** !! 若 `.env` 仍指向文件，装配期会**可读地报错**并提示迁移目标位置
+       （不是静默降级为「无定义文档」）。判据：`journalctl -u ib-web -g "definition" -n 200` 应见明确错误/提示。
+    !! 迁移工具**不删旧文件** !! 它把旧文件**移动**为 `<dir>/demo.json`（先备份再 `os.replace`）；
+       迁移前后都**不删除任何历史数据**（C-IB-38 纪律）。
+    !! 备份可能是冷文件（无服务打开）!! 其 mode 可严于主文件，**不要**据此判 FAIL（同 B22 订正）。
+
+[B25] 三专家历史迁移（REV-19 / C-IB-47 / DR-23；IFC-IB-386；**用户手工执行 + 先备份 + 失败回滚**）
+    背景：`demo` 项目内置三专家（`freeark-expert` / `inspection-expert` / `sanheng-knowledge`）；
+    历史上落在其他项目名下、却由这三专家产生的问答 / 会话记录，须**重归属**到 `demo`。
+    【订正前 · 不可运行，保留以追溯】（原两行，逐字保留；**勿照抄执行** —— 见下方「订正后 · 前瞻条款」）
+    $ sudo cp -a "$IB_LEDGER_PATH" "${IB_LEDGER_PATH}.pre-rev19.bak" ; sudo cp -a "$IB_SESSION_BACKUP" ... # 先备份台账 / 会话
+    $ python -c "from ib.streaming import migrate_expert_history as m; print(m('demo'))"                 # 或在应用内调用
+    （上两行四处实测缺陷：① `$IB_LEDGER_PATH` 仅在 systemd EnvironmentFile 中、**未导出到交互式 shell** ⇒ 空展开（同 B24 订正）；② `$IB_SESSION_BACKUP` 仓库内零命中 ⇒ **不存在的键**；③ 字面 `...` 省略号占位 ⇒ 不可执行；④ 次行用裸 `python` 而非 venv 解释器）
+    【订正后 · 前瞻条款】（2026-10-11 用户裁决：据既有裁决 C-IB-47「视为前瞻条款，登记说明即可」，**不得写成可复制执行的 runbook**；C-IB-47 当前**无可持久化迁移对象**，以下步骤待在会话持久化落地后再由用户手工执行）
+    原则：先备份 → 再迁移 → 失败回滚。备份一律用**显式字面路径**，勿用未导出的 shell 变量（同 B24 订正）。
+    步骤 1（获知真实路径：**先枚举、不硬编码生产实际值**）：
+        $ sudo grep -h '^[[:space:]]*IB_LEDGER_PATH=' /etc/intelligentbase/*.env
+        # 枚举得到台账文件的**实际**路径（该键仅在 systemd EnvironmentFile 中，故 $IB_LEDGER_PATH 会空展开）
+    步骤 2（以步骤 1 实测到的**实际路径**原样备份；下文 `<ledger_path>` 为占位、执行时替换为实测值）：
+        $ sudo cp -a <ledger_path> <ledger_path>.pre-rev19.bak
+        # 会话状态**无可备份对象**：原 `$IB_SESSION_BACKUP` 为**不存在的键**（已删除，勿再引用）；C-IB-47 所指会话 / 历史对应 SessionStore 面，当前唯一实现 = MemorySessionStore（进程内），persistence_policy 默认 in_process ⇒ 无持久化会话存储可备份
+    步骤 3（迁移；**当前不可执行**，前瞻条款）：
+        $ sudo /opt/intelligentbase/venv/bin/python -c "from ib.streaming import migrate_expert_history as m; print(m('demo'))"
+        # 解释器用 /opt/intelligentbase/venv/bin/python（3.12）—— **不要**写 python3.12 或裸 python；
+        # venv 经 .pth 注入 src 与 /etc/intelligentbase ⇒ ib 在任何 cwd 均可导入，**无需** PYTHONPATH
+        # **本清单当前无可执行内容**：SessionStore 唯一实现 = MemorySessionStore（in-process）、persistence_policy 默认 in_process；台账无消息历史 / 引用溯源表；migrate_expert_history 无生产调用点 ⇒ C-IB-47 当前**无持久化迁移对象**。此命令待会话持久化落地后再由用户手工执行。
+    [ ] 执行**前**已有可回滚备份（台账 + 会话状态）；备份路径登记留档
+    [ ] 迁移**幂等**：重复执行第二次应报 `applied=False` / `affected_*=0`（不翻倍改写）
+    [ ] **记录保留**：迁移**不删除任何行**（只改 `project_id` 字段）—— 判据：迁移前后行数不变
+    [ ] **已登记副作用**：非 demo 项目**因此失去**这些历史（AC-IB-45-04 明文），须事先告知相关项目方
+    !! 本工具**不写盘 / 不读环境变量 / 不碰 SQLite** !! 真正的落盘改写由运维在调用点完成；
+       `backup_path` 返回 `None` 是**如实回报**（工具不伪造路径）。
+    !! 归属判据是 **fail-closed** 的 !! 仅当「记录引用的专家 ∈ 三专家」且「当前项目 ≠ demo」才改写；
+       含糊不清一律**不动** —— 错迁一个会话是**不可逆的越权面**，少迁一个只是「历史没归拢」。
+    !! 迁移期间**必须停服** !! 运行期改写会话归属会与在途请求竞争；先停 `ib-web` / `ib-worker`，
+       迁移完成后重启（ADR-32：保存 + 重启重装配）。
+
 ##############################################################################
 # C. 验收签署
 ##############################################################################
 [ ] A1–A8 全部勾选，证据归档（命令原文 + 时间戳）
-[ ] B1–B23 全部勾选，证据归档
+[ ] B1–B25 全部勾选，证据归档
 [ ] 本文件不含任何真实凭据（自检：grep -nE 'sk-|ghp_|BEGIN .*PRIVATE KEY' 本文件应无命中）
 执行人：____________  复核人：____________  日期：____________

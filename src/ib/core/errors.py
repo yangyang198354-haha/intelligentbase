@@ -3,6 +3,7 @@
 @implements IFC-IB-012 (异常类型层次 IbError -> ConfigError / ScopeViolationError /
                        DependencyUnavailableError / ValidationError)
             IFC-IB-341 (REV-16-2) PromptNotFoundError / ToolParamValidationError
+            IFC-IB-380 (REV-19) ExpertRegistryError（专家域 fail-closed）
 @depends (none)
 @author software-developer
 
@@ -119,6 +120,27 @@ class ToolParamValidationError(IbError):
     code = "tool_param_validation"
 
 
+class ExpertRegistryError(IbError):
+    """**专家域解析 fail-closed**（IFC-IB-380，REQ-NFR-IB-21 / ADR-47）。
+
+    触发点（**不回退全局默认、不回退其他项目**，与硬隔离一致）：
+
+      * 默认专家缺失 / 非唯一；
+      * 专家集为空。
+
+    携带 `project_id`（**唯一**上下文）与 `reason`（结构化失败类别，**不含专家正文**）。
+    HTTP 层若无既有映射，落为 **500**（装配期则为 `StartupError` 语义的启动阻断）——
+    本异常只承载「哪个项目、哪类失败」，**绝不回显任何凭据 / 提示词正文**。
+    """
+
+    code = "expert_registry_error"
+
+    def __init__(self, project_id: str, reason: str, *, message: str | None = None) -> None:
+        super().__init__(message or f"专家域解析失败（project_id={project_id!r}）：{reason}")
+        self.project_id = project_id
+        self.reason = reason
+
+
 __all__ = [
     "IbError",
     "ConfigError",
@@ -130,4 +152,5 @@ __all__ = [
     "StartupError",
     "PromptNotFoundError",
     "ToolParamValidationError",
+    "ExpertRegistryError",
 ]

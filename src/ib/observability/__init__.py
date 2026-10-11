@@ -92,6 +92,16 @@ LOG_FIELDS: frozenset[str] = frozenset(
         # 是哪个后端** —— 而「以为在连 Qdrant，其实跑在内存替身」是最难发现的一类事故。
         # 与 `kind` / `stage` / `status` 同级的短标签，值上限仍由 redact 的 120 字符截断兜底。
         "backend",
+        # --- 专家域 fail-closed 的「原因」键（AC-IB-41-04 / module_design §13 / ADR-47）---
+        # 为什么必须新增：AC-IB-41-04 明文要求拒绝「**含项目标识与原因**」，`module_design`
+        # §13 的落点为 `log_event("expert_domain", <code>, project_id=…, reason=…)`。
+        # 沿用上面「外发边界声明三键」的**同一先例**：只新增一个**精确键名**（而非放宽匹配
+        # 规则），值由调用方传入**结构化短码**（如 `unregistered_project` /
+        # `empty_expert_set` / `default_expert_missing`），受 `redact()` 的 120 字符截断兜底
+        # —— 不引入任何可用于输出任意正文的通道。既有 `lifecycle` 的
+        # `reason="deleted_concurrently"`（src/ib/lifecycle/__init__.py:462）此前也被本白名单
+        # 静默丢弃，本键一并使其可见（同一键名的既有用法，非新造字段）。
+        "reason",
     }
 )
 

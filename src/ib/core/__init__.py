@@ -34,6 +34,7 @@ from .errors import (
     ConflictError,
     ConfigError,
     DependencyUnavailableError,
+    ExpertRegistryError,
     IbError,
     NotFoundError,
     PromptNotFoundError,
@@ -110,6 +111,8 @@ from .types import (
     LlmRole,
     LoginOutcome,
     Message,
+    MigrationReport,
+    MigrationResult,
     OcrDescriptor,
     OrchestrationSpecInput,
     PageImageBinding,
@@ -141,6 +144,7 @@ from .types import (
     RouteSpecInput,
     SaveResult,
     ScoredPoint,
+    SeedResult,
     Scope,
     SessionPersistencePolicy,
     SessionRecord,
@@ -191,6 +195,7 @@ __all__ = [
     "StartupError",
     "PromptNotFoundError",
     "ToolParamValidationError",
+    "ExpertRegistryError",
     # 数据结构
     "Vector",
     "Scope",
@@ -275,6 +280,10 @@ __all__ = [
     "ValidationErrorItem",
     "ValidationReport",
     "SaveResult",
+    # REV-19 迁移 / 播种结果值对象（IFC-IB-378 + IFC-IB-385 SeedResult）
+    "MigrationResult",
+    "MigrationReport",
+    "SeedResult",
     # REV-16-2 提示词 / 工具参数（IFC-IB-337 ~ 342）
     "PromptLayer",
     "ToolParamTypeLiteral",

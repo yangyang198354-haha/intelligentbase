@@ -1096,6 +1096,72 @@ class SaveResult:
 
 
 # --------------------------------------------------------------------------- #
+# REV-19 迁移 / 播种结果值对象（IFC-IB-378 + IFC-IB-385 的 SeedResult）
+#
+# 归属 MOD-IB-16 的 `ExpertRegistryView`/`resolve_expert_registry`（IFC-IB-379/380）、
+# MOD-IB-02 的 `migrate_legacy_definition_file`（IFC-IB-384）、MOD-IB-23 的 `seed_project`
+# （IFC-IB-385）与 MOD-IB-21 的 `migrate_expert_history`（IFC-IB-386）共用同一组**结果值对象**。
+#
+# `frozen dataclass`，纯 stdlib，**无实现体**；**不含任何凭据**。`backup_path` 仅登记
+# **路径字符串**（由用户环境决定，**不入日志 / 不回显**；见 module_design §2.2.10）。
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True, slots=True)
+class MigrationResult:
+    """定义文档**目录化迁移**结果（IFC-IB-378，C-IB-46 / IFC-IB-384）。
+
+    * `applied`：是否实际发生迁移（`False` = 目标已存在 / 源缺失，**fail-closed 不覆盖**）；
+    * `backup_path`：备份文件路径字符串；未备份为 `None`（**不入日志**）；
+    * `affected`：受影响条目数；
+    * `notes`：可读步骤说明（**不含凭据 / 不含文件正文**）。
+    """
+
+    applied: bool
+    backup_path: str | None
+    affected: int
+    notes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class MigrationReport:
+    """三专家**历史归属迁移**报告（IFC-IB-378，C-IB-47 / IFC-IB-386）。
+
+    * `applied`：是否发生归属改写（幂等重跑为 `False`）；
+    * `backup_path`：备份路径字符串；未备份为 `None`（**不入日志**）；
+    * `affected_sessions` / `affected_references`：被改写归属的会话数 / 引用数；
+    * `target_project_id`：改写目标（默认 `"demo"`）；
+    * `notes`：可读说明（**含「非 demo 项目因此失去该历史」的显式登记**）。
+    """
+
+    applied: bool
+    backup_path: str | None
+    affected_sessions: int
+    affected_references: int
+    target_project_id: str
+    notes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class SeedResult:
+    """项目**创建期播种**结果（IFC-IB-385，REQ-FUNC-IB-52 / IB-53 / ADR-45）。
+
+    * `created`：本次是否写入（幂等：已存在 → `False`）；
+    * `document_path` / `prompt_root`：落盘的**路径字符串**（**不含文件正文 / 凭据**）；
+    * `expert_names`：该项目种子专家名（顺序 = 注册表顺序）；
+    * `orchestration`：默认编排流标识（恒为单一默认流，OOS-21）；
+    * `notes`：可读说明（如「内置默认种子」/「demo 三专家种子」）。
+    """
+
+    created: bool
+    document_path: str
+    prompt_root: str
+    expert_names: tuple[str, ...]
+    orchestration: str
+    notes: tuple[str, ...] = ()
+
+
+# --------------------------------------------------------------------------- #
 # REV-16-2 提示词 / 工具参数（IFC-IB-337 ~ 342，module_design.md §2.1）
 #
 # 真源边界（ADR-15-R1）：定义文档 = 结构与配置域唯一真源；独立 markdown 提示词目录
