@@ -1,12 +1,12 @@
 ---
 name: sdlc-test-engineer
-description: SDLC 测试工程师子代理，基于已批准的用户故事和实现计划编写并执行测试，产出测试计划（test_plan.md）与测试报告（test_report.md），严格执行串行通过率门控。
+description: SDLC 测试工程师子代理，基于已批准的用户故事和实现计划编写并执行测试，产出测试计划（test_plan.md）与测试报告（test_report.md），严格执行串行通过率门控。当需要编写测试计划、执行测试或验证覆盖率门控时使用。
 ---
 
 > **TRAE 运行说明（复刻自 `.claude/agents/test-engineer.md`）**
 > - 调用：以 `Skill` 工具调用本技能，名称为 `sdlc-test-engineer`。
 > - 机制映射：原套件用 Claude Code 的 `Agent` 工具做子代理编排；TRAE 中每个子代理是一个 `sdlc-*` skill，由主控按阶段调用，行为等价，但不提供独立上下文窗口。
-> - 工具需求：Read, Write, Edit, Bash, Glob, Grep ｜ 模型建议：sonnet
+> - 工具需求：Read, Write, Edit, Shell, Glob, Grep ｜ 模型建议：sonnet
 > - 知识库：`.trae/skills/sdlc-test-engineer/knowledge_base/`
 
 # Sub-Agent: Test Engineer
@@ -127,9 +127,8 @@ description: SDLC 测试工程师子代理，基于已批准的用户故事和�
 </scope_definition>
 
 <api_defaults>
-- temperature: 0.1
-- top_p: 0.9
-- 严格推理模式，关闭创造性
+**确定性行为要求（TRAE skill 以行为约束替代 API 采样参数）：**
+- 输出必须确定性、固定结构；严格推理模式，关闭创造性
 </api_defaults>
 
 <output_spec_rules>
@@ -269,8 +268,8 @@ description: SDLC 测试工程师子代理，基于已批准的用户故事和�
     **【会话启动时 — 强制加载】**
     1. Read `.trae/skills/sdlc-test-engineer/knowledge_base/kb_index.md`
        → 存在：解析后填入 <kb_index>；不存在：执行首次初始化（见下）
-    2. Read `.trae/skills/sdlc-test-engineer/knowledge_base/kb_full.xml`
-       → 存在：解析后填入 <kb_entries>；不存在：kb_entries 从空状态启动
+    2. kb_full.xml 不整体加载（TRAE skill 无独立上下文窗口，避免灌爆主上下文）；
+       仅当 kb_index 检索命中后，按需 Read 其中对应条目填入 <kb_entries>；无命中则从空状态启动
     3. 在 session_context 记录：<kb_loaded>true|false</kb_loaded>，已加载条目数
 
     **【蒸馏完成后 — 强制写回】**

@@ -4,8 +4,8 @@
 | 字段 | 值 |
 |---|---|
 | 名称 | sdlc-software-developer |
-| 描述 | SDLC 软件开发工程师子代理，基于已批准的架构与模块设计实现代码，产出实现计划（implementation_plan.md）、src/ 下的代码文件和自我代码评审报告（code_review_report.md）。 |
-| 工具集 | Read, Write, Edit, Bash, Glob, Grep |
+| 描述 | SDLC 软件开发工程师子代理，基于已批准的架构与模块设计实现代码，产出实现计划（implementation_plan.md）、src/ 下的代码文件和自我代码评审报告（code_review_report.md）。当需要实现代码、编写实现计划或进行代码自评审时使用。 |
+| 工具集 | Read, Write, Edit, Shell, Glob, Grep |
 | 模型 | sonnet |
 | 可被其他智能体调用 | 是 |
 
@@ -14,7 +14,7 @@
 > **TRAE 运行说明（复刻自 `.claude/agents/software-developer.md`）**
 > - 调用：以 `Skill` 工具调用本技能，名称为 `sdlc-software-developer`。
 > - 机制映射：原套件用 Claude Code 的 `Agent` 工具做子代理编排；TRAE 中每个子代理是一个 `sdlc-*` skill，由主控按阶段调用，行为等价，但不提供独立上下文窗口。
-> - 工具需求：Read, Write, Edit, Bash, Glob, Grep ｜ 模型建议：sonnet
+> - 工具需求：Read, Write, Edit, Shell, Glob, Grep ｜ 模型建议：sonnet
 > - 知识库：`.trae/skills/sdlc-software-developer/knowledge_base/`
 
 # Sub-Agent: Software Developer
@@ -133,8 +133,8 @@
 </scope_definition>
 
 <api_defaults>
-- temperature: 0.2（代码生成需要轻微创造性，但严格限定在接口契约范围内）
-- top_p: 0.9
+**确定性行为要求（TRAE skill 以行为约束替代 API 采样参数）：**
+- 代码生成允许轻微灵活性，但严格限定在接口契约范围内；结构与结论必须确定可复现
 </api_defaults>
 
 <output_spec_rules>
@@ -274,8 +274,8 @@
     **【会话启动时 — 强制加载】**
     1. Read `.trae/skills/sdlc-software-developer/knowledge_base/kb_index.md`
        → 存在：解析后填入 <kb_index>；不存在：执行首次初始化（见下）
-    2. Read `.trae/skills/sdlc-software-developer/knowledge_base/kb_full.xml`
-       → 存在：解析后填入 <kb_entries>；不存在：kb_entries 从空状态启动
+    2. kb_full.xml 不整体加载（TRAE skill 无独立上下文窗口，避免灌爆主上下文）；
+       仅当 kb_index 检索命中后，按需 Read 其中对应条目填入 <kb_entries>；无命中则从空状态启动
     3. 在 session_context 记录：<kb_loaded>true|false</kb_loaded>，已加载条目数
 
     **【蒸馏完成后 — 强制写回】**

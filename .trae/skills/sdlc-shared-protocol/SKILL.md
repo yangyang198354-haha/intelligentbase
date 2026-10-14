@@ -1,6 +1,6 @@
 ---
 name: sdlc-shared-protocol
-description: SDLC 智能体套件共享协议：工作区目录约定、强制文件头、11 阶段定义、状态码、子代理调用与门控评审格式、phase_status 模式、ID 命名约定、门控通过标准与质量阈值。被 sdlc-orchestrator 及各 sdlc-* 角色技能引用。
+description: SDLC 智能体套件共享协议（参考协议，不直接执行任务，供编排器与各角色引用）：工作区目录约定、强制文件头、11 阶段定义、状态码、子代理调用与门控评审格式、phase_status 模式、ID 命名约定、门控通过标准与质量阈值。被 sdlc-orchestrator 及各 sdlc-* 角色技能引用。
 ---
 
 > **TRAE 运行说明（复刻自 `.claude/agents/shared_protocol.md`）**

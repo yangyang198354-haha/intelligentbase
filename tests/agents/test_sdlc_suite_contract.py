@@ -6,11 +6,181 @@
     python -m pytest tests/agents -q
 
 断言全部基于**已落盘产物**的静态事实，不启动服务、不联网。
+
+注意：本目录**刻意不放 conftest.py** —— 全仓 `pytest tests` 收集时，任何名为
+conftest.py 的模块都会在 sys.modules 中以裸名 "conftest" 注册并互相覆盖，
+tests/conftest.py（e2e/integration 以 `from conftest import ...` 依赖）必须唯一。
+故夹具直接内联于本文件。
 """
 
 from __future__ import annotations
 
+import pathlib
 import re
+
+import pytest
+
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
+TRAE_DIR = REPO_ROOT / ".trae"
+SKILLS_DIR = TRAE_DIR / "skills"
+PACKS_DIR = TRAE_DIR / "agent-packs"
+
+#: 期望的 8 个 skill（目录名必须 == frontmatter 的 name）。
+EXPECTED_SKILLS = (
+    "sdlc-orchestrator",
+    "sdlc-requirement-analyst",
+    "sdlc-system-architect",
+    "sdlc-software-developer",
+    "sdlc-test-engineer",
+    "sdlc-devops-engineer",
+    "sdlc-shared-protocol",
+    "sdlc-agent-builder",
+)
+
+#: 角色 skill → 其**声明拥有**的产出文件（与 shared-protocol §A 目录约定一致）。
+ROLE_OUTPUT_FILES = {
+    "sdlc-orchestrator": ("phase_status.md", "delivery_report.md"),
+    "sdlc-requirement-analyst": ("requirements_spec.md", "user_stories.md"),
+    "sdlc-system-architect": ("architecture_design.md", "module_design.md", "tech_stack.md"),
+    "sdlc-software-developer": ("implementation_plan.md", "code_review_report.md"),
+    "sdlc-test-engineer": ("test_plan.md", "test_report.md"),
+    "sdlc-devops-engineer": ("cicd_pipeline.md", "deployment_plan.md", "deployment_report.md"),
+}
+
+#: 拥有知识库的 6 个 skill（shared-protocol / agent-builder 为只读参考，无 KB）。
+KB_SKILLS = (
+    "sdlc-orchestrator",
+    "sdlc-requirement-analyst",
+    "sdlc-system-architect",
+    "sdlc-software-developer",
+    "sdlc-test-engineer",
+    "sdlc-devops-engineer",
+)
+
+#: 每组知识库必须齐备且非空的文件。
+KB_REQUIRED_FILES = ("kb_index.md", "kb_full.xml", "kb_distillation_log.md")
+
+#: 7 个注册包文件名。
+PACK_FILES = (
+    "01-pm-orchestrator.md",
+    "02-requirement-analyst.md",
+    "03-system-architect.md",
+    "04-software-developer.md",
+    "05-test-engineer.md",
+    "06-devops-engineer.md",
+    "07-agent-builder.md",
+)
+
+#: skill 名 → 承载同一提示词正文的注册包（双源同步的唯一事实对照表）。
+#: `sdlc-shared-protocol` 是只读参考协议，无对应注册包。
+SKILL_PACK_PAIRS = {
+    "sdlc-orchestrator": "01-pm-orchestrator.md",
+    "sdlc-requirement-analyst": "02-requirement-analyst.md",
+    "sdlc-system-architect": "03-system-architect.md",
+    "sdlc-software-developer": "04-software-developer.md",
+    "sdlc-test-engineer": "05-test-engineer.md",
+    "sdlc-devops-engineer": "06-devops-engineer.md",
+    "sdlc-agent-builder": "07-agent-builder.md",
+}
+
+#: 提示词正文的统一起始锚点。
+PROMPT_TAG = "<generated_agent_prompt>"
+
+
+def read_text(path: pathlib.Path) -> str:
+    """以 UTF-8 读取文本（复刻产物全为中文 Markdown，无 BOM）。"""
+    return path.read_text(encoding="utf-8")
+
+
+def parse_frontmatter(text: str) -> dict:
+    """解析 `---` 包裹的 YAML frontmatter 为扁平字典（仅键值行，够用即可）。
+
+    本套件 frontmatter 只有 `name` / `description` 两个标量键，无需完整 YAML 解析；
+    遇到非法结构直接抛 AssertionError，由用例给出可读定位。
+    """
+    lines = text.splitlines()
+    assert lines and lines[0].strip() == "---", "frontmatter 缺少起始分隔符 `---`"
+    fm: dict = {}
+    for line in lines[1:]:
+        if line.strip() == "---":
+            return fm
+        if ":" in line and not line.lstrip().startswith("#"):
+            key, value = line.split(":", 1)
+            fm[key.strip()] = value.strip()
+    raise AssertionError("frontmatter 未闭合（缺少结束分隔符 `---`）")
+
+
+# --------------------------------------------------------------------------- #
+# 会话级夹具：把 spec 与产物一次性提供，避免用例各自重复读盘
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture(scope="session")
+def repo_root() -> pathlib.Path:
+    return REPO_ROOT
+
+
+@pytest.fixture(scope="session")
+def skills_dir() -> pathlib.Path:
+    return SKILLS_DIR
+
+
+@pytest.fixture(scope="session")
+def packs_dir() -> pathlib.Path:
+    return PACKS_DIR
+
+
+@pytest.fixture(scope="session")
+def expected_skills() -> tuple:
+    return EXPECTED_SKILLS
+
+
+@pytest.fixture(scope="session")
+def role_output_files() -> dict:
+    return ROLE_OUTPUT_FILES
+
+
+@pytest.fixture(scope="session")
+def kb_skills() -> tuple:
+    return KB_SKILLS
+
+
+@pytest.fixture(scope="session")
+def kb_required_files() -> tuple:
+    return KB_REQUIRED_FILES
+
+
+@pytest.fixture(scope="session")
+def pack_files() -> tuple:
+    return PACK_FILES
+
+
+@pytest.fixture(scope="session")
+def frontmatter_parser():
+    return parse_frontmatter
+
+
+@pytest.fixture(scope="session")
+def skill_texts(skills_dir, expected_skills) -> dict:
+    """skill 名 → SKILL.md 正文（缺文件即失败，尽早暴露）。"""
+    out: dict = {}
+    for name in expected_skills:
+        path = skills_dir / name / "SKILL.md"
+        assert path.is_file(), f"缺少 SKILL.md：{path}"
+        out[name] = read_text(path)
+    return out
+
+
+@pytest.fixture(scope="session")
+def pack_texts(packs_dir, pack_files) -> dict:
+    """注册包文件名 → 正文。"""
+    out: dict = {}
+    for name in pack_files:
+        path = packs_dir / name
+        assert path.is_file(), f"缺少注册包：{path}"
+        out[name] = read_text(path)
+    return out
+
 
 # --------------------------------------------------------------------------- #
 # 交付物 1：TRAE Skills（.trae/skills/sdlc-*/SKILL.md）
@@ -131,6 +301,67 @@ def test_no_stale_claude_kb_paths(skill_texts, pack_texts):
     combined = {**{f"{k}/SKILL.md": v for k, v in skill_texts.items()}, **pack_texts}
     for name, text in combined.items():
         assert ".claude/agents/knowledge_base" not in text, f"{name} 残留旧 KB 路径引用"
+
+
+# --------------------------------------------------------------------------- #
+# 防回归：TRAE 平台适配残留（第二轮优化后须保持零匹配）
+# --------------------------------------------------------------------------- #
+
+
+def test_no_platform_assumption_residue(skill_texts, pack_texts):
+    """全部 SKILL.md 与注册包不含 Claude 平台假设残留。"""
+    combined = {**{f"{k}/SKILL.md": v for k, v in skill_texts.items()}, **pack_texts}
+    for name, text in combined.items():
+        assert "temperature:" not in text, f"{name} 残留 API 采样参数 temperature:"
+        assert "top_p" not in text, f"{name} 残留 API 采样参数 top_p"
+        assert "sdlc-agent_builder" not in text, f"{name} 残留下划线 KB 路径 sdlc-agent_builder"
+        assert "Edit, Bash" not in text, f"{name} 残留 Claude 工具集表述 Edit, Bash"
+
+
+def test_agent_builder_output_spec_platform_neutral(skill_texts):
+    """agent-builder 的输出规格不得再将产物导向「Claude 中使用」。"""
+    text = skill_texts["sdlc-agent-builder"]
+    assert "Claude 中使用" not in text, "agent-builder 输出规格仍导向 Claude"
+
+
+def test_kb_persistence_lazy_load_declared(skill_texts, kb_skills):
+    """每个 KB-owning skill 的持久化协议均声明 kb_full.xml 懒加载（防整库灌入主上下文）。"""
+    for skill in kb_skills:
+        assert "不整体加载" in skill_texts[skill], (
+            f"{skill} 的 KB 持久化协议缺少「不整体加载」懒加载声明"
+        )
+
+
+def test_skill_pack_prompt_body_parity(skill_texts, pack_texts):
+    """SKILL.md 与对应注册包的提示词正文逐字一致（消除双源人工同步漂移）。
+
+    两侧均自 `<generated_agent_prompt>` 起至文件末尾承载同一份提示词正文；
+    比较前折叠空白（仅归一换行/缩进）。任一单侧改动而未同步另一侧即失败，
+    使「人工 discipline」升级为机器门。
+    """
+    def body(text: str) -> str:
+        idx = text.find(PROMPT_TAG)
+        assert idx >= 0, f"缺少提示词起始锚点 {PROMPT_TAG}"
+        return re.sub(r"\s+", " ", text[idx:]).strip()
+
+    for skill, pack in SKILL_PACK_PAIRS.items():
+        assert body(skill_texts[skill]) == body(pack_texts[pack]), (
+            f"{skill} 与 {pack} 的提示词正文不一致（双源漂移）："
+            "修改任一侧后必须同步另一侧"
+        )
+
+
+def test_tool_registry_populated(skill_texts):
+    """7 个可执行 skill 的 <tool_registry> 均至少注册 1 个工具（防空壳回潮）。
+
+    注：`sdlc-shared-protocol` 为只读参考协议，不含 tool_execution_layer，故不在检查范围。
+    """
+    for skill in SKILL_PACK_PAIRS:
+        m = re.search(r"<tool_registry>(.*?)</tool_registry>", skill_texts[skill], re.S)
+        assert m, f"{skill} 缺少 <tool_registry> 块"
+        assert re.search(r"<tool\s+name=", m.group(1)), (
+            f"{skill} 的 <tool_registry> 是空壳（只含格式注释，未注册任何工具）"
+        )
 
 
 # --------------------------------------------------------------------------- #

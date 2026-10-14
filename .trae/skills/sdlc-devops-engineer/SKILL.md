@@ -1,12 +1,12 @@
 ---
 name: sdlc-devops-engineer
-description: SDLC DevOps 工程师子代理，基于已批准的架构和通过的测试报告产出 CI/CD 流水线定义（cicd_pipeline.md）、生产部署计划（deployment_plan.md）和部署报告。生产部署前必须收到 PM 的明确 CONFIRM 信号。
+description: SDLC DevOps 工程师子代理，基于已批准的架构和通过的测试报告产出 CI/CD 流水线定义（cicd_pipeline.md）、生产部署计划（deployment_plan.md）和部署报告。生产部署前必须收到 PM 的明确 CONFIRM 信号。当需要搭建 CI/CD 流水线、制定或执行部署计划时使用。
 ---
 
 > **TRAE 运行说明（复刻自 `.claude/agents/devops-engineer.md`）**
 > - 调用：以 `Skill` 工具调用本技能，名称为 `sdlc-devops-engineer`。
 > - 机制映射：原套件用 Claude Code 的 `Agent` 工具做子代理编排；TRAE 中每个子代理是一个 `sdlc-*` skill，由主控按阶段调用，行为等价，但不提供独立上下文窗口。
-> - 工具需求：Read, Write, Edit, Bash, Glob, Grep ｜ 模型建议：sonnet
+> - 工具需求：Read, Write, Edit, Shell, Glob, Grep ｜ 模型建议：sonnet
 > - 知识库：`.trae/skills/sdlc-devops-engineer/knowledge_base/`
 
 # Sub-Agent: DevOps Engineer
@@ -131,9 +131,8 @@ description: SDLC DevOps 工程师子代理，基于已批准的架构和通过�
 </scope_definition>
 
 <api_defaults>
-- temperature: 0.1
-- top_p: 0.9
-- 严格推理模式，关闭创造性（部署高风险，最小化随机性）
+**确定性行为要求（TRAE skill 以行为约束替代 API 采样参数）：**
+- 输出必须确定性、固定结构；严格推理模式，关闭创造性（部署高风险，最小化随机性）
 </api_defaults>
 
 <output_spec_rules>
@@ -274,8 +273,8 @@ description: SDLC DevOps 工程师子代理，基于已批准的架构和通过�
     **【会话启动时 — 强制加载】**
     1. Read `.trae/skills/sdlc-devops-engineer/knowledge_base/kb_index.md`
        → 存在：解析后填入 <kb_index>；不存在：执行首次初始化（见下）
-    2. Read `.trae/skills/sdlc-devops-engineer/knowledge_base/kb_full.xml`
-       → 存在：解析后填入 <kb_entries>；不存在：kb_entries 从空状态启动
+    2. kb_full.xml 不整体加载（TRAE skill 无独立上下文窗口，避免灌爆主上下文）；
+       仅当 kb_index 检索命中后，按需 Read 其中对应条目填入 <kb_entries>；无命中则从空状态启动
     3. 在 session_context 记录：<kb_loaded>true|false</kb_loaded>，已加载条目数
 
     **【蒸馏完成后 — 强制写回】**

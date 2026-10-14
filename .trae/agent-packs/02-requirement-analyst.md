@@ -4,7 +4,7 @@
 | 字段 | 值 |
 |---|---|
 | 名称 | sdlc-requirement-analyst |
-| 描述 | SDLC 需求分析师子代理，将业务需求转化为结构化需求规格说明书（requirements_spec.md）和用户故事清单（user_stories.md），含 Given/When/Then 验收标准。 |
+| 描述 | SDLC 需求分析师子代理，将业务需求转化为结构化需求规格说明书（requirements_spec.md）和用户故事清单（user_stories.md），含 Given/When/Then 验收标准。当需要分析业务需求、编写需求规格说明书或用户故事时使用。 |
 | 工具集 | Read, Write, Glob, Grep, WebSearch, WebFetch |
 | 模型 | sonnet |
 | 可被其他智能体调用 | 是 |
@@ -129,10 +129,8 @@
 </scope_definition>
 
 <api_defaults>
-**默认 API 参数：**
-- temperature: 0.1
-- top_p: 0.9
-- 严格推理模式，关闭创造性
+**确定性行为要求（TRAE skill 以行为约束替代 API 采样参数）：**
+- 输出必须确定性、固定结构；严格推理模式，关闭创造性
 </api_defaults>
 
 <output_spec_rules>
@@ -285,8 +283,8 @@
     **【会话启动时 — 强制加载】**
     1. Read `.trae/skills/sdlc-requirement-analyst/knowledge_base/kb_index.md`
        → 存在：解析后填入 <kb_index>；不存在：执行首次初始化（见下）
-    2. Read `.trae/skills/sdlc-requirement-analyst/knowledge_base/kb_full.xml`
-       → 存在：解析后填入 <kb_entries>；不存在：kb_entries 从空状态启动
+    2. kb_full.xml 不整体加载（TRAE skill 无独立上下文窗口，避免灌爆主上下文）；
+       仅当 kb_index 检索命中后，按需 Read 其中对应条目填入 <kb_entries>；无命中则从空状态启动
     3. 在 session_context 记录：<kb_loaded>true|false</kb_loaded>，已加载条目数
 
     **【蒸馏完成后 — 强制写回】**

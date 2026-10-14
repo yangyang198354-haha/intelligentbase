@@ -1,4 +1,4 @@
-<kb_entries agent_domain="pm_orchestrator" version="0.3.0">
+<kb_entries agent_domain="pm_orchestrator" version="0.3.1">
 <!-- 本知识库于 2026-09-25 由 FreeArk 仓库 .claude/agents/knowledge_base/pm_orchestrator/ 迁移至 intelligentbase 项目目录，以保持 FreeArk 仓库只读（intelligentbase 硬约束 C-IB-01）。 -->
 
   <knowledge_entry id="KE-PM-020" type="pattern"
@@ -535,5 +535,22 @@
     <source_interactions>round-20</source_interactions>
     <outcome>五项订正（checklists B24/B25、deployment_plan §1.1/§16.3/§16.4、cicd 1.5.0→1.5.1、phase_status GR-E-007 open_item_5）落地；原文全部逐字保留；B24 与 §16.3 订正后命令逐字一致（均含 backup=False）</outcome>
     <confidence_history>2026-10-11 创建 confidence=0.75（单轮实证）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-033" type="domain"
+    confidence="0.90" frequency="1"
+    created_at="2026-10-14T00:00:00+08:00"
+    last_updated="2026-10-14T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>套件迁移至 TRAE 平台后，检索命中 KE-PM-019 / KE-PM-021 等以「PM/子代理无 Edit、无 Bash 工具」为前提的 Claude Code 时代条目时，如何处置</trigger>
+    <content>
+    1. **平台前提变更**：TRAE 中编排器与子代理以 skill 形态运行于主会话上下文，天然具备 Edit 与 Shell 能力；KE-PM-019（整文件 Write 载荷超限 → authoring 与落盘分离）与 KE-PM-021（PM 无 Bash → 委派受限 verifier 复跑）的核心 trigger 前提**在 TRAE 不成立**。
+    2. **处置规则**：命中上述条目时按 [KB-CONFLICT] 处理——标注「平台前提失效，已忽略」，不得据此绕路（如不必要的 authoring/落盘分离、不必要的委派复跑）；可直接由主控用 Edit/Shell 完成落盘与验证。
+    3. **历史留痕原则**：原条目**不删除、不改写**（它们是带时间戳的审计记录）；本条作为平台级 domain 知识凌驾于其上，冲突时以本条为准。
+    4. **仍然有效的部分**：KE-PM-021 的「不采信子代理自评、独立复核」精神与 KE-PM-025 的 XML 落盘收官门规程与平台无关，继续适用。
+    </content>
+    <source_interactions>TRAE 复刻轮 2026-10-14（agent-builder 复评第 2 轮 P2 修正项）</source_interactions>
+    <outcome>检索 KE-PM-019/021 时不再触发已失效的绕路规程；编排器在 TRAE 下直接使用 Edit/Shell 落盘与验证</outcome>
+    <confidence_history>2026-10-14 创建 confidence=0.90（平台事实型 domain 条目，由复评实测确认）</confidence_history>
   </knowledge_entry>
 </kb_entries>
