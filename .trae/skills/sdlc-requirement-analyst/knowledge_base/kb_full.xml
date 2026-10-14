@@ -1,0 +1,210 @@
+<kb_entries agent_domain="requirement_analyst" version="0.1.5">
+
+  <knowledge_entry id="KE-REQ-001" type="pattern"
+    confidence="0.7" frequency="1" created_at="2026-06-19T00:00:00Z" last_updated="2026-06-19T00:00:00Z" status="ACTIVE">
+    <trigger>需求涉及前端品牌/文案替换，且存在部分内容（注释、日志）非用户可见</trigger>
+    <content>必须严格区分"用户可见文案"与"仅面向开发者的注释/日志"。用户可见文案（标题、副标题、placeholder、空状态文案、错误消息）属 IN scope；代码注释、CSS注释、日志字符串默认属 OUT scope，需在 Open Questions 中向 PM 确认是否一并处理。每个用户可见文案替换单独拆分为一条 REQ-FUNC。</content>
+    <source_interactions>round-1</source_interactions>
+    <outcome>生成 REQ-FUNC-001 至 REQ-FUNC-007，分别覆盖 5 处前端文案 + 1 处后端错误消息，注释/日志列入 OUT scope</outcome>
+    <confidence_history>0.7（初始，round-1）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-REQ-002" type="pattern"
+    confidence="0.7" frequency="1" created_at="2026-06-19T00:00:00Z" last_updated="2026-06-19T00:00:00Z" status="ACTIVE">
+    <trigger>需求涉及 session 管理，且现有后端已有跨 session 历史注入逻辑</trigger>
+    <content>会话管理需求需拆分为：列表展示、新建、选择继续、删除、会话内上下文保留、会话间隔离、默认行为七个独立故事。核心 gap 是 load_history 跨 session 注入与"隔离会话上下文"的矛盾，需在 Open Questions 中明确 Q3/Q4/Q6。WS 接口扩展方式（query param vs 首条消息）及软/硬删除需单独提问。</content>
+    <source_interactions>round-1</source_interactions>
+    <outcome>生成 REQ-FUNC-008 至 REQ-FUNC-013 及 US-008 至 US-014，Open Questions Q3/Q4/Q5/Q6/Q7/Q8 覆盖关键决策点</outcome>
+    <confidence_history>0.7（初始，round-1）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-REQ-003" type="heuristic"
+    confidence="0.9" frequency="2" created_at="2026-06-19T00:00:00Z" last_updated="2026-06-22T00:00:00Z" status="ACTIVE">
+    <trigger>需求涉及灰度/回滚保护，或项目记忆中明确记载了兼容性约束（LangGraph 灰度切换场景）</trigger>
+    <content>任何涉及后端服务切换（灰度切换、AB实验）的需求，必须显式声明 OUT scope：保留回滚路径相关代码不得修改；同时生成 REQ-NFUNC 明确"变更不得破坏回滚能力"。对于前端 streaming 消费逻辑，还需额外要求向下兼容：若后端切回旧版（无 reasoning 字段），前端自动降级为普通消息展示，不报错、不崩溃。这是 FreeArk 项目的高优先级非功能约束。</content>
+    <source_interactions>round-1, round-3</source_interactions>
+    <outcome>round-1: 生成 REQ-NFUNC-001，OUT scope 明确排除 openclaw_adapter.py 等；round-3: 生成 REQ-NFUNC-005（不破坏 LangGraph 灰度回滚能力），前端降级逻辑与 REQ-FUNC-005 联动</outcome>
+    <confidence_history>0.8（初始，round-1）→ 0.9（round-3，再次应用验证有效）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-REQ-004" type="procedural"
+    confidence="0.9" frequency="3" created_at="2026-06-19T00:00:00Z" last_updated="2026-09-25T00:00:00Z" status="ACTIVE">
+    <trigger>需求中存在多个技术决策点（图标方案、删除方式、WS接口扩展方式）尚未由 PM 确定；或决策点已由用户拍板、需要把产出从"待确认"固化为"已确认"</trigger>
+    <content>此类决策点不应由需求分析师自行推断，必须在 requirements_spec.md 的 Open Questions 部分列出，并标注影响的 REQ ID。每个问题需标注优先级（P0/P1），P0 为阻塞开发必须先决策的问题。REQ-NFUNC 中可以声明"方案待 PM 确认后实施"但不得省略非功能约束条目本身。
+【决策固化阶段补充】当用户对 OQ 拍板后，须执行定向修订（不重写全文）：①文件头 version bump、status 按 invocation 指示（默认保持 DRAFT）；②新增"决策记录"章节，逐条记录决策值 + 决策日期 + 决策来源（用户拍板）；③原开放问题章节保留原分析作为留痕，但每条顶部加"结论（CONFIRMED，日期，来源）"；④删除正文/AC 中全部"待 OQ-xx 确认""取决于 OQ-xx""若 OQ-xx 选择…"软措辞，改为确定值；⑤被否决的方案标注"已评估未采纳"而非删除（保留决策留痕）；⑥同步更新推断项清单计数与占比；⑦REQ-/US-/AC- 编号保持稳定，只改内容不改 ID；⑧修订后正文、AC、决策记录三处对同一决策的表述必须一致。
+【第三次应用补充（intelligentbase 定稿）】⑨当用户的决策与分析师原「推荐项」不一致时，必须在决策记录中显式写出「此项推翻了原推荐方案」，并保留原推荐理由——不得因结论已定而抹平分歧；⑩当决策只给出「规模档位/算力档位」而未给具体数值时，**不得凭空造数值**，应把量化指标改写为「在目标机以该量级实测校准后确定」并标注校准前该 AC 为「未验收」；⑪当某决策使一个原本非阻塞的次级 OQ 变成前置条件时，须把该 OQ 显式标为「由 REQ-xx 派生 → 默认取值，待用户一行确认」，不得当作已拍板。
+【裁决候选点 → 正式需求的变体（2026-09-27 REV-06）】⑫当用户裁决的是「候选需求点」（如上轮调研文档的 A~E）而非既有 OQ 时，同样执行定向增量修订，但「确认对象」从 OQ 改为候选点：来源锚点须写「用户裁决（日期）+ 调研文档 §x.y 候选点 X」，且须**规范化重述**（功能需求条目 + Given/When/Then 可验收标准），**不得照抄候选点文案**；候选点 E 类「排除项」要落成显式范围外条目（新 OOS 行），落进 §1.2 而非只在 REQ 约束里提一句。详见 KE-REQ-015。
+【第五次应用补充（2026-09-27 REV-11）】⑬**覆盖缺口补全**：当既有 REQ 有来源锚点但**无任何 US/AC 承接**时，属「覆盖缺口」，须以 REV 增量补 US/AC（**不新增 REQ 条目**、不改写该 REQ 的 §2.5 描述），并在文档中显式声明「为既有 REQ 补 US/AC 属闭环覆盖，不属新增需求」+ 给出计数不变的核对（本轮：REQ-FUNC 维持 27、[INFERRED] 维持 0/27=0%）。同时须为该缺口涉及的**既有测试用例给出正确归属**（本轮：流式用例应挂 US-IB-19、会话隔离用例应挂 US-IB-20），但**不得改动 test_plan.md**（属其他代理产出），只登记在需求文档 + agent_response.notes。</content>
+    <source_interactions>round-1, round-7, INTELBASE-FINALIZE-1, INV-GROUP_A-INTELBASE-003, INV-GROUP_A-INTELBASE-004</source_interactions>
+    <outcome>round-1: 生成 9 条 Open Questions（Q1~Q9），其中 P0 问题 6 条，均标注关联 REQ；round-7: INV-GROUP_A-002 决策固化修订——FreeArk_AdjutantRecommendations 的 OQ-01~08 由用户全部拍板，产出 v0.2.0（CONFIRMED 决策记录 + 剩余开放问题 0 + [INFERRED] 计数归零），正文/AC 软措辞全部去条件化；INTELBASE-FINALIZE-1: intelligentbase 8 项决策固化，产出 requirements_spec.md + user_stories.md v1.1.0（OD-1~OD-5 全关闭、[INFERRED] 2→0、DR-03 记录用户选择推翻推荐项、性能 AC 改为实测校准口径、OQ-IB-01 派生为待一行确认）；INV-GROUP_A-INTELBASE-003: 裁决候选点 A~E → REQ-FUNC-IB-25~27 + OOS-10，走 APPLY_PACKAGE 交付（见 KE-REQ-015）；INV-GROUP_A-INTELBASE-004（REV-11）: 第五次应用，补 ⑬ 覆盖缺口补全变体——REQ-FUNC-IB-20 补 US-IB-19/20 + 11 组 AC，未新增 REQ，仍走 APPLY_PACKAGE</outcome>
+    <confidence_history>0.8（初始，round-1）→ 0.85（round-7，决策固化场景再次验证有效，补充 8 条修订清单）→ 0.9（INTELBASE-FINALIZE-1，第三次应用，补充 ⑨⑩⑪ 三条；INV-GROUP_A-INTELBASE-003 第四次应用，补充 ⑫ 候选点变体；INV-GROUP_A-INTELBASE-004 第五次应用，补充 ⑬ 覆盖缺口补全；confidence 维持 0.9）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-REQ-005" type="pattern"
+    confidence="0.8" frequency="1" created_at="2026-06-21T00:00:00Z" last_updated="2026-06-21T00:00:00Z" status="ACTIVE">
+    <trigger>需求涉及前端对底层硬件寄存器值的单位换算（如放大N倍整数转真实物理量），同时要求替换交互控件并保持提交格式与后端兼容</trigger>
+    <content>此类需求应拆分为五个独立关注点：①后端展示换算（get_display_value 或等效函数修复）；②前端控件类型替换（el-input-number → 步进按钮）；③步进边界禁用；④禁止键盘手工输入；⑤提交时反向换算（显示值×倍率→整数字符串）。后端 API 格式兼容性必须作为独立 REQ-NFUNC。OQ 应明确：上下限边界、其他参数是否同类换算、num_value_json 存储格式是否已换算。Given/When/Then 中必须包含具体数值（如原始整数130↔展示13.0℃），让验收条件可自动化验证。</content>
+    <source_interactions>round-2</source_interactions>
+    <outcome>生成 REQ-FUNC-001~005、REQ-NFUNC-001~003、CON-01~03、OQ-01~04、US-001~007，所有 AC 含具体数值</outcome>
+    <confidence_history>0.8（初始，round-2）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-REQ-006" type="pattern"
+    confidence="0.8" frequency="2" created_at="2026-06-22T00:00:00Z" last_updated="2026-09-27T00:00:00Z" status="ACTIVE">
+    <trigger>需求涉及流式（streaming）AI 回复中分离 reasoning/thinking 与 answer/content 两个阶段，并在前端实现折叠展示；或涉及流式输出契约中「思考片段 vs 正式答复片段」的分区</trigger>
+    <content>此类需求必须：①将 WS 事件字段分离可行性（OQ-001）列为 P0 阻塞项，在开发前确认；②折叠触发时机（OQ-003，后端信号 vs 前端检测 answer 首字符）列为 P0 阻塞项；③必须生成无思考过程时的降级 REQ-FUNC（不显示折叠控件，等同现有普通消息）；④REQ-NFUNC 必须明确前端向下兼容：无 reasoning 字段时自动降级为普通消息，不崩溃；⑤OQ 还应包含：折叠后 DOM 保留 vs 销毁（OQ-002）、思考内容是否持久化（OQ-004）、中断降级策略（OQ-005）、长内容截断方案（OQ-007）；⑥思考区域字体（斜体小号）与正式回答字体（大号）的具体 px 值应留给架构师设计阶段，需求层只描述相对关系。
+【2026-09-27 迁移应用（intelligentbase REV-11）】同一模式在**后端流式契约**层复现时的补充口径：①「区分思考与正式答复」须写成**可选能力**（默认不启用；启用后两类以**可区分的事件类别**分别推送，任一事件不同时承载两类内容=不混帧）；②必须以 AC 守住「内部子任务产物不得直 stream 给终端用户」（否则用户看到重复/半成品），锚点为 INTERNAL_NOSTREAM_TAG 类机制；③流式契约须有**终态收尾**语义（完成事件恰一次；空内容不发空帧、空产物不臆造），否则连接悬挂。</content>
+    <source_interactions>round-3, INV-GROUP_A-INTELBASE-004</source_interactions>
+    <outcome>round-3: 生成 REQ-FUNC-001~006、REQ-NFUNC-001~005、CON-001~004、OQ-001~009、US-001~008，OQ-001/OQ-003 明确标注 P0；INV-GROUP_A-INTELBASE-004：同模式迁移到智能体侧流式契约（US-IB-19 / AC-IB-19-01~05），补充「可选/默认不启用」「不混帧」「终态收尾」三条口径</outcome>
+    <confidence_history>0.8（初始，round-3）→ 0.8（INV-GROUP_A-INTELBASE-004 再次命中并迁移到后端流式契约，跨轮次验证有效；confidence 维持 0.8，待 PM 门控反馈）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-REQ-007" type="pattern"
+    confidence="0.7" frequency="1" created_at="2026-06-27T00:00:00Z" last_updated="2026-06-27T00:00:00Z" status="ACTIVE">
+    <trigger>微信小程序业主端需求，涉及 MQTT 主动拉取（DeviceStatusRead）、本地缓存（uni.getStorageSync）、多路径降级（屏端/PLC）</trigger>
+    <content>此类需求需注意：①DeviceStatusRead 需要 deviceSn，但 bind/status API 不返回 deviceSn（需从现有 ds_sns_{mac} 缓存复用），须在 OQ 中明确 deviceSn 来源；②realtime-params 缓存 key 设计用 specific_part 作 suffix（owner_realtime_{specific_part}），时间戳分离存储（_ts 后缀）；③拉取路径选择逻辑（有 screen_mac 走 MQTT，无 screen_mac 走 ondemand-refresh）须作为独立行为描述，不能合并；④`GET /api/miniapp/device-settings/config/` 的 rooms 字段只含有 screen_mac 的专有部分，`GET /api/miniapp/bind/status/` 含所有绑定（含无 screen_mac 的），两者必须联合使用才能覆盖所有场景；⑤MQTT 连接生命周期在结构展示页应按需建立（非页面级常驻），收到响应或超时后立即断开；⑥小程序 10MB 存储上限下，按 specific_part 分 key 存储不存在容量风险（估算 ≤ 50KB）。</content>
+    <source_interactions>round-4</source_interactions>
+    <outcome>生成 v1.11.0 requirements_spec.md（REQ-FUNC-001~005、REQ-NFUNC-001~004、OQ-01~07）和 user_stories.md（US-OWNER-001~005），7 个 OQ 覆盖关键决策点</outcome>
+    <confidence_history>0.7（初始，round-4）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-REQ-008" type="pattern"
+    confidence="0.9" frequency="2" created_at="2026-06-28T00:00:00Z" last_updated="2026-06-28T00:00:00Z" status="ACTIVE">
+    <trigger>FreeArk 小程序业主端需求涉及温控面板 sub_type 显示名，或怀疑多个页面可能受同一字段（sub_type_display / product_code_role）影响</trigger>
+    <content>FreeArk 小程序业主端有两个涉及温控面板显示名的主要页面，机制完全不同：
+①device-panel.vue（设备面板页）：卡片标题用 sub.display = cfg.sub_type_display，来自 /api/miniapp/owner/realtime-params/ 端点（views_miniapp_device_settings.py 第 259 行）。sub_type_display 字段变更会直接影响此页面。
+②param-settings.vue（参数设置页，v1.11.1 改造后）：区域一（我的房产）用 resolveRoomName(room) = room.room_name || room.ori_room_name，来自 device_room 表；区域二（写链路 deviceList 计算属性）用 product_code_role[productCode]。两个区域均不读 sub_type_display，不受影响。
+区域二的根因是 productCode=120003 对应所有末端温控，roleMap 统一映射为"末端温控"，无法区分房间。修复方向：在 deviceList 中利用 partState[sp].structure.rooms[].devices[].device_sn 做 deviceSn→房间名映射，复用 resolveRoomName(room)，需注意 deviceSn 类型归一化（MQTT 字符串 vs 结构数据数字，用 String() 转换）。
+关键陷阱：panel_bedroom → 次卧（非主卧）；panel_children_room → 主卧（非儿童房）。命名反直觉原因：基于三房户型空间关系定义。验收测试必须专项覆盖这两个串房场景。
+还需注意：Web 端和小程序端共享同一 DeviceConfig 表，若通过修改 DB 字段实现，须确认 Web 端兼容性（OQ 项）。</content>
+    <source_interactions>round-5, round-6</source_interactions>
+    <outcome>round-5: 生成 v1.11.2 requirements_spec.md（REQ-FUNC-001~004、REQ-NFUNC-001~004、OQ-01~04）和 user_stories.md（US-01~04，AC 10 组），OQ-01 已代码核验关闭，OQ-02~04 待 PM 确认。round-6: 生成 v1.11.3 requirements_spec.md（REQ-FUNC-001~005、REQ-NFUNC-001~003）和 user_stories.md（US-001~005，AC 13 组），无 OQ（PM 已预确认所有业务事实）。</outcome>
+    <confidence_history>0.8（初始，round-5，基于直接代码核验确认）→ 0.9（round-6，再次应用并扩展至区域二映射修复完整模式）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-REQ-009" type="pattern"
+    confidence="0.8" frequency="1" created_at="2026-06-28T00:00:00Z" last_updated="2026-06-28T00:00:00Z" status="ACTIVE">
+    <trigger>微信小程序需求中，某 computed 属性依赖异步加载的结构数据（如 structure.rooms），而该数据原本仅由另一个用户交互区域（如区域一展开操作）触发加载，不保证在用户进入当前功能区域前就已就绪</trigger>
+    <content>此类时序保障需求必须作为独立 REQ-FUNC 单独列出，不可合并进数据映射需求中。需求描述应明确：①触发时机（onLoad/onShow 进入页面，以及选择器/picker 变化导致 specific_part 切换）；②触发的具体函数（loadStructure(specificPart)）；③缓存命中时的行为（直接读取，不发网络请求）；④缓存未命中时的行为（异步请求+写缓存，computed 响应式自动更新）；⑤与兜底降级需求（REQ-FUNC-00N）的联动关系（异步加载完成前先用 roleMap 兜底，完成后响应式更新）。
+Given/When/Then 应分别覆盖：缓存命中（不发网络）、缓存未命中（触发网络请求后更新）、切换 specific_part（仅触发新 sp 的 loadStructure，不影响旧 sp 数据）三个场景。</content>
+    <source_interactions>round-6</source_interactions>
+    <outcome>生成 REQ-FUNC-005（时序保障）和 US-004（AC-004-01/02/03 覆盖三个时序场景），与 REQ-FUNC-004（兜底降级）和 US-003（AC-003-03 响应式更新）形成完整闭环</outcome>
+    <confidence_history>0.8（初始，round-6）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-REQ-010" type="procedural"
+    confidence="0.9" frequency="2" created_at="2026-09-25T00:00:00Z" last_updated="2026-09-25T00:00:00Z" status="ACTIVE">
+    <trigger>收到"决策固化修订"类调用（invocation 明确说明不是重新分析），要求按用户已拍板结论把既有产出从"待确认"改为"已确认"，且原文件已存在（status=DRAFT 或 REVIEWED）</trigger>
+    <content>决策固化修订的标准作业程序（SOP）：
+【读回优先】先完整读回既有产出（尤其含决策点的 REQ-*、AC-*、开放问题章节、[INFERRED] 清单、阻塞表），再逐条应用决策；禁止凭记忆重写。**注意：若文件较大被分页返回，必须补齐剩余页码后再动笔，禁止只凭首页就开始改写。**
+【修订清单】
+1. 文件头：version bump（如 0.1.0→0.2.0 / 1.0.0→1.1.0）、status 按 invocation 指示（默认保持 DRAFT 待 PM 门控；**若 invocation 显式要求 APPROVED / "需求定稿"，则以 invocation 为准——显式用户决策覆盖本默认**）、timestamp 更新；在 front matter 增加"修订日期"与"上游基线"行以保留溯源。
+2. 新增"决策记录"章节（决策记录总表：OQ/OD 编号 / 原优先级 / 状态 CLOSED 或 CONFIRMED / 决策值 / 决策日期 / 决策来源 / 受影响位置），置于原开放问题章节处（可作 §6.0）；原开放问题章节标题改为"决策确认记录与开放决策点"，每条 OQ/OD 顶部插入"结论（CLOSED，日期，来源：用户拍板）"，原分析保留并显式标注为"留痕"。**保留原优先级标注，不因用户在消息中的分组（如把 P1 项列入 P0）而改写文档既有优先级。**
+3. 删除正文/AC 中全部软措辞（"待 OQ-xx 确认""取决于 OQ-xx""若 OQ-xx 选择…"），改为确定值；**但留痕区块内的历史条件句可保留，需在其上方已给出确定结论**。
+4. 被否决的方案/选项标注"已评估未采纳"并保留在原表（决策留痕），不得删除。
+5. [INFERRED] 清单：被确认的推断项转为"已确认参数"（清单标题一并改名），并显式给出修订后的计数与占比（可能归零）。
+6. 阻塞/依赖章节整体改为"已关闭的决策"表（状态 CLOSED/RESOLVED），显式写出剩余开放问题数。
+7. 文末增加"自洽性声明"：正文 / AC / 决策记录三处对同一决策的表述一致；软措辞归零；隐私/范围未放宽；编号稳定。
+【硬约束（不得借修订之机违反）】①不得放宽任何隐私过滤、不得改动隐私回归矩阵结论；②不得新增需求范围（**为既有 REQ 补 AC / 补 US 属闭环覆盖，不算新增需求，但须在自检声明中说明**）；③REQ-/US-/AC- 编号保持稳定（只改内容不改 ID）；④不得写入架构/代码内容（**用户已拍板的选型只作"决策登记"，须在文档中声明"只登记决策、不产出实现方案"以守住需求阶段边界**）；⑤未被决策影响的内容（含能力映射表、等价需求的描述、来源追溯表）保持原样；⑥**目标机/环境类输入若"尚未实测"，一律记为 TBD（部署前补实测），不得编造成具体规格**。
+【注意】故事点类的 [INFERRED — 待开发团队评估] 占位符属输出格式标准字段，不属需求推断项，不应计入 [INFERRED] 需求计数，但须在文档中说明该口径以免核验误判。</content>
+    <source_interactions>round-7, INTELBASE-FINALIZE-1</source_interactions>
+    <outcome>round-7: FreeArk_AdjutantRecommendations INV-GROUP_A-002：OQ-01~08 全部 CONFIRMED（3 个 P0 阻塞解除），产出 requirements_spec.md + user_stories.md v0.2.0；[INFERRED] 计数 2→0；剩余开放问题 0；建议方案 A（仅扩意图规则）而在文档中同时保留 B/C/D 的评估留痕。INTELBASE-FINALIZE-1: intelligentbase 8 项决策固化，产出两份 v1.1.0（status=APPROVED，按 invocation 显式要求）；OD-1~OD-5 全关闭；[INFERRED] 2→0；DR-03 显式记录用户选择推翻分析师推荐；性能 AC 占位改为"目标机千级文档量级实测校准"；OQ-IB-01 派生为"待用户一行确认"；新增 US-IB-16 + AC-IB-04-06/07 补 REQ-FUNC-IB-24 / IB-11 的覆盖缺口</outcome>
+    <confidence_history>0.85（初始，round-7，一次完整应用验证有效）→ 0.9（INTELBASE-FINALIZE-1，第二次应用；补充 status 覆盖规则、分页读回纪律、TBD 纪律、AC/US 闭环补充的口径）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-REQ-011" type="exception"
+    confidence="0.9" frequency="1" created_at="2026-09-25T00:00:00Z" last_updated="2026-09-25T00:00:00Z" status="ACTIVE">
+    <trigger>需要在既有的需求产出文件（requirements_spec.md / user_stories.md 等）上做修订时，尤其是文件较大（数百行以上）或已被分页读取</trigger>
+    <content>【事故】INTELBASE-FINALIZE-1 中，代理在 Read 完 requirements_spec.md（762 行，因超限分两页返回）后，本意做定向编辑，却误用整文件覆盖写入（Write）并只写了占位符内容，导致产出文件被瞬间清空；该文件未纳入 git 追踪、无备份，只能靠上下文中的分页读取结果逐步重建。
+【铁律】①对已存在的产出文件做修订，**一律使用定向编辑（Edit / old_string→new_string）**，禁止用 Write 整文件覆盖；Write 只用于"创建新文件"或"已完整 Read 且确认无截断后的一次性全量生成"。②Write 前必须先自问："这个路径是否已存在文件？我是否读过它的全部内容？"若 Read 返回中出现任何 PARTIAL / 截断 / 分页提示，则**禁止**对该文件使用 Write；应改用 Edit，或先补齐全部页码。③产出目录若无 git 追踪、无备份，等同"唯一真源"，任何覆盖都不可逆；修订前评估可否用 Edit 替代。④若已发生误覆盖：立即用上下文中的读取结果重建，保留全部原有编号与表格结构，并在回报中**如实披露**事故与重建方式（不得隐瞒），同时把事故蒸馏为 exception 知识条目。
+【补充（2026-09-27）】当子代理**自身没有 Edit 工具**时，正确的做法不是"退化为 Write"，而是产出**APPLY_PACKAGE**（锚点 + 逐字 old/new 字符串）交由 PM 机械落盘——见 KE-REQ-015。这条补充把"无 Edit 工具"从死路变成合规交付形态。</content>
+    <source_interactions>INTELBASE-FINALIZE-1, INV-GROUP_A-INTELBASE-003, INV-GROUP_A-INTELBASE-004</source_interactions>
+    <outcome>requirements_spec.md 已按两页读取结果完整重建（827 行 v1.1.0，24 条 REQ-FUNC × 5 字段行 = 120 行核验通过、14 条 REQ-NFR 正文结构与既有锚点核验保留），事故已在 agent_response 的 notes 中向 PM 披露。INV-GROUP_A-INTELBASE-003 / 004 全程遵守：两份既有目标文件一次 Write 未发，仅新建 apply_package 文件</outcome>
+    <confidence_history>0.9（初始，INTELBASE-FINALIZE-1，真实事故一次即高置信；INV-GROUP_A-INTELBASE-003 补充"无 Edit 工具时的合规替代"；INV-GROUP_A-INTELBASE-004 第三次遵守，零违规）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-REQ-012" type="factual"
+    confidence="0.9" frequency="3" created_at="2026-09-25T00:00:00Z" last_updated="2026-09-27T00:00:00Z" status="ACTIVE">
+    <trigger>intelligentbase 项目（通用 RAG + 多智能体基座）进入架构/开发/测试阶段，需要该项目的需求侧既定决策基线</trigger>
+    <content>intelligentbase 需求定稿基线（2026-09-25 用户拍板，产出 requirements_spec.md REQ-SPEC-INTELBASE-001 v1.1.0 + user_stories.md REQ-US-INTELBASE-001 v1.1.0，状态 APPROVED）：
+①向量库 = Qdrant（单实例、非容器裸装直部署）；
+②embedding = bge-m3（稠密向量、本地部署、余弦相似度；v1 不用其稀疏/多向量能力）；
+③部署形态 = 沿用 FreeArk「禁 Docker」，全物理机直部署、组件裸装、不做容器双路径（**该结论推翻分析师原推荐的"折中方案"，已在 §6.3 留痕**）；
+④聊天/多智能体 LLM = 保留云端 DeepSeek，须显式声明「用户提问文本 + 检索片段外发云端」，LLM 端点可配置以备未来切本地，v1 不做本地 LLM 双端；
+⑤规模 = 千级文档量级（几百~几千份）；性能量化指标不得凭空设定，须在目标机（CPU-only + bge-m3 CPU 模式）以该量级实测校准；
+⑥多项目隔离 = 要，拓扑为单实例多项目（Qdrant collection + 项目级配置隔离）；
+⑦索引重建 = 要（支持 embedding 模型/维度变更的一键重建）；
+⑧图片 OCR / 扫描件整页 OCR = v1 纳入（复用 FreeArk 已有 OCR 链路移植）；PyMuPDF AGPL v3 合规保留 REQ-NFR-IB-12 评估，**禁止默认「内部平台合规」豁免**。
+⑨【2026-09-27 用户裁决（REV-06）】**诉求③「UI 可视化配置」纳入 v1**：新增 REQ-FUNC-IB-25（可视化配置界面 = 定义文档的图形视图，双向 round-trip、非第二真源）、REQ-FUNC-IB-26（可编辑对象仅限节点参数与专家集合，**不含运行期增删图节点**——图是编译期结构）、REQ-FUNC-IB-27（配置完备性校验在**装配期 fail-fast**，非法配置不得静默生效、界面不豁免），并追加范围外条目 OOS-10（插件市场/包管理、远程定义拉取、多语言同构、Power Fx 式表达式、A2A/MCP、成本/配额/多租户）；同步新增 US-IB-17 / US-IB-18 与 AC-IB-17-01~06 / AC-IB-18-01~06（12 组 AC，全 Given/When/Then）；两份文档升版 1.1.0 → **1.2.0**，功能需求 24 → **27**，[INFERRED] 维持 **0 / 27 = 0%**；§1.2 OOS-06 与 §6.6 OQ-IB-04 口径同步澄清为「**配置侧可视化已纳入 / 问答侧产品化界面仍范围外、OQ-IB-04 部分开放**」。**来源**：`docs/agent_platform_research.md` §3.4 候选点 A~E（用户裁决前为待裁决候选点；REV-06 将其**规范化**为正式需求，非照抄）。
+⑩【2026-09-27 REV-11 / GROUP_A R7 增量】**REQ-FUNC-IB-20（流式输出契约与会话生命周期）此前有需求无 US/AC 承接 = 覆盖缺口，本轮已补**：新增 US-IB-19（流式交付：增量片段 / 可选思考分区（默认不启用）/ 完成附结构化产物 / 内部产物不外流 / 终态收尾）与 US-IB-20（会话生命周期：会话隔离 / 持久化策略须声明且丢失=fail-closed / 可选确认中间态（提供机制、默认不启用、不绑定业务）/ 确认决策恢复 / 跨项目会话拒绝），共 **11 组 AC**（AC-IB-19-01~05、AC-IB-20-01~06，全 Given/When/Then）。**未新增需求条目**（REQ-FUNC 仍 27、[INFERRED] 仍 0/27=0%）；两份文档 1.2.0 → **1.3.0**（状态 **REVISED_PENDING_REVIEW，待 PM 门控**）。**交付形态 = APPLY_PACKAGE**（`docs/rev11_stream_session_apply_package.md`，14 条指令：user_stories 9 + requirements_spec 5），由 PM 以 Edit 落盘。**测试用例归属修正（待 test_plan.md 执行）**：TC-UNIT-016 / 017 / TC-INT-039 应自 US-IB-08 改挂 US-IB-19；TC-UNIT-018 / 022 应自 US-IB-11 改挂 US-IB-20。
+【约束】目标机 192.168.31.133 硬件规格未实测 → 一律记 TBD（部署前补实测）；据用户反馈该机当前仅开放密钥登录（密码登录被拒）。遗留待确认：OQ-IB-01（原始文件是否持久化）由 IB-24 派生，默认持久化，待用户一行确认；OQ-IB-02/04（仅剩问答侧）/05/06/07/08 保持开放（OQ-IB-07/08 现主挂接 US-IB-20）。
+【口径】需求阶段的"选型登记"不等于架构设计：架构方案与模块设计属 GROUP_B（system-architect），需求文档只登记决策值 + 依据 + 影响的 REQ。**REV-06 特别提醒**：配置界面的交付/宿主形态（在基座内 or 由接入方提供）属架构阶段问题，需求阶段只做边界声明、不规定实现形态（守住 C-IB-04）。**REV-11 特别提醒**：为既有 REQ 补 US/AC 属**闭环覆盖**，不得据此改写该 REQ 的 §2.5 能力描述，也不得计入"新增需求"。</content>
+    <source_interactions>INTELBASE-FINALIZE-1, INV-GROUP_A-INTELBASE-003, INV-GROUP_A-INTELBASE-004</source_interactions>
+    <outcome>供 intelligentbase 后续 GROUP_B/测试阶段代理引用；避免重复询问用户已拍板的 8 项决策。REV-06 后该基线含 9 项（8 项 + 诉求③纳入 v1），下游代理需知功能需求基数为 **27** 而非 24。REV-11 后：REQ-FUNC-IB-20 已由 US-IB-19 / US-IB-20 承接，US 基数为 **20**（原 18），文档版本 **1.3.0**（pending 门控）；下游代理需知 REQ-FUNC-IB-20 的测试用例归属已修正（见 ⑩）</outcome>
+    <confidence_history>0.85（初始，INTELBASE-FINALIZE-1，来自用户直接拍板）→ 0.9（INV-GROUP_A-INTELBASE-003，补充第 ⑨ 项用户裁决与 1.2.0 基线，第二次应用）→ 0.9（INV-GROUP_A-INTELBASE-004，补充第 ⑩ 项 REV-11 覆盖闭环与 1.3.0 基线，第三次应用）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-REQ-013" type="exception"
+    confidence="0.8" frequency="1" created_at="2026-09-27T00:00:00Z" last_updated="2026-09-27T00:00:00Z" status="ACTIVE">
+    <trigger>任务要求"基于官方文档/官方站点"做外部调研，需要 WebFetch 抓取原始页面时</trigger>
+    <content>【事故】INV-GROUP_A-INTELBASE-002（Dify/MAF/OpenAI Agents SDK/CrewAI/LangGraph/n8n/semantic-router/DSPy/LiteLLM 九项目对标调研）中，**WebFetch 对全部目标域一律返回**「Unable to verify if domain X is safe to fetch. This may be due to network restrictions or enterprise security policies blocking claude.ai」—— docs.dify.ai / microsoft.github.io / openai.github.io / docs.crewai.com / learn.microsoft.com / github.com / raw.githubusercontent.com **无一例外**。即**原始页面抓取全线不可用**，只有 WebSearch 可用。
+【处置纪律】①**如实披露**该限制，不得把检索摘要伪装成"已抓取官方原文"；②证据分级：检索命中的**官方域名** URL 视为官方证据（但须注明"经检索摘要、非原始抓取"）；仅见于第三方站点（社区仓库 / DeepWiki / 教程 / 博客）的结论**逐条标注「待官方证实」**，不得作为官方证据；③**查不到就写「官方文档未查到」**，绝不编造字段名/API 名来填空；④调用块给出的入口若已迁移，如实登记（如 LangGraph 现行文档域为 docs.langchain.com，而不是调用块所列的 langchain-ai.github.io）；⑤已知易被二手信息污染的对象（如 Dify 字段级 DSL、n8n workflow JSON schema）应在交付物中**显式标为"官方未发布"**。
+【同类判据】官方文档站若是 SPA/JS 重渲染或受限域，WebFetch 常失败；此时 WebSearch + 官方 URL 定位是**可接受的降级**，但证据等级必须降级声明。</content>
+    <source_interactions>INV-GROUP_A-INTELBASE-002</source_interactions>
+    <outcome>产出 docs/agent_platform_research.md v0.1.0：9 项目分节、每条能力断言附官方 URL、第三方结论逐条标「待官方证实」、Dify 字段级 DSL 与 n8n JSON schema 明确标注"官方未发布/未查到"；证据完备度表在 §1.2 逐项披露</outcome>
+    <confidence_history>0.8（初始，INV-GROUP_A-INTELBASE-002，环境级限制一次即高置信）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-REQ-014" type="procedural"
+    confidence="0.7" frequency="1" created_at="2026-09-27T00:00:00Z" last_updated="2026-09-27T00:00:00Z" status="ACTIVE">
+    <trigger>收到 RESEARCH_SUPPLEMENT / 对标调研类 invocation（明确声明"不是重写需求规格、不是架构设计"，要求基于外部项目官方文档做证据化补充），且输入含 status=APPROVED 的既有需求文档</trigger>
+    <content>【定位】主体成果 = 对外部事实的归纳 + 与本项目现状的**差距对照**，属需求分析范畴（证据收集与差距识别）。
+【边界（PM 显式授权，不必因此返回 BLOCKED）】①**禁止**产出本项目的模块设计、接口签名（IFC-*）、ADR 决策、代码或配置实现；②凡涉本项目者一律写为「候选需求点 / 待确认建议」并标 `[候选 — 待 PM/用户确认]`；③**禁止修改** status=APPROVED 的输入文件（requirements_spec.md / user_stories.md），增量只能以候选形式在调研文档中列出，由 PM/用户裁决后另行落盘；④产出为**新建**文件才能用 Write（既有一律 Edit，见 KE-REQ-011）。
+【SOP】1. 先读回既有需求文档，提取 REQ-/US-/AC- 编号体系，供差距分析引用（只读不写）；2. 逐项目按统一三段式组织：**(a) 它怎么建模**（agent/路由/编排/工具/UI 可视化）、**(b) 该学什么**（机制/数据模型/DSL 形态，不是照抄代码）、**(c) 过度设计不学什么**；3. 每条能力断言附官方 URL；二手来源单列标注「待官方证实」；4. 结论摘要用一张「项目 → 机制 → 对齐缺口 → 借鉴成本」映射表；5. 把业界结论映射回用户诉求，给出**分 P0/P1/P2/P3 的候选演进路线**，且每条须点出**复用本项目已有接缝**的具体位置（如 install(specs) / validate_specs / IntentRouter 注入构造 / ToolRegistry.register / orchestrator_for(project_id)）；6. 单列「风险与反模式」章：逐一对照本项目既有优势（单一真源、绝不无人应答、framework-free、fail-fast、secret 不进配置）说明会被通用化破坏之处与守住办法；7. 文末自检声明须含"未修改 APPROVED 输入""未产出架构/代码""证据限制已如实披露"三条。
+【顺序原则（经验结论）】声明式定义（数据化）**先于**UI 可视化；可视化只能是定义文档的**视图**（Dify 画布↔DSL / MAF 左 YAML 右图 / LangGraph Studio assistants 三例一致），先做画布必然产生第二真源。另：LangGraph 的图是**编译期**结构，"UI 配置工作流"的现实边界是配置节点参数与专家集合，而非运行期增删节点。
+【常见过度设计黑名单】插件市场/包管理、远程或任意路径加载定义（安全反模式）、可执行表达式（Power Fx/代码节点）、多语言同构、A2A/MCP 协议面、成本/配额/多租户、无金标集时的提示优化器（DSPy 类）。
+【下游闭环（2026-09-27 补充）】本类调研产出的"候选点"若被用户裁决采纳，**下一步必须由需求分析师以 REV 定向增量修订落为正式需求**（规范化重述 + Given/When/Then + 新编号 + 新 OOS 行），走 APPLY_PACKAGE 交付——见 KE-REQ-015。调研文档本身**不改动**（用户裁决"证据限制接受、不要求逐字复跑"）。</content>
+    <source_interactions>INV-GROUP_A-INTELBASE-002, INV-GROUP_A-INTELBASE-003</source_interactions>
+    <outcome>产出 docs/agent_platform_research.md v0.1.0（status=DRAFT 待 PM 门控）：§1 摘要+证据完备度、§2 九项目三段式分析、§3 对三条用户诉求的差距分析与 P0~P3 候选路线、§4 五项风险与反模式、附录 A 自检声明、附录 B 证据来源清单。**关键发现**：用户诉求③「UI 可视化配置」在 v1.1.0 需求中**无任何 REQ 承接**（OQ-IB-04/OOS-06 反而把完整界面推给接入方），已作为需求级缺口上报，并以候选点 A~E 形式列出待裁决。**下游闭环已发生**：INV-GROUP_A-INTELBASE-003 将候选点 A~E 落为 REQ-FUNC-IB-25~27 + OOS-10（REV-06，两文档 1.2.0）</outcome>
+    <confidence_history>0.7（初始，INV-GROUP_A-INTELBASE-002，首次应用）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-REQ-015" type="procedural"
+    confidence="0.75" frequency="2" created_at="2026-09-27T00:00:00Z" last_updated="2026-09-27T00:00:00Z" status="ACTIVE">
+    <trigger>收到 REV 定向增量修订 / APPLY_PACKAGE 类 invocation：要求在**不改编号、不重写全篇**的前提下，把某项用户裁决落进既有 APPROVED 需求产出，且**子代理自身无 Edit 工具**（只有 Read/Write），落盘由 PM 执行</trigger>
+    <content>【形态选择】无 Edit 工具时**不得退化为 Write 整文件覆盖**（KE-REQ-011 事故）。正确形态 = **APPLY-READY 修订包**（新建一个 `docs/<scope>_apply_package.md`），由 PM 以 Edit 机械落盘。本仓库既有先例：`docs/r2_apply_package_part1.md` ~ `part7.md`、`docs/rev06_ui_config_apply_package.md`。
+【修订包五段结构（缺一不可）】1. **修订总览**：版本变更表、新增编号与标题一览、受影响章节清单（逐条指令 × 章节 × 动作 × 摘要）、预计新增行数、**编号纪律声明**（列明哪些编号族"未改动"）。2. **权威内容正文**：新增 REQ/US/AC/OOS 的**完整规范文本**，供人复核并作为 paste 源；并声明"若与落盘指令有字符差异，以落盘指令为准"。3. **逐条落盘指令（核心）**：每条含六字段 `target_file` / `action`(INSERT_AFTER|REPLACE) / `anchor` / `old_string` / `new_string` / `rationale`；old/new 必须**逐字精确**（全角标点、「」、《》、`~`、缩进、反引号一律照抄）。4. **一致性自检**：编号稳定性核对表、**计数更新核对表（列出每一处旧计数所在小节）**、两文件交叉引用一致表、无残留旧版本号核对。5. **本包自检声明**：未修改既有文件、[INFERRED] 占比、无架构内容、AC 全 Given/When/Then、锚点质量、无凭据、未越权。
+【锚点铁律（KE-PM-025）】①锚点必须**语义独立且全局唯一**；②**禁止**把锚点选在单独成行的自闭合标记（如 `/>`）或过短易重复的行上；③片段若多处出现，**加宽上下文**直到全局唯一；④每条锚点落盘前用 Grep 逐条核验"该片段在文件内出现次数 == 1"；⑤`INSERT_AFTER` 的 `new_string` **必须包含锚点原文**，其后追加新行（不额外补尾随换行，锚点行原有换行即终止符），以免破坏后续空行与分隔符。
+【定向增量修订的检查清单（每处都要有落点）】①文件头 version/status/定稿依据；②版本历史追加新行（不删旧行）；③纳入范围表加行；④**计数联动**：汇总行、统计口径行、附录自检行（旧计数可能散落 3~4 处，必须逐处列出并更新，并声明"其余含该数字处为编号/行号/维度等非计数语境，不得改动"）；⑤新增小节正文；⑥**新旧口径冲突必须显式协调**：既有 OOS / OQ 若与新纳入项语义重叠（如"完整界面范围外" vs "配置侧可视化纳入"），须改写该行的说明列做**边界切分**（配置侧 vs 问答侧），并在自检中声明"全文无自相矛盾表述"；⑦追溯矩阵（REQ→来源 与 US→REQ 两侧都要加行）；⑧覆盖性自检表加行（原有无 REQ 承接的用户诉求，纳入后必须在此登记）；⑨附录自检追加本轮结论（编号稳定性 / 无越界 / [INFERRED] 占比 / 口径一致性 / 交叉一致）。
+【变体：**覆盖缺口补全**类 REV（无新 REQ，2026-09-27 REV-11 补充）】当 REV 的目标是"既有 REQ 有需求但无 US/AC 承接"时，落点清单与上述不同，须为：①文件头 version/status/修订标识/invocation_id；②版本历史追加行；③**新增 US 正文**（插在末条 US 之后、附录 A 之前，各以 `---` 收尾）；④US 侧追溯矩阵加行 + 功能域覆盖表加行；⑤**REQ 侧追溯矩阵该行"补记 US 覆盖"（仅在行尾追加，来源锚点原文一字不动）+ 表后补注**；⑥附录 B 决策前置段补注（新 US 是否受 OD 影响）；⑦附录 C 的 OQ 行改挂接（主挂接新 US，**保留**原挂接并如实标注两处关联）；⑧附录 E 自检追加（格式/来源/编号/交叉/**下游挂接**）；⑨**声明"为既有 REQ 补 US/AC 属闭环覆盖、不新增需求" + 计数不变核对（本轮 REQ-FUNC 27、[INFERRED] 0/27=0%）**；⑩**若涉及既有测试用例归属错误，必须给出正确归属并在需求文档内登记，但不得改动 test_plan.md**（属其他代理产出），只记入 notes。
+【边界纪律】新 US 的两个必落子子句若在 REQ 描述/约束中为**明写**，则**不标 [INFERRED]**（须在自检中给出逐条依据）；仅对"明写条款的边界具体化"在 US 内附「来源与口径」块说明推导依据与锚点。
+【优先级处理】用户裁决"纳入 v1"→ 新 REQ/US 一律记 **Must Have**（Must Have 的定义即"本版本交付所必需"；降级为 Should 等于部分推翻用户裁决）。若分析师自行评定（非用户明示），**须在 agent_response 的 notes 中标注"由分析师评定"**，请 PM 复核。
+【格式遵从既有文档】invocation 里描述的字段列表（如"ID/描述/来源引用/优先级/备注"）**可能与既有文档实际格式不符**——一律**遵从文档既有逐条表格格式**，新增字段只加在新增条目上，并在新小节序言里说明差异，**不得改写既有条目格式**。
+【[INFERRED] 占比】来源为"用户裁决 + 上一轮调研文档章节锚点"的条目**不计入** `[INFERRED]`（有明确来源即可溯源）；须在自检中给出修订后计数（如 0/27 = 0%）。
+【下游影响必须上报、不得静默处理】新增 REQ 会使其下游文档的计数陈述过期（模块设计、实施计划中常写"N 条 REQ-FUNC"）。这些文件属**其他代理的产出**，**不得修改**，但必须在 `<agent_response><notes>` 中逐条点名（文件 + 行号 + 旧值 → 新值），并提示测试计划/测试报告可能需补新 US 的覆盖。</content>
+    <source_interactions>INV-GROUP_A-INTELBASE-003, INV-GROUP_A-INTELBASE-004</source_interactions>
+    <outcome>INV-GROUP_A-INTELBASE-003: 产出 docs/rev06_ui_config_apply_package.md（v0.1.0，status=DRAFT，mode=APPLY_PACKAGE）：24 条编辑指令（requirements_spec.md 16 条 R-01~R-16 + user_stories.md 8 条 U-01~U-08），锚点逐条 Grep 核验全局唯一；覆盖 REQ-FUNC-IB-25~27 / OOS-10 / US-IB-17~18 / AC-IB-17-01~06 / AC-IB-18-01~06；两文档 1.1.0→1.2.0；计数 24→27 三处全部联动；既有编号族零改动；既有文件零 Write。INV-GROUP_A-INTELBASE-004: 产出 docs/rev11_stream_session_apply_package.md（v0.1.0，APPLY_PACKAGE，14 条指令 = user_stories 9 + requirements_spec 5）：为 REQ-FUNC-IB-20 补 US-IB-19/20 + 11 组 AC；两文档 1.2.0→1.3.0（REVISED_PENDING_REVIEW）；**计数零联动**（明确声明"本轮计数不变，下列各处一律不得改动"以防误改）；实施"行尾片段 REPLACE"锚点策略（长行锚点用行尾唯一子串，避免逐字重抄长行）；首次落地"覆盖缺口补全"变体（见 content 末段）</outcome>
+    <confidence_history>0.75（初始，INV-GROUP_A-INTELBASE-003，首次应用；INV-GROUP_A-INTELBASE-004 第二次应用，补充"覆盖缺口补全"变体与"行尾片段 REPLACE"锚点策略；confidence 维持 0.75，待 PM 落盘与门控结果反馈后调整）</confidence_history>
+  </knowledge_entry>
+
+  <!-- ================= 知识蒸馏队列（待蒸馏经验候选） ================= -->
+  <distillation_queue>
+    <candidate id="DC-001" type="procedural" occurrences="1" last_seen="INV-GROUP_A-INTELBASE-004" status="PENDING">
+      <pattern_description>「覆盖缺口补全」类 REV 的识别与作业：既有 REQ 有来源锚点但无任何 US/AC 承接时，需求文档在"REQ 侧完整、US 侧缺失"上失去闭环；同时其相关既有测试用例往往已存在但**归属错误**（挂在相邻 US 下）。本轮的处置 = 补 US/AC（不新增 REQ）+ 给出用例正确归属 + 计数不变声明。</pattern_description>
+      <source_rounds>INV-GROUP_A-INTELBASE-004</source_rounds>
+      <proposed_entry>建议在下次出现同类场景（occurrences ≥ 3）时蒸馏为 KE-REQ-016（procedural，初始 confidence=0.6）；亦可视 PM 门控反馈提前（若 PM 对本轮交付给出 PASS，则按"PM 确认扫描"直接建条）。判据：①是否能在需求文档内检索到"REQ 存在但附录 A 无对应 US 行"的缺口；②是否能在 test_plan.md 中检出归属可疑的既有 TC。注：其作业细节已先行并入 KE-REQ-015 的「覆盖缺口补全」变体段与 KE-REQ-004 的 ⑬ 项，本条候选用于追踪该模式的复现频次。</proposed_entry>
+    </candidate>
+  </distillation_queue>
+
+  <!-- ================= 知识库操作日志 ================= -->
+  <kb_operation_log>
+    <op time="2026-09-27T00:00:00Z" type="RETRIEVE" entry_id="KE-REQ-011,KE-REQ-012,KE-REQ-015,KE-REQ-006,KE-REQ-004" round="INV-GROUP_A-INTELBASE-004" reason="会话启动加载 + 任务预检索：命中 KE-REQ-011（无 Edit 工具时禁止 Write 覆盖既有文件）、KE-REQ-015（REV/APPLY_PACKAGE SOP 与锚点铁律）、KE-REQ-012（intelligentbase 决策基线，确认既有编号族与硬约束）、KE-REQ-006（流式/思考分区模式，直接支撑 US-IB-19 的"可选分区"写法）、KE-REQ-004（编号稳定、只追加不改 ID）"/>
+    <op time="2026-09-27T00:00:00Z" type="UPDATE" entry_id="KE-REQ-012" round="INV-GROUP_A-INTELBASE-004" reason="第三次应用：新增第 ⑩ 项 —— REV-11 补 REQ-FUNC-IB-20 的 US/AC 覆盖缺口（US-IB-19/20 + 11 组 AC），两文档 1.2.0→1.3.0（REVISED_PENDING_REVIEW）；登记测试用例正确归属（TC-UNIT-016/017、TC-INT-039 → US-IB-19；TC-UNIT-018/022 → US-IB-20）；frequency 2→3，confidence 维持 0.9"/>
+    <op time="2026-09-27T00:00:00Z" type="UPDATE" entry_id="KE-REQ-015" round="INV-GROUP_A-INTELBASE-004" reason="第二次应用：补充「覆盖缺口补全类 REV」的 10 处落点变体（含"计数不变核对表"与"下游 TC 归属只登记不改 test_plan.md"）与"行尾片段 REPLACE"锚点策略（长行锚点改用行尾唯一子串，规避逐字重抄长行的漂移风险）；frequency 1→2，confidence 维持 0.75（待 PM 落盘与门控反馈）"/>
+    <op time="2026-09-27T00:00:00Z" type="UPDATE" entry_id="KE-REQ-006" round="INV-GROUP_A-INTELBASE-004" reason="再次命中并迁移到后端流式契约层：补充三条口径（可选/默认不启用、不混帧、终态收尾语义），支撑 US-IB-19 的 AC 写法；frequency 1→2，confidence 维持 0.8"/>
+    <op time="2026-09-27T00:00:00Z" type="UPDATE" entry_id="KE-REQ-004" round="INV-GROUP_A-INTELBASE-004" reason="第五次应用：补充 ⑬ 覆盖缺口补全变体（既有 REQ 无 US/AC 承接 → REV 增量补覆盖、不新增 REQ、须给既有 TC 正确归属）；confidence 维持 0.9"/>
+    <op time="2026-09-27T00:00:00Z" type="UPDATE" entry_id="KE-REQ-011" round="INV-GROUP_A-INTELBASE-004" reason="第三次遵守验证：本代理无 Edit 工具，全程未对两份既有产出文件发出任何 Write，改走 APPLY_PACKAGE（见 KE-REQ-015）；confidence 维持 0.9"/>
+    <op time="2026-09-27T00:00:00Z" type="CREATE" entry_id="DC-001" round="INV-GROUP_A-INTELBASE-004" reason="新增蒸馏候选（occurrences=1，PENDING）：「覆盖缺口补全」类 REV 的识别与作业模式。暂不建正式条目（未达 frequency≥3），其作业细节已先并入 KE-REQ-015 变体段与 KE-REQ-004 ⑬ 项，本条用于追踪复现频次"/>
+  </kb_operation_log>
+
+</kb_entries>

@@ -1,0 +1,52 @@
+<kb_entries agent_domain="system_architect" version="r18" supplement_for="kb_full.xml" note="本轮（R18，2026-10-07，INV-GROUP_B-INTELBASE-012）新增知识条目的完整正文。kb_full.xml 为独占大文件、无 Edit 时不可整文件覆盖，故以 supplement 形式承载；待具备 Edit/append 能力时合并回 kb_full.xml（边界条件见 KE-ARCH-009 / KE-ARCH-014 / KE-ARCH-015）。">
+
+  <knowledge_entry id="KE-ARCH-021" type="heuristic" confidence="0.8" frequency="1" created_at="2026-10-07" last_updated="2026-10-07" status="ACTIVE">
+    <trigger>当需求/裁决引入「某个凭据（或必需资源）存于运行期可变载体（DB/文件）」且「该凭据必须经 Web 管理界面写入」，而既有装配规范对该凭据缺失时采取 fail-fast（缺即拒绝启动）时；或任何「写入通道依赖服务已启动、而服务启动依赖该写入」的循环前置。</trigger>
+    <content>这类组合会产生**首启死锁**：① 首次部署 DB 为空；② 启动校验要求凭据存在，否则拒绝装配（StartupError）；③ 服务不启动 ⇒ 管理界面不可达 ⇒ 无法写入首个凭据 ⇒ 永远无法启动。
+处置范式（架构侧按**派生必要性**给方案，但不发明业务数值）：把该凭据的启动校验**放宽为「未配置态」** —— 服务**可启动**；依赖该凭据的功能路径在**调用期 fail-closed**（以可读、**不含任何凭据信息**的错误拒绝，绝不静默返回空结果）；管理与健康端点**始终可达**；成功配置后仍遵循既有「保存 + 服务重启重装配」生效口径。
+关键纪律：① 放宽**只对这一个**（因「界面管理」而必须的）凭据；**其余必填项仍 fail-fast**。② 必须把该放宽登记为 **OPEN ITEM**（供给序：先部署 → 登录 → 配置 → **由用户手工重启**）并在架构假设表显式化，**不自行拍板**是否改用「部署期用户手工预置」的替代路径（二选一交 PM / 用户裁决）。③ 同步登记为架构假设（如 [ARCH-ASSUMPTION-A12]）与 TBD（真机验证库文件权限）。
+反面警示：若坚持「缺凭据即 fail-fast」而又要求「只经界面配置」，就是设计成**不可启动**的系统。</content>
+    <source_interactions>R18 / INV-GROUP_B-INTELBASE-012（ADR-39；OI-2；REQ-FUNC-IB-47 + REQ-NFR-IB-20 + OQ-IB-25）</source_interactions>
+    <outcome>R18 据此给出 ADR-39 Option C（未配置态 fail-closed），破除首启死锁；Option A（保持 fail-fast）与 Option B（部署期手工预置）列为已评估未采纳 / 备选，供给序以 OPEN ITEM 交裁。</outcome>
+    <confidence_history>2026-10-07 创建 confidence=0.8（待 PM 门控）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-022" type="heuristic" confidence="0.8" frequency="1" created_at="2026-10-07" last_updated="2026-10-07" status="ACTIVE">
+    <trigger>当某轮裁决在语义上改变了**既有文档中的一句事实性陈述**（例：tech_stack 的「目标机凭据**一律经环境变量注入**」），但**并未引入任何新第三方选型 / 依赖**时；以及「是否该做版本 bump、bump 到哪一位」的判定。</trigger>
+    <content>判定顺序：
+① **先问「是否引入新选型 / 新依赖」**：无 ⇒ 通常应写「本轮: 无变更」。
+② **再问「既有陈述是否因此变假」**：若某句事实陈述（凭据载体 / 默认值 / 边界）因新裁决**变为不实**，则**即使无新选型，也必须做最小事实订正**——否则文档产生**假陈述**（这与「消解假陈述」的既有纪律同源）。订正范围 = 受影响的**那一句 + 其直接衍生句**（例：`<credential_policy>` 行 + §1「配置载体」行的「凭据仅环境变量」字段），**不外扩**。
+③ **版本口径**：此类修订性质标为「**登记型补丁修订**」，取**补丁位**（如 1.4.0 → 1.4.1）而非次版本位；revision_history 记明「无新第三方依赖 / 无新选型 / 无键名改名」，并给出唯一实质订正项（同 R10「登记型修订，选型未变」先例）。
+④ **留退路**：同时给出「若 PM 判定本轮不动」的降级（登记「无变更」一行），并**显式告知该行将与本轮架构侧 ADR 口径不一致**（把选择权与风险一并交 PM）。
+要点：`no new dependency ≠ no change needed` —— 事实订正的触发条件是「陈述变假」，不是「依赖变化」。</content>
+    <source_interactions>R18 / INV-GROUP_B-INTELBASE-012（tech_stack Part C：版本决策 + EDIT-TECH-02 / 04；ADR-38）</source_interactions>
+    <outcome>R18 将 tech_stack 由 1.4.0 → 1.4.1 / 登记型补丁，修订凭据载体口径以消除与 ADR-38 的不一致；§1 选型表未新增行、§2 台账未新增条目。</outcome>
+    <confidence_history>2026-10-07 创建 confidence=0.8（待 PM 门控）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-023" type="pattern" confidence="0.8" frequency="1" created_at="2026-10-07" last_updated="2026-10-07" status="ACTIVE">
+    <trigger>需求要求「删除」某实体（项目 / 账号 / 记录）但同时又要求「数据保留 / 可恢复」，且约束「零迁移」（不得新增列）；或需为用户误操作提供删除保护。</trigger>
+    <content>处置范式：**用既有 `status` 枚举的 `disabled` 承载「软删 / 停用」**，而非新增 `deleted_at` 列 ——
+① **零迁移**：复用既有状态列（如 `AccountStatus="disabled"`），**不**加 `deleted_at`、**不**加唯一约束 → 满足「零迁移」裁决（OQ-IB-28 类）。
+② **类型层事实**：把「数据保留、可恢复」做成**类型层事实**（`ProjectStatus` / `AccountStatus` 的 `disabled` 成员），而非仅在文档里承诺；UI 必须呈现为「**停用（数据保留、可恢复）**」，**不得**呈现为「永久删除」。
+③ **二次确认**：删除需**二次确认**（确认值 = 目标标识，如 `confirm_project_id` / `confirm_username`），不一致即 `400`。
+④ **删除保护**：如「禁删 `admin` 或最后一个有效 `admin`」→ `409`；此类**跨行判定放在服务层**（读 `list_users`），**不放端口层**（保持端口方法集不变）。
+⑤ **不物理级联**：软删父实体**不**级联删除子实体（保留可恢复）；物理级联属 out-of-scope，显式登记。
+⑥ **端口稳定**：软删复用既有 `set_status`；如需新编辑能力，用**加成式扩展**（如 `update_user`），**不改既有方法签名**。
+要点：`status` 枚举 + 服务的跨行判定，可在**不迁移 schema**的前提下同时满足「可恢复」与「删除保护」。</content>
+    <source_interactions>R18 / INV-GROUP_B-INTELBASE-012（ADR-37 / ADR-40；OQ-IB-27 / OQ-IB-28 / OQ-IB-29；OOS-19）</source_interactions>
+    <outcome>R18 以 `ProjectStatus` / `AccountStatus` 的 `disabled` 落地软删，零迁移、二次确认、删除保护在服务层；`AccountStore` 13 方法文本不动。</outcome>
+    <confidence_history>2026-10-07 创建 confidence=0.8（待 PM 门控）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-024" type="exception" confidence="0.85" frequency="1" created_at="2026-10-07" last_updated="2026-10-07" status="ACTIVE">
+    <trigger>当新裁决 / 新需求与**既有 ADR（或既有 REQ）的表述**之间存在「**是否冲突取决于对该表述的语义解读**」的张力时（例：既有 ADR 写「账户↔项目 **1:1** 绑定」，新裁决为「**1:N**、零迁移、无唯一约束」—— 若 1:1 意为「每账号恰绑一项」则不冲突，若意为「每项目至多一账号」则冲突）。</trigger>
+    <content>处置铁律：① **不自行改写既有 ADR / REQ** —— 语义未澄清前改写可能制造**新的假陈述**；② 在**影响复核表**中该条判为「**待裁决（口径张力）**」而非「经修订」或「不受影响」；③ 在**开放问题（OPEN ITEM）**里**登记**该张力：写明「两种语义解读下分别是否冲突」、影响面（是否需上游改 REQ）、以及备选处置（如「若判定需修订，另出 `ADR-XX-R1` amend 子节」）；④ 在 `agent_response` 的 notes 显著标注；⑤ **本包不改动任何既有需求文本**。
+类比既有纪律：这与「需求冲突无法协调 → 暂停并澄清、禁止自行发明解决方案」「歧义 → 发 clarification_request」同源，但适用于**架构侧已能产出、只是某条表述存疑**的情形 —— 即「**能继续交付，但把分歧点登记为 OPEN ITEM 交裁**」，不阻断其余产出。
+要点：`待裁决 ≠ 不受影响 ≠ 经修订` —— 三分法可让门控方一眼看到分歧点，避免被静默吞掉。</content>
+    <source_interactions>R18 / INV-GROUP_B-INTELBASE-012（§2.0.9 影响复核表 ADR-21 行；OI-1；architecture_design.md §10.1）</source_interactions>
+    <outcome>R18 将 ADR-21（1:1 表述）与 OQ-IB-28（1:N 裁决）的口径张力登记为 OI-1，判「待裁决」；未改写 ADR-21，未改既有 REQ 文本；ADR-40 按 1:N / 零迁移落地实现侧。</outcome>
+    <confidence_history>2026-10-07 创建 confidence=0.85（待 PM 门控）</confidence_history>
+  </knowledge_entry>
+
+</kb_entries>

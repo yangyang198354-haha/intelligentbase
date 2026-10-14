@@ -1,0 +1,152 @@
+<kb_entries agent_domain="software_developer" version="0.1.0">
+  <knowledge_entry id="KE-DEV-001" type="exception" confidence="0.8" frequency="1" created_at="2026-09-27T00:00:00Z" last_updated="2026-09-27T00:00:00Z" status="ACTIVE">
+    <trigger>任务要求把文档中某个数字（如 "24"）全局同步为新值，且明确点名若干"受保护行"不得改动</trigger>
+    <content>同一数字在不同语境可能属**不同口径**（例：`24/24 PASS` 是离线自检**用例数**，`24 条 REQ-FUNC` 是**需求条数**）。替换前必须**逐处判定口径**，只改目标口径的实例。受保护行绝不能靠"看起来相同"就放过：改完后用 `git diff -U0 &lt;file&gt; | grep &lt;受保护字符串&gt;` 证明这些行**未出现在 diff**（即逐字未改）；若为在文件头追加内容导致行号整体下移，须在交付清单中同时给"原行号 → 现行号"并声明内容不变。盲目全局替换 = 回归缺陷。</content>
+    <source_interactions>round-1 (INV-GROUP_C-INTELBASE-005 Task 1)</source_interactions>
+    <outcome>implementation_plan.md 的 L471/L603/L621/L732「24/24 PASS」保持逐字不变（diff -U0 中零出现），仅 L54 的 REQ 计数 24→27；避免了一次回归缺陷</outcome>
+    <confidence_history>2026-09-27: 0.6→0.8（错误学习：该模式若误用直接构成回归缺陷）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-002" type="procedural" confidence="0.6" frequency="1" created_at="2026-09-27T00:00:00Z" last_updated="2026-09-27T00:00:00Z" status="ACTIVE">
+    <trigger>需要向一个已有"一次性装配守卫"（首次调用置 `_installed` 标志）的模块注册表追加**增量**数据源</trigger>
+    <content>不要放宽或绕过既有一次性守卫（会改变既有语义）。改为**新增一个独立的幂等装配入口**（例：`install_derived(specs)`：无 `_installed` 守卫、可重复调用、整体替换注册表内容）。这样既有 `install()` 语义不动，测试中的 `build_deps(force=True)` 反复装配也不炸。</content>
+    <source_interactions>round-1 (INV-GROUP_C-INTELBASE-005 Task 2)</source_interactions>
+    <outcome>ib/experts 增 `install_derived`，既有 install() 一字未改；离线自检与既有行为全绿</outcome>
+    <confidence_history>2026-09-27: 0.6（首次记录）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-003" type="pattern" confidence="0.6" frequency="1" created_at="2026-09-27T00:00:00Z" last_updated="2026-09-27T00:00:00Z" status="ACTIVE">
+    <trigger>需求要求某能力"必须不存在"（例：不提供强制继续 / 忽略错误开关），且希望它是**结构性保证**而非纪律约定</trigger>
+    <content>把"该能力不存在"做成**类型层事实**：校验结果结构体（`ValidationReport`）只含 `ok`/`errors`，**不含** `force`/`ignore`/`warn_only` 字段 → 调用方在类型层无法表达"带病继续"。再配一个**装配期 fail-fast 闸门**（`admit`）：校验不通过即抛聚合**全部**校验项的 `ConfigError`，拒绝装配、服务不启动。校验器为**纯函数**（framework-free、无 IO）以便离线可测。</content>
+    <source_interactions>round-1 (INV-GROUP_C-INTELBASE-005 Task 2; ADR-16)</source_interactions>
+    <outcome>ValidationReport 字段集被自检断言为 {"ok","errors"}；admit() 在装配序列第一步闸门化</outcome>
+    <confidence_history>2026-09-27: 0.6（首次记录）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-004" type="procedural" confidence="0.8" frequency="2" created_at="2026-09-27T00:00:00Z" last_updated="2026-09-28T00:00:00Z" status="ACTIVE">
+    <trigger>需修改超大文档（数千行）且其中有"受保护行号"</trigger>
+    <content>**必须**用 Edit（定点替换）而非整文件 Write（历史事故：超限 Write 截断）。注意：在文件头（revision_note / version 等）追加内容会把其后**所有行号整体下移**，受保护行的**行号会漂移但内容不变**。交付时须：① 给"原行号 → 现行号"对照；② 用 `git diff -U0` 证明受保护行**未出现在 diff**（内容逐字未改）。**进阶技巧（round-3 实证）**：若受保护行位于文件**中段**，最稳妥是让头部**一行都不新增** —— 把新的修订段落**续写进既有那一物理行的末尾**（`old_string` 不含前导换行），而非另起一行。这样行号**完全不漂移**（可断言"与上一轮记录的行号完全一致"）。若已不慎引入换行导致 +1 行，立即用 `grep -n "&lt;受保护字符串&gt;"` 复核并把新段落并回同一物理行；`git diff -U0 | grep -c` 的计数应只来自**你自己新增的那一行**。</content>
+    <source_interactions>round-1 (INV-GROUP_C-INTELBASE-005 Task 1/2); round-3 (INV-GROUP_C-INTELBASE-010 Task 3)</source_interactions>
+    <outcome>implementation_plan.md 四处「24/24 PASS」受保护行经 diff -U0 验证内容逐字未变；round-3 进一步做到行号零漂移（仍为 L483/L615/L633/L744），diff 中提及该值者仅本轮新增的自述行 1 条</outcome>
+    <confidence_history>2026-09-27: 0.6（首次记录）；2026-09-28: 0.6→0.8（round-3 复现并新增"同一物理行续写以免行号漂移"技巧）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-005" type="exception" confidence="0.8" frequency="1" created_at="2026-09-27T00:00:00Z" last_updated="2026-09-27T00:00:00Z" status="ACTIVE">
+    <trigger>修复"某条构建/CI 流水线失败"类缺陷，且上游只定位到**一个**根因</trigger>
+    <content>构建失败常有**多个互为独立的阻断根因**，修好第一个只会**暴露**第二个 —— 因为失败者会掩盖其后的阶段。必须"**修一处 → 跑完整流水线 → 直到全绿**"地收敛，而非只验证被点名的那个根因。R10 实例：前端 CI 阶段9 失败 = ① `package-lock.json` 未同步 `@vue-flow/core`（`npm ci` EUSAGE）＋ ② `ConfigPage.vue` **从未被 `git add`**（CI checkout 后缺文件）＋ ③ 该文件有未使用导入（`noUnusedLocals` 下 `TS6133`）。三者任存其一即失败；只修①时 build 仍 `EXIT=2`。**判据**：交付前必须实跑**完整流水线命令序列**并记录各步 EXIT，不得以"我修的那个点看起来对了"收尾。</content>
+    <source_interactions>round-2 (INV-GROUP_C-INTELBASE-008 Task 1/2)</source_interactions>
+    <outcome>三处根因全部修复；`npm ci` + `npm run build` 双双 EXIT=0（修复前 build EXIT=2 的原始报错已留证）</outcome>
+    <confidence_history>2026-09-27: 0.6→0.8（错误学习：若止步于第一个根因即交付，会误报 SUCCESS 而流水线仍红）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-006" type="procedural" confidence="0.6" frequency="1" created_at="2026-09-27T00:00:00Z" last_updated="2026-09-27T00:00:00Z" status="ACTIVE">
+    <trigger>需要证明"锁文件完整、可复现"，或为刚修好的缺陷补一条回归测试</trigger>
+    <content>① **锁完整性**：`npm ci`（而非 `npm install`）是**最强证据** —— 它会先清空 `node_modules` 再严格依 lock 重装，且会比对 lock 与 `package.json` 声明，不一致即 EUSAGE 失败。复现时先 `rm -rf node_modules` 以排除残留。② **回归闸有效性**：新加的回归断言必须用**负向对照**证明它**在修复前的产物上会失败**（如把旧 lock 从 `git show HEAD:&lt;path&gt;` 取出临时覆盖再跑），否则可能是恒真的空转断言。取证：两次运行的 EXIT 与失败信息一并留日志。</content>
+    <source_interactions>round-2 (INV-GROUP_C-INTELBASE-008 Task 1/2)</source_interactions>
+    <outcome>npm ci EXIT=0 作为锁完整的证明；负向对照用 R10 前旧锁跑出 `AssertionError: package-lock.json 未解析 @vue-flow/core`（pass 5/fail 1），证明断言非空转</outcome>
+    <confidence_history>2026-09-27: 0.6（首次记录）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-007" type="procedural" confidence="0.6" frequency="1" created_at="2026-09-27T00:00:00Z" last_updated="2026-09-27T00:00:00Z" status="ACTIVE">
+    <trigger>需要在 Node 项目里加"零新增依赖"的冒烟测试入口，且 CI 与本机 Node 主版本可能不同</trigger>
+    <content>用 Node 内建 `node:test` + `node:assert`，`package.json` 写 `"test": "node --test"`（**无参数**）。无参形式递归扫描、默认排除 `node_modules`，在 Node 18/20/24 行为一致，且能自动发现新用例。**不要**传目录参数（`node --test tests/` 在 Node 24 上会被当成模块入口而报 MODULE_NOT_FOUND），**不要**用 glob（Node 21+ 才支持，Node 20 CI 会挂）。断言优先"源码结构 + 构建产物存在性"；对 `dist/` 这类**由构建生成且不入库**的产物，以"目录存在"为**前置条件**（存在才校验内容），这是前置判断而非削弱断言。</content>
+    <source_interactions>round-2 (INV-GROUP_C-INTELBASE-008 Task 3)</source_interactions>
+    <outcome>tests/frontend.smoke.test.js 6 用例全绿、零新增依赖；`node --test tests/` 与 glob 变体均实测不可用后选定无参形式</outcome>
+    <confidence_history>2026-09-27: 0.6（首次记录）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-008" type="procedural" confidence="0.6" frequency="1" created_at="2026-09-27T00:00:00Z" last_updated="2026-09-27T00:00:00Z" status="ACTIVE">
+    <trigger>许可合规要求"据实登记"某依赖的**传递依赖**的版本与许可证</trigger>
+    <content>不要照抄 lock 的 `license` 字段就下结论。① 先 `npm install` 让 `node_modules` 就位；② 对每个包**实地读** `node_modules/&lt;pkg&gt;/package.json` 的 `version` / `license`，并**确认包内存在 `LICENSE` 文件**（`readdirSync` 匹配 `^licen[cs]e`）；③ 注意嵌套包（如同名 `vue-demi` 挂在多个父包下）——按 `node_modules/&lt;parent&gt;/node_modules/&lt;pkg&gt;` 路径逐处登记，别用顶层单一查找（会漏报 MISSING）；④ 登记时同时给出**解析到的精确版本**（`^` 区间会漂移，如 `^1.41.0` → 1.48.2）。全部宽松（MIT/ISC/BSD-3-Clause）方可判定不触发重选型。原始输出落证据文件。</content>
+    <source_interactions>round-2 (INV-GROUP_C-INTELBASE-008 Task 4)</source_interactions>
+    <outcome>14 个传递包全部实测为 MIT/ISC/BSD-3-Clause（零 copyleft），登记入 tech_stack.md §2.1；证据 groupc_r10_license.log</outcome>
+    <confidence_history>2026-09-27: 0.6（首次记录）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-009" type="pattern" confidence="0.6" frequency="1" created_at="2026-09-28T00:00:00Z" last_updated="2026-09-28T00:00:00Z" status="ACTIVE">
+    <trigger>设计文档给出的数据结构字段集与**既有实现**（已被其他模块 / 既有测试依赖）不一致，而本轮须落地该设计</trigger>
+    <content>不要二选一硬切（会打破既有消费方），也不要擅改设计文档。按**最小一致原则**做**兼容扩展**：既有字段**逐字保留**、新增字段**全部给安全默认值** → 任何既有构造点（`SessionState(messages=[], last_expert=None, sticky_turns_left=0)`）仍可工作，新消费方按需读取新字段。同时把口径冲突登记为**设计缺口**（列出"设计版本 / 实现版本 / 处置理由"）交 PM 裁决，并在报告结论里显式声明"未擅自扩充架构、设计文档一字未改"。配套：自检里加一条"旧字段可单独构造"的构造兼容断言 + 一条"新字段默认值"断言。</content>
+    <source_interactions>round-3 (INV-GROUP_C-INTELBASE-010 Task 1; GAP-R11-01)</source_interactions>
+    <outcome>SessionState 兼容扩展后，既有 orchestration/streaming 消费方与 GROUP_D 184 用例零改动全绿；冲突登记为 GAP-R11-01 待 PM 裁决</outcome>
+    <confidence_history>2026-09-28: 0.6（首次记录；经 PM 指令"不得擅自发明架构"确认为正确姿势）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-010" type="pattern" confidence="0.6" frequency="1" created_at="2026-09-28T00:00:00Z" last_updated="2026-09-28T00:00:00Z" status="ACTIVE">
+    <trigger>实现"是否允许恢复/继续一个被挂起的中间态"这类**安全判定**（fail-closed 语义）</trigger>
+    <content>① 把判据做成**纯函数**（无 IO、无副作用，例：`can_resume(state, gate_id, payload) -> bool`）—— 这样才能**离线穷举**三条判据（状态丢失 / 归属不符 / 未携决策）的每一种组合，并把"缺哪一条就放行"的漏洞在自检里钉死。② 恢复/续跑类 HTTP 端点：**所有前置检查放在打开流之前**，任一失败**显式 4xx/5xx**（鉴权 403 / 不存在 404 / 状态冲突 409 / 依赖不可用 503），**绝不**退化为"新建会话后重跑"（那等于把未确认的动作重新执行）。③ 载荷解析要**容错但保守**：残缺载荷一律视为"未携决策"（`decision is None`），**绝不**补成"默认批准"。④ 自检必须同时覆盖**正向**（批准/拒绝均可恢复）与**反向**（每一判据各一条）。</content>
+    <source_interactions>round-3 (INV-GROUP_C-INTELBASE-010 Task 1; IFC-IB-306/307)</source_interactions>
+    <outcome>can_resume 纯函数 + 三类残缺载荷断言（均为 False）+ 端点 401/400/403/409 状态码断言全部离线通过（自检第 2、7 例）</outcome>
+    <confidence_history>2026-09-28: 0.6（首次记录）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-011" type="procedural" confidence="0.6" frequency="1" created_at="2026-09-28T00:00:00Z" last_updated="2026-09-28T00:00:00Z" status="ACTIVE">
+    <trigger>向既有校验器**追加**一项新校验（新错误码），而既有测试对某些错误码做了"**不存在**"断言</trigger>
+    <content>新增校验用**全新错误码**，**不要**复用既有码。理由：既有护栏常写成 `assert "expert_keyword_collision" not in codes`（用于表达"这种情况不属那类错误"），若把新场景也塞进同一码，会**误伤既有护栏**（它本意是排除跨专家场景，而非禁止同专家场景）。例：同专家内重复关键词 → 用新码 `expert_keyword_duplicate`（而非 `expert_keyword_collision`），并与空关键词码 `expert_keyword_empty` 分开 → 既有 TC-UNIT-062/065 仍绿。另：新校验**追加在既有校验项之后**，既有项的语义与顺序不动；被"补强"的旧兜底（`validate_specs`）**保留并用行为断言守护**（构造非法输入 → 断言仍抛异常），不得因新增校验就删旧兜底。</content>
+    <source_interactions>round-3 (INV-GROUP_C-INTELBASE-010 Task 4; BLK-R8-02)</source_interactions>
+    <outcome>validate() 第 12 项以新码落地；既有 definition 用例（11 passed）与全量 184 passed 均无回归；validate_specs 兜底由自检第 5 例行为断言守护</outcome>
+    <confidence_history>2026-09-28: 0.6（首次记录）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-012" type="pattern" confidence="0.6" frequency="1" created_at="2026-09-28T00:00:00Z" last_updated="2026-09-28T00:00:00Z" status="ACTIVE">
+    <trigger>需要给既有函数/构造函数引入一个新"接缝"（如业务话术构造器、可选数据提供者），但又**不得改父签名文本**、且要求"未使用即零行为差异"</trigger>
+    <content>用**兼容超集**手法：新增**可选关键字参数**，默认 `None`，`None` 时行为与既有**逐字相同**（并显式声明"显式传 None 与不传等价 —— 不存在必须显式关闭的陷阱"）。沿用同一代码库里**已有先例**（例：先有 `related_images_provider`，后加 `confirmation_prompt_builder`）以保持风格一致。若契约里的参数是裸 `dict`（如 `resume(session_key, payload: dict)`），**只新增其"载荷类型"**（例：`ResumePayload` + `from_dict` 容错解析），**签名文本一字不改**。骨架侧必须**不生成业务语义**（话术/规则由接入方注入）；未注入 → 不触发该路径（而非呈递空内容）。</content>
+    <source_interactions>round-3 (INV-GROUP_C-INTELBASE-010 Task 1; IFC-IB-301/305)</source_interactions>
+    <outcome>build_graph 新增可选关键字 confirmation_prompt_builder；确认门默认关闭 / 未注入时自检断言"无 confirmation_required"（零行为差异）</outcome>
+    <confidence_history>2026-09-28: 0.6（首次记录；同一手法在本库出现 2 次 → 后续若再出现应升格为既定范式）</confidence_history>
+  </knowledge_entry>
+  <knowledge_entry id="KE-DEV-013" type="heuristic" confidence="0.8" frequency="1" created_at="2026-10-06T00:00:00Z" last_updated="2026-10-06T00:00:00Z" status="ACTIVE">
+    <trigger>设计文档把某契约项（IFC-xxx）明确分配给某个模块，而实现时该契约容易被"就近"在消费点顺手实现</trigger>
+    <content>契约项写明了**落点模块**时，必须在**该模块**落地 —— 只在消费点读取 / 判断**不算实现**。例：IFC-IB-312 要求"配置键名登记"落 MOD-IB-02（`ib/config/__init__.py`），若只在 `ibweb/accounts/__init__.py` 等处用 `os.environ.get(...)` 读取，功能能跑，但**键名不可被集中审计**、违反"单一真源"，且违反"实现必须遵循接口契约"的硬约束。**自查方法**：交付前逐条把 IFC 编号映射到**文件名**，凡映射不到指定模块的即为缺口。**修法通常很小**（把键名追加进既有的键名注册表 `IB_RUNTIME_ENV_KEYS`）+ 在自检里补一条"已在注册表内 / 未混入受保护集合"的断言防回退。</content>
+    <source_interactions>round-4 (INV-GROUP_C-INTELBASE-012; IFC-IB-312, FND-R13-01)</source_interactions>
+    <outcome>起草 implementation_plan §19 时按"IFC → 文件"逐条映射，发现 IFC-IB-312 未落到 MOD-IB-02；补齐 9 个键名登记并新增自检断言，45/45 + 207 passed 无回归</outcome>
+    <confidence_history>2026-10-06: 0.8（错误学习：属"契约不全"类实质缺陷，自评阶段拦下）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-014" type="pattern" confidence="0.8" frequency="1" created_at="2026-10-06T00:00:00Z" last_updated="2026-10-06T00:00:00Z" status="ACTIVE">
+    <trigger>既有端口 Protocol 声明了固定方法数（如"恰好 N 方法"）且不得改动，但新需求需要端口之外的内部能力</trigger>
+    <content>在**具体实现**侧扩展方法，**端口协议一字不改**（仍 N 方法），并登记 `[DEVIATION — reason]`。先例：`upsert_chunks`（D-07）、`revoke_sessions_for_user`（D-R13-02）。**必要条件**：① 替身实现必须提供**同签名**（保证"内存 / 生产两实现语义一致"的自检仍然成立）；② 扩展方法只做端口语义的**自然延伸**（例：端口只有 `revoke_session(单个摘要)`，调用方无从枚举，而"改密后撤销该用户其余会话"是安全必需）；③ 在 `implementation_plan.md` 偏差表逐条登记原决策 / 偏差原因 / 合规性论证。**判据**：若扩展会改变端口语义或引入第二套授权判断，则不可用此手法，应先回设计。</content>
+    <source_interactions>round-4 (INV-GROUP_C-INTELBASE-012; IFC-IB-310, D-R13-02)</source_interactions>
+    <outcome>AccountStore 端口保持恰好 13 方法（自检断言）；SqliteAccountStore / MemoryAccountStore 同签名提供 revoke_sessions_for_user；改密后旧会话被撤销（HTTP 自检实证）</outcome>
+    <confidence_history>2026-10-06: 0.8（首次记录；同一手法在本库出现 2 次 → 已构成既定范式）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-015" type="exception" confidence="0.8" frequency="1" created_at="2026-10-06T00:00:00Z" last_updated="2026-10-06T00:00:00Z" status="ACTIVE">
+    <trigger>在 Windows 上用 `tempfile.TemporaryDirectory` + SQLite 写自检 / 单测</trigger>
+    <content>① Windows 上若 SQLite 连接未关闭，`TemporaryDirectory` 清理会抛 `PermissionError [WinError 32]`；该异常在 `with` 退出时抛出，会**覆盖 `with` 体内真实的断言失败** —— 表现为"报了个莫名其妙的文件占用"，真因被埋（本例首轮误判为"库中未找到 bcrypt 摘要"，实际是循环变量被覆盖、只检查了最后一个文件）。② **修法**：把连接收进一个列表，在 `with` **体内显式 `close()`**，并给 `TemporaryDirectory(ignore_cleanup_errors=True)`，让清理异常绝不取代真实错误。③ 扫 SQLite 全文（如找 bcrypt 摘要 / 断言零明文）要覆盖 **main / -wal / -shm 三件套**（WAL 模式下摘要可能只在 `-wal` 里），只扫主文件会漏检。</content>
+    <source_interactions>round-4 (INV-GROUP_C-INTELBASE-012; r13_account_store_parity, FND-R13-03)</source_interactions>
+    <outcome>改为显式 close + ignore_cleanup_errors + 三件套全量扫描后，真实断言失败立刻显形；修复后 r13_account_store_parity PASS</outcome>
+    <confidence_history>2026-10-06: 0.8（错误学习：测试基础设施缺陷会伪装成产品缺陷）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-016" type="exception" confidence="0.8" frequency="1" created_at="2026-10-06T00:00:00Z" last_updated="2026-10-06T00:00:00Z" status="ACTIVE">
+    <trigger>调用结构化日志 `log_event` 发审计 / 事件</trigger>
+    <content>`log_event(stage, outcome, **extra)` 的 `outcome` 是**第二个位置参数**，**不能**再以关键字放进 `**extra`，否则 `TypeError: got multiple values for argument 'outcome'`。该异常若被上层宽泛捕获，表现为"**审计事件静默丢失**"（最危险的一类：功能正常、留痕为空，验收时不易发现）。**正确写法**：事件名走**位置参数**，`**extra` 只带日志白名单内的附加字段（如 `status` / `project_id`）。**设计要点**：让审计函数**签名本身拒绝**敏感字段（不接受 username / user_id / token / password），比"靠自觉不写"更可靠 —— 想写进去也写不进。</content>
+    <source_interactions>round-4 (INV-GROUP_C-INTELBASE-012; IFC-IB-326, FND-R13-02)</source_interactions>
+    <outcome>throttle.audit 改为 log_event("auth", outcome_or_event, **只有 status/project_id)；认证审计恢复落盘</outcome>
+    <confidence_history>2026-10-06: 0.8（错误学习：静默失败类缺陷）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-017" type="exception" confidence="0.7" frequency="1" created_at="2026-10-06T00:00:00Z" last_updated="2026-10-06T00:00:00Z" status="ACTIVE">
+    <trigger>写"源码纪律"类自检（断言某字符串**不得出现**在某文件里）</trigger>
+    <content>断言前必须**剥离注释**（`/* */`、`&lt;!-- --&gt;`、`//`、`#`）。否则解释性注释（例："本文件不再接受 `?token=` 查询串"）会造成**假阳性** —— 代码其实合规，注释却触发了禁令。同理，断言"无令牌输入入口"这类**结构性**要求时，断言**结构**（例：不得出现 `&lt;input` / `setToken(` / `type="password"`）比断言**自然语言词**（"令牌"）稳健得多。**通用原则**：纪律断言应尽量落在**可机判的结构**上，而非落在会被人话解释污染的文本上。</content>
+    <source_interactions>round-4 (INV-GROUP_C-INTELBASE-012; r13_frontend_auth_discipline, FND-R13-09)</source_interactions>
+    <outcome>App.vue 断言改为结构性（input/setToken/type=password 均不得出现）；client.ts 断言前加 _strip() 剥离注释；两条均转 PASS</outcome>
+    <confidence_history>2026-10-06: 0.7（首次记录）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-018" type="exception" confidence="0.8" frequency="1" created_at="2026-10-11T00:00:00Z" last_updated="2026-10-11T00:00:00Z" status="ACTIVE">
+    <trigger>新增代码 / 文案里出现某字符串，而仓库存在「退场旧标识 grep 归零」类测试（例：ADR-31 旧 cn_label / 旧 slug 不得残留）</trigger>
+    <content>① 该类测试通常用**子串包含**判定，故**注释 / 文档字符串里的旧字面量也会命中**——新写的解释性注释（"标签不得与旧值 X 同字"）本身就把旧值带回了仓库，造成自己触发禁令。② 更隐蔽的是**新标签恰好等于退场旧标签**（本例：内置 KB agent 取 `cn_label="知识库问答"`，而它正是 ADR-31 退场的旧 cn_label）——功能全对，测试红。③ **修法**：为新增的内置默认值选一个**与退场标签不同字**的标签（例 `知识库助手`），且**不要在注释里复述退场字面量**（改为指向反向断言的出处）。④ **通用原则**：任何"某字符串归零"的约束都应在**设计取值**阶段对照退场清单，而不是等测试报红后回填。</content>
+    <source_interactions>round-5 (INV-GROUP_C-INTELBASE-020; test_TC_UNIT_122_repo_grep_zero_old_slugs_and_labels, REV-19)</source_interactions>
+    <outcome>改 cn_label 为「知识库助手」+ 注释不再复述退场字面量；全量 suite 复跑转 352 passed</outcome>
+    <confidence_history>2026-10-11: 0.8（错误学习：自触发式回归）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEV-019" type="exception" confidence="0.8" frequency="1" created_at="2026-10-11T00:00:00Z" last_updated="2026-10-11T00:00:00Z" status="ACTIVE">
+    <trigger>在带 XML 头（&lt;file_header&gt;…&lt;/file_header&gt;）的文档头部内追加文字，且文字含裸 `&lt;` `&gt;`（如路径占位 `&lt;dir&gt;/&lt;pid&gt;.json`）</trigger>
+    <content>① 该头被要求以 `xml.etree.ElementTree` **严格解析**；正文（Markdown）不受影响，但**头内**任何裸 `&lt;` `&gt;` 会让整块解析 `mismatched tag` 失败——而 Markdown 预览看不出问题。② **修法**：头内一律写实体 `&amp;lt;` / `&amp;gt;`（或避开尖括号写法，如用反引号包 `pid` 不带尖括号）。③ **自检动作**：每次改头后，抽出 `&lt;file_header&gt;…&lt;/file_header&gt;` 子串送 `ET.fromstring`，并报该文件 sha256 + 解析结论。④ 注意**代码评审报告**类文档可能是 **Markdown 表头**（非 XML 头）——此时 ET 解析"不适用"，应如实登记，不要伪造一个通过。</content>
+    <source_interactions>round-5 (INV-GROUP_C-INTELBASE-020; impl_plan §26 revision_note 裸 &lt;dir&gt; 触发 PARSE_ERROR)</source_interactions>
+    <outcome>裸尖括号转义为 &amp;lt; / &amp;gt; 后 implementation_plan.md 头 ET 解析 OK</outcome>
+    <confidence_history>2026-10-11: 0.8（错误学习：头内实体转义）</confidence_history>
+  </knowledge_entry>
+</kb_entries>

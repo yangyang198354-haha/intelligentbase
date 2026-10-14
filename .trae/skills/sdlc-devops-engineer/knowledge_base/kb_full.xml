@@ -1,0 +1,39 @@
+<kb_entries agent_domain="devops_engineer" version="0.1.0">
+  <knowledge_entry id="KE-DEVOPS-001" type="procedural" confidence="0.6" frequency="1" created_at="2026-09-26" last_updated="2026-09-26" status="ACTIVE">
+    <trigger>为采用「git pull + systemd 直管」交付纪律的项目撰写生产部署计划时，尤其是项目尚未建立 git 仓库 / remote 的场景。</trigger>
+    <content>部署计划的第 1 节必须是「前置条件（Blockers）」且先独立核验 VCS 现状，而不是直接假设代码可用 git 交付。核验方法：`git remote -v` / `ls -la <root>/.git`。若返回 `fatal: not a git repository` 且无 .git，则「git pull 交付流程」整节不可执行，且任何 rsync/scp 绕道都违反交付纪律——须登记为 P0 阻塞、明确责任方=用户/PM、并写清「未闭合则不得进入部署阶段」。同类须一并核验的外部前置：SSH 凭据注入方式、apt/pip 源可达性、模型权重（大文件，禁入 git）离线获取方式、以及上游遗留 MAJOR 缺陷是否阻塞部署。</content>
+    <source_interactions>round-1（INV-GROUP_E-INTELBASE-001）</source_interactions>
+    <outcome>intelligentbase PHASE_10 部署计划据此把 B-01~B-06 六项列为 P0 阻塞，避免「计划写成可执行、实际第一步就断」。</outcome>
+    <confidence_history>2026-09-26 创建 confidence=0.6（单轮频率扫描）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEVOPS-002" type="heuristic" confidence="0.6" frequency="2" created_at="2026-09-26" last_updated="2026-09-26" status="ACTIVE">
+    <trigger>撰写部署计划、逐条登记 systemd unit 与配置模板时，需要发现「交付物之间的隐性漂移」。</trigger>
+    <content>已交付的 systemd unit / env 模板 / 检查清单往往与架构文档存在**未被任何测试捕获**的漂移，因为它们是「非代码文本」。部署计划须逐条交叉比对并把差异显式登记为开放项，典型三类：① 二进制/路径不一致（unit 写 `/usr/local/bin/qdrant`，架构 ADR 写 `/usr/bin/qdrant`）；② 同一约束的多落点数值不一致（unit `MemoryMax=2560M` vs env 的 `IB_EMBED_MEMORY_LIMIT_MB=2560`，改一处须改另一处）；③ unit 假设的落点与仓库实际布局不一致（unit `WorkingDirectory=/opt/ib-embed` 且 `-m ib_embed.server`，而仓库包在 `src/ib_embed`；另有 unit 引用了仓库里根本不存在的 `ib-worker.env` 模板）。核验手段：`systemctl cat <unit> | diff - <repo>/deploy/systemd/<unit>`、逐 unit 列 EnvironmentFile 实际文件是否存在、`grep` 二进制路径。</content>
+    <source_interactions>round-1（INV-GROUP_E-INTELBASE-001）</source_interactions>
+    <outcome>据此登记 C-02~C-05 四项待澄清（nginx 归属、ib-worker.env 缺失、Qdrant 路径、ib_embed 包落点）。</outcome>
+    <confidence_history>2026-09-26 创建 confidence=0.6</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEVOPS-003" type="pattern" confidence="0.6" frequency="1" created_at="2026-09-26" last_updated="2026-09-26" trigger_keywords="静默降级,验收判据,embedding,OCR,健康检查" status="ACTIVE">
+    <trigger>为含有「fail-open 降级」设计的系统（RAG/检索/OCR 类）编写部署后验证清单时。</trigger>
+    <content>此类系统最危险的事故不是「报错」，而是**静默降级**：依赖其实没装上，但产品照常出结果，于是没人发现。因此验证清单的判据必须**直连依赖**、不得以「端到端能出字」验收。具体模式：① embedding 服务——不能只看进程 active，必须验 `/healthz` 的 `model_loaded=true` 且 `dim` 正确、且**冷路径与热路径都真返回向量**（用系统自己的客户端调，同时验证服务与客户端契约）；② OCR——不能只看「导入成功」，必须断言引擎类型是 `RapidOcrEngine` **而非**静默接管的 `NullOcrEngine`，且 `available() is True`、`recognize()` 有真实输出；③ 扫描件——「整篇 0 字却无任何 WARNING」= 缺陷（静默失败），「单页 0 字 + WARNING」= 允许的降级。另须与上游测试报告的「本机 not-verified 清单」逐项映射，明确每项在部署后应由哪条真机命令归档为证据。</content>
+    <source_interactions>round-1（INV-GROUP_E-INTELBASE-001）</source_interactions>
+    <outcome>据此把 NV-01~NV-08 与 checklists.txt 的 A*/B* 条目一一映射，形成部署后证据归档表。</outcome>
+    <confidence_history>2026-09-26 创建 confidence=0.6；2026-09-26 R4 复现（C-02~C-06 逐条核验落地）frequency→2</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-DEVOPS-004" type="procedural" confidence="0.6" frequency="1" created_at="2026-09-26" last_updated="2026-09-26" status="ACTIVE">
+    <trigger>部署计划修订轮：把上一轮登记的 P1「待确认项」（C-XX）逐条闭合为可执行内容，且不得改冻结决策 / 不得声明已 APPROVED。</trigger>
+    <content>闭合 C 项的通用手法（每条都必须锚定**可核验事实**，不得写成「按实际为准」）：
+1) **隐性必需组件入册**：当某组件只出现在注释/口头约定（如「生产由 nginx 反代」）而不在交付清单里时，用**两个独立证据**坐实其必需性（settings 未配 STATIC_ROOT → 前端不由 Django 托管；vite.config 生产注释 → 反代目标端口），再把它显式列为「第 N 个交付组件」，并**回填进正向/回滚表**。反代清单必须点名：站点文件路径、静态根、proxy_pass 目标端口（**取 src 内真实端口，勿臆造**）、**SSE 必须 `proxy_buffering off`**、`proxy_read_timeout` > 流最长静默期；并注意**外部监听端口不得与上游应用回环端口冲突**（同机同端口 EADDRINUSE）。
+2) **模板缺口闭合**：缺的 env 模板要新建，但**键集必须与既有模板逐键一致**（`diff <(grep -oE '^IB_[A-Z_]+' a|sort) <(...b|sort)` 验证），并在文档里**显式声明「未新增/改名任何键」**，而非静默复制出一套新键。
+3) **路径二义消除**：两处文档/交付物写不同二进制路径时，选**单一规范源**（官方包实际落点）统一，改交付物**一行**即可；保留安装后 `systemctl cat X | diff - <repo>/X` 为空 + `which` 的核验门。关键是**消除二义**，不是迁就任一方。
+4) **包落点**：当 unit 的 WorkingDirectory 与仓库布局不一致时，用**软链**（`ln -sfn`）保「唯一真源」，**禁止复制第二份源码**（副本会与 git pull 漂移）；给出创建/验证（`python -c "import pkg; print(pkg.__file__)"` 指向源）/回滚（只删软链）。
+5) **CPU 指令集（AVX2/SIGILL）类风险**：写成**有序决策树 + 目标机最小探针优先**（探针=import + 一次极小真实推理，各自独立进程），并把**多条受影响链路合并评估**，**逐链路写清「挂掉时的可观测症状」**（如 embedding 挂→健康检查仍 200 但 model_loaded=false→检索静默降级）。
+纪律：修订轮 file_header 的 status 只能写 REVISED_PENDING_REVIEW，**不得自评 APPROVED**；并加修订记录表（改了哪几节/为哪个 C 项/依据什么事实）。</content>
+    <source_interactions>round-2（INV-GROUP_E-INTELBASE-002, R4/REV-04-3）</source_interactions>
+    <outcome>据此刻意把 C-02~C-06 全部闭合：nginx 入册 §7.5、新建 ib-worker.env.example（键集 diff 一致）、qdrant ExecStart 统一 /usr/bin、ib_embed 软链 §8.1、AVX2 决策树 §6.1；status 置 REVISED_PENDING_REVIEW 待 GR-E-002。</outcome>
+    <confidence_history>2026-09-26 创建 confidence=0.6（R4 修订轮单轮蒸馏）</confidence_history>
+  </knowledge_entry>
+</kb_entries>

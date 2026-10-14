@@ -1,0 +1,139 @@
+<kb_entries agent_domain="test_engineer" version="0.3.0">
+
+  <knowledge_entry id="KE-TEST-001" type="procedural" confidence="0.7" frequency="1"
+    created_at="2026-09-27T14:20:00+08:00" last_updated="2026-09-27T14:20:00+08:00" status="ACTIVE">
+    <trigger>上游纯追加新校验后，既有的「正向 / 合法基线」用例成批转为失败。</trigger>
+    <content>先区分「夹具陈旧」与「真实回归」：若失败断言的语义正是「基线合法 → ok is True / errors == () / admit 通过」，
+      且新校验与基线数据冲突（如两位专家共用 cn_label / keywords），则属夹具陈旧，只改夹具数据、不改断言语义
+      （最小面积：把 helper 默认值改为随 name 派生）。若失败断言明显指向实现行为改变或数据损坏 → 立即 BLOCKED 上报，不掩盖。</content>
+    <source_interactions>round-1 (INV-GROUP_D-INTELBASE-005 / R8)</source_interactions>
+    <outcome>D-R8-01：4 例（TC-UNIT-056/057/061、TC-INT-082）修复后全绿，正向断言原样保留并通过。</outcome>
+    <confidence_history>created 0.7 (候选, 待 PM 门控确认)</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-TEST-002" type="procedural" confidence="0.8" frequency="3"
+    created_at="2026-09-27T14:20:00+08:00" last_updated="2026-10-07T00:00:00+08:00" status="ACTIVE">
+    <trigger>产出 test_report.md 增量节 / 判定门控时。</trigger>
+    <content>三层严格串行：单元通过率 ≥ 80% 才跑集成、集成 ≥ 90% 才跑 E2E；通过率 = pass/(pass+fail)（skip/blocked 不入分母）；
+      metrics 必须精确满足 total = pass + fail + skip + blocked。报告须给真实 EXIT 码 + 逐层用例数 + 证据日志路径。
+      从仓库根目录跑 pytest（读 tests/conftest.py 的 sys.path 注入），不要 cd src。
+      增量修订打版本线：test_plan 每次 +0.1、test_report 每次 +0.1，且不得改写历史节的版本行。
+      分层用例数用 `pytest tests/<层> --collect-only -q | grep -cE '::'` 独立实测，勿凭全量 log 反推。
+      前端冒烟 / selfcheck 是**独立层**，不并入 Python 三层算术。</content>
+    <source_interactions>round-1 (R8), round-2 (INV-GROUP_D-INTELBASE-006 / R9), round-3 (INV-GROUP_D-INTELBASE-019 / REV-18)</source_interactions>
+    <outcome>R8：unit 67/67、integration 88/88、e2e 16/16、全量 171/171、selfcheck 31/31，EXIT 全 0。
+      R9：同样 171/171（用例数不变，纯治理轮），test_plan 1.3.0→1.4.0、test_report 1.4.0→1.5.0。
+      REV-18：unit 157 / integration 170 / e2e 24 = 351/351，前端 35/35，selfcheck 51/51，4 命令 EXIT 全 0；
+      test_plan 2.2.0→2.3.0、test_report 1.13.0→1.14.0。</outcome>
+    <confidence_history>created 0.8 | round-2 沿用（未被 REJECTED） | round-3 沿用（待 PM 门控）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-TEST-003" type="exception" confidence="0.7" frequency="2"
+    created_at="2026-09-27T14:20:00+08:00" last_updated="2026-09-27T15:45:00+08:00" status="ACTIVE">
+    <trigger>Windows 上跑 tests/integration/test_ib_embed_wire.py（真实回环 HTTP）出现偶发红。</trigger>
+    <content>FLAKE-IB-01：客户端 getresponse 抛 ConnectionAbortedError WinError 10053（或 ConnectionResetError 10054），
+      命中 TC-INT-025/026（/warmup 用例）。属测试环境偶发、非产品缺陷（重跑即过）。
+      治理落点：仅在该文件的传输助手（_Server.get/post 共用的 _exchange → _request_bounded）对
+      (ConnectionAbortedError, ConnectionResetError) 做有界重试；不得碰断言、不得改状态码、不得 skip/xfail。
+      重试不改语义的前提：TC-INT-026 的 FakeRuntime.fail_next_load 是「持续失败」而非一发式（_fail_load 永不复位），
+      故重发仍恒 500；TC-INT-025 恒 200。否则重试可能把期望 500 翻成 200（禁止）。
+      登记红线：用有限样本无法确证「零复发」——只可标 MITIGATED，绝不据此声称 CLOSED/已根治。</content>
+    <source_interactions>round-1 (R8), round-2 (R9)</source_interactions>
+    <outcome>R8：登记补全（14/4、8/1 命中），保持 OPEN。
+      R9：测试侧有界重试已实施，机制经探针确证（连接级异常前 2 次抛、第 3 次成功）；复跑单文件 10/10 绿、集成层 8/8 绿。状态 OPEN → MITIGATED（未声称 CLOSED）。</outcome>
+    <confidence_history>created 0.6 | round-2 机制经探针验证 → 0.7</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-TEST-004" type="factual" confidence="0.8" frequency="2"
+    created_at="2026-09-27T14:20:00+08:00" last_updated="2026-10-07T00:00:00+08:00" status="ACTIVE">
+    <trigger>在 tests/unit 或 tests/integration 新增测试文件时。</trigger>
+    <content>本仓库测试目录无 __init__.py，pytest 以基名（basename）作模块名。新增文件基名必须全局唯一，
+      否则报「import file mismatch」。R7 已用 _r7 后缀规避；R8 新增须用不同基名
+      （如 test_definition_uniqueness_extra_r8.py 区别于 test_definition_uniqueness_r8.py）。
+      REV-18 沿用：test_rev18_system_mgmt_unit.py 与 test_rev18_system_management_int.py /
+      test_rev18_system_management_extra_int.py 三者基名互异。</content>
+    <source_interactions>round-1 (R8), round-3 (INV-GROUP_D-INTELBASE-019 / REV-18)</source_interactions>
+    <outcome>171 tests collected（R8）；351 tests collected（REV-18），均无 import 冲突。</outcome>
+    <confidence_history>created 0.8 | round-3 沿用（新增文件继续遵守，frequency 1→2）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-TEST-005" type="heuristic" confidence="0.6" frequency="1"
+    created_at="2026-09-27T14:20:00+08:00" last_updated="2026-09-27T14:20:00+08:00" status="ACTIVE">
+    <trigger>为上游修复的缺陷（FND-*）补回归、判定 CLOSED_VERIFIED。</trigger>
+    <content>先读 developer 已写的用例，只补其未覆盖的边界分支与跨模块接缝（不重复造轮子）；
+      闭合判定须覆盖三层：纯函数层（单元边界）、跨模块层（闸门/端点接缝）、自检层（selfcheck 对应项）。
+      报告中逐条对照原缺陷的处置建议判据。</content>
+    <source_interactions>round-1 (R8)</source_interactions>
+    <outcome>FND-R7-01 CLOSED_VERIFIED：TC-UNIT-062~066 + TC-INT-082/087 + selfcheck definition_uniqueness。</outcome>
+    <confidence_history>created 0.6</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-TEST-006" type="procedural" confidence="0.7" frequency="1"
+    created_at="2026-09-27T15:45:00+08:00" last_updated="2026-09-27T15:45:00+08:00" status="ACTIVE">
+    <trigger>需在测试侧治理偶发连接抖动（flake），被要求「加有限重试但不得放松断言」时。</trigger>
+    <content>标准做法（四步）：
+      ① 只在**传输助手**（get/post 共用的发送封装）加重试，绝不碰任何用例的断言；
+      ② 只 except **特定连接级异常元组** (ConnectionAbortedError, ConnectionResetError)，
+         另用独立分支显式排除 HTTPError（原样返回其 code），**禁止** except Exception / 裸 except；
+      ③ 有界：≤3 次尝试 + 短退避；循环末次以**裸 raise** 原样抛出（保留回溯，失败可观测）；
+      ④ 自证守约：写独立探针猴补 urlopen，逐条断言——
+         连接级异常被重试至成功 / 其他异常 attempts=1 冒泡 / 断言类 attempts=1 冒泡 /
+         持续连接异常 3 次后抛出 / HTTPError 不重试且状态码原样。
+      语义安全前提：确认被重试的用例对同一请求**幂等**（如失败标志是一发式则**禁止**重试，否则会把期望 500 翻成 200）。
+      结论口径：只能标 MITIGATED；有限样本无法确证零复发，绝不可标 CLOSED。</content>
+    <source_interactions>round-2 (INV-GROUP_D-INTELBASE-006 / R9)</source_interactions>
+    <outcome>R9：FLAKE-IB-01 治理落地；探针 A~E 全符预期；文档 §14.2/§14.3 给代码引用 + 探针证据。</outcome>
+    <confidence_history>created 0.7（候选，待 PM 门控确认）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-TEST-007" type="pattern" confidence="0.6" frequency="1"
+    created_at="2026-10-07T00:00:00+08:00" last_updated="2026-10-07T00:00:00+08:00" status="ACTIVE">
+    <trigger>需要为 Vue 前端（.vue / .ts）写契约断言，但前端层只有 `node --test` 冒烟（无组件挂载框架）。</trigger>
+    <content>做法：读源码文本 → **先 stripComments**（去 /* */ 与 // 注释）→ 再正则断言。
+      两种稳定断言形态：① 从 .ts 抽 `export type LlmKeyStatus = {...}` 块，断言字段集合与「不含明文字段」；
+      ② 从 .vue 抽 `TOP_ORDER = [...]` / `SYSTEM_ORDER = [...]` 数组字面量，断言导航分组归属。
+      坑：不 strip 注释会让注释里的字面量（如示例字段名）误命中/误漏；正则用非贪婪 + 显式定界（`};` / `]`）。
+      理由说明：这是「源码结构契约」断言，不是行为断言——只用于锁定「类型层无明文」「导航分组」这类结构性事实。</content>
+    <source_interactions>round-3 (INV-GROUP_D-INTELBASE-019 / REV-18)</source_interactions>
+    <outcome>REV-18 前端第 35 例：LlmKeyStatus 无明文字段 + files 保持独立顶级，绿。</outcome>
+    <confidence_history>created 0.6（候选，待 PM 门控确认）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-TEST-008" type="factual" confidence="0.6" frequency="1"
+    created_at="2026-10-07T00:00:00+08:00" last_updated="2026-10-07T00:00:00+08:00" status="ACTIVE">
+    <trigger>在 intelligentbase 写后端单元测试需定位 SQLite DDL / 断言迁移或表结构时。</trigger>
+    <content>schema 模块（`ib.ledger.schema`）里 DDL 按域分常量：**users / accounts 表在 `ACCOUNT_DDL_STATEMENTS`**，
+      **项目表在 `project_registry_ddl_script()`**、**LLM Key 表在 `llm_key_ddl_script()`**（后两者是「单源 DDL 函数」，
+      迁移 .sql 快照须与之归一化后相等）。库文件迁移 `src/deploy/migrations/005_projects.sql` / `006_llm_key.sql`。
+      REV-18 后端口 17 → 19（新增 `ProjectRegistryStore` IFC-IB-367、`LlmKeyStore` IFC-IB-368）。
+      验证迁移幂等：对真实 schema 连续 `executescript(script)` 两次，比对前后快照逐位一致。</content>
+    <source_interactions>round-3 (INV-GROUP_D-INTELBASE-019 / REV-18)</source_interactions>
+    <outcome>TC-UNIT-R18-002/003/006/008 依赖此定位，全绿。</outcome>
+    <confidence_history>created 0.6（候选，待 PM 门控确认）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-TEST-009" type="heuristic" confidence="0.6" frequency="1"
+    created_at="2026-10-07T00:00:00+08:00" last_updated="2026-10-07T00:00:00+08:00" status="ACTIVE">
+    <trigger>被要求测试「运行期动态创建的实体」与「配置侧登记」之间的能力落差（本例：D-R18-01 运行期新建项目）。</trigger>
+    <content>若上游已裁决该落差为**交付边界**（ADR-32「保存 + 重启生效，无热重载」在项目维度的延伸），
+      处置三步：① 在报告中登记为「**已裁决的交付边界 / 非缺陷**」，绝不计为待修项；
+      ② 测试断言的是**清晰的边界错误**（如 `scope_violation` 403 / `startup_error` 500，且消息含未登记实体名），
+      **不是**崩溃、**不是**静默错误结果；③ 必带**对照正例**（对已登记实体同操作成功），防止「一律拒绝」假绿。</content>
+    <source_interactions>round-3 (INV-GROUP_D-INTELBASE-019 / REV-18)</source_interactions>
+    <outcome>TC-INT-161：新建项目上传 403 scope_violation / 检索 500 startup_error；对照 p_alpha 上传 201；绿。</outcome>
+    <confidence_history>created 0.6（候选，待 PM 门控确认）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-TEST-010" type="exception" confidence="0.8" frequency="1"
+    created_at="2026-10-07T00:00:00+08:00" last_updated="2026-10-07T00:00:00+08:00" status="ACTIVE">
+    <trigger>用 `next(... for s in DDL_STATEMENTS if 'USERS' in s)` 找 users 表 DDL，报 StopIteration。</trigger>
+    <content>根因：`ib.ledger.schema.DDL_STATEMENTS` **不含 users 表**（账户域独立为 `ACCOUNT_DDL_STATEMENTS`）。
+      修法：改 `from ib.ledger.schema import ACCOUNT_DDL_STATEMENTS` 并遍历该常量。
+      通用教训：在 intelligentbase 里按「业务域」分流找 DDL 常量——发现空迭代（StopIteration）时，
+      先怀疑「找错了域常量」，而非数据缺失。验证脚本可先 print 各常量里的 `CREATE TABLE` 名清单定位。</content>
+    <source_interactions>round-3 (INV-GROUP_D-INTELBASE-019 / REV-18)</source_interactions>
+    <outcome>TC-UNIT-R18-008 首跑 StopIteration；更正常量后该用例转绿（8 passed）。</outcome>
+    <confidence_history>created 0.8（错误→修正，立即固化为 exception 条目）</confidence_history>
+  </knowledge_entry>
+
+</kb_entries>

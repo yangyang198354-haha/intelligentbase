@@ -1,0 +1,539 @@
+<kb_entries agent_domain="pm_orchestrator" version="0.3.0">
+<!-- 本知识库于 2026-09-25 由 FreeArk 仓库 .claude/agents/knowledge_base/pm_orchestrator/ 迁移至 intelligentbase 项目目录，以保持 FreeArk 仓库只读（intelligentbase 硬约束 C-IB-01）。 -->
+
+  <knowledge_entry id="KE-PM-020" type="pattern"
+    confidence="0.85" frequency="1"
+    created_at="2026-09-26T00:00:00+08:00"
+    last_updated="2026-09-26T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>复核「fail-open / 降级路径」类实现的代码评审结论（尤其子代理自报「用例全绿 / CRITICAL 归零」）</trigger>
+    <content>
+    1. 现象（intelligentbase GROUP_C 实证）：检索层按设计 fail-open（MOD-IB-15 永不抛异常，故障转 degraded）。当读路径闭包引用了未在作用域内的名字（NameError）时，**每次检索都抛异常 → 被 fail-open 吞成 degraded → 问答永远显示「未接入知识资料库」，不报错、不崩溃**。
+    2. 关键陷阱：原用例 `retrieval_fail_open` 只断言「不抛异常且降级」——**缺陷产出的正是这个形状，所以用例当时是 PASS 的**。即 fail-open 用例会把缺陷当成功来「粉饰」。
+    3. 处置范式：**任何 fail-open / 降级路径，必须配一个 happy-path 反例**（断言「不降级 且 有命中」），否则降级用例不具备缺陷检出能力。同类：前端 SSE 分帧哨兵 `-1` 配 `while (boundary >= 0)` 恒 false → 分帧循环一次不执行 → 多帧并一帧、正文全丢、页面空白但不报错。
+    4. 门控含义（PM 复核动作）：子代理声称「无 CRITICAL」时，**不要只信「用例全绿」**；须确认其用例集中存在与降级路径**相反方向**的正向断言（happy-path），并单独排查「静默失败」类缺陷（不抛异常、不报错、只是功能不出结果）。
+    5. 通用判据：凡「异常被吞成降级」的设计，其测试矩阵须成对出现 [降级用例 + 正向用例]；缺一即有粉饰风险。
+    </content>
+    <source_interactions>intelligentbase GROUP_C 2026-09-26（PHASE_06b 自评 FND-IB-23-001 / FND-IB-24-001 两条静默失败）</source_interactions>
+    <outcome>修复 4 CRITICAL（含 2 条静默失败）；新增 retrieval_happy_path 防止 fail-open 继续粉饰缺陷；GROUP_C 门控 PASS_WITH_CONDITIONS</outcome>
+    <confidence_history>初始 0.85（真实缺陷 + 一次修复与用例补齐验证）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-019" type="exception"
+    confidence="0.85" frequency="1"
+    created_at="2026-09-25T00:00:00+08:00"
+    last_updated="2026-09-25T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>子代理需修订/重写超大整文件（约 90–105KB），但其工具集只有整文件 Write（无 Edit/Bash）</trigger>
+    <content>
+    1. 现象：system-architect 工具集为 Read/Write/Glob/Grep/WebSearch/WebFetch，**无 Edit、无 Bash**；整文件 Write 载荷上限约 **50–55KB**；architecture_design.md（~90KB）与 module_design.md（~105KB）的整文件 Write 多次因 JSON 截断失败 → 子代理返回 PARTIAL_SUCCESS，阻塞门控重跑。此类失败**不会损坏原文件**（写未落盘）。
+    2. 关键判断：**不要**改用超限写入，**也不要**让 PM 自行生成领域内容（后者违反「PM 只编排、不改领域内容」铁律）。
+    3. 处置范式 —— **authoring 与落盘分离**：领域内容仍由原子代理以**文本**产出 apply-ready 修订清单（作者身份不变）；PM 用自身 Edit 工具**逐项机械落盘**（只应用、不改写语义）。
+    4. 判据：整文件 Write 载荷一旦接近 50–55KB 即触顶；超过该量级的文档修订一律走「子代理出文本清单 + PM Edit 落盘」路径。
+    5. PM 落盘时宜拆成**小而唯一**的 Edit（大段替换的 old_string 易无法唯一匹配或受外部改动影响而失败），逐块验证返回成功。
+    </content>
+    <source_interactions>intelligentbase GROUP_B R1 2026-09-25</source_interactions>
+    <outcome>以「架构师出文本清单 + PM Edit 落盘」完成 architecture_design.md 34 项、module_design.md 14 项 R1 修订（两文件均升 1.1.0 R1）；GR-B-002 门控 PASS</outcome>
+    <confidence_history>初始 0.85（真实阻塞 + 一次成功处置）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-018" type="procedural"
+    confidence="0.85" frequency="1"
+    created_at="2026-09-25T00:00:00+08:00"
+    last_updated="2026-09-25T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>PARTIAL_FLOW「既有实现 → 通用基座抽离」类项目的需求阶段编排</trigger>
+    <content>
+    1. 需求从「只读调研既有实现」起步：每条需求锚定 `文件:行号(符号)`；PM 门控务必**亲自抽验锚点行号真实性**，不得轻信子代理自述（本轮抽验 rag_service.py / models_rag.py / views_rag.py / experts.py / orchestrator.py / settings.py，全部命中真实代码）。
+    2. 产出现状 vs 目标「变更对照表」，明确指出哪些既有决策被**反转**（本轮：向量库与 embedding 本地化，均反转了 FreeArk v1.4.0 把向量数据库列为范围外的既有决策）。
+    3. **参考项目的项目级约束不得默认继承**：FreeArk 的「禁 Docker」必须提升为独立决策点，而非默认沿用。
+    4. **用户最终可能选择与分析师推荐相反的选项**（本轮 OD-3 用户选「禁 Docker」，而非分析师推荐的「折中双路径」）。推荐项只作参考，必须在门控与文档中标注「系建议而非结论」。
+    5. 通用性须落成**可验收判据**（如「接入新项目核心代码改动行数为 0」）。
+    6. **KB 持久化路径若指向只读参考仓库内会被权限系统拦截**；应把知识库迁移到项目自身目录 `&lt;project&gt;/.claude/agents/knowledge_base/&lt;agent&gt;/`，不要绕过权限去写只读仓库。
+    </content>
+    <source_interactions>intelligentbase GROUP_A 2026-09-25</source_interactions>
+    <outcome>GROUP_A 门控 PASS_WITH_CONDITIONS；用户 8 项决策确认后需求定稿并进入 GROUP_B</outcome>
+    <confidence_history>初始 0.85（完整执行 + 用户决策确认）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-017" type="factual"
+    confidence="0.95" frequency="1"
+    created_at="2026-09-25T00:00:00+08:00"
+    last_updated="2026-09-25T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>intelligentbase（通用 RAG + 多智能体可复用基座）的技术决策基线</trigger>
+    <content>
+    2026-09-25 用户拍板（经协调者转达），共 8 项：
+    1. 向量数据库 = **Qdrant**（单实例、非容器直部署；collection 维度做项目隔离）
+    2. embedding = **bge-m3**（稠密向量、本地部署、余弦相似度）
+    3. 部署 = **沿用 FreeArk「禁 Docker」**，全物理机直部署；向量库与 embedding 均**裸装**（systemd 直部署），**不做**容器双路径
+    4. 聊天/多智能体 LLM = **保留云端 DeepSeek**；须显式声明「提问文本 + 检索片段外发云端」；LLM 端点可配置以便未来切本地；v1 不做本地 LLM 双端
+    5. 规模 = **千级文档量级**（几百~几千份）
+    6. 多项目隔离 = 要，**单实例多项目**（Qdrant collection + 项目级配置隔离）
+    7. 索引重建 = 要（支持 embedding 模型/维度变更的一键重建）→ 派生前置：**原始文件须持久化**
+    8. OCR / 扫描件 = **v1 纳入**，复用 FreeArk RapidOCR 链路移植；PyMuPDF AGPL v3 合规**不得**默认沿用 FreeArk「内部平台合规」豁免，须按 REQ-NFR-IB-12 重审
+    目标机 `192.168.31.133` 硬件**未实测**（密码登录被拒，疑仅开密钥）；架构默认假设 **CPU-only + bge-m3 CPU 模式**，GPU 可选，部署前补实测。
+    </content>
+    <source_interactions>intelligentbase GROUP_A 2026-09-25（用户决策确认）</source_interactions>
+    <outcome>需求定稿 APPROVED，进入 GROUP_B 架构阶段</outcome>
+    <confidence_history>初始 0.95（用户明确拍板）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-014" type="procedural"
+    confidence="0.90" frequency="1"
+    created_at="2026-05-22T10:35:00+08:00"
+    last_updated="2026-05-22T10:35:00+08:00"
+    status="ACTIVE">
+    <trigger>PARTIAL_FLOW 纯前端多文件 Vue 变更（组件修改 + 新建页面 + 路由配置）的开发测试编排模式</trigger>
+    <content>
+    纯前端多文件 Vue 变更的 PARTIAL_FLOW 处理规则：
+    1. 设计更新（OQ决策落图）应先于开发执行：在 module_design.md 中明确 OQ 决策细节（如 legend 位置=header slot、设备面板入口），避免实现阶段不确定性。
+    2. Options API 组件（如 DeviceCardsView）使用 this.$router 而非 useRouter() hook；Composition API 组件（如 DeviceManagementSettingsView）使用 useRoute()/useRouter()。两种风格在同一项目中共存时必须区分。
+    3. 弹窗改路由时需同时处理：(a)移除 dialog DOM + ref，(b)移除 import 和 components 注册，(c)更新 return 语句，(d)更新事件处理函数，(e)新建路由页面，(f)注册路由。六步缺一不可。
+    4. 纯前端测试策略：静态代码审查（逐行读取源文件 + grep 关键元素）可覆盖 100% 的结构性 AC，不需要 npm run dev 或浏览器运行时。
+    5. 多文件副标题补齐中，flex 布局的页面头部（ServicesView: h2 + 刷新按钮）需用 page-title-group wrapper 隔离，避免副标题与按钮并排。
+    6. 静态测试门控通过标准：所有 TC 有具体文件行号引用作为证据，通过率 100%。
+    </content>
+    <source_interactions>FreeArkWeb UI v2 PARTIAL_FLOW 2026-05-22</source_interactions>
+    <outcome>PHASE_03b(设计更新) + GROUP_C + GROUP_D 全部门控 PASS，27/27 测试通过，0 CRITICAL</outcome>
+    <confidence_history>初始 0.90（完整执行 + 门控 PASS）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-013" type="procedural"
+    confidence="0.90" frequency="1"
+    created_at="2026-05-21T05:40:00Z"
+    last_updated="2026-05-21T05:40:00Z"
+    status="ACTIVE">
+    <trigger>纯前端样式/结构改造（无后端变更、无 migration）的 GROUP_E CI/CD 设计与部署</trigger>
+    <content>
+    纯前端改造（如 UI 一致性治理）的 GROUP_E 裁剪原则：
+    1. CI 流水线大幅简化：去掉后端构建、Django 检查、migration 检查、Python 测试阶段；核心只需 npm ci + npm run build + 产物验证（3 步）。
+    2. 生产部署步骤极简：git pull + npm run build（就地，Nginx root 直指 dist）+ nginx reload（不重启 nginx，不重启任何后端服务）。预计 3-5 分钟，零停机。
+    3. 快照备份策略：Step 3 备份 dist（cp -a dist dist_backup_${TS}），回滚时 cp 恢复 + nginx reload，约 2 分钟，无需 git revert。
+    4. 受影响服务只有 Nginx（reload），freeark-backend/task-scheduler/mqtt-consumer 全部不重启——务必在 deployment_plan.md §1 明确列出。
+    5. 色值 grep 验证（dist/assets/*.js 中搜索 #409eff 等）在 Vite minify 后可能变换，应标注为 INFO/非阻断项。
+    6. GitHub Actions YAML 只需 1 个 job（frontend-build-verify），无需 test/deploy-staging 等复杂 job。
+    </content>
+    <source_interactions>FreeArk_UIConsistency GROUP_E 2026-05-21</source_interactions>
+    <outcome>cicd_pipeline.md + deployment_plan.md + deployment_report.md 全部产出，门控 PASS_WITH_CONDITIONS（条件：Runbook 执行后回填）</outcome>
+    <confidence_history>初始 0.90</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-012" type="procedural"
+    confidence="0.90" frequency="1"
+    created_at="2026-05-20T00:00:00+08:00"
+    last_updated="2026-05-20T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>PARTIAL_FLOW 看板新增统计卡片（后端聚合 API + 前端卡片并排布局），涉及 PLCConnectionStatus + PLCLatestData 两表关联统计</trigger>
+    <content>
+    1. 查询策略：用 IN 子查询两步法（online_parts → switched_on_parts → mode_agg），3-4次 DB 查询，全走 (specific_part, param_name) UNIQUE 索引，无 N+1。
+    2. 未知模式（OQ-002）：unknown = powered_on_count - sum(mode 1-4)，Python 层计算，不增加 DB 查询；前端 v-if="unknown > 0" 按需显示。
+    3. 布局改造（OQ-004）：将独占行 div.section 改为 flex 容器 div.top-cards-row，原卡片 flex:2，新卡片 flex:1；CSS 增量添加，不删除原有类。
+    4. 测试命名：test_dashboard_power_status_v053.py，7个类，30个方法，覆盖 AC-101~110 + AC-201~205 + OQ-002。
+    5. 前端 AC 通过 TestFrontendCodeReview 读 HomeView.vue 源码静态验证（路径上溯4层..到 FreeArkWeb/）。
+    6. 所有现有 API 签名和 models 不变更，无 migration，纯增量开发。
+    </content>
+    <source_interactions>PARTIAL_FLOW v0.5.3 看板开机状况卡片 2026-05-20</source_interactions>
+    <outcome>GROUP_B+C+D 全部门控 PASS，30/30 测试通过，0 CRITICAL</outcome>
+    <confidence_history>初始 0.90</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-010" type="procedural"
+    confidence="0.90" frequency="1"
+    created_at="2026-05-20T00:00:00+08:00"
+    last_updated="2026-05-20T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>PARTIAL_FLOW 开发+测试阶段（GROUP_C+D），对象是启动脚本参数化（waitress/环境变量），不部署</trigger>
+    <content>
+    1. 代码变更极小（1处 serve() 调用替换为环境变量读取+扩展参数传入），使用 Edit 工具精确替换，不整体重写文件。
+    2. 单元测试策略：不 import 整个启动脚本（会触发 Django 初始化副作用），而是直接在测试中复现关键参数读取逻辑（完全相同表达式），用 unittest.mock.patch.dict 注入环境变量，用 MagicMock 捕获 serve() 调用参数。
+    3. settings.py 无变更验证：直接以 open() 读文件内容做 assertIn/assertNotIn（不依赖 Django ORM）。
+    4. 测试文件命名：test_{module}_{version}.py（如 test_waitress_config_v052.py），新建独立文件，不覆盖已有测试。
+    5. M3 无变更和 fail-fast 策略均需显式测试覆盖（assertRaises(ValueError)）。
+    6. 生产验证项（并发压测、systemd、MySQL 连接数）明确标注"待生产执行"，不阻塞 Windows 本地门控 PASS。
+    </content>
+    <source_interactions>PARTIAL_FLOW v0.5.2 waitress 调优开发测试任务 2026-05-20</source_interactions>
+    <outcome>GROUP_C+D 全部门控 PASS，10/10 单元测试通过，0 CRITICAL</outcome>
+    <confidence_history>初始 0.90</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-009" type="factual"
+    confidence="0.90" frequency="1"
+    created_at="2026-05-20T00:00:00+08:00"
+    last_updated="2026-05-20T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>waitress 线程数调优与 Django MySQL 持久连接容量安全边界分析</trigger>
+    <content>
+    关键设计决策（FreeArk v0.5.2）：
+    1. waitress threads=16（环境变量 WAITRESS_THREADS，代码默认 16）；树莓派4B 4核，I/O 密集推荐 4×CPU=16。
+    2. channel_timeout=120s（显式化 waitress 原始默认值，环境变量 WAITRESS_CHANNEL_TIMEOUT）。
+    3. connection_limit=100（显式化 waitress 原始默认值）。
+    4. CONN_MAX_AGE=300 保持不变；16 线程最多持有 16 个 MySQL 持久连接；总连接数 25~28，远低于 max_connections=151。
+    5. 不加 reconnect=True：Django 5.2 内置重连机制已足够；mysqlclient 的 reconnect=1 在 Django 事务管理下有丢失事务状态风险（官方不推荐）。
+    6. git commit c09f41e 的 "Lost Connection" 是 dph_cleanup 长事务场景，与看板短查询不同，不需要本次迭代额外处理。
+    7. 环境变量注入推荐：systemd override（生产）+ .env 文件（开发），load_dotenv 默认 override=False，systemd Environment= 优先。
+    </content>
+    <source_interactions>PARTIAL_FLOW v0.5.2 waitress 调优任务 2026-05-20</source_interactions>
+    <outcome>architecture_design.md ADR-01~06 均以此为基础，门控 PASS_WITH_CONDITIONS（1项MINOR：MySQL max_connections 待生产确认）</outcome>
+    <confidence_history>初始 0.90（基于代码分析+文档推理，容量计算已验证）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-008" type="procedural"
+    confidence="0.90" frequency="1"
+    created_at="2026-05-20T00:00:00+08:00"
+    last_updated="2026-05-20T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>PARTIAL_FLOW 仅到设计阶段（需求→用户故事→架构/模块设计）暂停等待用户确认的编排模式</trigger>
+    <content>当用户要求"先更新需求/设计文档，确认后再开发"时：
+    1. 执行 GROUP_A（需求分析+用户故事）→ 门控 PASS → 执行 GROUP_B（架构+模块设计）→ 门控 PASS
+    2. 在 GROUP_B 门控通过后立即暂停，不调用 software-developer
+    3. 向用户输出：所有新建文档路径 + 设计要点摘要 + 关键决策点清单（threads 取值、参数化方式、DB 配置确认）
+    4. 明确说明"等待用户确认后再进入开发阶段"
+    5. phase_status.md 记录 PHASE_05~11 状态为 PENDING，含明确的等待条件
+    6. 文档目录约定：docs/requirements/v{version}_{feature_slug}/ 存放该版本所有文档</content>
+    <source_interactions>PARTIAL_FLOW v0.5.2 waitress 调优任务 2026-05-20</source_interactions>
+    <outcome>完成 4 个文档产出，门控全部通过，清晰汇报等待用户确认</outcome>
+    <confidence_history>初始 0.90</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-007" type="pattern"
+    confidence="0.90" frequency="1"
+    created_at="2026-05-20T00:00:00+08:00"
+    last_updated="2026-05-20T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>PARTIAL_FLOW 诊断任务（性能分析+测试）的编排模式</trigger>
+    <content>诊断任务 PARTIAL_FLOW 处理规则：
+    1. 独立创建 perf_phase_status.md（不污染已有 phase_status.md）
+    2. 测试脚本独立文件（test_dashboard_perf.py），非 Django TestCase，而是 httpx asyncio 独立脚本
+    3. 所有测试为只读 GET 请求，不写入数据库，不修改配置
+    4. 需要配置对比（threads=4 vs 16）的测试，在报告中提供分步指导，不自动修改生产配置
+    5. 产出物：perf_analysis_report.md（静态分析）+ perf_test_plan.md（测试计划）+ perf_test_report.md（报告含待填区）+ test_dashboard_perf.py（可执行脚本）</content>
+    <source_interactions>PARTIAL_FLOW 性能诊断任务 2026-05-20</source_interactions>
+    <outcome>完成两阶段 PARTIAL_FLOW，门控 PASS，产出 4 个文件</outcome>
+    <confidence_history>初始 0.90</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-006" type="factual"
+    confidence="0.95" frequency="1"
+    created_at="2026-05-20T00:00:00+08:00"
+    last_updated="2026-05-20T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>FreeArk waitress 线程数导致看板 API 请求排队超时归零</trigger>
+    <content>start_waitress_server.py L82: serve(application, host='0.0.0.0', port=8000) 未传 threads 参数，默认 threads=4。HomeView.vue onMounted 同时触发 7 个 dashboard API 请求，超过线程池上限。dashboard_services 端点串行 subprocess 9 次 systemctl 调用（Linux），耗时 500~900ms，加剧线程占用。api.js 使用原生 fetch() 无 AbortController 超时，依赖浏览器 60s 超时，导致「转圈很久后归零」。修复：waitress threads=16（1行改动），前端加 15s AbortController 超时。</content>
+    <source_interactions>PARTIAL_FLOW 性能诊断任务 2026-05-20</source_interactions>
+    <outcome>识别 P1 主因（线程数）和 P2 前端超时机制，给出分优先级修复建议</outcome>
+    <confidence_history>初始 0.95（代码证据链完整）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-005" type="pattern"
+    confidence="0.85" frequency="1"
+    created_at="2026-05-20T00:00:00+08:00"
+    last_updated="2026-05-20T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>用户授权跳过 Staging 验证直接部署生产的风险接受处理</trigger>
+    <content>跳过 Staging 验证时：
+    1. 在 deployment_report.md 中写入 RISK_ACCEPTED_001（跳过staging）和 RISK_ACCEPTED_002（手动执行模式）
+    2. 缓解措施：verify_deployment.sh 提供等价的部署后自动验证；备份完整快照支持快速回滚
+    3. PHASE_11 门控状态定义为两阶段：runbook完成=PENDING_USER_EXECUTION；用户回填deployment_report=可执行完整GROUP_E PASS评审
+    4. 风险接受记录必须含：风险描述、风险等级、缓解措施、授权人、授权日期</content>
+    <source_interactions>round-1（FreeArk v0.5.0 PHASE_11）</source_interactions>
+    <outcome>风险接受合规记录，门控状态清晰</outcome>
+    <confidence_history>初始 0.85</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-004" type="procedural"
+    confidence="0.90" frequency="1"
+    created_at="2026-05-20T00:00:00+08:00"
+    last_updated="2026-05-20T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>PHASE_11 手动执行模式（密码SSH + 无CI自动化）的 Runbook 生成</trigger>
+    <content>当 PHASE_11 采用"用户 SSH 手动执行 Runbook"模式时：
+    1. Runbook 使用 ${DEPLOY_USER}、${PROJECT_ROOT} 等环境变量占位，用户执行前 export 替换
+    2. verify_deployment.sh 必须幂等可重跑，含 set -euo pipefail，输出 PASS/FAIL，结束行输出 DEPLOYMENT_VERIFIED=true/false + exit 0/1
+    3. rollback.sh 必须接受 --snapshot-timestamp 参数，对应 Step 3 备份产物路径
+    4. deployment_report.md 预先写入 PENDING_USER_EXECUTION 状态 + 风险接受记录，留空字段待用户执行后回填
+    5. 部署验证 5 项：健康检查HTTP200、API路由HTTP401、前端HTTP200、bundle含markDirty、DB验证is_active=False
+    6. 所有脚本产物放在 docs/deployment/{version}/ 与 runbook 同目录</content>
+    <source_interactions>round-1（FreeArk v0.5.0 PHASE_11 启动轮）</source_interactions>
+    <outcome>成功生成 4 个 PHASE_11 产出文件</outcome>
+    <confidence_history>初始 0.9</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-003" type="factual"
+    confidence="0.95" frequency="1"
+    created_at="2026-05-20T00:00:00+08:00"
+    last_updated="2026-05-20T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>FR-001 el-input-number 清空边界测试</trigger>
+    <content>FR-001 风险路径：el-input-number 清空 → inputValues[param]=undefined → String(undefined)="undefined" → WriteItemSerializer(CharField max_length=50) 接受 → PLCWriteRecord.new_value="undefined" → 任务调度器解析失败 → PLC 不被误写，但审计噪声。影响参数：仅限使用 el-input-number 的数值型参数（如 living_room_temp_setting），operation_mode 和 away_energy_saving 使用 el-select 不受影响。推荐修复：在 handleBatchSubmit 的 filter 链中过滤 undefined/null。风险等级：MINOR，不阻塞 GROUP_D PASS。</content>
+    <source_interactions>round-1</source_interactions>
+    <outcome>FR-001 完整验证并给出处置建议</outcome>
+    <confidence_history>初始 0.95（代码分析 + 测试验证双重确认）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-002" type="pattern"
+    confidence="0.90" frequency="1"
+    created_at="2026-05-20T00:00:00+08:00"
+    last_updated="2026-05-20T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>已有测试文件（test_device_settings.py、test_device_settings_integration.py）存在时追加 v0.5.0 测试</trigger>
+    <content>不要覆盖已有测试文件。在同一测试目录下新建专属版本文件（test_device_settings_v050.py），用 TestCase 子类组织，使得旧测试套件（v0.4.x）和新测试套件（v0.5.0）可独立运行也可合并运行。文件命名规则：test_{module}_{version}.py</content>
+    <source_interactions>round-1</source_interactions>
+    <outcome>新测试文件与现有测试共存，无冲突</outcome>
+    <confidence_history>初始 0.9</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-001" type="procedural"
+    confidence="0.90" frequency="1"
+    created_at="2026-05-20T00:00:00+08:00"
+    last_updated="2026-05-20T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>SendMessage 工具不可用时需要跨会话推进 SDLC 阶段</trigger>
+    <content>当 SendMessage 工具不可用导致跨会话中断时，PM 应在新会话中：
+    1. 读取所有 GROUP 已产出文件（requirements_spec、user_stories、architecture_design、module_design、implementation_plan、code_review_report）
+    2. 读取实际代码文件（views、param_value_label、seed_device_config、Vue 组件）
+    3. 重建 session_context（project_name、flow_mode、current_group、retry_counters）
+    4. 直接以当前 PM 身份执行子代理职责（测试工程师、开发工程师等），产出对应文件
+    5. 执行门控评审并向用户汇报，等待指令</content>
+    <source_interactions>round-1（FreeArk v0.5.0 GROUP_D 启动轮）</source_interactions>
+    <outcome>成功完成 GROUP_D 全部产出物</outcome>
+    <confidence_history>初始 0.9（用户明确确认信号）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-022" type="heuristic"
+    confidence="0.80" frequency="1"
+    created_at="2026-09-26T00:00:00+08:00"
+    last_updated="2026-09-26T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>对「追加式修订」（R2 / 只增不改类增量）做门控复核时，如何判定 R1 陈旧描述是缺陷还是历史留痕</trigger>
+    <content>
+    1. 前提：R2 常声明「只追加、不改写既有」。因此**历史报告正文**（如 code_review_report §1~§8）保留 R1 旧结论**不算缺陷** —— 只要追加章节（§9）显式闭合/更正即可。不要把这些当失效。
+    2. 真缺陷集中在**在用交付物**：部署清单（checklists.txt）、systemd 单元、env 模板、面向运维/下游的**散文**。它们被直接使用，若仍写「某服务无归属 / 无生产端 / 无出处 / 需归属方提供」而 R2 已解决，即为**失实**（会误导运维）。本轮实证：checklists.txt B6 待办仍称 `ib-embed` 服务端「不在 MOD-IB-01~25 任一模组」，而 R2 已新增 MOD-IB-26 并实现之。
+    3. 审计法：grep 陈旧断言关键词（「无归属模组」「不在 MOD-IB-01~25」「无生产端」「无出处」「归属方提供」「尚未指派」），**逐条判定所在文件是历史正文还是在用交付物**。
+    4. 另一类高频不一致：**契约散文 vs 字段级定义**。字段级定义（本轮 module_design §2.1 / IFC-IB-276）为权威；散文（IFC-IB-282 称载荷「只传 image_id 与 url_path」而实际 5 字段）为措辞缺陷。判据：以字段级定义为准，登记散文缺陷以免下游按散文误断产生**假失败**。
+    5. 门控含义：这类均为 MINOR、非阻塞，但**必须登记**（open_item），否则会在 GROUP_D/部署阶段变成假失败或运维误操作。
+    </content>
+    <source_interactions>intelligentbase GR-C-002 2026-09-26（R2 交付物陈旧残留审计）</source_interactions>
+    <outcome>检出并登记 2 处在用交付物/散文陈旧描述（checklists.txt:165-167、module_design.md:466），均判 MINOR 非阻塞，未影响 GR-C-002 判 PASS</outcome>
+    <confidence_history>初始 0.80（真实检出 2 例；尚未有第二次独立复现）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-021" type="pattern"
+    confidence="0.90" frequency="2"
+    created_at="2026-09-26T00:00:00+08:00"
+    last_updated="2026-09-26T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>门控需采信子代理「自检全绿 / 测试通过」的可执行证据，但 PM 自身无 Bash 工具</trigger>
+    <content>
+    1. 铁律：子代理的「测试通过 / 自检全绿」**不得单独作为门控依据**（项目记忆 `verify-claims-by-real-execution`：空样本/判据太松/没真跑都会造成假象）。
+    2. 处置范式 —— **委派受限 verifier 复跑**：PM 若无 Bash，则派一个受限的子代理（如 general-purpose，有 Bash）**只复跑、不修改、不写文件**，并为每条命令要求：原始输出 + exit code；失败如实报；`NO_MATCH`/异常必须显式列出。
+    3. **关键鉴别（stderr 负路径日志）**：自检输出顶部若干 `... code=internal_error` / `Service Unavailable: ...` 行，可能是**被测代码在故意走坏路径时的设计内日志**（走 stderr），非失败。判据：丢弃 stderr 复跑（`2>/dev/null`），若 PASS 行与总计行不变即证实非失败。
+    4. 交叉审计项（应**全为空**）：禁忌顶层 import（fitz/pymupdf/fastapi/uvicorn/channels/redis）、核心契约树 import Web 框架（django）、跨包反向 import（服务端包↔业务基座）、真实凭据模式（sk-/ghp_/-----BEGIN/AKIA/password=/secret=）、前端裸 axios。每条命中都要**逐条追溯**是注释/自检正则/清单提示，还是真代码。
+    5. 收尾：将「复跑命令 + 原始输出 + exit code + 结论」写入 phase_status.md 的 audit_log，与子代理自述**并列留痕**（谁复跑的、复跑命令行可复制）。
+    6. 注意：verifier 无 Read/Glob/Grep 工具时，PM 自己做静态审计补充，两者**互补**（PM 静态审计 + verifier 动态复跑）。
+    </content>
+    <source_interactions>intelligentbase GR-C-002 2026-09-26（INV-GROUP_C-INTELBASE-002 的 24/24 自检由独立 verifier 复跑证实）</source_interactions>
+    <outcome>复跑 compileall EXIT=0 + selfcheck 24/24 EXIT=0；stderr 三行经 2>/dev/null 复跑证为设计内负路径日志；五项禁忌审计全空 → GR-C-002 判 PASS</outcome>
+    <confidence_history>初始 0.85（真实复跑成功一次）→ 0.90（2026-09-26 GROUP_C R3 / GR-D-002 第 2 次复用同一范式：面对 test-engineer 自报『142/142 全绿 + CLOSED_VERIFIED』仍不采信，改派独立只读 verifier 执行 13 项证伪清单；本次额外覆盖『复核第三方新缺陷的真伪』（新缺陷 FND-GROUP-D-03 须排除探针构造误差）与『亲读翻转后用例源码判定断言未弱化』）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-023" type="pattern"
+    confidence="0.90" frequency="2"
+    created_at="2026-09-26T00:00:00+08:00"
+    last_updated="2026-09-26T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>对「测试通过率」类门控（单元≥80% / 集成≥90% 等）复核子代理自报的 pass/fail 计数</trigger>
+    <content>
+    1. 前提：通过率是最容易被「注水」的度量（skip 掉难例、只在配置里 deselect、断言退化为 is not None、把 SUT 自身 monkeypatch 掉）。故**复跑通过率只是第一步，必须再做「防注水四查」**。
+    2. **复跑对账**：逐层复跑（unit/integration/e2e/all），要求 原始输出 + exit code；再用 `--collect-only` 取收集数，与「每文件 `def test_` 计数逐目录相加」对账 —— **函数计数必须等于收集数**，不等即存在静默丢弃/收藏钩子。
+    3. **配置文件面**：确认仓库（或测试根）**不存在** pytest.ini / setup.cfg / pyproject.toml / tox.ini，或存在但**无** `addopts` / `-k` / `--deselect` / `--ignore` / `collect_ignore` / `pytest_collection_modifyitems` 钩子 —— 这是隐藏「跳过用例」的常见入口。
+    4. **标记面**：`pytest.mark.skip|xfail`、`assert True`、`sys.exit/os._exit/pytest.exit` 在 tests/ 下命中数应为 0；skip 计数应为 0（skip 不计入通过率分母，最易被用来掩盖失败）。
+    5. **替身边界**：`monkeypatch.setattr` 只允许打在**外部依赖/端口替身**上；若打在 SUT（被测模块）自身的符号上，等于把被测物替换成桩，通过率失去意义。逐条核对其 target 是否落在 SUT 包内。
+    6. 加分证据：**脱离测试套件的独立探针**复现同一现象（本轮由 verifier 直接用 `delete_document` / `build_capability_digest` 探针复现两项缺陷），可同时证明「用例是真的在测真东西」。
+    7. 反例（诚实上限）：若被测项目**不是 git 仓库**，「实现未被改动以迎合测试」无法经 VCS 证明，只能以 **mtime 时间窗**（全部实现文件早于测试编写窗口）佐证，并须在门控中**显式标注该证据的强度上限**，不得声称已证明。
+    8. **第五查 ——「翻转忠实性」（2026-09-26 GROUP_C R3 / GR-D-002 增补）**：当本轮的门控动作是「把缺陷固化用例翻转为正向断言」（配合 KE-PM-024 的缺陷冻结）时，翻转本身可能被**悄悄弱化** —— 只断言 `isinstance(x, bool)` 而不主张真值、把断言包进 `try: ... except: pass`、或断言了与缺陷无关的旁支。故须**亲读翻转后的用例源码**，确认其断言强度**不低于缺陷原描述**（例：缺陷原为「删除返回 500」，翻转后必须断言「返回 2xx **且** 台账行消失 **且** 检索为空 **且** 再删 404」，而非仅断言「不抛异常」）。
+    </content>
+    <source_interactions>intelligentbase GR-D-001 2026-09-26（INV-GROUP_D-INTELBASE-001 的 55/69/14/138 通过率由独立 verifier 复跑 + 防注水四查证实）</source_interactions>
+    <outcome>四层复跑全部命中 55/69/14/138 且 EXIT=0；collect-only=138 与函数计数相等；无任何测试配置文件；0 skip/xfail；monkeypatch 全部落在替身；GR-D-001 判 PASS_WITH_CONDITIONS。R3（142 例）再次复用并增补第五查「翻转忠实性」</outcome>
+    <confidence_history>初始 0.85（真实复跑 + 四查全部执行一次）→ 0.90（2026-09-26 GROUP_C R3 / GR-D-002 第 2 次复用，并增补第五查『翻转忠实性』：固化用例翻转为正向断言后须亲读源码确认断言强度不低于缺陷原描述）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-024" type="pattern"
+    confidence="0.80" frequency="1"
+    created_at="2026-09-26T00:00:00+08:00"
+    last_updated="2026-09-26T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>测试阶段发现「已知但本轮不修」的实现缺陷，如何把它写进测试套件而不至于被后人顺手改成绿</trigger>
+    <content>
+    1. 问题：测试发现缺陷后有三种坏处置 —— (a) 跳过该用例（掩盖）、(b) 把断言放宽到能过（退化）、(c) 让测试失败（阻塞门控）。三者都会丢失「此缺陷已被记录」的信息。
+    2. **正确范式 —— 缺陷冻结（defect freeze）**：用例**断言当前的坏行为**，并在断言里附一句**守卫串**（如 `assert deleted.status_code == 500, "偏差已消除——请更新缺陷登记"`）。效果：缺陷一旦被修复，该用例**会响亮地失败**并提示去更新缺陷登记，而不是悄悄变绿。
+    3. 与 KE-PM-020 的关系：KE-PM-020 讲的是「fail-open 降级用例会把静默缺陷粉饰成成功」（危害）；本条目是它的**建设性对偶** —— 对**已知且已登记**的缺陷，反向断言 + 守卫串是诚实的编码方式；对**未发现**的静默缺陷，仍须靠 KE-PM-020 的 happy-path 反例去揪。
+    4. 门控含义：PM 看到「用例断言 500 / 断言空串 / 断言 degraded」时，**不要**立即判为测试写错；先确认它是否带守卫串且对应一条已登记缺陷（本轮 FND-GROUP-D-01/02 即如此）。反向：若这类用例**无**守卫串、也无缺陷登记，则须追问是「缺陷冻结」还是「断言退化」。
+    5. 配套：每条被冻结的缺陷须同时出现在 defect registry / open_inputs，注明复现命令、根因、严重度、处置路由与是否阻塞下一阶段 —— 否则「冻结」就退化为「遗忘」。
+    </content>
+    <source_interactions>intelligentbase GR-D-001 2026-09-26（FND-GROUP-D-01/02 以反向断言 + 守卫串固化）</source_interactions>
+    <outcome>两项缺陷以守卫串用例固化（TC-INT-009/041/061），并由独立探针二次复现；缺陷同时登记为 open_inputs FND-GROUP-D-01/02 并路由 software_developer</outcome>
+    <confidence_history>初始 0.80（首次记录；仅一例实证）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-025" type="pattern"
+    confidence="0.85" frequency="7"
+    created_at="2026-09-26T00:00:00+08:00"
+    last_updated="2026-10-06T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>PM 以 Edit 分批机械编辑大型 XML 状态文件（phase_status.md / 知识库 / 契约）时，如何防止把产物写成非法 XML —— 尤其是「属性值里混入裸引号或未转义 &lt;」这类**静默破损**；以及**新增元素时的 Edit 锚点选择**（避免把新元素插进未终止的多行起始标签内部）；并覆盖**多段文档（开头一个 XML file_header 区块 + 其后 markdown 正文）的 header 区块专项复核**</trigger>
+    <content>
+    1. **三种已实测的破损形态**（intelligentbase 同一 PM 会话中累计 3 次，故晋升）：
+       (a) **标签不配对**：GROUP_C 缺 `&lt;/group&gt;`（后于 GR-B-003 后补齐）；
+       (b) **孤立残留符**：GR-C-002 之后多出一行单独 `/&gt;`（删 `&lt;revision_request&gt;` 时漏删的尾巴）；
+       (c) **属性值内裸引号**：在 XML 属性里写 `回退 \"default\"` —— XML **不支持** 反斜杠转义，该 `"` 会**提前终止属性值**，整份文档解析失败（且肉眼极难发现，因为渲染出来"看起来正常"）。
+    2. **根因**：PM 的 Edit 是**机械落盘**（领域内容来自子代理），PM 注意力在"内容对不对"，而 XML 合法性与内容无关；分批编辑使每次落盘只看到局部，看不到全局配对状态。
+    3. **强制规程（每批 Edit 收尾必做，30 秒）**：
+       - 属性值内**禁止**裸引号（改用 `『』`）与裸 &lt;（用 `&amp;lt;`）、裸 &amp;（用 `&amp;amp;`）；
+       - 开闭计数自检：对 `&lt;group&gt;/&lt;/group&gt;`、`&lt;gate_review&gt;`、`&lt;followup_note&gt;/&lt;/followup_note&gt;`、`&lt;revision_request&gt;` 等**逐对计数相等**；
+       - 反查两类**静默**破损：`="[^"]*&lt;`（属性内未转义 &lt;）与 `&amp;[^a-zA-Z#]`（裸 &amp;）；因 ripgrep 默认不支持 look-around，**不要**依赖负向断言 grep，改用如上『正向可疑模式』逐个命中排查；
+       - 若编辑批次 ≥3 次，**收官必须做一次全文结构自检**，并在 audit_log 记 `PM_FIX`。
+    4. **认定标准（避免过度惊慌）**：`&lt;gate_review ...&gt;` 若通篇以 `...="..."/&gt;` 自闭合、则 `&lt;/gate_review&gt;` 计数为 0 是**正常**的；判定配对时须先确认该元素是"自闭合"还是"成对"，否则会把自闭合误报为未闭合（反之亦然）。
+    5. **与 KE-PM-019 的关系**：KE-PM-019 讲"载荷超限 → authoring 与落盘分离"；本条讲**分离之后的落盘环节**本身的静默破损风险 —— 分工是"谁来写"，本条是"谁来保证机械落盘不破坏载体语法"。
+    6. **[强制] 解析器收官门（第 4 次实测教训，优先级最高）**：开闭计数与肉眼自检**不足以**发现「成对元素被写成非自闭合起始标签」一类破损 —— 曾长期潜伏 5 个 `&lt;gate_review ...&gt;`（以 `&gt;` 而非 `/>` 结尾、全文无 `&lt;/gate_review&gt;`）。因此凡改过 XML 载体，**必须真跑一次 XML 解析器**（`xml.etree.ElementTree.fromstring`）作为不可省略的收官门，不得只靠 grep 计数。PM 无 Bash 时应委派受限 verifier 代跑。**廉价前置捕获法（第 5 次实测）**：grep『行尾＝引号紧跟大于号』可命中『多行标签的中间属性行被误加 `&gt;`』变体（须与合法开标签如 group / revision_request 人工区分）。第 5 次复发发生在 PM 正为同类缺陷写修复日志的同一批编辑中 —— 故**绝不可因『刚修过同类』而跳过收官闸**。
+    7. **第 6 次实测 —— 新形态 (g)『插入点落在未终止起始标签内部』，且**廉价前置捕获法对它无效**：本形态不是终止符写错，而是**新元素被插进了一个多行自闭合标签的最后一个属性与它的 `/&gt;` 之间**。实测经过：PM 为 GR-D-003 门控新增两条 `&lt;input&gt;` 时，把插入点锚在了「块末 `    /&gt;` 行」前，结果这两条 `&lt;input&gt;` 落在 GR-D-003 起始标签**内部** → 起始标签未终止（`xml.etree` 报 `not well-formed (invalid token): line 340, column 4`；lxml 更直白：`Couldn't find end of Start Tag gate_review line 325`）。**关键教训**：第 5 次的『行尾＝引号紧跟 `&gt;`』grep 对形态 (g) **零命中**（本例中该 grep 返回 No matches，而文件实际非法）—— 因为形态 (g) 的病征是一行**以 `&lt;` 开头却出现在属性续行缩进位置**的新标签，与行尾无关。因此：
+       - **廉价前置捕获补充**：查「缩进为续行级别（与属性行同缩进）却以 `&lt;` 开头的行」—— 一个 `&lt;` 开头的元素行本应处于更浅的容器缩进；若它与上一行属性**同级缩进**且上一行以 `"` 结尾，即形态 (g)。
+       - **锚点选择铁律（治本）**：新增元素时**绝不**把锚点选在 `    /&gt;` 这类单独成行的自闭合终止符上（它在一个文件里出现 N 次，且语义上属于**上一个**元素）。锚点应选**空行 + 紧随其后的同级兄弟元素开标签**（如 `\n\n    &lt;followup_note id="..."&gt;`）或**父容器的闭合行**（如 `  &lt;/open_inputs&gt;`），这样插入位置天然在元素外层。
+       - **本条再次证明**：形态清单只会越来越长，**解析器收官门是唯一的兜底**，任何 grep 前置检查都只是"提高发现概率"，不构成充分条件。
+    8. **第 7 次实测 —— 新形态 (h)『多段文档的 file_header 区块破损』＋『属性值内裸尖括号』（intelligentbase REV-16-3 轮，2026-10-06）**：不同于此前只改 phase_status.md（整文件 XML），本轮机械落盘**设计 / 实现文档**（architecture_design.md、module_design.md、implementation_plan.md），它们**不是**整文件 XML —— 仅开头一个 `&lt;file_header&gt;…&lt;/file_header&gt;` 区块，其后为 markdown 正文。三处破损共 6 个裸尖括号：
+       (a) architecture_design.md 的 rev-note **属性值**内 3 处（`&lt;root&gt;/&lt;project_id&gt;/` 与 `&lt;inputs&gt;` 写法）；
+       (b) module_design.md 的 rev 元素**文本**内 1 处（`&lt;inputs&gt;`）；
+       (c) implementation_plan.md 的 rev-note **文本**内 2 处（`bcrypt&gt;=4,&lt;5` 与 `&lt;router-view :key=…&gt;`），落在 R13 / R14 的**历史叙述段**。
+       **三条关键教训**：① **属性值同样脆弱** —— 『属性内不得裸尖括号』须与『文本内不得裸尖括号』并列为强制项（此前规程只强调属性内禁裸引号）；② **多段文档的复核口径 = 抽取 file_header 区块作独立 XML 文档解析**（对整文件解析必在 markdown 正文处失败，属基线，不可据此判 FAIL）；③ **header 的 rev-note 历史叙述段是裸尖括号富集区**（历代增量叙述充满标签名与比较符字面量），新写 header 时须顺带扫描**同区块既有文本**，而非只查自己新写的几行。另附漏洞教训：**本轮第一轮独立 verifier 只查了 phase_status.md 就宣告通过，漏掉三份设计 / 实现文档** —— 复核清单须按『本轮所有被 Edit 触碰的 XML 载体』枚举，不得只查权威状态文件。
+    </content>
+    <source_interactions>intelligentbase GR-B-003（形态 a，round=4）、GR-C-002（形态 b，round=4）、GROUP_C R3 REV-03 登记（形态 c，round=6）、REV-16-3 轮（形态 h：architecture_design.md / module_design.md / implementation_plan.md 三份多段文档的 file_header 区块，round=R16）</source_interactions>
+    <outcome>形态 (c) 于 GR-C 阶段亲自检出并修复（`回退 \"default\"` → `回退『default』`）；第 4 次由**独立 Python 解析器**复核再暴露一例长期潜伏破损（5 个 `&lt;gate_review&gt;` 非自闭合，自 GR-B-002 起使状态文件非法 XML，grep 计数自检完全无法察觉）→ 修复后补做解析器收官门，结论 WELL_FORMED</outcome>
+    <confidence_history>DC-001 候选（occurrences=2，0.6）→ 第 3 次实测晋升为正式条目，confidence 0.75（形态 (c) 已亲验并修复；规程为预防性）→ 第 4 次（独立解析器查出潜伏破损）confidence 0.80，并新增"解析器收官门"为强制第 6 条 → 第 6 次（形态 (g)：插入点落在未终止起始标签内部；第 5 次的 grep 前置对此**零命中**，暴露前置检查非充分）frequency 5→6，confidence 保持 0.80 并新增第 7 条（形态 (g) 的识别特征 + 锚点选择铁律）→ 第 7 次（形态 (h)：多段文档 file_header 区块破损 + 属性值内裸尖括号，三文档共 6 处；并暴露『复核清单不全』漏洞 —— 第一轮 verifier 只查状态文件而漏检设计文档）frequency 6→7，confidence 0.80→0.85，新增第 8 条（属性值脆弱性并列 + 多段文档 header 抽取解析口径 + 历史叙述段富集区 + 复核清单须枚举全部被触碰载体）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-026" type="heuristic"
+    confidence="0.75" frequency="1"
+    created_at="2026-09-26T10:00:00+08:00"
+    last_updated="2026-09-26T10:00:00+08:00"
+    status="ACTIVE">
+    <trigger>修订「计划 / 设计 / runbook / CI 定义」类文档以闭合一批待确认项之后，如何避免「计划改了、但执行计划的那份脚本没同步」的漂移；以及计划中端口 / 路径 / 落点类事实的二义如何在评审中被揪出</trigger>
+    <content>
+    1. **计划 ↔ 执行脚本漂移（本轮实证 F-1）**：devops R4 把 nginx 立为必需组件（依据 `settings.py` 无 `STATIC_ROOT` → 前端 `dist/` 不由 Django 托管），但 `src/deploy/checklists.txt` 的 [B12] **仍写『dist 由 ib-web 托管』**且无 `nginx -t` / `proxy_buffering off`，与计划**直接冲突**：PHASE_11 若照 checklists 执行，新加的两项验证根本不会跑。规律：**计划类文档往往有下游『执行脚本 / 清单 / CI 配置』在引用它**；只改计划不改清单 = 评审通过但执行时不生效。规程：修订计划后**必须全仓 grep 找出引用该计划条目的执行产物**，逐一同步，或显式登记为开放项（不得静默留下）。
+    2. **端口 / 路径 / 落点二义须回归真源**：旧计划把 `18080` 同时当『nginx 对外端口』与『Waitress 监听端口』—— 同机同端口不可复用（EADDRINUSE）；真源是 `src/deploy/systemd/ib-web.service` 的 `--port=18080`。规程：凡计划里出现端口 / 二进制路径 / 包落点，**必须回到实际单元文件 / 配置核验归属**，而非沿用散文描述。
+    3. **『顺手发现』应视为正面产出**：本轮修订轮的意外收获（端口冲突）比被指派的任务更有价值 —— 修订轮不应只机械闭合清单项，应允许并鼓励报告「计划内部矛盾」。
+    4. **用 mtime 时序佐证『某 agent 未改某文件』**：若某产物 mtime **早于**该 agent 的首次产出时刻，则它不可能是该 agent 所写（本轮据此正确排除 `requirements-embed.txt` 的误归因）。注意：非 git 仓库下这仍是**弱证据**，只能作旁证。
+    </content>
+    <source_interactions>intelligentbase GROUP_E PHASE_10 R4（INV-GROUP_E-INTELBASE-002）独立 verifier 复核（round=8）</source_interactions>
+    <outcome>verifier 揪出 F-1（MEDIUM：checklists.txt B12 与 C-02 冲突且未登记），PM 于 GR-E-002 判 PASS_WITH_CONDITIONS 并登记开放项；同轮 devops 主动发现并修正 18080 端口二义 → 佐证规程 2；同轮以 mtime 时序正确排除一处误归因。</outcome>
+    <confidence_history>初始 0.75（首次记录；规程 1/2/3 由本轮实证，规程 4 为既有实践）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-027" type="procedural"
+    confidence="0.85" frequency="1"
+    created_at="2026-09-27T00:00:00+08:00"
+    last_updated="2026-09-27T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>PARTIAL_FLOW「需求分析阶段补充调研」（RESEARCH_SUPPLEMENT）类任务的 PM 编排：把「业界官方文档对标 / 差距分析」作为既有需求规格的**增量补充**，而非重写需求规格</trigger>
+    <content>
+    1. **任务识别与归属**：用户要求「基于开源项目官方文档调查 + 补充到既有需求分析」时，归属 GROUP_A / PHASE_01 增量，由 requirement-analyst 承接（其工具集含 WebSearch/WebFetch，天然适配）。
+    2. **边界设定（防越界，关键）**：requirement-analyst 的 hard_constraints 禁止「架构/技术/代码内容」；而此类调研必然引用外部项目的机制/DSL/数据模型。PM 须在 special_instructions 中**显式授权边界**：对外部事实的引用 + 「候选建议（待 PM/用户确认）」属需求分析范畴；**禁止**产出本项目的 IFC-*/ADR/模块设计/代码。否则子代理要么返回 BLOCKED，要么越界产出。
+    3. **交付物形态**：**新增补充文档**（如 docs/agent_platform_research.md），**不改写**已 APPROVED 的 requirements_spec.md / user_stories.md；对既有需求的增量一律以「候选点」形式列出，真正落盘须另行定向修订（不改既有编号）。
+    4. **证据卫生（本轮实测核心）**：**WebFetch 在本执行环境对全部目标域均被域安全校验拒绝**（返回 "Unable to verify if domain … is safe to fetch"），仅 WebSearch 可用 → 证据退化为「官方页检索摘要 + 官方 URL 定位」。门控**不得因此判 FAIL**（障碍是环境约束而非起草方失误），但须登记为 **MAJOR 条件**，并要求：官方域名 URL 视为官方证据并注明「非原始抓取」、二手来源逐条标「待官方证实」、查不到就写「官方文档未查到」、**绝不臆造字段名/API 名**。
+    5. **PM 独立核验四查（不信自述）**：(a) 存在性 + file_header 合规；(b) grep 计数「待官方证实/未查到/官方未发布」标注数（应为正且分布合理）；(c) grep「IFC-|ADR-|def |class 」确认无本项目越界产物（命中须逐条追溯为边界声明句/外部 API 引用）；(d) grep 凭据模式（sk-/ghp_/-----BEGIN/AKIA/password/Bearer）应为零真实命中。另须读回既有 APPROVED 文件头部，确认其版本/状态未变。
+    6. **「无对应 REQ」是需求级缺口，不是实现落差**：本轮发现用户诉求③（UI 可视化配置）在 v1.1.0 无任何 REQ 承接（OQ-IB-04 / OOS-06 反推给接入方）。PM 应列为「须用户裁决」开放项，**不代为拍板**，也不允许子代理擅自扩写为需求。
+    7. **高价值产出形态**（可作门控检查清单）：映射表（项目→机制→缺口→成本）、分项目「该学 / 过度设计不学」双栏、缺口全量对照表、P0~P3 演进路线（**须点出复用既有接缝**，如 install(specs)/validate_specs/orchestrator_for）、风险与反模式（**逐一对照项目既有优势**）。顺序原则：先「定义数据化」，后「可视化」；可视化只能是定义文档的视图，否则产生第二真源。
+    </content>
+    <source_interactions>intelligentbase GROUP_A REV-05 2026-09-27（INV-GROUP_A-INTELBASE-002，9 项目官方文档调研）</source_interactions>
+    <outcome>产出 docs/agent_platform_research.md 478 行；PM 七项独立核验全 SATISFIED → GR-A-002 判 PASS_WITH_CONDITIONS（MAJOR 证据限制 + 需求级缺口开放项，均非阻塞）</outcome>
+    <confidence_history>初始 0.85（完整执行一次 + PM 独立七项核验 + 文件 status 由 DRAFT 置 APPROVED）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-028" type="pattern"
+    confidence="0.70" frequency="1"
+    created_at="2026-10-06T00:00:00+08:00"
+    last_updated="2026-10-06T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>一次定向修订改变某「全局度量」或「全局状态」（如 `[INFERRED]` 计数、需求/文档总数、文件版本号、status）时，PM 落盘后的收口检查</trigger>
+    <content>
+    1. **现象**：来源修订包通常只给出「主干锚点」的改计数指令（如 §1.1 汇总、§7.4 统计口径、附录自检）；但同一度量在文档**其他不相关章节**还有**现时态**复述（约束行、术语图例行、其他附录 bullet、正文注记）。这些位置不在包的指令清单里，落盘后即成为**陈旧计数**，与更新后的真值矛盾。
+    2. **本轮实证**：REV-13 把功能需求 27→36、`[INFERRED]` 0→1 后，requirements_spec.md 仍有 3 处现时态「计数为 0 / 0 / 27 = 0%」（§4 C-IB-07 行、§6.0 图例行、附录 C 第 2 条），独立 verifier 判为 WARNING。
+    3. **PM 收口动作**：修订落盘后，**不信任包的锚点清单为完备**；须对「被改动的度量/状态关键字」做**全文 grep 扫描**（如 `grep -n '计数为 0' / '0 / 27' / 旧版本号`），逐条判定「现时态陈述」vs「历史轮次陈述」。现时态的**就地同步**（这是 PM 机械计数归口，与 KE-PM-019 落盘同属一类，非生成领域内容）；历史轮次的**保留不动**（改写会伪造历史留痕），必要时加「（该轮口径）」消歧。
+    4. **判据**：门控条件里，陈旧现时态计数 = MINOR（不阻塞），但若不修则留风险；历史轮次计数命中 grep = 非缺陷，仅需在门控中说明归属。
+    </content>
+    <source_interactions>intelligentbase GROUP_A REV-13 2026-10-06（INV-GROUP_A-INTELBASE-013 / INV-GROUP_A-VERIFY-REV13）</source_interactions>
+    <outcome>独立只读 verifier 二轮把 3 处陈旧计数登记为 W1/W2；PM 按计数归口就地修 3 处（0 → 1/36）并补状态补注 → GR-A-005 condition_3 闭环</outcome>
+    <confidence_history>初始 0.70（单次实证，pattern 类；待第二次复现后升 0.8）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-029" type="pattern"
+    confidence="0.70" frequency="1"
+    created_at="2026-10-06T00:00:00+08:00"
+    last_updated="2026-10-06T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>PM 委派独立 verifier 复核「apply-ready 修订包」的落盘时，如何判定「落盘缺陷」vs「来源包自我记数笔误」</trigger>
+    <content>
+    1. **现象**：apply-ready 包的 rationale / 摘要常自述「追加 N 条」「共 M 处」，但其 `new_string` 实际给出的条目数可能与 N 不符（本轮 R-15 rationale 称「追加 6 条 REV-13 自检条目」，new_string 实为「1 条保留 + 5 条新增」）。
+    2. **归属判定（关键，避免误判 PM 落盘）**：PM 落盘是**逐字忠实于包内容**的机械操作。若包的 `new_string` 与包自述不符，则**落盘正确、包自述错**——这是**来源包记数笔误（MINOR、无落盘影响）**，不是 PM 缺陷，也不是目标文档缺陷（目标文档内容自洽）。
+    3. **核验动作**：独立 verifier 应**同时**核验 (a) 目标文档实落条目数 与 (b) 包 rationale 自述数；两者不符时，判为「包自述笔误」，登记为 MINOR 条件（不阻塞门控），并在门控 finding 中点明根因归属，避免下游误读为落盘失败。
+    4. **衍生**：跨文档「对称性」不可假定——同一轮在两份文档的附录自检 bullet 数可以不同（本轮 spec 附录 C 5 条 / stories 附录 E 6 条），因包设计使然；门控不应以「数量对称」为 PASS 标准。
+    </content>
+    <source_interactions>intelligentbase GROUP_A REV-13 2026-10-06（INV-GROUP_A-VERIFY-REV13 判 CHECK 2(h) FAIL）</source_interactions>
+    <outcome>pass 判定：24/24 落盘指令命中唯一锚点、逐字忠实；2(h) 归因为包 rationale 笔误 → GR-A-005 condition_2（MINOR、无落盘影响）</outcome>
+    <confidence_history>初始 0.70（单次实证，pattern 类）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-030" type="heuristic"
+    confidence="0.80" frequency="2"
+    created_at="2026-10-07T00:00:00+08:00"
+    last_updated="2026-10-11T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>门控评审 / 采信子代理自评 / 生产者自述 / 判定『永不抛异常』或『非致命』类契约 / 下游复跑</trigger>
+    <content>
+    1. 生产者（含其自我代码评审报告）的自述**不构成证据**；PM 门控必须对可验证断言做独立复核（grep / 读源码 / 委托只读校验），不得直接采信。
+    2. 本类缺陷（模块级调用一个仅以函数内局部 import 引入的符号 → NameError）恰落在**旁路 / 异常分支**上，自评常因『该分支无任何自动化用例覆盖』而漏判；本轮即由下游测试组的首次复跑捕获。
+    3. 推论：凡『永不抛异常 / 审计写失败非致命 / fail-safe』类契约，必须要求存在**该失败分支**的自动化用例，否则门控不得采信其成立。
+    4. 跨组闭环：门控判 FAIL 后应路由回上游生产者修复，再由原下游组复跑**同一用例**验证（本轮 TC-INT-147 FAIL → PASS）。
+    </content>
+    <source_interactions>round-16</source_interactions>
+    <outcome>下次遇到『非致命/永不抛异常』类契约时，先查是否存在覆盖该失败分支的用例；不存在则该断言在门控中记为未证。</outcome>
+    <confidence_history>2026-10-07 创建 confidence=0.75</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-031" type="pattern"
+    confidence="0.80" frequency="1"
+    created_at="2026-10-11T00:00:00+08:00"
+    last_updated="2026-10-11T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>缺陷修复轮 / DEFECT 闭合 / 上游回填后出增量门控 / 判『选哪个实现方案』类坑 / 门控条件 OPEN 转 CLOSED</trigger>
+    <content>
+    1. 修复轮＝最小改动面：缺陷修复轮只动实现、不碰测试断言（本轮 GROUP_C 回填只改 2 个 src 文件，测试文件 sha256 一字未变）。测试文件若被改动，视为削弱证据，门控不得采信其转绿。
+    2. 先证前提再派单：预判的『坑』在派单前用只读探查独立证实其前提（本轮确认 LOG_FIELDS 白名单确缺 reason）；若探查发现前提不成立（本轮坑 2：仓库用函数内局部 from-import，monkeypatch 可拦，探针无缺陷），应撤回该坑、不作无效指派，并在回报中显式说明证伪。
+    3. 版本只 bump 实际改动层：增量门控只 bump 内容真正变更的 phase 版本（本轮仅 PHASE_06 代码面 2.14.0→2.15.0；PHASE_05/06b 文档未改、维持 2.14.0），并在 gate_decision 里写清口径，避免制造『文档有新版』的假象。
+    4. 闭合上游条件：修复轮的增量门控应把上游门控指向本缺陷的 condition_*_status 由 OPEN 追加式改为 CLOSED（原文保留），并新增一组审计日志（PM_PHASE_REVISION + PM_GATE_REVIEW + PM_GATE_PASS）。
+    5. 白名单类修复用精确键：对『白名单之外静默丢弃』的字段，修复方式优先精确加键名（本轮 reason），不得改成前缀或正则宽松匹配；并复算新键不命中敏感模式。
+    </content>
+    <source_interactions>round-19</source_interactions>
+    <outcome>GROUP_C 回填轮 GR-C-015 PASS_WITH_CONDITIONS；DEFECT-R19-D-01 闭合、TC-INT-R19-006 FAIL→PASS；独立复跑 380 passed / 2 skipped / 0 failed EXIT 0、selfcheck 52/52；未新增模块 / 端口 / 依赖边</outcome>
+    <confidence_history>2026-10-11 创建 confidence=0.80（单轮实证 via 独立只读核验）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-PM-032" type="pattern"
+    confidence="0.75" frequency="1"
+    created_at="2026-10-11T00:00:00+08:00"
+    last_updated="2026-10-11T00:00:00+08:00"
+    status="ACTIVE">
+    <trigger>文书回填轮 / 交付物订正轮 / 非门控变更轮 / 追加式订正 / 等价措辞失真 / 阻塞表逐条重审 / 前瞻条款不写 runbook / 版本 bump 只到文书层</trigger>
+    <content>
+    『文书回填 + 交付物订正轮』（非门控变更轮）的规程：
+    1. 追加式订正是唯一姿态：原文（尤其『订正前』命令）逐字保留并加前缀标注（如『【订正前 · 不可运行，保留以追溯】』），订正后形式紧随；禁删、禁静默改写、禁把未核实项标为已闭合。
+    2. 『等价』措辞须经实测校验：本轮 §16.3 原称新旧命令『等价』，实测不等价（新式缺 backup=False ⇒ 走工具默认 backup=True、多产一份 root 属主 .bak）→ 订正为准确陈述（在两式都显式 backup=False 后于 demo.json 产出 / 属主 / 模式 / 幂等 / fail-closed 一致）。判据：凡写『等价』必须逐项列出可比对的输出面。
+    3. 阻塞前置表逐条重审＝加『已核验状态』列（原文逐字保留），按实测事实逐项落：已证伪 / 实质已闭合 / 部分闭合 / CLOSED_VERIFIED / 维持原文未复测；无测量依据者不得标为已闭合。跨文档同源不同步（如 B-04 在上游账本已 CLOSED_VERIFIED 而下游计划仍写『未闭合』）应如实登记为『同源不同步』而非重推结论。
+    4. 前向条款不得写成 runbook：当前无可执行对象的迁移项（如 C-IB-47 无持久化 SessionStore）应保持前瞻条款，只需给『原则 + 获取实际值的步骤』（先 grep 枚举真实路径、再以该实际路径操作），并显式声明『本清单当前无可执行内容』。
+    5. 版本 bump 只到文书层并声明净影响：文书回填轮对 CI/流水线的净影响 = 零（无 step / 基线 / 门集合变更），须显式声明；本类文档若用 HTML 注释 + Markdown 元数据表（非 XML file_header），应如实登记『ET 解析不适用』，不编造 XML 判据。
+    6. 备份一律用显式字面路径：凡键仅存在于 systemd EnvironmentFile、未导出交互式 shell 者（如 IB_LEDGER_PATH / IB_DEFINITION_DOC_PATH），不得用 shell 变量（会空展开），须显式字面路径或先 grep 枚举。
+    </content>
+    <source_interactions>round-20</source_interactions>
+    <outcome>五项订正（checklists B24/B25、deployment_plan §1.1/§16.3/§16.4、cicd 1.5.0→1.5.1、phase_status GR-E-007 open_item_5）落地；原文全部逐字保留；B24 与 §16.3 订正后命令逐字一致（均含 backup=False）</outcome>
+    <confidence_history>2026-10-11 创建 confidence=0.75（单轮实证）</confidence_history>
+  </knowledge_entry>
+</kb_entries>

@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kb_entries agent_domain="system_architect" version="0.1.2">
+
+  <knowledge_entry id="KE-ARCH-001" type="pattern" confidence="0.8" frequency="5"
+    created_at="2026-09-25T00:00:00Z" last_updated="2026-09-26T00:00:00Z" status="ACTIVE">
+    <trigger>需求出现「某外部依赖必须可替换」「替换后上层零改动」「须能离线测试」类验收标准（如 AC-06-05）；或架构需要验证某选型决策的可逆性。</trigger>
+    <content>为每个易变外部依赖定义「窄接口端口 + 双适配器」：一个生产适配器（真实服务）+ 一个内存/替身适配器（Fake/InMemory）。关键收益不是「可替换」这个口号，而是把「替换后行为等价」变成**可执行的端口一致性测试**——同一套测试跑两个适配器。端口须保持窄（本次约 10 方法），高级能力经显式扩展方法渐进暴露，且扩展方法须显式声明「不支持」语义而非静默失败。端口方法中承载隔离语义的参数（如 scope）必须**无默认值**，使「漏传」在类型检查期即失败，而非运行期静默全量检索。</content>
+    <source_interactions>intelligentbase GROUP_B（ADR-01 VectorStore、ADR-13 RetrievalResult、§1.3 可替换点表）；R1 复核（框架切换后端口与数据结构载体不变，证伪「端口化只是为了可替换」的浅层理解）；R2 补交（MOD-IB-26 服务端模块形态）</source_interactions>
+    <outcome>AC-06-05「替换向量库只改配置与适配」可被自动化验证；AC-14-05「降级路径须有替身覆盖」离线可测；类型化契约同时满足「接口须类型化」类门控标准。R1 补充证据：Web 框架由 FastAPI 换成 Django 时，端口层与契约层**零改动**（仅载体描述变更），实测印证了端口化的收益边界。R2 补充证据：把「服务端进程」也纳入同一模式——MOD-IB-26 不被任何模块 import，只经端口（MOD-IB-09）与线协议访问。</outcome>
+    <confidence_history>2026-09-25 创建（confidence=0.8，源自架构设计中的实际操作，尚未经 PM 门控确认）；2026-09-25 R1 修订引用 +0.0（未变，但 frequency +1）；2026-09-26 R2 复用（frequency +1，confidence 不变）：新增「无入边的服务端模块」形态 MOD-IB-26 —— 上层只经端口 + 线协议访问，端口化边界与「替换后行为等价」的断言形式不变</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-002" type="heuristic" confidence="0.8" frequency="4"
+    created_at="2026-09-25T00:00:00Z" last_updated="2026-09-26T00:00:00Z" status="ACTIVE">
+    <trigger>上游文档已包含「已锁定决策」（用户/PM 已拍板的选型），而任务仍要求产出 ADR 且要求「每个决策点评估 ≥2 个候选方案」。</trigger>
+    <content>不要用 ADR 重新论证已锁定的选型（会被判为越权重开决策），而应**把决策问题的粒度下沉一层**：ADR 的 Context 明确写「选型由 DR-xx 锁定，本 ADR 决策的是落地方式与抽象边界」，然后对**落地方式**枚举 ≥2 个候选（如：无抽象层直依赖 SDK / 窄端口双适配器 / 复用第三方抽象），并对「已被否决的形态」以「已评估未采纳」留痕。这样既满足「≥2 方案」的门控标准，又不推翻用户决策。对必须回溯用户决策的情形（如性能实测不达标需换模型），在 Consequences 中显式写「须由 PM/用户裁决，架构层不自行改选型」。**修订轮（R1）追加**：当用户在中途**改变了**一个已锁定选型（如 Web 框架 FastAPI→Django），正确做法是「保留原标题 + 追加 R1 修订节 + 明确写『本 ADR 结论以 R1 节为准』」，而非重写 ADR 或另起新 ADR——这样既保留决策史，又不产生「两个并存结论」。同时新增一条**框架切换影响复核表**（逐 ADR 给「受影响 / 不受影响」结论），使门控可逐条追溯。**补交轮（R2）追加**：若缺口是「既定决策的**落点**没写全」（如某服务只有单元文件与客户端、缺服务端模块归属与契约），正确做法是**只补落点、不动 Decision**，并在复核表中把该 ADR 标为「受影响（仅补附注）」，其余 ADR **逐条显式写「不受影响」**。</content>
+    <source_interactions>intelligentbase GROUP_B（ADR-01/ADR-03/ADR-04/ADR-08 均以「选型已锁定」开篇，决策点在落地方式）；R1 修订（13 条 ADR 的框架切换复核 + ADR-11-R1）；R2 补交（ADR-02-R2 附注 + §2.0.1 R2 影响复核表）</source_interactions>
+    <outcome>ADR 满足门控的「≥2 候选 + 选择理由 + 已评估未采纳项」，同时不触碰用户已拍板决策；R1 中「用户改选型」这一新情形也被同一套「下沉粒度 + 留痕」框架覆盖；R2 中「决策已对但落点缺失」的第三种情形同样被覆盖。</outcome>
+    <confidence_history>2026-09-25 创建（confidence=0.8）；2026-09-25 R1 复用并扩展（frequency +1，confidence 不变）；2026-09-26 R2 复用并再扩展（frequency +1，confidence 不变）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-003" type="exception" confidence="0.8" frequency="4"
+    created_at="2026-09-25T00:00:00Z" last_updated="2026-09-26T00:00:00Z" status="ACTIVE">
+    <trigger>模块设计门控要求「证明依赖图无环（DAG）」，且模块数量较多（十几个以上）、存在若干「看似会成环」的依赖。</trigger>
+    <content>不要靠人工遍历找环，改用**构造性证明**：给每个模块赋权 w(M) = 其编号，且**编号按拓扑序分配**；逐条检查每条依赖边 A→B 均有 w(A) 大于 w(B)。若成立，则任意环 M1→…→Mk→M1 会导出 w(M1) 大于 … 大于 w(M1) 的矛盾，故无环。相比「目视检查」，该证明的额外价值是：它把「编号即拓扑序」变成一条**可传承的纪律**——新增模块须取大于其全部依赖的编号；若新需求导致必须依赖更大编号的模块，说明分层被破坏，必须先重构分层（下沉契约/引入端口），不得直接加边。另须单独列出「看似会成环」的几处及其化解方式（如：编排层不直接依赖检索层，而依赖「已绑定 scope 的工具」，绑定发生在组合根 → 编译期无该依赖边）。**修订轮（R1）注意**：若修订只换**载体**（如 Web 框架）而不新增/删除模块，则无环证明**无需重证**，但必须在文档中**显式重述「仍无环」**并说明理由，否则门控无法区分「未重证」与「已重证」。**补交轮（R2）注意**：新增模块时**最强的无环论据是「无入边」**——若新模块不被任何模块 import（只经端口/线协议访问），则它根本不可能出现在任何环上，此时权值不等式只是**第二重**保险；两者都要写。</content>
+    <source_interactions>intelligentbase GROUP_B（module_design §4.2，25 模块 DAG 证明）；R1 修订（模块集合不变 → 证明沿用，但显式重述）；R2 补交（26 模块；MOD-IB-26 无入边 + 权值校验双重论据）</source_interactions>
+    <outcome>无环结论可被 PM 逐条复核（每条边都是可检查的不等式），而非依赖「我检查过了」的自述。R2 中「无入边」这一更强论据把结论从「已验证」提升到「结构上不可能」。</outcome>
+    <confidence_history>2026-09-25 创建（confidence=0.8）；2026-09-25 R1 复用（frequency +1）；2026-09-26 R2 复用并强化（frequency +1，confidence 不变）：新增模块 MOD-IB-26 的权值校验 w(26)=26 大于 max{w(01),w(02),w(04)}=4，且 26 无入边 → 无环性质保持</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-004" type="exception" confidence="0.9" frequency="4"
+    created_at="2026-09-25T00:00:00Z" last_updated="2026-09-26T00:00:00Z" status="ACTIVE">
+    <trigger>现有参考实现依赖 AGPL/GPL 类 copyleft 库（如 PyMuPDF 为 AGPL-3.0、Poppler CLI 为 GPL-2.0），而需求要求「开源协议友好」并**明令禁止**以「内部平台合规」「仅内部使用」等口径豁免。</trigger>
+    <content>处理步骤：① 不因「现成代码能用」而默认保留，也不接受「子进程隔离即合规」的模糊论证（法律定性有争议，不能作为合规确定性来源）；② 逐条列出该 copyleft 库的合规前置条件并逐条判定是否成立（商业授权成本、整体开源是否与目标冲突、纯内部使用是否与需求冲突）；③ 给出许可宽松的替代组合，并按能力拆分——注意**文本提取与页面渲染是两种能力**，纯 Python 宽松许可库通常只具备前者，渲染须另选（如 pypdfium2，BSD-3/Apache-2.0 双许可、PDFium 内核）；④ 明确声明「本决策改变参考实现的既有做法，其既有解析逻辑须重写」；⑤ 在技术选型文档中留痕「不采纳 + 理由」。许可现状（BSD/MIT/Apache/AGPL 归属）应经外部核实而非凭印象。**常见 Web 框架栈的许可事实（已外部核实，可直接登记）**：Django = BSD-3-Clause；Django REST Framework = BSD-3-Clause；Waitress = ZPL-2.1（OSI 认可、FSF 认定与 GPL 兼容）；Gunicorn = MIT；Uvicorn = BSD-3-Clause；PyTorch = BSD-3-Clause；HuggingFace transformers = Apache-2.0。**传递依赖纪律（R2 追加）**：许可登记**不得只登记直接依赖**——若某候选会引入 torch/transformers 之类的传递依赖，必须把它们**当成独立条目**逐条登记并标「条件性采纳」，否则「换一个库」会静默扩大许可与体积面。</content>
+    <source_interactions>intelligentbase GROUP_B（ADR-06 + tech_stack §1.1 / §2；FreeArk rag_service.py 内「AGPL v3，内部平台合规」注释）；R1 修订（新增 Django/DRF/Waitress/Gunicorn/Uvicorn 许可事实）；R2 补交（新增 torch / transformers 传递依赖登记 + 三候选加载库的许可对照）</source_interactions>
+    <outcome>许可合规结论可逐条追溯；同时避免了「换库导致某能力静默丢失」（渲染能力）这一常见陷阱；R1 中被复用于框架切换后的许可台账扩容（BSD/ZPL/MIT 全家桶，无新增 copyleft 面）；R2 中被复用于「同一能力的三个候选 + 各自传递依赖」的对照登记。</outcome>
+    <confidence_history>2026-09-25 创建（confidence=0.9，许可归属经外部检索核实）；2026-09-25 R1 扩展（新增 5 项许可事实，frequency +1）；2026-09-26 R2 再扩展（新增 torch/transformers 传递依赖与新候选许可事实，frequency +1，confidence 不变）：重申未引入 PyMuPDF、未引入 Docker</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-005" type="heuristic" confidence="0.7" frequency="3"
+    created_at="2026-09-25T00:00:00Z" last_updated="2026-09-26T00:00:00Z" status="ACTIVE">
+    <trigger>架构需要在「性能未实测」的前提下决定某个有显著性能影响的部署形态（如进程内推理 vs 独立推理服务），且目标机硬件规格未知、不允许编造数值。</trigger>
+    <content>选择有性能未知风险，但**在端口化前提下保留可逆性**：① 把两种形态都实现为同一端口下的适配器；② 论证选定形态的非性能优势（如超时纪律有单一落点、可独立限流、与 Web 启动解耦）；③ 显式写出「若实测 TBD-x 显示不可接受，可切回另一形态而不改任何上层模块，成本 = 换适配器 + 改一行装配配置」。此外给出缓解手段清单（批处理 / 模型常驻 / 并发上限 + 有界队列 / 推理线程数受控 / 热路径短超时 / 多 worker），并明确「超限快速降级而非无限排队」——排队会把「慢」放大成「全链路超时」。**绝不给出编造的性能数值**；只给量级判断并标注 [ESTIMATE]，把精确数值列入 TBD 实测清单。**值域扩展纪律（R2 追加）**：当可逆开关的**值域**需要新增形态（如 http|fake → http|inproc|fake）时，**只扩展值域、不改键名与默认值**，并强制「所有形态通过同一套端口一致性测试」——否则形态切换会**静默改变写入语义**（如维度或归一化不一致），这是比不可逆更隐蔽的故障。</content>
+    <source_interactions>intelligentbase GROUP_B（ADR-02 形态可逆；architecture_design §4 CPU-only 可行性与必测清单）；R1 修订（同一「可逆性 + TBD」框架被复用于流式方案 A/B 的取舍）；R2 补交（值域扩展 + 三形态一致性测试）</source_interactions>
+    <outcome>在信息不足时仍能给出可执行决策，且决策失败时的回退成本被量化到「换一个适配器」。R2 把「可逆」从「两个形态」推广到「成形开关的值域只增不改」。</outcome>
+    <confidence_history>2026-09-25 创建（confidence=0.7，仅一次实践，未经验证）；2026-09-25 R1 复用（frequency +1，confidence 不变）；2026-09-26 R2 复用并扩展（frequency +1，confidence 不变）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-006" type="pattern" confidence="0.8" frequency="4"
+    created_at="2026-09-25T00:00:00Z" last_updated="2026-09-26T00:00:00Z" status="ACTIVE">
+    <trigger>多租户/多项目隔离设计：需求给出了隔离**拓扑**（如「单实例多项目，以 X + 项目级配置隔离」）但**未明确隔离粒度边界**（例如知识库是否也是硬隔离边界），而验收标准字面上测的是更细的粒度。</trigger>
+    <content>两条动作：① **把粒度选择收敛到单一函数**（如 `CollectionResolver.resolve(scope) -&gt; collection_name`），所有需要「隔离命名空间」的模块都调它，禁止各自拼字符串。这样若边界定义变更（项目级 → 项目+知识库级），改动仅限「一个解析规则 + 配置结构」，上层零改动。② 在假设清单中**显式标注该缺口并标为需 PM 确认项**，写清「若不成立的影响与代价已被收敛到何处」。另须施加 defense-in-depth：即便采用硬隔离（collection-per-project），仍在 payload 中冗余写入 tenant 标识并让查询 filter 恒含该字段——目的是把「配置级命名错误」从「泄漏」降级为「查不到」（fail-closed 而非 fail-open）。**回填规则（R1）**：当 PM 后续确认了该假设，须把状态从「待确认」改为「已确认」，并**同时写明确认结论**（如「隔离 = 项目级硬隔离 + 知识库级软隔离 filter」），但**不得改动已收敛的解析入口设计**——确认只消解不确定性，不应触发返工。**新增端点纪律（R2 追加）**：R2 之后的任何新增读写端点（包括只读的图片字节端点）**一律带 scope** 并复用同一归属断言，且「不存在」与「不属于你」**返回同一状态码**（避免存在性探测）；这两条是「隔离贯穿全链路」验收的落点。</content>
+    <source_interactions>intelligentbase GROUP_B（ADR-04 + ARCH-ASSUMPTION-A2 + FM-1/FM-5）；R1 修订（A2 确认为「软隔离」的正式回填）；R2 补交（图片端点 IFC-IB-283 的 scope 与 403/404 口径）</source_interactions>
+    <outcome>「隔离贯穿全链路」的验收可满足；边界定义变化时的重构成本被压缩到单点；配置错误不演变为数据泄漏。R2 证明该模式对**新增只读端点**同样适用，且无需触碰隔离粒度设计。</outcome>
+    <confidence_history>2026-09-25 创建（confidence=0.8）；2026-09-25 R1 确认回填（frequency +1）；2026-09-26 R2 复用（frequency +1，confidence 不变）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-007" type="exception" confidence="0.9" frequency="3"
+    created_at="2026-09-25T00:00:00Z" last_updated="2026-09-25T00:00:00Z" status="ACTIVE">
+    <trigger>需要为浏览器端实现服务端推送/流式输出，并同时要求「鉴权凭据不得进入 URL」。</trigger>
+    <content>浏览器 WebSocket API **无法设置 Authorization 头**，实践中只能把凭据放进 query string，而反向代理/ASGI 访问日志会完整打印含凭据的 URL（已知真实事故类别）。因此：优先用 **SSE（text/event-stream）**——它走标准 HTTP，可携带 `Authorization` 头，天然规避该类泄漏；同时其单向服务端推送语义恰好匹配「流式回答」场景。代价须显式声明：① 用户中断/确认需另发 POST（单向）；② 必须禁用反向代理的响应缓冲（`X-Accel-Buffering: no` / `Cache-Control: no-cache`）；③ 断线重连的 `Last-Event-ID` 语义须定义（最简可取「重连即重问」）。选型文档须同时列出「不采纳 WebSocket 生态（如 Channels）会连带引入的组件」（如 Redis channel layer 及其版本兼容事故史）。**与 Web 框架无关的落地要点（R1 追加）**：无论 Django 还是 FastAPI，SSE 都可用各自的原生流式响应（Django = `StreamingHttpResponse`；FastAPI = `StreamingResponse`）实现；鉴权落点分别是 **Django 中间件 / 视图装饰器** 与 FastAPI 依赖注入。**两条硬性实现约束（来自真实事故，必须随文档传递）**：① **禁止 `?token=`**——凭据只许经请求头或请求体，日志禁止记录 Authorization 头与 cookie；② 若引入 `channels_redis`，必须 pin `redis-py` 5.x 并以**真实本地 Redis** 验证 WS 收发（InMemory channel layer 测不出 RESP3 超时缺陷）。**范围扩展纪律（R2 追加）**：该纪律的适用范围是**全部端点**（含只读端点与非流式端点），不是「只有流式端点」；新增端点时必须显式重申一次，否则新端点会以「它只是取图」为由重新引入 query string 凭据。</content>
+    <source_interactions>intelligentbase GROUP_B（ADR-11；FreeArk ChatConsumer 从 ?token= 读 token 的事故记录）；R1 修订（Django 落点 + 两条约束的强制化）</source_interactions>
+    <outcome>凭据不出现在 URL；同时避免了流式方案连带引入的重型依赖。</outcome>
+    <confidence_history>2026-09-25 创建（confidence=0.9，有真实事故背景支撑）；2026-09-25 R1 扩展（frequency +1）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-008" type="heuristic" confidence="0.8" frequency="4"
+    created_at="2026-09-25T00:00:00Z" last_updated="2026-09-26T00:00:00Z" status="ACTIVE">
+    <trigger>设计「依赖故障时的降级」契约，而验收标准同时要求「故障可定位」与「区分故障与正常空结果」。</trigger>
+    <content>三处要点：① 降级结果必须是**类型化契约**（含 `degraded: bool` + `degrade_reason: 枚举` + `elapsed_ms` + `candidate_count`），而非裸布尔或字典——`degrade_reason` 是「仅凭日志定位失败依赖」这一验收的落点。②「依赖故障」与「数据为空」必须是**不同取值**（前者 degraded=True 且有 reason；后者 degraded=False 且 hits 为空），否则二者不可区分，相关验收必然不通过。③ 明确 fail 语义分两类：**写路径核心（台账、原文件）为 fail-closed**（不可用即拒绝，不产生半成品状态），**读路径依赖（向量化、向量库、LLM、路由分类器、OCR）为 fail-open**（降级可用、不抛异常、用户可见文案）。降级必须留痕：结构化日志 + 流式响应中的 degraded 事件。**框架切换类修订（R1）须补一格**：Web 层自身的容量耗尽（如 WSGI 下 SSE 长连接占满 worker）应归入 **fail-closed**（快速 503，禁止无界排队）——因为它是「服务能力不足」而非「依赖故障」，语义上与依赖降级不同，混用会让用户看到错误的降级文案。**增强项降级纪律（R2 追加）**：对「增强项」（有更好、没有也不影响主流程，如页面图缩略图）应**不引入新的降级语义**——它要么**静默隐藏**（前端），要么**不发事件**（后端），且**复用既有 `degrade_reason` 取值、不新增枚举值**。理由是：同一观察点上出现两种降级语义会让「故障 vs 空结果可区分」的验收失效。</content>
+    <source_interactions>intelligentbase GROUP_B（ADR-13 + module_design §7.4 降级矩阵）；R1 修订（新增「Web 层容量耗尽」一行）；R2 补交（新增「ib-embed 服务不可达」行 + 增强项「有图才发事件 / 失败静默」纪律）</source_interactions>
+    <outcome>降级矩阵可被逐格验收；「空结果 vs 故障」可区分；写路径不产生不可恢复的中间态。R2 明确了「增强项不进降级矩阵的语义层」这一边界。</outcome>
+    <confidence_history>2026-09-25 创建（confidence=0.8）；2026-09-25 R1 扩展（frequency +1）；2026-09-26 R2 再扩展（frequency +1，confidence 不变）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-009" type="procedural" confidence="0.6" frequency="4"
+    created_at="2026-09-25T00:00:00Z" last_updated="2026-09-26T00:00:00Z" status="ACTIVE">
+    <trigger>在只有 Write（无 Edit、无 append、无 Shell）的工具环境下产出长交付物，且单次写入内容过大时工具调用会因输出被截断而解析失败。</trigger>
+    <content>经验做法：① 先探测单次写入的**可用容量区间**（过大时表现为输入无法解析/被截断，且该失败是**非确定性**的——同样内容重试可能成功，故重试是合法策略，失败不会破坏原文件）；② 把内容按**交付物边界**切分而非按文件切分——即主动重新分配内容归属（例：把「状态机详表 / 降级矩阵 / 装配表 / 覆盖率矩阵」放进模块设计文档，把「决策记录 + 失败模式 + 假设 + TBD 清单」放进架构文档），使每份文件都能一次写完；③ 用表格承载高密度信息以压缩篇幅；④ 每次写入后不要回读验证（工具成功即已落盘）。**R1 修订暴露的边界条件（重要）**：该策略只对**首次撰写**有效。若任务是**原地修订既有大文件**（须逐行保真保留全部未改动段落），则「按交付物边界重新分配内容」这条退路**被禁止**，而单次写入上限又低于文件体量 → 形成**硬阻塞**。此时正确处置顺序为：① 先确认是否具备 Edit/append 能力；② 若无，**不要尝试超限写入**（截断后若被写出会造成不可恢复的内容丢失，且此时已无第二条写入路径可回滚）；③ 向调用方报告「工具容量 vs 文件体量」的实测证据与可选方案（授权拆分文件 / 提供 Edit 能力 / 提升输出上限），把决策权交回 PM。教训：长交付物的**写入可行性**应在首次撰写时就与工具容量对齐（例如首次即按 ≤ 容量的分片设计），否则修订轮会陷入不可逆的境地。**R2 补交给出的解法（可复用交付形态）**：当「无 Edit + 目标文件超大 + 必须原地修订」三者同时成立时，正确交付物不是「新版本的完整文档」，而是一份 **APPLY-READY 锚点包**——逐条给出三元组（目标文件 / **原文照抄的唯一锚点** / 新内容），由持有 Edit 能力的一方机械施加。锚点纪律：必须逐字复制（含全角括号与原始空格），且**施加前须先验证该锚点在目标文件中恰好出现 1 次**；包本身按 ≤ 容量分册（part1..partN），并在正文中尽量少用双引号以降低转义导致的解析失败概率。</content>
+    <source_interactions>intelligentbase GROUP_B（architecture_design / module_design / tech_stack 三份文档的写入过程）；R1 修订轮（对既有 517 行 / 742 行文档做原地修订时遭遇单次写入上限）；R2 补交轮（改以 7 册锚点包交付，全部写入成功）</source_interactions>
+    <outcome>1.0.0 三份交付物均一次写入成功；但 R1 修订轮中，architecture_design.md（约 33k 字符）与 module_design.md（约 45k 字符）触发写入上限，原地重写不可行。R2 给出可复用解法：7 册锚点包（43 条目 / 51 定位点）全部一次写入成功，且未触碰目标文档。</outcome>
+    <confidence_history>2026-09-25 创建（confidence=0.7）；2026-09-25 R1 修订轮遭遇反例，confidence 0.7→0.6（原结论「一次写入必成功」被证伪，仅首次撰写成立）；2026-09-26 R2 补交轮：锚点包形态被验证有效（frequency +1，confidence 不变——解法正确性尚待 PM 施加后的门控确认）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-010" type="heuristic" confidence="0.8" frequency="4"
+    created_at="2026-09-25T00:00:00Z" last_updated="2026-09-26T00:00:00Z" status="ACTIVE">
+    <trigger>架构文档涉及性能/容量判断，但目标环境未实测（硬件规格未知、无基线数据），且任务明令「不得编造数值」。</trigger>
+    <content>用**三类标记**把「事实」与「推断」与「待测」彻底分开：`[ESTIMATE]` 估计（说明推断依据与量级，不作数值承诺）、`[TBD-Tn]` 必须部署阶段在目标机实测（逐项写明指标、关联的 REQ/AC、判定用途）、`[ARCH-ASSUMPTION-An]` 架构假设（写明需求侧缺口、假设内容、不成立时的影响与代价）。性能章节写成**评估**而非结论：给量级判断、可行性论证、缓解手段清单，并给出「触发条件」——即「若实测 X 不达标，可选手段依次为 A → B → C，其中涉及用户已拍板决策的变更须由 PM/用户裁决」。切忌用开发机数据替代目标机数据（相关验收标准通常已明令禁止）。**修订轮（R1）补记**：框架/载体切换会引入**新的容量未知项**（如 WSGI 下 SSE 长连接的并发上限），必须为其新增 TBD 项，而不能沿用旧清单——否则「未实测」被静默掩盖。**编号纪律（R2 追加）**：新增 TBD 只能**追加**新号，且若确有「被引用但定义缺失」的号（如上游文档引用了 T16/T18 而清单只到 T15），必须**补齐缺失号的定义**，而不能改引用；若某号在补交轮**无内容可填**，应把它**显式写成「预留未分配」**并写清目的，而不是留空或让下游另起一号——否则同一指标会出现两个号。</content>
+    <source_interactions>intelligentbase GROUP_B（architecture_design §4 / §9 TBD 清单 / §8 架构假设；ADR-06 中的 [ESTIMATE] 用法）；R1 修订（新增 TBD-T15）；R2 补交（补 T16 / T18 定义并显式声明 T17 为预留未分配）</source_interactions>
+    <outcome>性能相关内容不被误读为实测结论；PM 可在目标机按清单逐项校准，且每项都有明确的判定用途。R2 追加了「TBD 编号只增不改 + 悬空引用须补齐定义 + 无内容须显式预留」的纪律。</outcome>
+    <confidence_history>2026-09-25 创建（confidence=0.8）；2026-09-25 R1 扩展（frequency +1）；2026-09-26 R2 再扩展（frequency +1，confidence 不变）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-011" type="procedural" confidence="0.7" frequency="2"
+    created_at="2026-09-25T00:00:00Z" last_updated="2026-09-26T00:00:00Z" status="ACTIVE">
+    <trigger>评审（REV-xx）要求把一份已完成架构文档中的某个**用户已指定**的技术选型换掉（如 Web 框架 FastAPI → Django），且明确要求「修订（revision）而非重写」，并要求标注改动痕迹。</trigger>
+    <content>修订而非重写时的四条纪律：① **编号稳定**——ADR / 模块 / 端口 / IFC / REQ / FM / TBD / 假设的全部编号**一律不变**，因为下游文档（模块设计、覆盖率矩阵、门控清单）以编号互相引用；新增项只能**追加**新编号。② **改动留痕**——每处改动加 `-R1` 后缀或「（R1 修订）」标记，文件头加 `<version>1.1.0</version>` + `<revision>R1</revision>` + `<revision_history>`（记录 rev 号 / 日期 / invocation_id / 变更摘要），正文首行版本号与状态同步。③ **保留决策史**——被推翻的 ADR 保留原标题与原文，在其后追加 `ADR-NN-R1` 修订节，并显式写「本 ADR 结论以 R1 节为准」；不删除原选项，因为「已评估未采纳」本身是门控证据。④ **影响复核表**——用一张表逐条列出**全部** ADR（不只是受影响的）的「是否受影响 / 处置 / 说明」，对不受影响者**逐条写下**「经检查，不受框架切换影响」，否则门控无法区分「已检查」与「漏检查」。载体映射纪律：框架切换本质是**把原来挂在旧框架机制上的东西等价地挂到新框架机制上**（Pydantic 模型 → DRF Serializer / frozen dataclass；`Depends` 注入 → 显式装配 + 视图/中间件；路由装饰器 → URLconf + FBV/CBV），映射时**语义与类型化程度不得降级**（否则违反「接口须类型化」门控）；映射表应单独成节，便于逐条核对。另须同步的技术事实：Django 生态的许可（Django/DRF = BSD-3-Clause、Waitress = ZPL-2.1、Gunicorn = MIT）与「Django ORM 不是唯一选择」——若既有设计刻意自管 SQL 以保住升级路径与模块边界，换成 Django **不应**顺势改为 ORM（框架切换不等于数据访问层重写）。**补交轮（R2）复用要点**：R2 的改动同样受这四条纪律约束——`IFC-IB-001~265` 一字不动、新增号只追加、`revision_history` 追加一条 rev、并对**全部** ADR 逐条给出 R2 复核结论（受影响 1 条 / 不受影响 12 条）；此外新增两条：**新号须在多个文档间统一分配**（先确定段号用途再落地，避免同一段号在两份文档里含义不同），以及**需显式声明「预留未分配」的号**（防止下游误用）。</content>
+    <source_interactions>intelligentbase GROUP_B R1（REV-01：FastAPI→Django；ADR-11-R1；§2.0 框架切换影响复核表；module_design 载体映射）；R2 补交（L-03：编号只增不改 + 逐条 ADR 复核 + 预留号声明）</source_interactions>
+    <outcome>在用户中途改选型的情况下，交付一份**可追溯、编号稳定、下游零返工**的修订版；门控可逐条核对「哪些 ADR 受影响」。R2 复用同一套纪律处理「落点补齐」型修订，未产生任何编号冲突。</outcome>
+    <confidence_history>2026-09-25 创建（confidence=0.7，源自 R1 实际操作，尚未经 PM 门控确认）；2026-09-26 R2 复用（frequency 1→2，confidence 不变）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-012" type="heuristic" confidence="0.7" frequency="1"
+    created_at="2026-09-25T00:00:00Z" last_updated="2026-09-25T00:00:00Z" status="ACTIVE">
+    <trigger>在**全同步**技术栈上（同步 DB 驱动、同步 HTTP 客户端、同步向量库客户端、同步图编排）需要实现 SSE/流式长连接，需在「同步 WSGI」与「异步 ASGI」之间取舍，且要求不得引入重型组件（禁 Docker、最小组成面）。</trigger>
+    <content>判据不是「谁更先进」，而是**失效模式的可控性**与**与栈的同构度**：① **同步栈选同步 WSGI + 原生流式响应**（Django `StreamingHttpResponse` / FastAPI `StreamingResponse`）——零新增组件，无 async/sync 边界；代价是**每个长连接独占一个 worker/线程**，故并发上限 ≈ worker 数。② 异步 ASGI（如 Gunicorn + UvicornWorker）能提升长连接并发，但会把同步调用塞进事件循环：同步阻塞调用会**停滞整个 loop**，其失效模式是「无界、难观测、全站劣化」，而 WSGI 的失效模式是「有界、可观测、可快速 503」——在「不得静默劣化」的语境下，**有界优于无界**。③ 因此先把同步方案做成正确且可测的，**把异步方案保留为「并发升级路径」并量化切换成本**（视图异步化 + 服务器单元一行 + 加装 ASGI 服务器；端口、契约、前端均不动）。④ 无论选哪个，都必须给出**容量纪律**：并发上限可配、超限**快速失败**（禁止无界排队，排队把「慢」放大成「全链路超时」）、流结束立即释放、单流设最大时长/步数、新增 TBD 实测并发上限。⑤ 若选 WebSocket 生态（Channels），须连带评估 Redis channel layer 的组件面与版本兼容事故史——多数情况下 SSE 已足够且风险面小一个量级。⑥ **非流式端点不计入长连接预算**：与流式共存的新增端点若为普通 HTTP 响应，其并发代价与流式端点**不是一个量级**，不应被算进 SSE 容量估算（否则容量判断会偏保守一个数量级）。</content>
+    <source_interactions>intelligentbase GROUP_B R1（ADR-11-R1：A 纯 WSGI + StreamingHttpResponse / B 异步 ASGI / C Channels 三方案权衡）</source_interactions>
+    <outcome>在同步栈上选出「零新增组件 + 有界失效模式」的流式方案，同时保留量化了成本的升级路径；两条真实事故教训（禁 `?token=`、`channels_redis`×`redis-py` 版本不兼容）随决策一并传递。</outcome>
+    <confidence_history>2026-09-25 创建（confidence=0.7，源自 R1 实际操作，尚未经 PM 门控确认）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-013" type="exception" confidence="0.75" frequency="1"
+    created_at="2026-09-26T00:00:00Z" last_updated="2026-09-26T00:00:00Z" status="ACTIVE">
+    <trigger>评审发现某服务「**已经有了 systemd 单元文件、也已经有了客户端调用代码**，但缺**服务端的模块归属与完整契约**」——即交付物看上去齐了，实际上没有可被测试与门控的归属主体。或：上游文档引用了某个契约文件/编号，但该文件并不存在。</trigger>
+    <content>处置步骤（缺一不可）：① **补模块归属**——为该服务新增一个模块（本次 MOD-IB-26），给它编号、职责、覆盖需求、依赖边与无环论证；编号须大于其全部依赖编号。② **错误码语义不变式必须写进契约**：把「4xx/409 = 重试无用（配置或请求错）」「5xx = 重试可能有用（暂时故障）」写成**不变式**，因为它通常是客户端「4xx 不重试」（如 `if exc.code &lt; 500: break`）能成立的前提；同时禁止服务端用 `200` + 部分结果表达失败。③ **把「已落盘的客户端事实」登记为服务端义务，而不是重新设计**——客户端已在读哪些键（如 `vectors`）、如何判失败（长度/维度不符即抛依赖不可用）、重试分类、预热的超时与重试预算，逐条列成「客户端已落盘事实 ↔ 服务端义务」对照表。这样契约不会写成「理想接口」而与既有代码脱节。④ **契约单一落点**——服务端契约**单列一个文件**为唯一权威，模块设计文档只放**摘要视图**并注明「冲突以契约文件为准」；两份正文并存必然漂移。⑤ **对「看起来更主流但其实会制造断点」的方案显式「已评估未采纳」**（如为对齐 OpenAI 生态而改用 `/v1/embeddings`：客户端已按 `/embed` 落盘，改路径即制造服务端/客户端不同步）——留痕比沉默强。⑥ **形态可逆必须落在实现边界上**：进程内形态的实现须放在**客户端模块之内**，且**不得 import 服务端模块**，否则会新增一条反向依赖边，同时破坏 DAG 与「可逆」。</content>
+    <source_interactions>intelligentbase GROUP_B R2 补交（L-03：`ib-embed` 有单元文件与客户端、无服务端模块归属与契约 → 新增 MOD-IB-26 + `docs/ib_embed_service_contract.md`，IFC-IB-266~274）</source_interactions>
+    <outcome>把「看起来已完成」的交付物变成**有归属、有契约、可被测试与门控**的模块；契约与既有客户端事实对齐，避免了「新契约与线上代码不同步」的二次返工；错误码分类不变式随契约一并登记，使客户端的「不重试」逻辑可被追认为有据。</outcome>
+    <confidence_history>2026-09-26 创建（confidence=0.75，源自 R2 补交实际操作，尚未经 PM 门控确认）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-014" type="procedural" confidence="0.8" frequency="1"
+    created_at="2026-09-26T00:00:00Z" last_updated="2026-09-26T00:00:00Z" status="ACTIVE">
+    <trigger>调用方（PM）明确说「**上一次的修订内容只存在于会话文本里，我读不到**」，要求把修订**持久化为文件**；同时工具环境只有 Write（无 Edit）、且目标文档已超过单次写入容量。</trigger>
+    <content>交付形态选择 **APPLY-READY 锚点包**（本次 7 册，共 43 条目 / 51 定位点）：① **每条目固定三元组**：`目标文件`（精确路径）+ `锚点`（从既有文档中**逐字照抄的唯一**行/段，作为 Edit 定位器）+ `新内容`（保留锚点行的完整替换文本），使「施加」变成无需判断力的机械操作。② **锚点唯一性是硬要求**：优先选带独特数字/编号的行（如某 IFC 行、某模块总览行），避开正文里重复出现的措辞；对**同一段内多处改动**用 A/B/C 标注。③ **锚点必须逐字照抄**：保留全角括号、原始空格与原始标点（不要「顺手规范化」），否则定位失败。④ **分册按容量切**（每册约 7~12k 字符），并在每册尾部写明「下一册覆盖什么」，形成可断点续传的链条。⑤ **正文尽量少用双引号**：单次写入过大的失败表现为「输入无法解析为 JSON」，而转义密集的内容更早触发该失败。⑥ 包内附**不变式清单**（编号只增不改 / 契约单一落点 / DAG 纪律 / 凭据纪律 等）与**施加前机器校验清单**（锚点全文计数须恰为 1；`git diff` 中旧编号删除行数须为 0；新模块不得出现在任何模块的依赖列），把「能否正确施加」变成可判定的检查而非信任。⑦ 最后必须**如实给出条目计数与残余项**（含「无法恢复的上轮编号」的诚实交代），让 PM 知道哪些是已对齐、哪些是信息丢失。</content>
+    <source_interactions>intelligentbase GROUP_B R2 补交（INV-GROUP_B-INTELBASE-004：把 003 只存在于会话文本的修订落盘为 `docs/r2_apply_package_part1..7.md`）</source_interactions>
+    <outcome>7 册全部一次写入成功，目标文档（module_design.md 等）保持 R1 原状零改动；PM 可按册逐条 Edit 施加，且施加前有可判定的校验项。该形态与 KE-ARCH-009 的「按交付物边界切分」互补：009 解决「首次撰写」，本体解决「**无 Edit 能力下的原地修订**」。</outcome>
+    <confidence_history>2026-09-26 创建（confidence=0.8，源自 R2 补交实际操作；解法有效性待 PM 施加后确认）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-015" type="exception" confidence="0.9" frequency="1"
+    created_at="2026-09-26T00:00:00Z" last_updated="2026-09-26T00:00:00Z" status="ACTIVE">
+    <trigger>任务涉及「持久化到文件」且工作区中存在**多个项目目录**——其中一个是被明确标注为「只读参考」的仓库，另一个才是本次工作的项目根；且 KB / 交付物的落盘路径**必须以当前项目工作目录为基准**。</trigger>
+    <content>三条硬约束：① **KB 落盘路径是「当前项目工作目录」的相对路径**（`&lt;project_root&gt;/.claude/agents/knowledge_base/&lt;agent_domain&gt;/`），**不是**「参考仓库」的路径。若本次任务的上下文里大量出现参考仓库（如为借鉴经验而通读其代码），极易把模板里的路径「顺手」解析成参考仓库——本次真实发生过（把 intelligentbase 的 KB 写进了 FreeArk 仓库），属**硬约束违反**，须纠正并留痕。② **只读参考仓库绝对禁止写入**——即使内容「只是知识库」也不行；写入只读仓库会污染另一个项目的资产。③ **纠正时是「合并」不是「覆盖」**：先读目标目录既有文件，保留全部既有条目与既有历史，新条目从**未占用的编号**续起，仅追加式的日志文件严格 append-only（不得重写历史行），并更新索引的 frequency（复用计数）而**不改置信度**（除非本轮明确被门控否决或确认）。若同一内容在两个位置都写过，纠正后须在审计日志中记录该事件。</content>
+    <source_interactions>intelligentbase GROUP_B R2 补交（INV-GROUP_B-INTELBASE-003 曾把 KB 写入 FreeArk 仓库；004 纠正落盘至 intelligentbase 的 `.claude/agents/knowledge_base/system_architect/`，与既有 KE-ARCH-001~012 合并）</source_interactions>
+    <outcome>KB 回到正确项目根且内容完整（既有 12 条保留 + 新增 4 条），无覆盖、无历史改写；该违反被登记为可检索的经验，避免在「多项目 + 只读参考」的组合场景中复发。</outcome>
+    <confidence_history>2026-09-26 创建（confidence=0.9，有真实硬约束违反事件背景）</confidence_history>
+  </knowledge_entry>
+
+  <knowledge_entry id="KE-ARCH-016" type="heuristic" confidence="0.75" frequency="1"
+    created_at="2026-09-26T00:00:00Z" last_updated="2026-09-26T00:00:00Z" status="ACTIVE">
+    <trigger>技术选型要引入**预编译二进制 wheel** 的推理/数值运行时（`onnxruntime`、`torch` 等），而目标机是**较老的 x86_64 CPU**；且架构文档全篇基于「CPU-only 可运行」这一前提。</trigger>
+    <content>要点：① **预编译 wheel 隐含指令集基线**——面向 x86_64 分发的 `onnxruntime` / PyTorch wheel 事实上按 **AVX2** 编译（PyTorch 的 NNPACK 等路径亦然）；在只有 **AVX 而无 AVX2** 的较老 CPU（如 Intel Ivy Bridge / i7-3770S 一代）上执行时会触发 **SIGILL（非法指令）**。② **SIGILL 是最坏的失效形态**：它是**进程级、不可捕获**的崩溃（不是可降级的异常），会**绕过所有降级设计**（降级矩阵、fail-open、异常分类全部失效），并且在**开发机（新 CPU）上完全测不出来**——只会在目标机暴露。③ 因此必须**在目标机先做最小探针**：真导入 + **一次真实推理**（不是 `pip list`，也不是「能 import 就算过」），并把「目标机 CPU 是否含 AVX2」记为实测项（本次登记为 TBD-T18）。④ 处置顺序：换用**无 AVX2 依赖的构建** → **自源码编译并关闭 AVX2** → **降级到纯 Python 后备路径**；若均不可行，须**回 PM 裁决是否放宽能力**，不得以引入 copyleft 组件或容器化来规避。⑤ **同源性归并**：同一条依赖链上的多个消费方（本次：既有 OCR 链路的 `onnxruntime` 与新增的 embedding 推理运行时）**必须合并评估**——分别处置会重复踩坑，且排障时会错误归因（把 embedding 的崩溃算成 OCR 的问题）。⑥ 在选型文档中，若该风险命中**已在采纳清单里的组件**，应把该行**风险等级上调**（本次由「中」升为「高」），而不是在备注里轻描淡写。</content>
+    <source_interactions>intelligentbase GROUP_B R2 补交（tech_stack §1「Embedding 推理运行时」行改写 + §5.2 新增风险行 + §4.2/§4.3 验证项 + architecture_design [TBD-T18]；目标机 CPU = Intel i7-3770S）</source_interactions>
+    <outcome>把「开发机可跑」与「目标机可用」的区别显式化，并为「CPU-only 可运行」这一既有前提补上一条此前缺失的、会导致进程崩溃的验证项；同时识别出该风险**同时命中已采纳的 OCR 链路**（影响面超出本次新增项）。</outcome>
+    <confidence_history>2026-09-26 创建（confidence=0.75，源自 R2 补交的指令集分析 + 外部检索；尚未在目标机实测确认）</confidence_history>
+  </knowledge_entry>
+
+</kb_entries>
