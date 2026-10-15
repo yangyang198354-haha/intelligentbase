@@ -474,3 +474,51 @@ def test_TC_INT_R19_010_question_out_of_scope_project_failclosed(accounts_app):
     assert resp.status_code >= 400
     body = resp.content.decode("utf-8", errors="replace")
     assert "never_registered" in body or "startup_error" in body, body
+
+
+# --------------------------------------------------------------------------- #
+# TC-INT-R19-011 —— `reload_projects()` 须同步刷新装配期每项目工件
+# --------------------------------------------------------------------------- #
+
+
+def test_TC_INT_R19_011_hot_registered_project_gets_prompt_store(accounts_app, monkeypatch, tmp_path):
+    """US-IB-42 / AC-IB-42-01 延伸；IFC-IB-339 / 345 / 352。
+
+    缺陷现象：`prompt_stores` / `definitions` / `derived_views` 皆为**装配期一次性**构建，
+    而 `reload_projects()` 此前只刷新 `projects` —— 于是**热登记**的项目在 `prompt_stores`
+    中缺条目，`/api/config/prompts` 对该项目 fail-closed **503**（定义文档因经单实例存储
+    按需读取而不受影响，故线上表现为「提示词区不可用、定义页正常」）。
+
+    本用例断言：`POST /api/projects` 之后，新项目三份工件齐备且提示词列表端点 **200**。
+    """
+    from ib.config import FileDefinitionDocumentStore
+    from ibweb.composition import known_tool_names
+
+    # 与生产同构：定义域取**文件态**。离线夹具默认走内存默认文档，`seed_project` 落盘的
+    # 文件它读不到 —— 那样就测不到「种子落盘 → 热重载装载」这条真实链路。
+    monkeypatch.setenv("IB_DEFINITION_DOC_PATH", str(tmp_path))
+    deps, Client = accounts_app
+    deps.definition_store = FileDefinitionDocumentStore(
+        str(tmp_path), known_tools=known_tool_names()
+    )
+
+    client = Client()
+    h = bearer(_login_admin(client))
+
+    r = client.post(
+        "/api/projects",
+        data=json.dumps({"project_id": "hotproj", "name": "热登记项目"}),
+        content_type="application/json",
+        **h,
+    )
+    assert r.status_code == 201, r.content
+
+    assert "hotproj" in deps.prompt_stores, "热登记项目未补入 prompt_stores → /api/config/prompts 将 503"
+    assert "hotproj" in deps.definitions, "热登记项目未补入 definitions → 提示词区列不出专家"
+    assert "hotproj" in deps.derived_views, "热登记项目未补入 derived_views"
+
+    resp = client.get("/api/config/prompts", **h, **{DEF_PATH_HEADER: "hotproj"})
+    assert resp.status_code == 200, resp.content
+    payload = json.loads(resp.content)
+    assert [e["name"] for e in payload["experts"]] == ["kb-agent"]
+    assert set(payload["experts"][0]["layers"]) == {"main", "fallback"}

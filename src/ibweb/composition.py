@@ -178,12 +178,55 @@ class Deps:
         self._orchestrators: dict[str, Any] = {}
 
     def reload_projects(self) -> None:
-        """热重载项目快照：CRUD 后立即刷新并重建编排器缓存，无需重启服务。"""
+        """热重载项目快照：CRUD 后立即刷新并重建编排器缓存，无需重启服务。
+
+        **同时补齐装配期一次性构建的每项目工件**（`prompt_stores` / `definitions` /
+        `derived_views`）：此前只刷新 `projects`，导致热登记项目在 `prompt_stores` 中缺条目，
+        `/api/config/prompts` 对该项目 fail-closed 返回 503（定义文档因经单实例存储按需读取
+        而不受影响，故此前表现为「配置页提示词区不可用、定义页正常」）。
+        """
         fresh = _projects_from_registry(self.cfg, self.ledger, self.project_registry)
         _ensure_collections(self.vectors, self.collections, fresh)
         with self._lock:
             self.projects = fresh
             self._orchestrators = {}
+        self._sync_project_artifacts(fresh)
+
+    def _sync_project_artifacts(self, projects: dict[str, ProjectRecord]) -> None:
+        """把每项目工件收敛到当前快照（`reload_projects` 专用；装配序列见 `_assemble`）。
+
+        * `prompt_stores`：**整表重建**（构造无 I/O，顺带剔除已不在快照的项目）；
+        * `definitions` / `derived_views`：**只补缺失项目**，走与装配期**同一个**
+          「装载 → 提示词引用 → 两域准入 → 派生」序列；已装配项目**不重跑**
+          （不重复注入派生视图、不重读文件），故热重载对在跑项目零扰动。
+
+        定义文档**装载不到**的项目（如未配置 `IB_DEFINITION_DOC_PATH` 时定义域取内存默认，
+        新项目在装配期存储里无文档）→ **不静默**：记 ERROR 级结构化日志后跳过该项目的
+        `definitions` / `derived_views` 补充，**绝不**把「项目创建 / 改名」变成 500
+        （`orchestrator_for` 对缺派生视图已有显式防御性回落）。
+        """
+        self.prompt_stores = build_prompt_stores(self.cfg, projects)
+        tool_specs = known_tool_param_specs()
+        for project_id in projects:
+            if project_id in self.definitions:
+                continue
+            try:
+                doc, view = _load_and_admit(
+                    self.definition_store, self.prompt_stores.get(project_id), project_id, tool_specs
+                )
+            except ConfigError:
+                from ib.observability import log_event
+
+                log_event(
+                    "definition_doc",
+                    "reload_skipped_unloadable_project",
+                    project_id=project_id,
+                    reason="definition_document_unavailable",
+                    level="ERROR",
+                )
+                continue
+            self.definitions[project_id] = doc
+            self.derived_views[project_id] = view
 
     # ------------------------------------------------------------------ #
     # 每项目一份编排器（工具按项目绑定）
@@ -501,6 +544,28 @@ def is_bootstrapped() -> bool:
     return _DEPS is not None
 
 
+def _load_and_admit(
+    definition_store: Any,
+    prompt_store: Any,
+    project_id: str,
+    tool_specs: Any,
+) -> tuple[Any, Any]:
+    """单项目「装载定义文档 → 取提示词引用 → 两域准入 → 派生只读视图」。
+
+    装配期（`_assemble` 4c-2）与热重载（`Deps._sync_project_artifacts`）**共用本序列**，
+    避免两条路径漂移（同 `admit_two_domains` 的「唯一入口」纪律）。
+    """
+    doc = definition_store.load(project_id)  # IFC-IB-288
+    prompt_refs = prompt_store.list_refs() if prompt_store is not None else ()  # IFC-IB-345
+    view = admit_two_domains(  # IFC-IB-353（290 扩展 + 345 + 346 + 347）
+        doc,
+        store=definition_store,
+        prompt_refs=prompt_refs,
+        tool_specs=tool_specs,
+    )
+    return doc, view
+
+
 def _assemble() -> Deps:
     """真正的装配动作（`build_deps` 加锁后调用）。"""
     from ib.blob import build_blob_store
@@ -666,14 +731,8 @@ def _assemble() -> Deps:
     definitions: dict[str, Any] = {}
     derived_views: dict[str, Any] = {}
     for project_id in projects:
-        doc = definition_store.load(project_id)  # IFC-IB-288
-        prompt_store = prompt_stores.get(project_id)
-        prompt_refs = prompt_store.list_refs() if prompt_store is not None else ()  # IFC-IB-345
-        view = admit_two_domains(  # IFC-IB-353（290 扩展 + 345 + 346 + 347）
-            doc,
-            store=definition_store,
-            prompt_refs=prompt_refs,
-            tool_specs=tool_specs,
+        doc, view = _load_and_admit(
+            definition_store, prompt_stores.get(project_id), project_id, tool_specs
         )
         definitions[project_id] = doc
         derived_views[project_id] = view
