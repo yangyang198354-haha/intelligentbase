@@ -94,6 +94,14 @@ def _store(doc):
     )
 
 
+def _write_prompt(root: str, project_id: str, expert: str, layer: str, text: str) -> None:
+    """落盘一层提示词文件（临时目录；模拟创建期落盘 / 回填迁移的产物）。"""
+    d = os.path.join(root, project_id, expert)
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, f"{layer}.md"), "w", encoding="utf-8") as fh:
+        fh.write(text)
+
+
 def _two_tool_registry():
     """两台工具**共享**同名裸参数 `top_k`（用于验证跨工具参数名隔离）。"""
     registry = ToolRegistry()
@@ -177,7 +185,7 @@ def test_TC_UNIT_111_admit_signature_frozen_and_two_domain_gate_present():
 # --------------------------------------------------------------------------- #
 
 
-def test_TC_UNIT_112_admit_two_domains_rejects_cross_domain_violations():
+def test_TC_UNIT_112_admit_two_domains_rejects_cross_domain_violations(tmp_path):
     doc = _doc()
     store = _store(doc)
 
@@ -195,26 +203,23 @@ def test_TC_UNIT_112_admit_two_domains_rejects_cross_domain_violations():
         admit_two_domains(doc, store=store, prompt_refs=orphan, tool_specs=())
     assert "prompt_orphan_file" in {i.code for i in ei.value.validation_items}
 
-    # (b) 缺兜底：目录无 fallback.md **且** 该专家无内置兜底 → 拒绝。
-    #     REV-17（ADR-36）：判据已不再来自定义文档字段（该字段已删），而来自注入的内置兜底。
-    #     正常装配下 `builtin_fallbacks` 恒覆盖每个专家，故这里显式注入空映射来触发它 ——
-    #     该错误码因此退化为「提示词域注入残缺」的防御性断言。
+    # (b) 缺提示词：目录内该专家 `main.md` 与 `fallback.md` **两层皆缺** → 拒绝。
+    #     **契约翻转（REV-20 / ADR-48）**：原 REV-17 判据为「缺 fallback.md 且无内置兜底
+    #     （`prompt_fallback_missing`）」；代码内置兜底退役后，判据改为「两层皆缺 →
+    #     `prompt_missing`」，且该判据在**正常装配下即可达**（不再是防御性断言）。
     doc_b = _doc()
     with pytest.raises(core.ConfigError) as ei:
-        admit_two_domains(
-            doc_b, store=_store(doc_b), prompt_refs=(), tool_specs=(), builtin_fallbacks={}
-        )
-    assert "prompt_fallback_missing" in {i.code for i in ei.value.validation_items}
+        admit_two_domains(doc_b, store=_store(doc_b), prompt_refs=(), tool_specs=())
+    assert "prompt_missing" in {i.code for i in ei.value.validation_items}
 
-    # (b2) 反之：有内置兜底、无 fallback.md → **通过**（这正是 REV-17 要放行的场景）
+    # (b2) 反之：任一专家**落盘了 main.md** → 该专家通过（新的「破死锁」路径 = 创建期落盘）
+    root = str(tmp_path)
+    for name in ("freeark-expert", "sanheng-knowledge"):
+        _write_prompt(root, "p1", name, "main", f"# {name} 提示词\n")
     view_b = admit_two_domains(
-        doc_b,
-        store=_store(doc_b),
-        prompt_refs=(),
-        tool_specs=(),
-        builtin_fallbacks={"freeark-expert": "BI", "sanheng-knowledge": "BI"},
+        doc_b, store=_store(doc_b), prompt_refs=cfg.load_prompt_directory(root, "p1"), tool_specs=()
     )
-    assert all(b.resolved_from == "builtin_fallback" for b in view_b.prompt_bundles)
+    assert all(b.resolved_from == "main_file" for b in view_b.prompt_bundles)
 
     # (c) 未知工具参数（spec 未声明）→ 拒绝
     bad_param = _doc(
@@ -238,19 +243,23 @@ def test_TC_UNIT_112_admit_two_domains_rejects_cross_domain_violations():
     assert "tool_param_unauthorized_tool" in {i.code for i in ei.value.validation_items}
 
 
-def test_TC_UNIT_113_admit_two_domains_clean_passes_and_derives_bundles():
+def test_TC_UNIT_113_admit_two_domains_clean_passes_and_derives_bundles(tmp_path):
+    """**契约翻转（REV-20 / ADR-48）**：原 REV-17 口径下「无提示词文件 → 退回代码内置兜底」
+    也能通过两域闸门；REV-20 后，**两层文件皆缺即 fail-closed**，故本用例改为
+    「两位专家均落盘 main.md」后通过，并断言来源可核验（`resolved_from == main_file`）。"""
     doc = _doc()
-    view = admit_two_domains(doc, store=_store(doc), prompt_refs=(), tool_specs=())
+    root = str(tmp_path)
+    for name in ("freeark-expert", "sanheng-knowledge"):
+        _write_prompt(root, "p1", name, "main", f"# {name} 主提示词\n")
+    view = admit_two_domains(
+        doc, store=_store(doc), prompt_refs=cfg.load_prompt_directory(root, "p1"), tool_specs=()
+    )
     by = {b.expert_name: b for b in view.prompt_bundles}
     assert set(by) == {"freeark-expert", "sanheng-knowledge"}
-    # 无提示词文件 → 退回**代码内置兜底**（REV-17 / ADR-36），且生效提示词恒非空（ADR-29）
-    assert all(b.resolved_from == "builtin_fallback" for b in by.values())
+    # 生效提示词来自**项目提示词目录**（来源可核验，REQ-FUNC-IB-55），恒非空
+    assert all(b.resolved_from == "main_file" for b in by.values())
     assert all(b.effective_prompt.strip() for b in by.values())
-    # 两个专家名都在 `_DEFAULT_SPECS` 中 → 兜底取自各自的内置提示词（非通用安全网）
-    from ib.experts import BUILTIN_FALLBACK_DEFAULT, builtin_fallback_for
-
-    assert by["freeark-expert"].effective_prompt == builtin_fallback_for("freeark-expert")
-    assert by["freeark-expert"].effective_prompt != BUILTIN_FALLBACK_DEFAULT
+    assert by["freeark-expert"].effective_prompt == "# freeark-expert 主提示词\n"
 
 
 # --------------------------------------------------------------------------- #
@@ -386,39 +395,41 @@ def test_TC_UNIT_118_semantic_hash_and_whitelist_include_param_values():
 # --------------------------------------------------------------------------- #
 
 
-def test_TC_UNIT_119_experts_registry_freeark_aligned_and_old_slugs_gone():
+def test_TC_UNIT_119_builtin_registry_is_single_generic_kb_agent():
+    """**契约翻转（REV-20 / ADR-50）**：原 REV-19/ADR-31 口径下内置注册表 = FreeArk 严格
+    对齐的三专家（`freeark-expert` / `inspection-expert` / `sanheng-knowledge`）；
+    REV-20 起**默认三专家机制整体退役**，内置注册表 = **唯一通用 kb-agent**，
+    且其 `fallback_prompt` 字段已**去驱动化**（提示词正文不再内联于代码）。"""
     import ib.experts as experts
 
-    assert experts.names() == ("freeark-expert", "inspection-expert", "sanheng-knowledge")
-    assert experts.cn_map() == {
-        "freeark-expert": "系统管家",
-        "inspection-expert": "巡检诊断",
-        "sanheng-knowledge": "三恒知识",
-    }
-    assert experts.default_expert() == "freeark-expert"
+    assert experts.names() == ("kb-agent",)
+    assert experts.cn_map() == {"kb-agent": "知识库助手"}
+    assert experts.default_expert() == "kb-agent"
     by = {s.name: s for s in experts.EXPERT_SPECS}
-    # 旧 slug 必须彻底消失（硬改名，ADR-31）
+    # 旧 slug 必须彻底消失（硬改名，ADR-31 的这条结论仍有效）
     assert all(s not in by for s in _OLD_SLUGS)
-    # is_data_expert 语义随名字迁移：freeark 承接「数据专家」语义
-    assert by["freeark-expert"].is_data_expert is True
-    assert by["sanheng-knowledge"].is_data_expert is False
-    assert by["inspection-expert"].is_data_expert is True
-    # 每位专家兜底恒非空（ADR-29：生效提示词永不空白）
-    assert all(s.fallback_prompt.strip() for s in experts.EXPERT_SPECS)
+    # 唯一内置专家承担「数据专家」语义（持知识检索工具）
+    assert by["kb-agent"].is_data_expert is True
+    # 提示词正文不在代码里（ADR-48 / OQ-IB-42=B）：该字段恒空串，不参与运行期取值
+    assert all(s.fallback_prompt == "" for s in experts.EXPERT_SPECS)
+    # 三专家退役：不再是任何内置注册表成员
+    for retired in ("freeark-expert", "inspection-expert", "sanheng-knowledge"):
+        assert retired not in by
 
 
-def test_TC_UNIT_120_load_prompt_bundle_ref_exists_but_file_missing_falls_back():
+def test_TC_UNIT_120_load_prompt_bundle_ref_missing_is_fail_closed():
+    """**契约翻转（REV-20 / ADR-48）**：原口径下「引用声称存在但文件已缺 → 回落内置兜底」；
+    代码内置兜底退役后，同场景改为 **`PromptNotFoundError(code="prompt_missing")`**。"""
     ref = core.ExpertPromptDocumentRef(
-        expert_name="freeark-expert",
+        expert_name="kb-agent",
         layer="main",
         rel_path=os.path.join("does", "not", "exist", "main.md"),
         content_hash="sha256:stale",
         exists=True,  # 引用声称存在，但文件实际已缺（例如被外部删除）
     )
-    bundle = cfg.load_prompt_bundle("freeark-expert", refs=(ref,), builtin_fallback="内置兜底")
-    assert bundle.resolved_from == "builtin_fallback"
-    assert bundle.effective_prompt == "内置兜底"
-    assert bundle.main_prompt is None
+    with pytest.raises(core.PromptNotFoundError) as ei:
+        cfg.load_prompt_bundle("kb-agent", refs=(ref,))
+    assert ei.value.code == "prompt_missing"
 
 
 def test_TC_UNIT_121_editing_main_layer_keeps_fallback_layer():
@@ -434,7 +445,7 @@ def test_TC_UNIT_121_editing_main_layer_keeps_fallback_layer():
     assert m2.saved is True
     refs2 = {r.layer: r for r in store.list_refs() if r.expert_name == "freeark-expert"}
     assert refs2["fallback"].content_hash == fb_hash_before  # 兜底层未被触碰
-    bundle = store.load_bundle("freeark-expert", builtin_fallback="内置")
+    bundle = store.load_bundle("freeark-expert")
     assert bundle.main_prompt == "主v2" and bundle.fallback_prompt == "兜底v1"
     assert bundle.resolved_from == "main_file"
 

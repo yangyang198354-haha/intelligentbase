@@ -1,19 +1,23 @@
-"""单元测试层 —— REV-19 增量（每项目专家集隔离 / 定义文档目录化 / 新项目种子 / 三专家属 demo）。
+"""单元测试层 —— REV-19 增量（每项目专家集隔离 / 定义文档目录化 / 新项目种子）
+**REV-20 修订**（ADR-48 / ADR-50 / ADR-51）：默认三专家机制退役、内置注册表收敛为唯一
+通用 `kb-agent`、`seed_project` 新增提示词落盘子步。
 
-覆盖 `architecture_design.md` ADR-43 ~ ADR-47 与 `module_design.md` IFC-IB-378 ~ IFC-IB-388 的
-**纯函数 / 结构 / 语义**层（离线，无 HTTP、无外部 IO）：
+覆盖 `architecture_design.md` ADR-43 ~ ADR-47（REV-20 由 ADR-48/50/51 修订承接）与
+`module_design.md` IFC-IB-378 ~ IFC-IB-392 的**纯函数 / 结构 / 语义**层（离线，无 HTTP、无外部 IO）：
 
   * `ExpertRegistryView`（IFC-IB-379）的**类型层不变量**（`default_expert` 必填非空、无跨项目字段）；
   * `resolve_expert_registry`（IFC-IB-380）**fail-closed**（空集 / 缺默认 / 默认非唯一 → `ExpertRegistryError`，
     **无跨项目 / 全局回退**）—— AC-IB-41-02 / AC-IB-41-05；
   * `builtin_default_registry`（IFC-IB-381）新建项目种子 = **恰 1 个** KB agent（内置不可删）—— AC-IB-44-04；
-  * `builtin_expert_registry` = `demo` 三对齐专家 —— AC-IB-45-01；
+  * **契约翻转（REV-20 / ADR-50）**：`builtin_expert_registry` 与 `builtin_default_registry`
+    **同值** = 唯一 `kb-agent`（原 demo 三专家退役）；
   * `IntentRouter(experts=…)`（IFC-IB-382）**只在本项目专家集内**路由、永不无人应答、
-    非 demo 项目不调用三专家 —— AC-IB-43-01 / 43-02 / 43-03 / 45-03；
+    不再存在「demo 专属专家」这一概念 —— AC-IB-43-01 / 43-02 / 43-03；
   * `FileDefinitionDocumentStore` 目录化 `_path_for` 与按项目 round-trip（IFC-IB-383）—— AC-IB-42-02 / 42-03 / 42-04；
   * `migrate_legacy_definition_file`（IFC-IB-384，C-IB-46）—— AC-IB-42-04；
-  * `migrate_expert_history`（IFC-IB-386，C-IB-47）归属改写 + 记录保留 + 幂等 —— AC-IB-45-04；
-  * `seed_project`（IFC-IB-385）按项目落地 + 单一默认编排流 —— AC-IB-44-01 / 44-03 / 44-06。
+  * `migrate_expert_history`（IFC-IB-386，C-IB-47）归属改写 + 记录保留 + 幂等
+    （**REV-20：默认 `experts=()` 空元组，迁移口径停用，仅保留显式调用的能力**）—— AC-IB-45-04；
+  * `seed_project`（IFC-IB-385 / 390）按项目落地 + 提示词落盘 + 单一默认编排流 —— AC-IB-44-01 / 44-03 / 44-06。
 
 凭据纪律：全程无任何真实 token / key / 口令；定义文档只含键名 / 专家名。
 离线纪律：`tempfile` 临时目录 + 内存替身，不触网、不碰生产路径。
@@ -36,12 +40,15 @@ from ib.core import (
     Scope,
 )
 from ib.experts import (
-    DEMO_EXPERT_NAMES,
     ExpertRegistryView,
     builtin_default_registry,
     builtin_expert_registry,
     resolve_expert_registry,
 )
+
+#: REV-20（ADR-50）**已退役**的三专家（FreeArk 对齐集）——
+#: 仅用于「已退场」的反向断言，与 ADR-46 迁移能力的显式参数。
+_RETIRED_DEMO_EXPERTS = ("freeark-expert", "inspection-expert", "sanheng-knowledge")
 
 #: 一份最小可用的编排规格（路由纯函数不消费它以做决策，仅需合法占位）。
 _GRAPH = OrchestrationSpecInput(nodes=("START", "END"), conditional_edges=(), edges=())
@@ -115,10 +122,10 @@ def test_TC_UNIT_R19_002_resolve_registry_failclosed_without_fallback() -> None:
         assert ei.value.project_id == "p_probe", "错误必须携带项目标识"
         assert ei.value.reason == reason, f"reason 应为结构化类别 {reason}"
 
-    # 回退面不存在：单专家项目解析结果**恰为**该专家，而非内置三专家（全局默认）。
+    # 回退面不存在：单专家项目解析结果**恰为**该专家，而非任何全局 / 内置专家。
     ok = resolve_expert_registry("p_ok", view=_view(_spec("solo", is_default=True)))
     assert ok.names() == ("solo",)
-    assert not (set(ok.names()) & set(DEMO_EXPERT_NAMES)), "解析不得注入全局 / 其他项目的专家"
+    assert not (set(ok.names()) & set(_RETIRED_DEMO_EXPERTS)), "解析不得注入全局 / 其他项目的专家"
 
 
 # --------------------------------------------------------------------------- #
@@ -130,52 +137,50 @@ def test_TC_UNIT_R19_003_builtin_default_seed_is_single_non_global_kb_agent() ->
     """US-IB-44 / AC-IB-44-04、AC-IB-44-02；OQ-IB-33(a) / ADR-45 / IFC-IB-381。
 
     新建项目种子视图 = **恰 1 个** 内置不可删 KB 问答 agent（`is_default=True`），
-    且**不是**全局 `EXPERT_SPECS`（三对齐专家）—— 默认专家被喂以「本项目」专家集。
+    且**不是**「三对齐专家」—— 默认专家被喂以「本项目」专家集。
     """
     seed = builtin_default_registry()
     assert len(seed.experts) == 1, "新建项目种子必须恰 1 个专家"
     assert seed.experts[0].is_default is True, "种子专家必须 is_default=True（内置不可删兜底）"
     assert seed.default_name() == "kb-agent"
-    # AC-IB-44-02：非全局 EXPERT_SPECS（三专家）。
-    assert seed.names() != DEMO_EXPERT_NAMES
-    assert not (set(seed.names()) & set(DEMO_EXPERT_NAMES))
+    # AC-IB-44-02：不与已退役三专家重叠（REV-20 / ADR-50）。
+    assert not (set(seed.names()) & set(_RETIRED_DEMO_EXPERTS))
 
 
 # --------------------------------------------------------------------------- #
-# TC-UNIT-R19-004 —— AC-IB-45-01：demo 项目含三对齐专家
+# TC-UNIT-R19-004 —— **契约翻转（REV-20 / ADR-50）**：demo 三专家机制退役，
+#                     `builtin_expert_registry` 与 `builtin_default_registry` 同值
 # --------------------------------------------------------------------------- #
 
 
-def test_TC_UNIT_R19_004_demo_registry_has_three_aligned_experts() -> None:
-    """US-IB-45 / AC-IB-45-01；REQ-FUNC-IB-53 / 42 / ADR-45。
+def test_TC_UNIT_R19_004_builtin_expert_registry_equals_default_single_kb_agent() -> None:
+    """US-IB-45（原「demo 项目含三对齐专家」）；**REV-20 / OQ-IB-46=B / OQ-IB-47=C / ADR-50**。
 
-    `demo` 项目专家集 = `freeark-expert` / `inspection-expert` / `sanheng-knowledge`
-    （与 FreeArk 100% 对齐），默认专家 = `freeark-expert`。
+    契约翻转：原 REV-19/ADR-31 口径下 `demo` 项目专家集 = FreeArk 三对齐专家；REV-20 起
+    「默认三专家」机制**整体退役**，`builtin_expert_registry()` 与 `builtin_default_registry()`
+    **同值** = 唯一通用 `kb-agent`（`demo` 亦改 kb-agent），且不再含任何业务域专家。
     """
     demo = builtin_expert_registry()
-    assert demo.names() == DEMO_EXPERT_NAMES == (
-        "freeark-expert",
-        "inspection-expert",
-        "sanheng-knowledge",
-    )
-    assert demo.default_name() == "freeark-expert"
+    assert demo.names() == builtin_default_registry().names() == ("kb-agent",)
+    assert demo.default_name() == "kb-agent"
+    # 已退役三专家不得出现在任何内置视图。
+    assert not (set(demo.names()) & set(_RETIRED_DEMO_EXPERTS))
 
 
 # --------------------------------------------------------------------------- #
-# TC-UNIT-R19-005 —— AC-IB-45-02：非 demo 项目专家集不含三专家（全隐藏）
+# TC-UNIT-R19-005 —— AC-IB-45-02：内置视图不含业务域专家（全隐藏）
 # --------------------------------------------------------------------------- #
 
 
-def test_TC_UNIT_R19_005_non_demo_registry_excludes_three_experts() -> None:
-    """US-IB-45 / AC-IB-45-02；OQ-IB-35(a) / ADR-45。
-
-    由「新建项目种子」解析出的非 demo 项目视图**不含**三专家中任何一个 —— 由**种子差异**
-    在结构上保证「三专家属 demo」，而非任何 UI 约定。
+def test_TC_UNIT_R19_005_builtin_views_contain_no_business_domain_experts() -> None:
+    """**契约翻转（REV-20 / OQ-IB-48=C / ADR-50）**：原口径「非 demo 项目专家集不含三专家，
+    由种子差异保证三专家属 demo」；三专家退役后，本判据强化为「**任何**内置视图都不含
+    业务域专家」—— 断言两个内置视图同值且与已退役集不相交。
     """
     non_demo = builtin_default_registry()
-    assert not (set(non_demo.names()) & set(DEMO_EXPERT_NAMES)), "非 demo 项目不得出现三专家"
-    # 与 demo 视图逐项不同（隐藏 ≠ 只是「不可见」，而是**不在集合内**）。
-    assert set(non_demo.names()) != set(builtin_expert_registry().names())
+    assert not (set(non_demo.names()) & set(_RETIRED_DEMO_EXPERTS)), "内置视图不得出现业务域专家"
+    # 两个内置视图逐项相同（demo 与非 demo 不再有专家集差异）。
+    assert set(non_demo.names()) == set(builtin_expert_registry().names()) == {"kb-agent"}
 
 
 # --------------------------------------------------------------------------- #
@@ -218,27 +223,25 @@ def test_TC_UNIT_R19_007_router_never_without_answer_falls_back_to_project_defau
 
 
 # --------------------------------------------------------------------------- #
-# TC-UNIT-R19-008 —— AC-IB-43-03 / AC-IB-45-03：非 demo 不调用三专家
+# TC-UNIT-R19-008 —— AC-IB-43-03：路由不调用任何业务域专家（三专家已退役）
 # --------------------------------------------------------------------------- #
 
 
-def test_TC_UNIT_R19_008_router_does_not_invoke_demo_experts_in_non_demo() -> None:
-    """US-IB-43 / AC-IB-43-03；US-IB-45 / AC-IB-45-03；OQ-IB-34(a) / ADR-43。
-
-    在非 demo 项目中提一个「本应由 demo 专属专家处理」的问题（命中 `巡检` / `三恒` / `能耗`）——
-    **不调用** demo 专家，由本项目专家集处理；对照组（未注入视图的 legacy 路由器）会命中
-    `inspection-expert`，证明该问句本可触发 demo 专家。
+def test_TC_UNIT_R19_008_router_never_invokes_business_domain_experts() -> None:
+    """**契约翻转（REV-20 / ADR-50）**：原口径「非 demo 项目不调用 demo 三专家，
+    对照组（未注入视图）会命中 `inspection-expert`」；三专家退役后，对照组的全局注册表
+    亦只有 `kb-agent`，故**注入与未注入都恒为 kb-agent**（不再存在业务域专家可命中）。
     """
     from ib.routing import IntentRouter
 
-    view = builtin_default_registry()  # 非 demo：仅 kb-agent
+    view = builtin_default_registry()  # 唯一 kb-agent
     d = IntentRouter(experts=view).classify_experts("巡检一下 PLC 故障", scope=Scope(project_id="p_x"))
-    assert not (set(d.experts) & set(DEMO_EXPERT_NAMES)), f"非 demo 项目调用了 demo 专家：{d.experts}"
+    assert not (set(d.experts) & set(_RETIRED_DEMO_EXPERTS)), f"调用了已退役三专家：{d.experts}"
     assert d.experts == ["kb-agent"]
 
-    # 对照组：同一问句在未注入视图（内置默认三专家）下确实命中 demo 专家。
+    # 对照组：未注入视图（进程级内置注册表）同样只有 kb-agent —— 无业务域专家可命中。
     legacy = IntentRouter().classify_experts("巡检一下 PLC 故障", scope=Scope(project_id="p_x"))
-    assert legacy.experts == ["inspection-expert"], "对照问句应能触发 demo 专家"
+    assert legacy.experts == ["kb-agent"], "全局注册表亦不含业务域专家"
 
 
 # --------------------------------------------------------------------------- #
@@ -345,8 +348,12 @@ def test_TC_UNIT_R19_011_migrate_legacy_definition_file(tmp_path) -> None:
 def test_TC_UNIT_R19_012_migrate_expert_history_reassign_retain_idempotent() -> None:
     """US-IB-45 / AC-IB-45-04；OQ-IB-40(b) / DR-23 / C-IB-47 / ADR-46 / IFC-IB-386。
 
-    引用 demo 三专家的历史会话归属改写为 `demo`（记录保留，不删除）；非 demo 项目因此
-    失去可见；未引用三专家的会话不动；重复执行幂等（`applied=False`）。
+    **REV-20（ADR-50）修订**：`migrate_expert_history` 的 `experts` 默认值改为**空元组**
+    （迁移口径**停用** —— 三专家退役后不再有「默认待迁移集」）；本用例**显式**传入已退役
+    三专家，验证**能力仍在**（显式调用时行为不变）：归属改写 + 记录保留 + 未引用者不动 + 幂等。
+
+    引用三专家的历史会话归属改写为 `demo`（记录保留，不删除）；非 demo 项目因此失去可见；
+    未引用三专家的会话不动；重复执行幂等（`applied=False`）。
     """
     import ib.streaming as streaming
     from ib.core import MigrationReport, SessionState
@@ -357,7 +364,13 @@ def test_TC_UNIT_R19_012_migrate_expert_history_reassign_retain_idempotent() -> 
     store.save("demo:s3", SessionState(last_expert="inspection-expert", project_id="demo"))
     before = len(store)
 
-    report = streaming.migrate_expert_history("demo", sessions=store)
+    # 默认 experts=() → 空跑（迁移口径停用）
+    default_run = streaming.migrate_expert_history("demo", sessions=store)
+    assert default_run.applied is False and default_run.affected_sessions == 0
+
+    report = streaming.migrate_expert_history(
+        "demo", sessions=store, experts=_RETIRED_DEMO_EXPERTS
+    )
     assert isinstance(report, MigrationReport)
     assert report.applied is True and report.affected_sessions == 1
     assert report.target_project_id == "demo"
@@ -368,7 +381,9 @@ def test_TC_UNIT_R19_012_migrate_expert_history_reassign_retain_idempotent() -> 
     # 未引用三专家的会话不动。
     assert store.load("legacy:s2") is not None
     # 幂等。
-    again = streaming.migrate_expert_history("demo", sessions=store)
+    again = streaming.migrate_expert_history(
+        "demo", sessions=store, experts=_RETIRED_DEMO_EXPERTS
+    )
     assert again.applied is False and again.affected_sessions == 0
 
 
@@ -378,10 +393,11 @@ def test_TC_UNIT_R19_012_migrate_expert_history_reassign_retain_idempotent() -> 
 
 
 def test_TC_UNIT_R19_013_seed_project_lands_per_project(tmp_path) -> None:
-    """US-IB-44 / AC-IB-44-01、AC-IB-44-03；OQ-IB-32(b) / ADR-45 / IFC-IB-385。
+    """US-IB-44 / AC-IB-44-01、AC-IB-44-03；OQ-IB-32(b) / ADR-45 / ADR-51 / IFC-IB-385 / 390。
 
-    `seed_project` 写 `<dir>/<pid>.json`（该项目专家集）+ 提示词目录骨架
-    `<root>/<pid>/<expert>/`；非 demo = 内置默认单例；幂等（已存在不覆盖）。
+    `seed_project` 写 `<dir>/<pid>.json`（该项目专家集）+ **提示词落盘**
+    `<root>/<pid>/kb-agent/main.md`（REV-20 新增子步，IFC-IB-390）；非 demo = 内置默认单例；
+    幂等（已存在不覆盖）。
     """
     from ib.config import FileDefinitionDocumentStore
     from ibweb.composition import seed_project
@@ -393,6 +409,10 @@ def test_TC_UNIT_R19_013_seed_project_lands_per_project(tmp_path) -> None:
     assert res.expert_names == ("kb-agent",)
     assert (defs / "proj_p.json").is_file(), "种子须按项目落地 <dir>/<pid>.json"
     assert (prompts / "proj_p" / "kb-agent").is_dir(), "提示词目录骨架为 <root>/<pid>/<expert>/"
+    # REV-20（IFC-IB-390）：创建期即落盘提示词正文（提示词正文唯一来源 = 项目目录）
+    main_file = prompts / "proj_p" / "kb-agent" / "main.md"
+    assert main_file.is_file(), "创建期须落盘 main.md（否则装配期 prompt_missing fail-closed）"
+    assert main_file.read_text(encoding="utf-8").strip(), "落盘内容不得为空"
 
     doc = FileDefinitionDocumentStore(str(defs), known_tools=frozenset()).load("proj_p")
     assert [e.name for e in doc.experts] == ["kb-agent"]

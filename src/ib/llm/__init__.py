@@ -174,7 +174,12 @@ class OpenAiCompatibleProvider:
     def build_expert(self, spec: ExpertSpec, *, system_prompt: str | None = None) -> LlmRole:
         """[IFC-IB-212] 专家角色。**REV-17（ADR-36）**：人格文本取 `system_prompt`
         （装配期由两域合并派生的 `ExpertPromptBundle.effective_prompt`）；
-        缺省 / 全空白 → 回落 `spec.fallback_prompt`（代码内置安全网，ADR-29）。
+        缺省 / 全空白 → 回落 `spec.fallback_prompt` 字段（**通用透传机制**）。
+
+        **REV-20（ADR-48）**：原「代码内置安全网」已退役 —— 内置注册表的
+        `spec.fallback_prompt` 恒为空串（该字段**去驱动化**），故该回落分支只为
+        **显式构造的 spec** 保留（既有调用点零行为变化）；「生效系统提示词恒非空」由
+        **创建期落盘 + 装配期 fail-closed**（`prompt_missing`）保证，不再由代码常量保证。
 
         此前本方法的 docstring 声称「主提示由接入方按 `spec.name` 加载后经 `system_prompt`
         覆盖」，而 `system_prompt` **并不存在**、全仓无调用方 —— 是一句假陈述，且掩盖了

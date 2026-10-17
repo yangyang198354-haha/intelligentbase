@@ -926,9 +926,10 @@ class ExpertSpecInput:
     **REV-17（ADR-36）**：本类**不再携带任何提示词文本**。历史字段
     `fallback_prompt` 已移除 —— 它曾是「兜底提示词」的第二个可写入口，与提示词域的
     `fallback.md` 构成重叠真源（正是 ADR-15-R1 否决 Option C 的理由）。提示词文本的
-    唯一可配置载体是提示词目录（`ExpertPromptStore`，IFC-IB-339）；代码内置兜底
-    （`ib.experts.builtin_fallback_for`）是**不可配置的安全网**，不属本类管辖，
-    在装配期注入到运行期 `ExpertSpec.fallback_prompt`。
+    唯一可配置载体是提示词目录（`ExpertPromptStore`，IFC-IB-339）。
+    **REV-20（ADR-48）**：原代码内置兜底安全网（`ib.experts.builtin_fallback_for`）已**整体退役** ——
+    提示词正文只来自**项目提示词目录的两层文件**，两层皆缺即装配期 `prompt_missing` fail-closed。
+    运行期 `ExpertSpec.fallback_prompt` 字段已「去驱动化」（恒为空串，不参与任何提示词取值）。
     """
 
     name: str
@@ -1178,8 +1179,9 @@ class ExpertPromptDocumentRef:
     `rel_path` 为相对目录根的路径；`content_hash` 为语义哈希（乐观并发判据）；
     `exists=False` 表示该层文件缺失。
 
-    **REV-17（ADR-36）**：`fallback` 缺失**不再是非法** —— 它回落到代码内置兜底；
-    仅当该专家在代码内置映射中也不可得时，装配期才报 `prompt_fallback_missing`。
+    **REV-17（ADR-36）**：`fallback` 缺失**不再是非法** —— 它回落兜底层。
+    **REV-20（ADR-48）**：代码内置兜底已整体退役，`fallback.md` 亦**可缺** ——
+    但 `main.md` 与 `fallback.md` **两层皆缺**即非法（装配期 `prompt_missing` fail-closed）。
     """
 
     expert_name: str
@@ -1198,20 +1200,18 @@ class ExpertPromptBundle:
     * `effective_prompt`：合并后**恒非空**的生效系统提示词（主缺失 → 回退兜底；
       见 ADR-29「绝不空白系统提示词」）。**REV-17 起该值进 system 消息位**
       （组 4 / ADR-36），不再是 human 前缀；
-    * `resolved_from`：生效来源（`main_file` / `fallback_file` / `builtin_fallback`），
-      供界面可观测（IFC-IB-354）。
+    * `resolved_from`：生效来源（`main_file` / `fallback_file`），供界面可观测（IFC-IB-354）。
 
-    **REV-17（ADR-36）把第三值由 `definition_doc_fallback` 改为 `builtin_fallback`**：
-    定义文档已不再承载提示词文本，第三层来源改为**代码内置兜底**
-    （`ib.experts.builtin_fallback_for`）。该字面量**不过 HTTP**（前端自行判定），
-    故改名不产生跨端契约破坏。
+    **REV-20（ADR-48 / OQ-IB-42=B）把第三值 `builtin_fallback` 退役**：代码内置提示词
+    安全网整体删除后，生效来源只可能是项目提示词目录的两层文件之一；**两层皆缺** →
+    `PromptNotFoundError(code="prompt_missing")`（装配期 fail-closed）。
     """
 
     expert_name: str
     main_prompt: str | None
     fallback_prompt: str
     effective_prompt: str
-    resolved_from: Literal["main_file", "fallback_file", "builtin_fallback"]
+    resolved_from: Literal["main_file", "fallback_file"]
 
 
 @dataclass(frozen=True, slots=True)

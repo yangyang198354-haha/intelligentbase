@@ -93,6 +93,26 @@ def _expert(name: str, cn_label: str | None = None, *, is_default: bool = False)
     )
 
 
+def _inject_two_expert_project(deps, project_id: str = "p_alpha") -> None:
+    """把 `project_id` 的定义文档换成**两位专家**，并同步**预填各自 `main` 提示词层**。
+
+    **REV-20（ADR-48 / ADR-51 决定 ③）**：定义文档内每位专家都必须在提示词域有可取值
+    （两层皆缺 → `prompt_missing` fail-closed）。故「跨专家重复」类校验用例必须随文档
+    一并把提示词落盘，否则会被提示词域判据先拦下、掩盖目标判据。
+    """
+    from ib.config import InMemoryDefinitionDocumentStore, InMemoryExpertPromptStore
+    from ibweb.composition import build_application, known_tool_names
+
+    doc = _doc(project_id)
+    deps.definition_store = InMemoryDefinitionDocumentStore(
+        documents={project_id: doc}, known_tools=known_tool_names()
+    )
+    deps.prompt_stores[project_id] = InMemoryExpertPromptStore(
+        project_id, documents={e.name: {"main": f"# {e.name} 主提示词\n"} for e in doc.experts}
+    )
+    build_application(deps)
+
+
 def _doc(project_id: str = "p_alpha", **overrides):
     base = dict(
         project_id=project_id,
@@ -352,7 +372,8 @@ def test_TC_INT_084_definition_endpoint_contract_matrix(http_app):
     document = payload["document"]
     edited = json.loads(json.dumps(document))
     edited["route"]["tau"] = 0.72
-    edited["experts"][1]["cn_label"] = "改过的标签"
+    # **REV-20（ADR-50）**：内置默认文档只有唯一专家 `kb-agent`（原三专家退役），故改 `[0]`。
+    edited["experts"][0]["cn_label"] = "改过的标签"
     saved = client.put(
         PATH,
         data=json.dumps({"expected_content_hash": document["content_hash"], "document": edited}),
@@ -365,13 +386,15 @@ def test_TC_INT_084_definition_endpoint_contract_matrix(http_app):
 
     after = json.loads(client.get(PATH, **AUTH).content)
     assert after["document"]["route"]["tau"] == 0.72
-    assert after["document"]["experts"][1]["cn_label"] == "改过的标签"
+    assert after["document"]["experts"][0]["cn_label"] == "改过的标签"
     assert after["document"]["content_hash"] == deps.definitions["p_alpha"].content_hash
     assert deps.definitions["p_alpha"].route.tau == 0.72
 
-    # --- PUT 400：非法（默认专家不唯一）→ 逐条定位，指向 experts ---
+    # --- PUT 400：非法（**零个**默认专家）→ 逐条定位，指向 experts ---
+    # **REV-20（ADR-50）**：默认文档只有一位专家，无法再造「两个默认」，故改为「把唯一专家
+    # 的 `is_default` 置 False」→ 同样触发 `expert_default_count`（数量 ≠ 1）。
     dup = json.loads(json.dumps(after["document"]))
-    dup["experts"][1]["is_default"] = True
+    dup["experts"][0]["is_default"] = False
     rejected = client.put(PATH, data=json.dumps({"document": dup}), content_type="application/json", **AUTH)
     assert rejected.status_code == 400, rejected.content
     err = json.loads(rejected.content)["error"]
@@ -550,6 +573,12 @@ def test_TC_INT_087_r8_uniqueness_fails_fast_through_admit_and_endpoint(http_app
     from ibweb.composition import admit
 
     deps, Client = http_app
+
+    # **REV-20（ADR-48 / ADR-50）**：内置默认文档只有唯一专家，无法表达「跨专家重复」类校验。
+    # 故先把本项目定义文档换成**两位专家**，并按其专家集**预填提示词 main 层**（等价生产里
+    # 项目提示词目录已落盘）—— 否则保存期会先以 `prompt_missing` 拒绝，掩盖本用例要测的
+    # 「关键词撞车 / 标签重复」两项校验。
+    _inject_two_expert_project(deps)
     store = deps.definition_store
 
     # --- 装配闸门：关键词撞车 + 标签重复同时命中 → 聚合拒绝（含两项新错误码）---

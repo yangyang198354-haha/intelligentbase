@@ -491,11 +491,58 @@
        含糊不清一律**不动** —— 错迁一个会话是**不可逆的越权面**，少迁一个只是「历史没归拢」。
     !! 迁移期间**必须停服** !! 运行期改写会话归属会与在途请求竞争；先停 `ib-web` / `ib-worker`，
        迁移完成后重启（ADR-32：保存 + 重启重装配）。
+    !! **REV-20（ADR-50）口径变更** !! `migrate_expert_history` 的 `experts` 默认值已改为
+       **空元组**（迁移口径**停用** —— 三专家退役后不再有「默认待迁移集」）；如需执行本迁移，
+       必须**显式**传入 `experts=("freeark-expert", "inspection-expert", "sanheng-knowledge")`。
+       默认调用将**空跑**（`applied=False`）—— 这是刻意的，不是缺陷。
+
+[B26] 提示词落盘 / 回填 + legacy `fallback_prompt` 键部署前检查（REV-20 / ADR-48 / ADR-51；
+    IFC-IB-389 / 390 / 391；**用户手工执行 + 先备份 + 失败回滚 + 不静默**）
+    背景（**这条不过就是停机事故**）：REV-20 删除**代码内置提示词兜底**后，提示词正文的**唯一**
+    来源 = 项目提示词目录（`<IB_EXPERT_PROMPT_DIR>/<project_id>/<expert>/{main.md|fallback.md}`）。
+    `main.md` 与 `fallback.md` **两层皆缺 → 装配期 `prompt_missing` fail-closed**（ib-web 起不来）。
+    故升级前**必须**逐项确认下列三件事，缺一不可。
+
+    (1) 提示词目录键与目录权限（新语义：目录根，非单文件）
+    [ ] `.env`（**全部** `*.env`）中 `IB_EXPERT_PROMPT_DIR` 指向**目录根**（如
+        `/var/lib/intelligentbase/prompts`），且该目录存在、可读写（属主对齐服务账号）
+    [ ] `IB_EXPERT_PROMPT_DIR` 与 `IB_DEFINITION_DOC_PATH` **不是同一个值**（定义文档域 =
+        `<dir>/<project_id>.json`；提示词域 = `<dir>/<project_id>/<expert>/main.md`，两域不得重叠）
+    [ ] 种子资产随代码同步到生产：`src/ib/expert_seeds/kb-agent.md` 在 `/opt/intelligentbase`
+        下存在（回填 / 创建期落盘均取该正文；缺失即 fail-closed 上抛）
+
+    (2) 既有项目提示词回填（**用户手工执行**）
+    [ ] 执行**前**已备份（建议 `--backup-dir` 指向独立目录：这是唯一的回滚点）
+    [ ] 逐项目确认「被覆盖 / 新建」由脚本输出如实列出（**不静默**）
+    [ ] 回填后逐项目确认 `<prompt_root>/<project_id>/kb-agent/main.md` 存在且非空
+    建议执行（以服务账号身份、**先停服或至少确认无用户在编辑提示词**）：
+        $ sudo /opt/intelligentbase/venv/bin/python /opt/intelligentbase/src/scripts/backfill_prompts.py \
+              --prompt-root "<实测到的 IB_EXPERT_PROMPT_DIR 值>" \
+              --backup-dir  "<独立备份目录>"
+        # 解释器用 venv 的 python（**不要**裸 python）；未导出到交互 shell 的变量请用**显式字面路径**
+        # 只回填指定项目（不必装配应用）：
+        #   ... backfill_prompts.py --prompt-root <root> --projects demo,Freeark
+    !! 该脚本**不是启动钩子**：绝不自动执行（自动回填会静默覆盖用户手工编辑，且无回滚点）。
+    !! 失败即回滚：脚本任一项失败会**用备份还原已覆盖项**并以非零退出码报错（不留下半成品）。
+    !! 未提供 `--backup-dir` 时脚本会打 WARN：**没有回滚点**，请勿在生产省略该参数。
+
+    (3) legacy `fallback_prompt` 键（**部署前检查，命中即拒绝启动**）
+    [ ] 检查定义文档是否残留 `experts[].fallback_prompt`（REV-17 起已移出 schema）：
+        $ sudo grep -l 'fallback_prompt' /var/lib/intelligentbase/*.json
+        # 命中即须**用户手工迁移**：把该文本移入 <prompt_root>/<project_id>/<expert>/main.md，
+        # 然后从 <dir>/<project_id>.json 删除该键（REV-20 起比对基准已删除，**一律 fail-closed**）
+    !! 不迁移就重启 = **启动失败**（`ConfigError`），错误消息只报专家名 / 长度 / 迁移目标，
+       **不回显正文**（IFC-IB-348 纪律）。
+
+    [ ] 三单元重启后严格断言：`ActiveState=active` **且** `NRestarts==0` **且** journal 出现
+        `startup succeeded` **且** `/healthz/deps==200`（**不得**只用 `systemctl is-active` 判定）
+    [ ] 装配期 `prompt_source` 结构化日志可见（`resolved_from ∈ {main_file, fallback_file}`，
+        **不含正文**）—— 回落 `fallback_file` 属语义降级，须在日志里**看得见**（IFC-IB-392 / REQ-NFR-IB-22）
 
 ##############################################################################
 # C. 验收签署
 ##############################################################################
 [ ] A1–A8 全部勾选，证据归档（命令原文 + 时间戳）
-[ ] B1–B25 全部勾选，证据归档
+[ ] B1–B26 全部勾选，证据归档
 [ ] 本文件不含任何真实凭据（自检：grep -nE 'sk-|ghp_|BEGIN .*PRIVATE KEY' 本文件应无命中）
 执行人：____________  复核人：____________  日期：____________

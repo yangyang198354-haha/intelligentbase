@@ -85,30 +85,50 @@ def test_TC_INT_089_internal_expert_products_never_leak(deps):
 
     强制双专家路由，令每个专家的原始作答都带内部标签；断言：(1) 面向用户只有**一条**
     content（不逐专家推送）；(2) 专家原始作答（含内部标签）不出现在**任何**事件的载荷里。
+
+    **REV-20（ADR-50）**：内置注册表已收敛为唯一 `kb-agent`，故本用例在本测试内**临时
+    注入**一份两位专家的派生注册表（`install_derived` 幂等；结束时立即恢复内置单例）——
+    被覆盖的仍只是「注册表内容」，融合 / 不外流机制一字未改。
     """
-    from ib.core import RouteDecision, RouteTier
+    from ib.core import ExpertSpec, RouteDecision, RouteTier
+    from ib.experts import BUILTIN_DEFAULT_KB_AGENT, install_derived
     from ib.llm import FakeLlmProvider
 
     class _TwoExpertRouter:
         def classify_experts(self, query, *, history=None, scope=None):
             return RouteDecision(
-                experts=["freeark-expert", "inspection-expert"],
+                experts=["kb-agent", "helper-agent"],
                 tier=RouteTier.KEYWORD_UNIQUE,
                 confidence=0.9,
             )
 
+    def _spec(name, label, *, default=False):
+        return ExpertSpec(
+            name=name,
+            cn_label=label,
+            keywords=(label,),
+            is_data_expert=False,
+            fallback_prompt="装配期注入的占位提示",
+            is_delegating=False,
+            is_default=default,
+        )
+
     llm = FakeLlmProvider(expert_output="内部子任务产物", aggregator_output="对外最终答复")
-    orch = _orchestrator(deps, llm=llm, router=_TwoExpertRouter())
-    events = list(orch.run("温度与故障", ctx=request_ctx("p_alpha"), session_key="p_alpha:u:s1"))
-    kinds = _kinds(events)
+    install_derived([_spec("kb-agent", "知识库助手", default=True), _spec("helper-agent", "辅助专家")])
+    try:
+        orch = _orchestrator(deps, llm=llm, router=_TwoExpertRouter())
+        events = list(orch.run("温度与故障", ctx=request_ctx("p_alpha"), session_key="p_alpha:u:s1"))
+        kinds = _kinds(events)
 
-    contents = [e.data for e in events if str(e.kind) == "content"]
-    assert len(contents) == 1, f"内部产物被逐专家推送：{kinds}"
-    assert contents[0] == "对外最终答复", f"交付的应是融合后的答复：{contents!r}"
+        contents = [e.data for e in events if str(e.kind) == "content"]
+        assert len(contents) == 1, f"内部产物被逐专家推送：{kinds}"
+        assert contents[0] == "对外最终答复", f"交付的应是融合后的答复：{contents!r}"
 
-    joined = "\n".join(str(e.data) for e in events)
-    assert "内部子任务产物" not in joined, "专家的原始（内部）作答不得进入事件流"
-    assert "系统管家" not in joined and "巡检诊断" not in joined, "内部专家标签不得外流"
+        joined = "\n".join(str(e.data) for e in events)
+        assert "内部子任务产物" not in joined, "专家的原始（内部）作答不得进入事件流"
+        assert "知识库助手" not in joined and "辅助专家" not in joined, "内部专家标签不得外流"
+    finally:
+        install_derived([BUILTIN_DEFAULT_KB_AGENT])
 
 
 def test_TC_INT_090_reasoning_partition_distinct_from_answer(deps):

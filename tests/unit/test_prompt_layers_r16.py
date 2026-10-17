@@ -107,29 +107,31 @@ def _tool_registry():
 
 
 # --------------------------------------------------------------------------- #
-# IFC-IB-343：分层合并（主 > 兜底文件 > **代码内置兜底**；兜底恒非空）
+# IFC-IB-343：分层合并（主 > 兜底文件）；**REV-20（ADR-48）两层皆缺 → fail-closed**
 #
-# REV-17（ADR-36）：第三层来源由「定义文档兜底字段」改为「代码内置安全网」，
-# 故 `resolved_from` 第三值为 `builtin_fallback`（原 `definition_doc_fallback`）。
+# **契约翻转（REV-20 / OQ-IB-42=B / ADR-48）**：原第三层「代码内置兜底」整体退役，
+# `resolved_from` 值域收窄为 `{main_file, fallback_file}`；「两层皆缺」由
+# 「取内置兜底」翻转为「抛 `PromptNotFoundError(code="prompt_missing")`」。
 # --------------------------------------------------------------------------- #
 
 
-def test_merge_layers_priority_then_never_blank():
+def test_merge_layers_priority_then_fail_closed():
     # 主存在 → 用主（resolved_from=main_file）
-    b = merge_prompt_layers("a", main_content="MAIN", fallback_content="FB", builtin_fallback="BI")
+    b = merge_prompt_layers("a", main_content="MAIN", fallback_content="FB")
     assert b.effective_prompt == "MAIN" and b.main_prompt == "MAIN" and b.resolved_from == "main_file"
     # 主缺失 → 回退兜底文件
-    b = merge_prompt_layers("a", main_content=None, fallback_content="FB", builtin_fallback="BI")
+    b = merge_prompt_layers("a", main_content=None, fallback_content="FB")
     assert b.effective_prompt == "FB" and b.main_prompt is None and b.resolved_from == "fallback_file"
-    # 两层皆缺 → 代码内置兜底
-    b = merge_prompt_layers("a", main_content="", fallback_content="", builtin_fallback="BI")
-    assert b.effective_prompt == "BI" and b.resolved_from == "builtin_fallback"
-    # 主存在时兜底层字段仍如实回填（供界面展示「兜底是什么」，不参与生效）
-    b = merge_prompt_layers("a", main_content="MAIN", fallback_content="", builtin_fallback="BI")
-    assert b.fallback_prompt == "BI"
-    # 三层皆空 → 非法（effective_prompt 永不空白，ADR-29）
-    with pytest.raises(PromptNotFoundError):
-        merge_prompt_layers("a", main_content=None, fallback_content="", builtin_fallback="   ")
+    # 主存在时兜底层字段如实回填（供界面展示「兜底是什么」，不参与生效）
+    b = merge_prompt_layers("a", main_content="MAIN", fallback_content="")
+    assert b.fallback_prompt == ""
+    # 两层皆空 → 非法（REV-20：代码内置兜底已退役，无第三层可回落）
+    with pytest.raises(PromptNotFoundError) as excinfo:
+        merge_prompt_layers("a", main_content="", fallback_content="")
+    assert excinfo.value.code == "prompt_missing"
+    with pytest.raises(PromptNotFoundError) as excinfo:
+        merge_prompt_layers("a", main_content=None, fallback_content="   ")
+    assert excinfo.value.code == "prompt_missing"
 
 
 def test_prompt_content_hash_is_semantic_and_stable():
@@ -139,7 +141,7 @@ def test_prompt_content_hash_is_semantic_and_stable():
 
 
 # --------------------------------------------------------------------------- #
-# IFC-IB-345：目录装载 + 完备性校验（孤儿 / 命名不符 / 缺兜底）
+# IFC-IB-345：目录装载 + 完备性校验（孤儿 / 命名不符 / 缺提示词）
 # --------------------------------------------------------------------------- #
 
 
@@ -154,24 +156,23 @@ def test_load_prompt_directory_missing_is_empty_not_error(tmp_path):
     assert load_prompt_directory(str(tmp_path / "absent"), "p1") == ()
 
 
-def test_validate_prompt_directory_detects_orphan_naming_and_missing_fallback(tmp_path):
+def test_validate_prompt_directory_detects_orphan_naming_and_missing_prompt(tmp_path):
     doc = _doc("p1")  # 专家 a / b
     root = str(tmp_path)
     _write_prompt(root, "p1", "a", "fallback", "fb-a")
     _write_prompt(root, "p1", "ghost", "fallback", "fb-ghost")  # 孤儿
     refs = load_prompt_directory(root, "p1")
-    # REV-17（ADR-36）：缺兜底的第二判据由「文档兜底为空」改为「内置兜底缺失」。
-    codes = {e.code for e in validate_prompt_directory(refs, doc=doc, builtin_fallbacks={"a": "BI", "b": "BI"})}
+    # REV-20（ADR-48）：判据由「缺兜底且无内置兜底」改为「main.md 与 fallback.md 两层皆缺」。
+    codes = {e.code for e in validate_prompt_directory(refs, doc=doc)}
     assert "prompt_orphan_file" in codes
-    # b 无 fallback.md 但有内置兜底 → 不算缺兜底（这正是 REV-17 要放行的场景）
-    assert "prompt_fallback_missing" not in codes
+    # a 有 fallback.md → 不算缺提示词；b 两层皆缺 → prompt_missing
+    assert "prompt_missing" in codes
+    missing = {e.path for e in validate_prompt_directory(refs, doc=doc) if e.code == "prompt_missing"}
+    assert missing == {"prompt_directory[b]"}
 
-    # 无 fallback.md **且** 内置兜底缺失 → 缺兜底（注入残缺的防御性断言）
-    codes2 = {e.code for e in validate_prompt_directory((), doc=doc, builtin_fallbacks={})}
-    assert "prompt_fallback_missing" in codes2
-
-    # 未注入（None）时从严：等价于「无内置兜底」
-    assert "prompt_fallback_missing" in {e.code for e in validate_prompt_directory((), doc=doc)}
+    # 空目录 + 两位专家 → 均缺提示词（fail-closed 可达）
+    codes2 = {e.code for e in validate_prompt_directory((), doc=doc)}
+    assert codes2 == {"prompt_missing"}
 
 
 def test_validate_prompt_directory_naming_mismatch(tmp_path):
@@ -314,7 +315,7 @@ def test_derive_prompt_layers_joins_by_expert_name_and_installs(tmp_path):
     _write_prompt(root, "p1", "a", "fallback", "FB-A")
     _write_prompt(root, "p1", "b", "fallback", "FB-B")
     refs = load_prompt_directory(root, "p1")
-    view = derive_prompt_layers(doc, refs, builtin_fallbacks={"a": "BI-A", "b": "BI-B"})
+    view = derive_prompt_layers(doc, refs)
     by_name = {b.expert_name: b for b in view.prompt_bundles}
     assert by_name["a"].effective_prompt == "MAIN-A" and by_name["a"].resolved_from == "main_file"
     assert by_name["b"].effective_prompt == "FB-B" and by_name["b"].resolved_from == "fallback_file"
@@ -326,14 +327,12 @@ def test_derive_prompt_layers_joins_by_expert_name_and_installs(tmp_path):
     assert prompt_bundles()["b"].effective_prompt == "FB-B"
 
 
-def test_derive_prompt_layers_without_files_uses_builtin_fallback():
-    """REV-17（ADR-36）：提示词目录两层皆缺 → 生效提示词取**代码内置兜底**。
-
-    这是「配置页编辑的 markdown 从未进 system 位」缺陷的对照面：兜底层必须恒有值，
-    且该值**不来自**任何一个可写入口。
+def test_derive_prompt_layers_without_files_is_fail_closed():
+    """**契约翻转（REV-20 / OQ-IB-42=B / ADR-48）**：原 REV-17 口径下「提示词目录
+    两层皆缺 → 生效提示词取**代码内置兜底**」；代码内置兜底整体退役后，同一场景改为
+    **`PromptNotFoundError(code="prompt_missing")` fail-closed** —— 这是「生效提示词
+    恒非空」从「代码常量保证」改为「可达的装配期判据保证」的直接可观测面。
     """
-    view = derive_prompt_layers(_doc("p1"), (), builtin_fallbacks={"a": "BI-a", "b": "BI-b"})
-    by_name = {b.expert_name: b for b in view.prompt_bundles}
-    assert by_name["a"].effective_prompt == "BI-a"
-    assert by_name["a"].resolved_from == "builtin_fallback"
-    assert by_name["b"].resolved_from == "builtin_fallback"
+    with pytest.raises(PromptNotFoundError) as excinfo:
+        derive_prompt_layers(_doc("p1"), ())
+    assert excinfo.value.code == "prompt_missing"

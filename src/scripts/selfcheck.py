@@ -2101,9 +2101,11 @@ def definition_config_endpoints() -> None:
     assert r2.status_code == 200, r2.content
     assert set(r2.json()) == {"ok", "content_hash", "conflict", "errors"} and r2.json()["ok"]
 
-    # 非法（两个默认专家）→ 400，逐条 path/code/message
+    # 非法（**零个**默认专家）→ 400，逐条 path/code/message
+    # **REV-20（ADR-50）**：默认文档只有一位专家（`kb-agent`），无法再造「两个默认」，
+    # 故改为把唯一专家的 `is_default` 置 False（数量 ≠ 1 → `expert_default_count`）。
     doc2 = copy.deepcopy(payload["document"])
-    doc2["experts"][1]["is_default"] = True
+    doc2["experts"][0]["is_default"] = False
     r3 = client.put(
         "/api/config/definition",
         data=json.dumps({"document": doc2}),
@@ -2152,7 +2154,8 @@ def definition_assembly_injects_derived() -> None:
     assert deps.definitions["p_alpha"] is not deps.definitions["p_beta"]
     # 派生的只读视图存在
     view = deps.derived_views["p_alpha"]
-    assert [e.name for e in view.experts] == ["freeark-expert", "inspection-expert", "sanheng-knowledge"]
+    # **REV-20（ADR-50）**：内置默认文档的专家集 = 唯一通用 `kb-agent`（原三专家退役）。
+    assert [e.name for e in view.experts] == ["kb-agent"]
     # 注入 MOD-IB-16：派生注册表 == 文档专家集
     assert experts.names() == tuple(e.name for e in view.experts)
     assert experts.default_expert() == deps.definitions["p_alpha"].route.default_expert
@@ -2582,11 +2585,53 @@ def r8_within_expert_keyword_validation() -> None:
 
 @_case("r8_expert_handoff：交接接缝默认关闭零行为差异，开启后受步数上限约束（REV-12-2）")
 def r8_expert_handoff_seam() -> None:
+    """**REV-20（ADR-50）**：内置注册表唯一专家 `kb-agent` **非委派**，故「交接接缝」需
+    在本用例内**临时注入**一份含委派专家的派生注册表（结束即恢复内置单例）。"""
     deps = _deps()
-    from ib.core import GraphConfig, RouteDecision, Scope
-    from ib.experts import EXPERT_SPECS, default_expert, delegating_experts
+    from ib.core import ExpertSpec, GraphConfig, RouteDecision, Scope
+    from ib.experts import (
+        BUILTIN_DEFAULT_KB_AGENT,
+        default_expert,
+        delegating_experts,
+        install_derived,
+    )
     from ib.orchestration import MAX_EXPERT_STEPS, Orchestrator
 
+    def _spec(name: str, label: str, kws: tuple[str, ...], *, delegating: bool = False, default: bool = False) -> Any:
+        return ExpertSpec(
+            name=name,
+            cn_label=label,
+            keywords=kws,
+            is_data_expert=True,
+            fallback_prompt="装配期注入的占位提示",
+            is_delegating=delegating,
+            is_default=default,
+        )
+
+    install_derived(
+        [
+            _spec("kb-agent", "知识库助手", ("知识库", "资料"), default=True),
+            _spec("handoff-helper", "交接助手", ("交接",), delegating=True),
+        ]
+    )
+    try:
+        _r8_expert_handoff_body(
+            deps,
+            GraphConfig,
+            RouteDecision,
+            Scope,
+            Orchestrator,
+            MAX_EXPERT_STEPS,
+            default_expert,
+            delegating_experts,
+        )
+    finally:
+        install_derived([BUILTIN_DEFAULT_KB_AGENT])
+
+
+def _r8_expert_handoff_body(
+    deps, GraphConfig, RouteDecision, Scope, Orchestrator, MAX_EXPERT_STEPS, default_expert, delegating_experts
+) -> None:
     # `is_delegating` / `delegating_experts()` 已不再是死字段：至少有专家声明可交接。
     delegating = delegating_experts()
     assert delegating, "delegating_experts() 为空 —— is_delegating 仍是死字段（REV-12-2 未落地）"
@@ -2629,8 +2674,12 @@ def r8_expert_handoff_seam() -> None:
     )
     assert [n for n, _ in self_plan] == [delegate], self_plan
 
-    # ⑤ 默认注册表键集合仍被 `EXPERT_SPECS` 唯一真源覆盖（不引入新专家）。
-    assert {s.name for s in EXPERT_SPECS} >= {source, delegate}
+    # ⑤ 注册表键集合仍由 `ib.experts.EXPERT_SPECS` 唯一真源覆盖（不引入新专家）。
+    #    注意：必须**在调用期**取 `ib.experts.EXPERT_SPECS`（`install_derived` 会 rebind
+    #    该模块级名字为新列表对象，函数导入期绑定的旧对象已不是当前真源）。
+    import ib.experts as _experts
+
+    assert {s.name for s in _experts.EXPERT_SPECS} >= {source, delegate}
 
 
 @_case("r8_chat_resume_http：/api/chat/resume 准入顺序与状态码（IFC-IB-307）")
@@ -3440,9 +3489,10 @@ def r13_deploy_discipline() -> None:
         "[B23]",
         "[B24]",
         "[B25]",
+        "[B26]",
     ):
         assert item in checklists, f"checklists.txt 缺少验收项 {item}"
-    assert "B1–B25" in checklists, "签署行未同步到 B25"
+    assert "B1–B26" in checklists, "签署行未同步到 B26"
 
     # 4b) REV-18 迁移：005 / 006 存在、幂等（IF EXISTS）、且**纯追加**（只建新表 / 不回改旧表）。
     for name, table in (
@@ -3702,13 +3752,17 @@ def r16_prompt_layers() -> None:
     )
     from ib.experts import install_prompt_bundles, main_prompts, prompt_bundles
 
-    # 分层优先级（REV-17 / ADR-36）：主 > 兜底文件 > **代码内置兜底**；三层皆空即非法
-    assert merge_prompt_layers("a", main_content="M", fallback_content="F", builtin_fallback="D").resolved_from == "main_file"
-    assert merge_prompt_layers("a", main_content=None, fallback_content="F", builtin_fallback="D").resolved_from == "fallback_file"
-    assert merge_prompt_layers("a", main_content="", fallback_content="", builtin_fallback="D").resolved_from == "builtin_fallback"
+    # 分层优先级（REV-20 / ADR-48）：主 > 兜底文件；**两层皆空即非法**（代码内置兜底已退役）
+    assert merge_prompt_layers("a", main_content="M", fallback_content="F").resolved_from == "main_file"
+    assert merge_prompt_layers("a", main_content=None, fallback_content="F").resolved_from == "fallback_file"
     try:
-        merge_prompt_layers("a", main_content=None, fallback_content="", builtin_fallback="  ")
-        raise AssertionError("三层皆空竟未抛 PromptNotFoundError")
+        merge_prompt_layers("a", main_content="", fallback_content="")
+        raise AssertionError("两层皆空竟未抛 PromptNotFoundError")
+    except PromptNotFoundError:
+        pass
+    try:
+        merge_prompt_layers("a", main_content=None, fallback_content="  ")
+        raise AssertionError("两层皆空竟未抛 PromptNotFoundError")
     except PromptNotFoundError:
         pass
 
@@ -3720,7 +3774,7 @@ def r16_prompt_layers() -> None:
             exemplars=(),
             is_data_expert=False,
             # REV-17（ADR-36）：定义文档不再承载提示词文本 —— 提示词只由独立目录的
-            # `main.md` / `fallback.md` 与代码内置兜底承载。
+            # `main.md` / `fallback.md` 承载（REV-20 起代码内置兜底亦已退役）。
             is_delegating=False,
             is_default=is_default,
         )
@@ -3756,18 +3810,16 @@ def r16_prompt_layers() -> None:
         assert by_name["a"].effective_prompt == "MAIN-A" and by_name["a"].resolved_from == "main_file"
         assert by_name["b"].effective_prompt == "FB-B" and by_name["b"].resolved_from == "fallback_file"
 
-        # REV-17（ADR-36）：两层文件皆缺 → 回落代码内置兜底；且**不**再报「缺兜底」
-        # （「兜底恒非空」由结构保证，不再由文档层校验设卡 —— 这正是新增专家死锁的解法）。
-        from ib.experts import builtin_fallback_for
-
-        builtins = {n: builtin_fallback_for(n) for n in ("a", "b")}
+        # **REV-20（ADR-48）**：两层文件皆缺 → `prompt_missing`（**装配期可达**，
+        # 不再是「有内置兜底」的放行分支）；「生效提示词恒非空」由创建期落盘 + 该判据保证。
         bare_refs = tuple(r for r in refs if r.expert_name != "b")  # b 的两层都拿掉
-        assert validate_prompt_directory(bare_refs, doc=doc, builtin_fallbacks=builtins) == ()
-        bare_view = derive_prompt_layers(doc, bare_refs, builtin_fallbacks=builtins)
-        bare_by = {b.expert_name: b for b in bare_view.prompt_bundles}
-        assert bare_by["b"].resolved_from == "builtin_fallback"
-        assert bare_by["b"].effective_prompt == builtin_fallback_for("b")
-        assert bare_by["b"].effective_prompt.strip(), "生效提示词恒非空（ADR-29）"
+        bare_codes = {e.code for e in validate_prompt_directory(bare_refs, doc=doc)}
+        assert "prompt_missing" in bare_codes, "两层皆缺应报 prompt_missing（REV-20 口径）"
+        try:
+            derive_prompt_layers(doc, bare_refs)
+            raise AssertionError("两层皆缺竟仍派生出发效提示词（应 fail-closed）")
+        except PromptNotFoundError:
+            pass
 
         # 存储实现：兜底为空非法 + 乐观并发冲突（两实现语义一致）
         for store in (InMemoryExpertPromptStore("p1"), FsExpertPromptStore(root, "p1")):
@@ -3839,25 +3891,26 @@ def r16_prompt_tool_endpoints() -> None:
     payload = json.loads(listed.content)
     assert set(payload) == {"experts", "tool_param_specs", "available_tools", "layout", "config_key_names"}
     assert payload["available_tools"] == ["search_knowledge"]
-    assert {e["name"] for e in payload["experts"]} == {"freeark-expert", "inspection-expert", "sanheng-knowledge"}
+    assert {e["name"] for e in payload["experts"]} == {"kb-agent"}
     assert payload["config_key_names"] == ["IB_EXPERT_PROMPT_DIR", "IB_EXPERT_PROMPT_ENABLED"]
 
-    # 未保存 → 404；PUT main → 200；GET 回读一致
-    assert client.get("/api/config/prompts/freeark-expert/main", **auth).status_code == 404
+    # **REV-20（ADR-48 / ADR-51 ③）**：离线态已由种子**预填** `kb-agent/main.md`，故
+    # 「未保存 → 404」的探针改用**未预填**的 `fallback` 层。
+    assert client.get("/api/config/prompts/kb-agent/fallback", **auth).status_code == 404
     saved = client.put(
-        "/api/config/prompts/freeark-expert/main",
-        data=json.dumps({"content": "你是系统管家。"}),
+        "/api/config/prompts/kb-agent/main",
+        data=json.dumps({"content": "你是知识库助手。"}),
         content_type="application/json",
         **auth,
     )
     assert saved.status_code == 200, saved.content
     digest = json.loads(saved.content)["content_hash"]
-    got = json.loads(client.get("/api/config/prompts/freeark-expert/main", **auth).content)
-    assert got["content"] == "你是系统管家。" and got["content_hash"] == digest
+    got = json.loads(client.get("/api/config/prompts/kb-agent/main", **auth).content)
+    assert got["content"] == "你是知识库助手。" and got["content_hash"] == digest
 
     # 乐观并发冲突 → 409（不覆盖）
     conflict = client.put(
-        "/api/config/prompts/freeark-expert/main",
+        "/api/config/prompts/kb-agent/main",
         data=json.dumps({"content": "改", "expected_hash": "sha256:0"}),
         content_type="application/json",
         **auth,
@@ -3865,7 +3918,7 @@ def r16_prompt_tool_endpoints() -> None:
     assert conflict.status_code == 409, conflict.content
     # 兜底为空 → 400（fail-safe）
     empty = client.put(
-        "/api/config/prompts/freeark-expert/fallback",
+        "/api/config/prompts/kb-agent/fallback",
         data=json.dumps({"content": "  "}),
         content_type="application/json",
         **auth,
@@ -3909,7 +3962,9 @@ def r17_build_expert_system_slot() -> None:
         assert "spec" in params, target
 
     # ② 替身必须**接受**该 keyword（`runtime_checkable` Protocol 不校验签名，故只能实调）
-    spec = get("freeark-expert")
+    # **REV-20（ADR-50）**：内置专家名 = 唯一 `kb-agent`。
+    spec = get("kb-agent")
+    assert spec is not None
     assert FakeLlmProvider().build_expert(spec, system_prompt="装配期合并结果") is not None
 
     # ③ 真实链路：生效提示词进 system 位、human 位只留用户问题（用`_run_expert` 的实际接线）
@@ -3928,30 +3983,30 @@ def r17_build_expert_system_slot() -> None:
             return LlmRole(role="expert", temperature=0.0, impl=_Impl())
 
     result = _run_expert(
-        {"expert": "freeark-expert", "query": "设备怎么巡检？", "prompt": "MERGE-结果"}, _Llm(), {}
+        {"expert": "kb-agent", "query": "设备怎么巡检？", "prompt": "MERGE-结果"}, _Llm(), {}
     )
     assert result.degraded is False, result.degrade_reason
     assert captured["system"] == "MERGE-结果", "生效提示词必须进 system 位"
     assert captured["human"] == "设备怎么巡检？", "human 位只留用户问题（旧口径的前缀拼接已废弃）"
 
 
-@_case("r16_rename_alignment：FreeArk 专家名硬改名（无旧名残留）+ 禁止标签并集（ADR-31）")
+@_case("r16_rename_alignment：内置专家集收敛 + 旧名残留归零 + 禁止标签并集（ADR-31 / REV-20）")
 def r16_rename_alignment() -> None:
-    """核验专家名 / 中文标签已按 ADR-31 硬改名，且骨架不含业务中文名（仅过渡并集例外）。"""
+    """核验专家名 / 中文标签口径，且骨架不含业务中文名（仅过渡并集例外）。
+
+    **REV-20（ADR-50）**：内置注册表收敛为唯一通用 `kb-agent`（FreeArk 三专家退役）；
+    「旧 slug 无残留」与「禁止标签含活体中文标签 + 过渡并集」两条纪律保持不变。
+    """
     import pathlib
 
     from ib.experts import cn_map, names
     from ib.orchestration import forbidden_labels
 
-    assert names() == ("freeark-expert", "inspection-expert", "sanheng-knowledge")
-    assert cn_map() == {
-        "freeark-expert": "系统管家",
-        "inspection-expert": "巡检诊断",
-        "sanheng-knowledge": "三恒知识",
-    }
+    assert names() == ("kb-agent",)
+    assert cn_map() == {"kb-agent": "知识库助手"}
     # 派生只读视图：禁止标签含活体中文标签（ACE-IB-09-03），且为过渡并集（旧 ∪ 新）
     labels = forbidden_labels(cn_map())
-    assert "系统管家" in labels and "三恒知识" in labels and "巡检诊断" in labels
+    assert "知识库助手" in labels
     # 过渡态：旧标签仍在并集内（ADR-31 Decision 第 4 条）→ 旧聚合标签不得泄漏
     assert "数据管家" in labels and "知识库问答" in labels
     # 派生视图可调用（不硬编码业务名，改由 cn_map 派生）
@@ -3991,16 +4046,10 @@ def r19_project_expert_isolation() -> None:
     )
     from ib.routing import IntentRouter
 
-    # 1) 三专家列表三处**同值**（ib.experts / ib.streaming / demo 语义）
-    assert experts.DEMO_EXPERT_NAMES == (
-        "freeark-expert",
-        "inspection-expert",
-        "sanheng-knowledge",
-    ), "三专家真源漂移"
-    assert streaming._DEMO_EXPERT_NAMES == experts.DEMO_EXPERT_NAMES, (
-        "ib.streaming 与 ib.experts 的三专家列表不一致（MOD-IB-21 依赖边界内重复字面量，须由本断言兜底）"
-    )
-    assert experts.names() == experts.DEMO_EXPERT_NAMES, "内置默认专家集（代码安全网）应为三对齐专家"
+    # 1) **REV-20（ADR-48 / ADR-50）**：内置注册表收敛为唯一通用 `kb-agent`；
+    #    原「三专家列表三处同值」断言随三专家退役一并退役（`DEMO_EXPERT_NAMES` 已删除）。
+    assert experts.names() == ("kb-agent",), "内置默认专家集应为唯一通用 kb-agent"
+    assert not hasattr(experts, "DEMO_EXPERT_NAMES"), "DEMO_EXPERT_NAMES 应已退役"
 
     # 2) 新建项目种子 = **恰 1 个** KB agent（is_default=True，内置不可删）—— 类型层可测事实（C-IB-45）
     seed_view = experts.builtin_default_registry()
@@ -4009,10 +4058,10 @@ def r19_project_expert_isolation() -> None:
     assert seed_view.default_name() == "kb-agent", "种子默认专家名应为内置 KB agent"
     # 不变量：默认专家 ∈ 专家集
     assert seed_view.default_expert.name in {e.name for e in seed_view.experts}
-    # demo 视图 = 三对齐专家，默认 freeark-expert
+    # **REV-20（ADR-50）**：`builtin_expert_registry()` 与内置默认单例**同值**（demo 亦为 kb-agent）
     demo_view = experts.builtin_expert_registry()
-    assert demo_view.names() == experts.DEMO_EXPERT_NAMES
-    assert demo_view.default_name() == "freeark-expert"
+    assert demo_view.names() == seed_view.names() == ("kb-agent",)
+    assert demo_view.default_name() == "kb-agent"
 
     # 3) resolve_expert_registry **fail-closed**（空集 / 缺默认 / 默认非唯一）
     graph = OrchestrationSpecInput(nodes=("START", "END"), conditional_edges=(), edges=())
@@ -4053,9 +4102,10 @@ def r19_project_expert_isolation() -> None:
         "帮我查一下知识库里的资料", scope=Scope(project_id="p_new")
     )
     assert routed.experts == ["kb-agent"], f"注入 KB 视图后应路由到 kb-agent，实为 {routed.experts}"
-    # 未注入视图 → 行为与 R1~R18 逐位一致（回落到内置三专家；中性问句落默认专家）
+    # 未注入视图 → 行为与 R1~R18 逐位一致（回落到内置专家集；中性问句落默认专家）
+    # **REV-20（ADR-50）**：内置专家集已收敛为唯一 `kb-agent`。
     legacy = IntentRouter().classify_experts("随便聊聊天气", scope=Scope(project_id="p1"))
-    assert legacy.experts == ["freeark-expert"], f"缺省路由应回落 freeark-expert，实为 {legacy.experts}"
+    assert legacy.experts == ["kb-agent"], f"缺省路由应回落 kb-agent，实为 {legacy.experts}"
 
     # 5) 定义文档目录化 + C-IB-46 迁移（临时目录内离线全链路）
     with tempfile.TemporaryDirectory() as td:
@@ -4080,20 +4130,26 @@ def r19_project_expert_isolation() -> None:
         assert "target_exists_fail_closed" in res2.notes, "fail-closed 未在 notes 中登记原因"
 
     # 6) 三专家历史迁移：归属改写 + 记录保留 + 幂等 + 非 demo 失去可见
+    # **REV-20（ADR-50）**：`migrate_expert_history` 的 `experts` 默认值改为**空元组**
+    # （迁移口径停用）；本段**显式**传入已退役三专家，验证**能力仍在**。
     from ib.core import SessionState
 
+    retired_experts = ("freeark-expert", "inspection-expert", "sanheng-knowledge")
     store2 = streaming.MemorySessionStore()
     store2.save("legacy:s1", SessionState(last_expert="freeark-expert", project_id="legacy"))
     store2.save("legacy:s2", SessionState(last_expert="unrelated", project_id="legacy"))
     store2.save("demo:s3", SessionState(last_expert="inspection-expert", project_id="demo"))
     before = len(store2)
-    report = streaming.migrate_expert_history("demo", sessions=store2)
+    # 默认 experts=() → 空跑（迁移口径停用）
+    noop = streaming.migrate_expert_history("demo", sessions=store2)
+    assert noop.applied is False and noop.affected_sessions == 0, "默认口径应停用（空跑）"
+    report = streaming.migrate_expert_history("demo", sessions=store2, experts=retired_experts)
     assert report.applied is True and report.affected_sessions == 1, "应恰迁移 1 个会话"
     assert len(store2) == before, "迁移不得删除任何会话（记录保留）"
     assert store2.load("demo:s1") is not None and store2.load("legacy:s1") is None, "归属未改写"
     assert store2.load("legacy:s2") is not None, "未引用三专家的会话不得被迁走"
     # 幂等：第二次空跑
-    again = streaming.migrate_expert_history("demo", sessions=store2)
+    again = streaming.migrate_expert_history("demo", sessions=store2, experts=retired_experts)
     assert again.applied is False and again.affected_sessions == 0, "迁移必须幂等"
     assert isinstance(again, MigrationReport)
     assert again.backup_path is None, "工具不写盘，backup_path 应如实为 None"

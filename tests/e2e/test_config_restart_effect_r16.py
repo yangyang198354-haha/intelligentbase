@@ -47,9 +47,10 @@ def test_TC_E2E_022_save_then_restart_reassembly_takes_effect(tmp_path, django_r
     client = Client()
 
     # ① 保存（AC-IB-33-01：写入文件并持久保留）
-    main_md = tmp_path / "p_alpha" / "freeark-expert" / "main.md"
+    # **REV-20（ADR-50）**：内置专家名改为唯一 `kb-agent`（原三专家退役）。
+    main_md = tmp_path / "p_alpha" / "kb-agent" / "main.md"
     put = client.put(
-        f"{LIST}/freeark-expert/main",
+        f"{LIST}/kb-agent/main",
         data=json.dumps({"content": "重启后生效的主提示词：先澄清需求再执行"}),
         content_type="application/json",
         **AUTH,
@@ -63,12 +64,8 @@ def test_TC_E2E_022_save_then_restart_reassembly_takes_effect(tmp_path, django_r
 
     # ③ 「重启」= 新进程视角：新 store 实例读盘 + 重新装载目录 + 重新装配（AC-IB-32-03）
     fresh_store = FsExpertPromptStore(str(tmp_path), "p_alpha")
-    # REV-17（ADR-36）：兜底层由调用方从 `ib.experts` 注入，不再是定义文档字段。
-    from ib.experts import builtin_fallback_for
-
-    bundle = fresh_store.load_bundle(
-        "freeark-expert", builtin_fallback=builtin_fallback_for("freeark-expert")
-    )
+    # **REV-20（ADR-48）**：`load_bundle` 不再接收内置兜底形参（代码内置兜底已退役）。
+    bundle = fresh_store.load_bundle("kb-agent")
     assert bundle.resolved_from == "main_file"
     assert bundle.effective_prompt.startswith("重启后生效")
 
@@ -78,10 +75,11 @@ def test_TC_E2E_022_save_then_restart_reassembly_takes_effect(tmp_path, django_r
         store=d.definition_store,
         prompt_refs=refs,
         tool_specs=known_tool_param_specs(),
+        prompt_store=fresh_store,
     )
     by = {b.expert_name: b for b in view.prompt_bundles}
-    assert by["freeark-expert"].effective_prompt.startswith("重启后生效")
-    assert by["freeark-expert"].resolved_from == "main_file"
+    assert by["kb-agent"].effective_prompt.startswith("重启后生效")
+    assert by["kb-agent"].resolved_from == "main_file"
     # 其余专家未被牵连（分层/按专家隔离）
     assert all(
         b.effective_prompt.strip() for b in view.prompt_bundles
@@ -137,22 +135,21 @@ def test_TC_E2E_023_out_of_scope_grant_rejected_and_config_unchanged(http_app):
 # --------------------------------------------------------------------------- #
 
 
-def test_TC_E2E_024_demo_project_experts_aligned_with_freeark(http_app):
-    """US-IB-34：示例项目默认专家集与 FreeArk 专家注册表严格对齐（专家名 + cn_label + 工具名）。"""
+def test_TC_E2E_024_default_expert_set_is_single_generic_kb_agent(http_app):
+    """**契约翻转（REV-20 / OQ-IB-47=C / OQ-IB-48=C / ADR-50）**：原 US-IB-34 口径
+    「示例项目默认专家集与 FreeArk 三专家严格对齐（专家名 + cn_label + 工具名）」；
+    REV-20 起默认专家集 = **唯一通用 `kb-agent`**（`demo` 亦改 kb-agent），
+    且**不得含任何业务域专家**。断言口径随之收敛为「逐项目种子 = 该唯一集」+「端点同源」。
+    """
     import ib.experts as experts
     from ibweb.composition import known_tool_names
 
     deps, Client = http_app
 
-    # 对齐后的专家标识（与只读参考 FreeArk:.../experts.py 的 EXPERT_SPECS 逐字段一致）
-    assert experts.names() == ("freeark-expert", "inspection-expert", "sanheng-knowledge")
-    assert experts.cn_map() == {
-        "freeark-expert": "系统管家",
-        "inspection-expert": "巡检诊断",
-        "sanheng-knowledge": "三恒知识",
-    }
+    assert experts.names() == ("kb-agent",)
+    assert experts.cn_map() == {"kb-agent": "知识库助手"}
 
-    # 每个已装配项目的默认种子专家集 = 对齐集（AC-IB-34-04：默认专家集为对齐后的定义）
+    # 每个已装配项目的默认种子专家集 = 该唯一集（AC-IB-34-04 的同源口径）
     assert deps.definitions, "装配未产出任何项目的定义文档"
     for _pid, doc in deps.definitions.items():
         assert {e.name for e in doc.experts} == set(experts.names())

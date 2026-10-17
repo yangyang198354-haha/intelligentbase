@@ -3,17 +3,17 @@
   <artifact>architecture_design</artifact>
   <path>docs/architecture_design.md</path>
   <doc_id>ARCH-INTELBASE-001</doc_id>
-  <version>1.11.0</version>
-  <revision>REV-19</revision>
+  <version>1.12.0</version>
+  <revision>REV-20</revision>
   <status>DRAFT_FOR_GATE_REVIEW</status>
   <phase>GROUP_B / PHASE_03 系统架构设计</phase>
   <author>system-architect</author>
-  <invocation_id>INV-GROUP_B-INTELBASE-014</invocation_id>
+  <invocation_id>INV-GROUP_B-INTELBASE-015</invocation_id>
   <created_at>2026-09-25</created_at>
-  <updated_at>2026-10-11</updated_at>
+  <updated_at>2026-10-17</updated_at>
   <inputs>
-    <input path="docs/requirements_spec.md" version="1.11.0" revision="REV-19" status="APPROVED"/>
-    <input path="docs/user_stories.md" version="1.11.0" revision="REV-19" status="APPROVED"/>
+    <input path="docs/requirements_spec.md" version="1.12.0" revision="REV-20" status="APPROVED"/>
+    <input path="docs/user_stories.md" version="1.12.0" revision="REV-20" status="APPROVED"/>
     <readonly_reference path="FreeArk 仓库" note="只读参考；本阶段未修改 FreeArk 任何文件"/>
   </inputs>
   <locked_decisions source="requirements_spec.md §6.0">DR-01 Qdrant 单实例非容器 | DR-02 bge-m3 稠密本地 | DR-03 禁 Docker 全裸装 | DR-04 云端 DeepSeek 可配置 | DR-05 千级文档量级 CPU-only 假设 | DR-06 单实例多项目 | DR-07 须支持索引重建 | DR-08 v1 纳入 OCR</locked_decisions>
@@ -33,13 +33,14 @@
     <rev version="1.10.1" revision="REV-18-R1" date="2026-10-07" basis="用户裁决（2026-10-07）：GR-B 三项待决收口 —— OI-1 出 ADR-21-R1（N:1，amend）；OI-2 采纳 ADR-39 Option C；OI-3 保持 OPEN" note="REV-18-R1 裁决收口（状态登记 + amend 子节，无结构变更）：① 新增 **ADR-21-R1**（对 ADR-21 的正式修订子节，**amend**；**ADR-21 正文一字不动**）—— 把「账户↔项目绑定」关系式**收窄 / 订正为 N:1**（每个运维账号恰绑一个项目；一个项目可有多个运维账号），承接 **OI-1**（依据 OQ-IB-28 / DR-15 / ADR-21）；**零迁移**（不加 `users.project_id` 唯一约束），授权落点与端口结论不变。② §2.0.9 影响复核表 ADR-21 行由「待裁决（口径张力）」改为「口径补注（已由 ADR-21-R1 承接）」；**结论计数 32 / 3 / 1 / 6 → 32 / 4 / 0 / 6**。③ §10.1：**OI-1 CLOSED**（经 ADR-21-R1）、**OI-2 CLOSED**（采纳 **ADR-39 Option C**，缺 Key 非致命、fail-closed 于调用期，其余必填仍 fail-fast；备选 Option B 已评估未采纳）、**OI-3 保持 OPEN**（施工期定，不阻塞）。④ ADR-39 Consequences 补记「Option B 已评估未采纳 / 采纳 Option C」；§10.3 自检同步。**不变约束**：ADR 数 42、模块数 26、端口 19、`IFC-IB-001 ~ 377` 号 / 名 / 签名一字不动、§4.1 依赖边逐行不变、DAG 无环、**不新增 REQ / 不改 AC**、**不新增 / 不删 ADR 编号**。需求侧文档与 FreeArk 仓库未改动；未写入任何口令 / 令牌 / Key / 证书字面量（只登记键名 / 表名 / 文件名 / 字段名）。"/>
     <rev version="1.10.2" revision="REV-18-R2" date="2026-10-07" basis="协调者复核（2026-10-07）：GR-B 落档复核后三处「现在时未决」措辞收尾；由 PM 机械落盘（无新 producer 调用）" note="REV-18-R2 一致性措辞收尾（无结构变更；只把与已关闭 OI 冲突的现时态陈述改为已决，供 software-developer 照已决实现）：① **ADR-40 ③** 注句由「与 ADR-21 的 1:1 表述存在口径张力，登记为 OPEN ITEM OI-1，本 ADR 不自行改写 ADR-21」改为「口径张力已由 **ADR-21-R1**（amend 子节）承接、关系式订正为 **N:1**、**OI-1 已由用户裁决于 2026-10-07 关闭**；**ADR-21 正文一字未动**」；② **[ARCH-ASSUMPTION-A12]** 末两列由「若 PM / 用户不采纳『未配置态』，须以部署期由用户手工预置 Key 替代（ADR-39 Option B）…／需 PM 知悉（OI-2 / OI-3）」改为「**用户裁决 2026-10-07 已采纳『未配置态』（ADR-39 Option C）**、Option B **已评估未采纳** …／**已决**：**OI-2 已关闭**、**OI-3 保持 OPEN**（施工期定，不阻塞）」—— **架构侧取值列（①…③）的既有取值一字未动**，**未新增假设项**。**不变约束**：ADR 数 42、模块数 26、端口 19、`IFC-IB-001 ~ 377` 号 / 名 / 签名一字不动、§4.1 依赖边逐行不变、DAG 无环、**不新增 REQ / 不改 AC**、**ADR-21 正文一字不动**。需求侧文档与 FreeArk 仓库未改动；未写入任何口令 / 令牌 / Key / 证书字面量（只登记键名 / 表名 / 文件名 / 字段名）。"/>
     <rev version="1.11.0" revision="REV-19" date="2026-10-11" invocation_id="INV-GROUP_B-INTELBASE-014" basis="GROUP_A REV-19 下游贯通（每项目专家集隔离 / 可视化配置项目域切换-加载 / 知识问答项目闭环 / 新项目默认种子 / 三专家属 demo：REQ-FUNC-IB-49~53 / REQ-NFR-IB-21 / C-IB-44~C-IB-47 / OOS-20 / OOS-21 / DR-22 / DR-23）；上游 requirements_spec.md 1.11.0（REV-19）/ user_stories.md 1.11.0（REV-19）（均 APPROVED）；用户裁决 2026-10-11：OQ-IB-32~40 一次拍板" note="REV-19 每项目专家集 / 定义文档目录化 / 新项目种子 / 三专家属 demo（下游贯通）：① 新增 **ADR-43**（每项目专家注册表的解析与 C-IB-45 不变量的结构保证）、**ADR-44**（定义文档物理载体目录化 `IB_DEFINITION_DOC_PATH` 文件 → 目录 + C-IB-46 部署迁移）、**ADR-45**（新项目默认种子与「三专家属 demo」）、**ADR-46**（三专家既有会话 / 历史 / 引用的归属数据迁移 C-IB-47 / DR-23）、**ADR-47**（专家域解析的 fail-closed 与可观测 REQ-NFR-IB-21）；每条含 Context（REQ 引用）/ Options（≥2，含已评估未采纳）/ Decision / Status / Consequences；**ADR 数 42 → 47**；② 新增 **§2.0.10 REV-19 影响复核表**（**既有 42 条 ADR 逐条复核，无一条跳过**：42 条不受影响、其中 **11 条**判「不受影响且 REV-19 是其应用」；**新增 5 条**）；③ §1.3 追加 R19 增补段与定义文档来源行口径修订（**不新增端口**）；④ §8 修订 **[ARCH-ASSUMPTION-A6]**（由「需 PM 确认」订正为「**已确认，落地于 ADR-44**」；一项目一文档 = `&lt;dir&gt;/&lt;project_id&gt;.json`）、[ARCH-ASSUMPTION-A10] 追加「**REV-19 不受影响**」句；⑤ §9 新增 **[TBD-T28]** / **[TBD-T29]**；⑥ §10.1 新增 REV-19 OPEN ITEM（OQ-IB-32~40 承接并关闭 + 新建项目 KB 问答 agent 命名与文案为代码内置且待定，**架构层不发明**）；⑦ §10.2 追加「许可面未变」句；⑧ §10.3 追加 REV-19 自检；⑨ 落点并入既有模块（**零新增模块、零新增依赖边**）；⑩ **计数同步**：REQ-FUNC 48/48 → **53/53**（新增 IB-49~53）、NFR 20 → **21**（新增 NFR-21）。**不变约束**：模块数 26、端口数 19（**未新增**）、既有 `IFC-IB-001 ~ 377` 号 / 名 / 签名一字不动（**仅 5 组文字与取值口径修订**，登记于 §2.0.10 / `module_design.md` §2.2.10）、**§4.1 依赖边逐行不变（零新增边）**、DAG 无环、**不引运行期热重载**（ADR-32 / C-IB-40 / OOS-16）；新增 IFC 为 **IFC-IB-378 ~ 388**（11 条，见 `module_design.md` §2.2.10）。**红线未破（强制）**：专家集**硬隔离 = 项目级**（**无跨项目回退**）；三专家「属 demo」由**种子差异**结构性保证（**非 UI 约定**）；**UI 分组 / 可见性非权限机制**（ADR-42 纪律）；`kb_id` 仍由已认证主体 `project_id` 推导、**保留** `assert_kb_in_project`（IFC-IB-130）归属断言（失败仍 403）。**C-IB-45 两条不变量为类型层事实**（`ExpertRegistryView.default_expert` 必填非空 + 内置不可删默认专家种子），**不依赖校验放行**。**登记：C-IB-46 / C-IB-47 迁移由用户手工执行 + 先备份 + 失败回滚**（C-IB-38）。需求侧文档与 FreeArk 仓库未改动；**未写入任何口令 / 令牌 / Key / 证书字面量**（只登记键名 / 表名 / 文件名 / 字段名 / 头名）。"/>
+    <rev version="1.12.0" revision="REV-20" date="2026-10-17" invocation_id="INV-GROUP_B-INTELBASE-015" basis="GROUP_A REV-20 裁决收尾（OQ-IB-41=B / 42=B / 43=C / 44=C / 45=C / 46=B / 47=C / 48=C；结论见 requirements_spec.md §2.13.4 / C-IB-52）；上游 requirements_spec.md 1.12.0（REV-20）/ user_stories.md 1.12.0（REV-20）（均 APPROVED）" note="REV-20 内置 kb-agent 提示词重建 / 代码兜底层退役 / 默认三专家机制退役（下游贯通）：① 新增 ADR-48（提示词域兜底层退役：合并链收窄为两层 + 非空性由「创建期落盘 + 装配期 fail-closed」保证）、ADR-49（内置 kb-agent 提示词的载体 = 仓库 markdown 种子资产 + 按 agent-builder 9 层架构的内容边界）、ADR-50（默认三专家机制退役与未落盘项目回落）、ADR-51（创建期播种落盘范围（两目录）与既有项目回填迁移）；ADR 数 47 → 51；② 新增 §2.0.11 REV-20 影响复核表（既有 47 条 ADR 逐条复核，无一条跳过：33 条不受影响、4 条口径补注（ADR-09 / 14 / 16 / 33）、6 条修订（ADR-15-R1 / 15-R2 / 29 / 35 / 36 / 45）、2 条退役（ADR-31 / 46）；新增 4 条）；③ §8 新增 [ARCH-ASSUMPTION-A14]（两层提示词皆缺即拒绝装配的部署前提）与 [ARCH-ASSUMPTION-A15]（9 层架构的平台承担层边界）；④ §9 新增 [TBD-T30]（提示词落盘创建期 / 回填成本与效果）；⑤ §10.1 新增 REV-20 行：OQ-IB-41 ~ 48 承接并关闭 + OI-4（legacy fallback_prompt 键残留，一律 fail-closed，须用户手工迁移）；⑥ 落点并入既有模块（零新增模块、零新增端口、零新增依赖边）；⑦ 计数同步：REQ-FUNC 53/53 → 58/58、NFR 21 → 22。不变约束：模块数 26、端口数 19（未新增）、`IFC-IB-001 ~ 388` 号 / 名 / 签名一字不动（IFC-IB-343 / 345 / 347 / 288 / 289 / 339 仅 keyword-only 参数集与判据口径修订；**IFC-IB-365 退役**；IFC-IB-379 / 380 / 381 / 385 口径修订）、§4.1 依赖边逐行不变（零新增边）、DAG 无环、不引运行期热重载（ADR-32 / C-IB-40 / OOS-16）；新增 IFC 为 IFC-IB-389 ~ 392（4 条，见 module_design.md §2.2.11）。红线（强制）：提示词域**不再有非项目域载体**（代码内置兜底层退役）；「生效提示词恒非空」由**可达 fail-closed 判据**（prompt_missing）保证；C-IB-45 两条不变式仍为类型层事实。登记：创建期落盘与回填迁移**须用户手工执行 + 先备份 + 失败回滚**（C-IB-38 / C-IB-52）。tech_stack.md NO_CHANGE（无新第三方依赖）。需求侧文档与 FreeArk 仓库未改动；未写入任何口令 / 令牌 / Key / 证书字面量（只登记键名 / 表名 / 文件名 / 字段名 / 头名）。"/>
   </revision_history>
   <scope_boundary>只做架构与模块设计；不含实现代码、测试用例、部署脚本。允许接口签名、类型注解、数据结构定义。</scope_boundary>
 </file_header>
 
 # 系统架构设计 — intelligentbase 通用 RAG + 多智能体可复用基础架构
 
-**版本**: 1.11.0（REV-19 修订）| **状态**: DRAFT_FOR_GATE_REVIEW | **日期**: 2026-10-11
+**版本**: 1.12.0（REV-20 修订）| **状态**: DRAFT_FOR_GATE_REVIEW | **日期**: 2026-10-17
 **R2 修订摘要（L-03：`ib-embed` 服务端无模块归属与完整契约）**: 追加 **ADR-02-R2 附注**（服务端归属成立 = 新增 MOD-IB-26；冷/热单一落点在客户端；形态可逆值域 `http|inproc|fake`），新增 **§2.0.1 R2 影响复核表**（**受影响 1 条：ADR-02（仅补附注）**；**R2 不受影响 12 条**：ADR-01 / 03 / 04 / 05 / 06 / 07 / 08 / 09 / 10 / 11 / 12 / 13），并为 ADR-04 / 06 / 11 / 13 追写 inline R2 复核句；§9 补 **[TBD-T16] / [TBD-T18]** 并声明 **[TBD-T17] 预留未分配**。**不变**：§1 / §3~§7 的结论、模块数与端口数、`IFC-IB-001~265`、REQ→MOD 覆盖矩阵、DAG 无环（R2 只追加）。
 **R7 修订摘要（GROUP_A REV-06 贯通：诉求③「UI 可视化配置」纳入 v1）**: 新增 **ADR-14 / ADR-15 / ADR-16**（编辑模型 / 单一真源（双向同源）/ 装配期 fail-fast 准入闸门），**ADR 数 13 → 16**；新增 **§2.0.2 R7 影响复核表**（**既有 13 条 ADR 在 R7 下全部不受影响**——其中 ADR-09 判「不受影响且 R7 是其应用」；**新增 3 条**；**无一条 ADR 未复核**）；新增**第 14 个端口** `DefinitionDocumentStore`（IFC-IB-287，纯追加；§1.3 增一行）；§6 增补图编译输入约束；§8 新增 A6 / A7；§9 新增 [TBD-T19] / [TBD-T20]。**不变**：§1 / §3~§7 的既有结论、模块数（**26，未新增**）、`IFC-IB-001~286` 编号体系、**§4.1 依赖边逐行不变（零新增依赖边）**、DAG 无环。**计数同步**：REQ→MOD 覆盖由 24/24 同步为 **27/27**（v1.2.0 需求总数；R1 / R2 时点基线 24/24 以括注保留）。
 
@@ -449,6 +450,64 @@
 ---
 
 
+
+### 2.0.11 REV-20 影响复核表（内置 kb-agent 提示词重建 + 代码兜底层退役 + 默认三专家机制退役）
+
+> **触发需求**：REQ-FUNC-IB-54 ~ IB-58、REQ-NFR-IB-22（`requirements_spec.md` §2.13 / §2.13.4）。
+> **触发裁决**：OQ-IB-41=B / 42=B / 43=C / 44=C / 45=C / 46=B / 47=C / 48=C（用户裁决 2026-10-17，结论见 `requirements_spec.md` §2.13.4）。
+> **触发约束**：C-IB-48（口径与编号纪律）、C-IB-49（取代 / 修订登记）、C-IB-50（经 C-IB-52② 限定为**授权覆盖**）、C-IB-51（grounding 护栏铁律）、**C-IB-52**（REV-20 裁决后的取代 / 口径修订登记）。
+> **复核口径**：既有 **ADR-01 ~ ADR-47 逐条复核、无一条跳过**（结论列 `不受影响` / `口径补注` / `修订` / `退役`）；修订 / 退役者其**正文一字不动**，由新增 ADR-48 ~ ADR-51 承接（表末 4 条见 §2.1 的 ADR-48 ~ ADR-51 条目）。
+
+| ADR | 复核结论 | 说明 |
+|-----|----------|------|
+| ADR-01 向量库抽象层 | 不受影响 | 检索链路与 collection 语义未动 |
+| ADR-02 embedding 部署形态 | 不受影响 | 未动 |
+| ADR-03 部署形态（systemd 裸装） | 不受影响 | 未新增第三方依赖 |
+| ADR-04 多项目隔离 | 不受影响 | collection-per-project 未动 |
+| ADR-05 原始文件持久化 | 不受影响 | 未动 |
+| ADR-06 PDF 解析库许可 | 不受影响 | 未动 |
+| ADR-07 元数据 / 台账存储 | 不受影响 | 未动 |
+| ADR-08 LLM 端点抽象 | 不受影响 | 未动 |
+| ADR-09 编排骨架业务零依赖 | **口径补注** | 三专家退役（ADR-50）后骨架**更彻底**零业务语义（OQ-IB-48=C / REQ-FUNC-IB-58）；正文一字不动 |
+| ADR-10 异步入库形态 | 不受影响 | 未动 |
+| ADR-11 Web 层 / SSE | 不受影响 | 未动 |
+| ADR-11-R1 修订节 | 不受影响 | 未动 |
+| ADR-12 OCR 与页面渲染 | 不受影响 | 未动 |
+| ADR-13 检索契约与降级 | 不受影响 | `degrade_reason` 枚举未动 |
+| ADR-14 可视化配置编辑模型 | **口径补注** | 提示词编辑页不再有「内置兜底预填 / 只读回显内置兜底」；定义文档只读回显的兜底来源消失（ADR-48 决定 1 / 4） |
+| ADR-15 定义文档单一真源 | 不受影响 | 已由 ADR-15-R1 / R2 承接 |
+| ADR-15-R1 分域真源 + 装配期合并 | **修订** | 合并规则的**第三层（代码内置兜底）退役**，合并链收窄为**两层**（`main.md` > `fallback.md`）；修订承接见 **ADR-48**；正文一字不动 |
+| ADR-15-R2 兜底层真源收窄 | **修订** | 同上（ADR-48 承接） |
+| ADR-16 装配期完备性校验 fail-fast | **口径补注** | 提示词域「缺兜底」由**不可达的防御性断言**升为**可达的 fail-closed 判据**（`prompt_missing`，ADR-48 决定 2） |
+| ADR-17 手动确认中间态 | 不受影响 | 未动 |
+| ADR-18 ~ ADR-20（REV-13 组） | 不受影响 | 账户 / 会话 / 前端未动 |
+| ADR-21 账户↔项目 1:1 | 不受影响 | 未动 |
+| ADR-21-R1 关系式收窄 N:1 | 不受影响 | 未动 |
+| ADR-22 ~ ADR-27（REV-13 组） | 不受影响 | 未动 |
+| ADR-28 项目上下文（R14） | 不受影响 | 未动 |
+| ADR-29 主 / 兜底分层 | **修订** | 兜底层语义由「代码内置**恒非空**」改为「**文件两层，皆缺即拒绝装配**」；修订承接见 **ADR-48**；正文一字不动（承接 C-IB-52①） |
+| ADR-30 工具授权勾选 + 参数 | 不受影响 | 工具本体 / 参数契约未动 |
+| ADR-31 FreeArk 严格对齐（含专家名） | **退役** | 默认集不再含三专家（ADR-50）⇒ 对齐诉求的**载体消失**（OQ-IB-48=C / C-IB-52④）；正文一字不动，标注「已退役（REV-20）」 |
+| ADR-32 生效口径（保存 + 重启重装配） | 不受影响 | 本增量**沿用**（ADR-51 决定 ④）；语义声明重申 |
+| ADR-33 保存期校验落点（单入口） | **口径补注** | 单入口内的**提示词域判据**变更（ADR-48 决定 2）；入口数量 / 位置不变 |
+| ADR-34 配置审计载体 | 不受影响 | 未动 |
+| ADR-35 内存态生效提示 | **修订** | 内存态存储（`InMemoryExpertPromptStore`）须由**种子内容预填**，否则「两层皆缺」将拒绝装配；修订承接见 **ADR-48 / ADR-51**；正文一字不动 |
+| ADR-36 兜底层重定位（代码内置安全网） | **修订** | **代码内置安全网退役**（ADR-48 承接）；「第二可写入口」结论保持且病灶永久闭合 |
+| ADR-37 项目注册表 | 不受影响 | 未动 |
+| ADR-38 LLM Key 载体 | 不受影响 | 未动 |
+| ADR-39 LLM 未配置态 | 不受影响 | 未动 |
+| ADR-40 运维账号 CRUD | 不受影响 | 未动 |
+| ADR-41 kb_id 推导与归属断言 | 不受影响 | 未动 |
+| ADR-42 系统管理三分 | 不受影响 | 未动 |
+| ADR-43 每项目专家视图与 C-IB-45 | 不受影响 | 两条不变式**保持**（默认专家恰好一个 = kb-agent；永不无应答）；`ExpertRegistryView` 契约未动 |
+| ADR-44 定义文档目录化 | 不受影响 | **复用**其目录布局；提示词目录同步落盘见 ADR-51 |
+| ADR-45 新项目默认种子 + 三专家属 demo | **修订** | `demo` 种子**亦**为唯一 kb-agent；三专家**不再属任何项目**（ADR-50 承接）；REQ-FUNC-IB-53 **被取代**（C-IB-49 / C-IB-52） |
+| ADR-46 三专家历史迁移（C-IB-47 / DR-23） | **退役** | 迁移口径**停用**（OQ-IB-47=C / C-IB-52③）：三专家停用隐藏、既有记录**保持现状、不再迁移**；正文一字不动 |
+| ADR-47 专家域 fail-closed 与可观测 | 不受影响 | fail-closed 语义与打点保持 |
+
+**新增 4 条**：**ADR-48**（提示词域兜底层退役：合并链收窄为两层 + 非空性由「创建期落盘 + 装配期 fail-closed」保证）、**ADR-49**（内置 kb-agent 提示词的载体 = 仓库 markdown 种子资产 + 按 agent-builder 9 层架构的内容边界）、**ADR-50**（默认三专家机制退役与未落盘项目回落）、**ADR-51**（创建期播种落盘范围（两目录）与既有项目回填迁移）。本 4 条与既有 47 条**无冲突**：修订 / 退役项均由本 4 条**承接**（既有正文一字不动）。
+
+**计数**：ADR 42 → **51**（REV-18 后 42 条；REV-19 新增 ADR-43 ~ 47 = 47 条；本轮新增 ADR-48 ~ 51 = **51 条**）；模块数 **26**（未变）；端口数 **19**（未变，本轮**不新增端口**）；`§4.1 依赖边清单` **逐行不变（零新增依赖边）**；DAG 无环（§4.2.10 再声明）；`tech_stack.md` **NO_CHANGE**（无新第三方依赖，仅代码 / 资产布局调整）。
 
 ### ADR-01 向量库抽象层与 Qdrant 集成方式
 
@@ -1297,6 +1356,62 @@
 
 ---
 
+### ADR-48 提示词域兜底层退役：合并链收窄为两层 + 非空性由「创建期落盘 + 装配期 fail-closed」保证
+
+- **Status**: Accepted（REV-20 新增；**修订关系**：本 ADR 是 **ADR-29 / ADR-15-R2 / ADR-36** 的修订承接 —— 三者正文一字不动，其被取代的结论以「REV-20 修订」标注）。
+- **Context**: REQ-FUNC-IB-54（创建期落盘提示词）/ IB-55（生效来源可核验、不静默回退）/ IB-56、REQ-NFR-IB-22；**C-IB-41（补注被改写）**、**C-IB-52①**；用户裁决 **OQ-IB-42=B**（删除代码内置提示词全部要素；`requirements_spec.md` §2.13.4）。**现状（一手核实）**：`ib.experts` 持有三层兜底常量 —— `_BUILTIN_FALLBACK_PROMPTS`（由 `_DEFAULT_SPECS` 派生）、`BUILTIN_FALLBACK_DEFAULT`（通用安全网）、`BUILTIN_FALLBACKS`（全名域映射）；`merge_prompt_layers` / `validate_prompt_directory` / `derive_prompt_layers` / `FileDefinitionDocumentStore` 均**以「代码内置兜底恒非空」为前提**（ADR-36 决定 2「通用安全网」）。裁决要求**删除该层**。
+- **Options**:
+  - **Option A 保留代码内置兜底（现状）**：优—零改动；「新增专家死锁」已破。缺—**违反 OQ-IB-42=B**；且保留「非项目域的提示词载体」这一与「提示词域真源唯一」张力面。**已评估未采纳**。
+  - **Option B（选定）删除代码内置兜底层，合并链收窄为 `main.md` → `fallback.md` 两层；非空性改由「创建期落盘（REQ-FUNC-IB-54）+ 装配期 fail-closed（两层皆缺即拒绝装配）」保证；`resolved_from` 值域收窄为 `{main_file, fallback_file}`**：优—**彻底**落实裁决；「恒非空」由**可达判据**（而非「不可达的防御性断言」）保证，可测、可观测（对齐 REQ-FUNC-IB-55 / REQ-NFR-IB-22）。缺—**未配置 `IB_EXPERT_PROMPT_DIR`（或内存态）的部署不再有隐式兜底**：装配期若某专家两层皆缺即**启动失败**（**语义变化，须登记**）；离线 / 内存态必须由种子内容预填（见 ADR-51）。
+  - **Option C 把代码内置提示词搬到「仓库 markdown 资产」但**仍作第三层运行期兜底****：优—载体从 `.py` 换为 `.md`，diff 友好。缺—**仍是运行期隐式兜底**（来源不可核验、违反 REQ-FUNC-IB-55 的旨趣），与「删除代码内置提示词」的裁决意图张力。**已评估未采纳**（但同一份 markdown 资产的**合法用途**是「**创建期种子**」而非「运行期兜底」—— 见 ADR-49）。
+- **Decision**: **Option B**。四条落地决定：
+  1. **`ib.experts` 退役**：`BUILTIN_FALLBACK_DEFAULT` / `_BUILTIN_FALLBACK_PROMPTS` / `BUILTIN_FALLBACKS` / `_BuiltinFallbackMap` / `builtin_fallback_for` / `builtin_fallbacks_for`（原 **IFC-IB-365 整体退役**）；`BUILTIN_DEFAULT_KB_AGENT` 的 **专家元数据保留**（name / cn_label / keywords / is_* —— 它是新建项目的专家集真源），其 `fallback_prompt` 字段**去驱动化**（不再参与任何运行期取值）。
+  2. **`ib.config.prompts` 口径修订**：`merge_prompt_layers` / `load_prompt_bundle` 删 keyword-only `builtin_fallback`；两层皆空 → `PromptNotFoundError(code="prompt_missing")`。`validate_prompt_directory` 删 keyword-only `builtin_fallbacks`；判据由「缺 `fallback.md` **且** 无内置兜底」改为「**`main.md` 与 `fallback.md` 皆缺 → `prompt_missing`**」。`derive_prompt_layers` 同步删参。**原 IFC-IB-343 / 345 / 347 的号 / 名不变**，仅 keyword-only 参数集与判据口径修订。
+  3. **`ib.config.definition`**：`FileDefinitionDocumentStore` 删 `builtin_fallbacks` 注入；legacy 键 `experts[].fallback_prompt`（REV-17 起已移出 schema）的处置由「与内置逐字比对后分级（相同→丢弃 / 不同→fail-closed）」改为**一律 fail-closed**（抛 `ConfigError`，指明迁移目标 `<root>/<project_id>/<name>/main.md`，**只报长度、不回显正文**）—— 删除比对基准后无法再判「有无损失」，故按「信息损失绝不静默丢弃」的 ADR-36 原则**从严**。**（原 IFC-IB-288 / 289 号 / 名不变。）**
+  4. **来源可核验**：`resolved_from ∈ {main_file, fallback_file}`；回落 `fallback_file` **不得静默** —— 装配期结构化日志 `prompt_source`（MOD-IB-04 `log_event`，**不含提示词正文**）+ 配置页显示（复用 IFC-IB-354），对齐 REQ-NFR-IB-22。
+- **Consequences**:
+  - **正向**: OQ-IB-42=B 彻底落实；ADR-36 的「第二写入口」病灶**永久闭合**（系统中不再存在**非项目域**的提示词载体）；「生效提示词恒非空」由**可达的 fail-closed 判据**保证（可单测、可观测，对齐 REQ-FUNC-IB-55 / REQ-NFR-IB-22）。
+  - **负向**: ① **未配置 `IB_EXPERT_PROMPT_DIR` 的部署语义变化** —— 此前「无文件亦可用（取内置兜底）」，此后「无文件即拒绝该专家 / 项目装配」；**离线 / 内存态必须预填种子**（ADR-51），否则 `build_deps` 失败 —— 登记 **[ARCH-ASSUMPTION-A14]**。② legacy `fallback_prompt` 键由「分级」改「一律 fail-closed」⇒ 既有文档若残留该键将**启动失败**（部署计划**必须**含「检查 + 迁移」步；见 §10.1 **OI-4**）。③ ADR-29 / ADR-15-R2 / ADR-36 的相关结论须以「REV-20 修订」标注（正文一字不动）。④ 错误码 `prompt_fallback_missing` 退役，新增 **`prompt_missing`**（`validate_prompt_directory` 的判据码）。
+
+### ADR-49 内置 kb-agent 提示词的载体（仓库 markdown 种子资产）与内容边界（按 agent-builder 9 层架构）
+
+- **Status**: Accepted（REV-20 新增）。
+- **Context**: REQ-FUNC-IB-56（内容要求：引用来源 / 无命中诚实应答 / 工具使用契约 + 保持 grounding 护栏）、REQ-FUNC-IB-58（通用性）；**OQ-IB-41=B**（P0+P1 **并**按 **9 层架构**生成完整提示词，含 SC-1~SC-6 与记忆 / 知识库模块）；**C-IB-51**（护栏铁律）；S-9（现行提示词 2 句，agent-builder **原生口径 20/100**）。9 层与 SC-1~SC-6 的构成见 `.trae/skills/sdlc-agent-builder/SKILL.md`；**本基座中「会话记忆 / 工具执行 / 流式交付 / 编排」等层由平台承担**（MOD-IB-21 / 22 / 23），故提示词中**引用而非重实现**（S-9 的限定）。
+- **Options**:
+  - **Option A 仅 P1 三件套（文本小改）**：优—改动最小。缺—**不满足 OQ-IB-41=B**（未含 9 层架构）。**已评估未采纳**。
+  - **Option B（选定）全文按 9 层架构撰写，落为仓库内 markdown 种子资产（`src/ib/expert_seeds/kb-agent.md`），创建期读取并写入项目提示词目录（ADR-51）**：优—提示词**移出代码**（与 OQ-IB-42=B 一致）；文件态可 diff / 可版本管理；创建期可复现地落盘（REQ-FUNC-IB-54）；项目域可编辑（REQ-FUNC-IB-41）。缺—资产与代码**同仓分发**（部署须保证同步）；资产读取属**只读本地 I/O**（置于 `ib.config`，见 IFC-IB-389）。
+  - **Option C 同内容内联于 Python 常量（`ib.experts` 内）**：优—无文件依赖。缺—**提示词正文仍在 `.py` 内**，与「删除代码优化的提示词」的裁决旨趣张力；不利于 diff / 审查。**已评估未采纳**。
+- **Decision**: **Option B**。**内容边界（须写进提示词的层）**：①**静态身份与职责**（通用知识库助手，**无任何业务域语义**，REQ-FUNC-IB-58）；②**引用来源**（命中资料时给出**文件名与位置**）；③**无命中诚实应答**（未检索到依据时**明确说明**，**不得**以模型既有知识冒充检索结果）；④**工具使用契约**（**何时必须**调用知识检索工具；依赖降级时的表述边界）；⑤**grounding 护栏三条**（C-IB-51：依检索资料作答 / 不得编造数据、来源或结论 / 无法取得依据时说明并给出结论适用边界 —— **逐条保留**）；⑥**输出结构规范**（可直接作答 / 需检索 / 需说明局限三态）；⑦**自校验**（作答前核对「本答复是否有依据」）。**由平台承担、提示词内仅引用**：会话记忆（REQ-FUNC-IB-20 会话生命周期）、流式交付（ADR-11-R1）、工具授权与执行（ADR-30）、编排（ADR-09）。**提示词正文不写入任何架构 / 模块设计文档**（施工期落盘于资产文件；架构层只登记**边界**）。
+- **Consequences**:
+  - **正向**: OQ-IB-41=B 落实；提示词成为**项目域可编辑载体**（文件态，可 diff / 版本管理）；grounding 护栏**可逐条核验**（C-IB-51 / AC-IB-48-01）。
+  - **负向**: ① 资产与代码**同仓分发** ⇒ 部署须保证资产随代码同步（部署计划登记）。② 「哪些层由平台承担」的判断为**架构假设** —— 登记 **[ARCH-ASSUMPTION-A15]**；若后续要求把平台层写进提示词，须重新裁决。③ 提示词为**业务无关通用文案**，**不承诺**达到 agent-builder 打分满分（打分口径与本基座的平台承担边界不一致）。
+
+### ADR-50 默认三专家机制退役与未落盘项目的回落
+
+- **Status**: Accepted（REV-20 新增；**修订关系**：修订承接 **ADR-45**（新项目默认种子 + 三专家属 demo）；**退役**承接 **ADR-31**（FreeArk 严格对齐）与 **ADR-46**（三专家历史迁移）；三者正文一字不动）。
+- **Context**: REQ-FUNC-IB-57（**任何**新建项目默认集 = 唯一通用 kb-agent）/ IB-58（通用性）；**OQ-IB-46=B**（`builtin_expert_registry()` 的 demo 种子 **与** `_DEFAULT_SPECS` 代码内置安全网 **一并退役**；**未落盘项目回落 = 唯一内置 kb-agent**）；**OQ-IB-47=C**（三专家**停用隐藏**、`demo` 改 kb-agent、既有记录**保留**、不再迁移）；**OQ-IB-48=C**（默认集**不得含任何业务域专家**）；**C-IB-45**（两条不变式不得破坏）；REQ-FUNC-IB-42 / IB-53（**载体被取代**，见 C-IB-52④）。现状：`_DEFAULT_SPECS` = 三对齐专家；`builtin_expert_registry()` 返回三专家视图；`DEMO_EXPERT_NAMES`（及 `ib.streaming._DEMO_EXPERT_NAMES`）为 `demo` 判定基准。
+- **Options**:
+  - **Option A 仅取消 demo 种子（`builtin_expert_registry` / `DEMO_EXPERT_NAMES`），保留 `_DEFAULT_SPECS` 作未落盘项目兜底**：优—改动局部。缺—**违反 OQ-IB-46=B**（「两者一并退役」）；三专家仍是「未落盘项目」的隐式默认集。**已评估未采纳**。
+  - **Option B（选定）两者一并退役：`_DEFAULT_SPECS` 由唯一内置单例（`BUILTIN_DEFAULT_KB_AGENT`）取代；`builtin_expert_registry()` 与 `builtin_default_registry()` 同值（唯一 kb-agent）；`DEMO_EXPERT_NAMES`（及 `ib.streaming._DEMO_EXPERT_NAMES`）退役；未落盘项目的回落 = 唯一内置 kb-agent**：优—**彻底**落实裁决；默认集**不含任何业务域专家**；ADR-31 的「基座引入 FreeArk 业务中文名」张力**随之消解**。缺—三专家代码载体删除后其**既有数据成孤儿引用**（见负向）。
+  - **Option C A + `demo` 保留三专家但仅作只读示例**：优—保留演示价值。缺—**违反 OQ-IB-47=C**（`demo` 改 kb-agent）。**已评估未采纳**。
+- **Decision**: **Option B**。① 进程级安全网 `EXPERT_SPECS` 的初始值 = `[BUILTIN_DEFAULT_KB_AGENT]`（生产装配主路径仍由**每项目视图**注入 —— ADR-43 / ADR-47 不变；本项仅「未落盘 / 未配置」回退）；② `demo` 项目种子 = 唯一 kb-agent（`seed_project` **删除 demo 分支**，见 ADR-51）；③ 三专家的**代码载体删除**（`_DEFAULT_SPECS` / `DEMO_EXPERT_NAMES` / `builtin_expert_registry` 三专家视图 / `ib.streaming._DEMO_EXPERT_NAMES`），其**既有数据（会话 / 历史 / 引用）保留**（OQ-IB-47=C）；④ **C-IB-45 两条不变式保持**（默认专家**恰好一个** = kb-agent；**永不无应答**）—— 由 `validate_specs`（`ib.experts`）与 `resolve_expert_registry`（ADR-43）的**既有结构**保证，**不依赖任何运行期「校验放行」**。
+- **Consequences**:
+  - **正向**: 任何项目默认集 = 唯一通用 kb-agent（REQ-FUNC-IB-57）；默认集**不含业务域专家**（OQ-IB-48=C / REQ-FUNC-IB-58）；ADR-09「骨架不见业务语义」**真正达成**。
+  - **负向**: ① 三专家退役后其既有历史记录成为**孤儿引用**（记录保留、专家**不可再路由**）—— 表现「历史会话仍可读、新提问**不再路由到三专家**」；登记为**非静默后果**（OQ-IB-47=C 已接受）。② `EXPERT_SPECS` 由「三专家」变「单 kb-agent」⇒ 既有**离线用例 / `selfcheck.py`** 的专家数断言须相应调整（属**施工期影响**，**非契约变更**）。③ 用户日后若需业务域专家，须经「可视化配置新增专家 + 写入其提示词文件」路径（ADR-14 / ADR-36 的编辑模型不变）。④ `builtin_expert_registry()` 的**号 / 名 / 签名不变**，语义澄清为「与内置默认单例同值」（IFC-IB-381 口径修订）。
+
+### ADR-51 创建期播种的落盘范围（定义文档目录 + 提示词目录）与既有项目回填迁移
+
+- **Status**: Accepted（REV-20 新增；**修订关系**：对 **ADR-45** 的创建期播种结论作**加成式扩展**（新增提示词落盘子步、删除 demo 分支）；ADR-45 正文一字不动）。
+- **Context**: REQ-FUNC-IB-54（**创建期**落盘提示词）；**OQ-IB-43=C**（「项目目录」= **两者**：定义文档目录 + 提示词目录）；**OQ-IB-44=C**（新建 **+ 既有回填**且**允许覆盖**；执行纪律 = **用户手工执行 + 先备份 + 失败回滚 + 不静默**）；C-IB-38（生产步骤**用户手工执行**）；C-IB-50（经 **C-IB-52②** 限定为「**授权覆盖**」）；ADR-44（定义文档目录化）、ADR-45（原创建期播种）、ADR-48（兜底层退役 ⇒ 创建期落盘**成为非空性前提**）、ADR-49（种子资产）。现状：`seed_project` 写 `<definition_dir>/<project_id>.json` + **仅建空的**提示词目录骨架 `<prompt_root>/<project_id>/<expert>/`（**不写** `main.md`）⇒「提示词来自项目目录」当前**不成立**（`requirements_spec.md` §2.13.0 F10）。
+- **Options**:
+  - **Option A 仅新建项目落盘提示词目录**：优—改动小。缺—**不满足 OQ-IB-44=C**（既有项目仍无项目域提示词载体 ⇒「让他工作」不成立）。**已评估未采纳**。
+  - **Option B（选定）创建期：`seed_project` 写 `<definition_dir>/<project_id>.json` + `<prompt_root>/<project_id>/kb-agent/main.md`（内容 = ADR-49 的种子资产）；既有项目：由一次性回填迁移（用户手工执行；先备份；覆盖既有提示词文件；失败即回滚）统一为 kb-agent 种子内容**：优—新建与既有项目**一律**具备项目域提示词载体；「提示词来自项目目录」成立（来源可核验，REQ-FUNC-IB-55）；覆盖**不静默**（逐项目记录 + 迁移报告）。
+  - **Option C 每次装配（启动）都强制覆盖为种子内容**：优—「永远一致」。缺—**静默覆盖用户编辑**，破坏 C-IB-50 的「不静默」精神，且使 REQ-FUNC-IB-41（**可经文件保存** + 乐观并发）失效 —— 用户存了提示词，重启即被冲掉。**已评估未采纳**。
+- **Decision**: **Option B**。① **`seed_project`（原 IFC-IB-385）加成式扩展**：保留既有行为（定义文档 + 提示词目录骨架），**新增**提示词落盘子步（写 `<prompt_root>/<project_id>/<expert>/main.md`，内容取 **IFC-IB-389** 的种子正文）；**删除 demo 分支**（ADR-50）；**幂等语义保持**（文档 / 提示词文件**已存在不覆盖** —— 避免重装配覆盖用户编辑）。② **回填迁移为一次性运维步骤**（**非运行期行为**），入口为独立脚本 **IFC-IB-391**：对**注册表全部活动项目**写 / 覆盖 `<prompt_root>/<project_id>/kb-agent/main.md` 为种子内容；**先备份**（四件套）、**失败回滚**、**覆盖不静默**（逐项目结构化日志 + 迁移报告，返回 **`MigrationResult` 元组**）。**须用户手工执行**（C-IB-38）。③ **内存态 / 离线路径**：`InMemoryExpertPromptStore` 由**种子内容预填**每项目 `kb-agent` 的 `main` 层，使离线装配不因「两层皆缺」失败（ADR-48 负向①的缓解）。④ **生效口径不变**（**ADR-32**：「保存 + 服务重启重装配」；**不引热重载**；C-IB-40 / OOS-16 维持）。
+- **Consequences**:
+  - **正向**: REQ-FUNC-IB-54 落点明确（创建期 + 回填）；「提示词来自项目目录」**成立**（来源可核验，REQ-FUNC-IB-55）；新建与既有项目**一律**具备项目域提示词载体；覆盖有备份 / 回滚 / 报告（**不静默**）。
+  - **负向**: ① 回填**覆盖**既有提示词内容 ⇒ 用户既有针对性编辑**丢失**（OQ-IB-44=C 已授权，但**必须**在部署说明与迁移报告中**显式告知** + **先备份**）。② `seed_project` 的「**已存在不覆盖**」幂等语义使**已存在项目**（含既有 Freeark / `demo`）**不会**在创建路径被自动更新 ⇒ **必须**经回填迁移（**不可依赖重启自愈**）。③ 生产 `IB_EXPERT_PROMPT_DIR` 与 `IB_DEFINITION_DOC_PATH` 的既有布局**不变**（ADR-44 / [ARCH-ASSUMPTION-A10]）。
+
 ## 3. 多项目隔离：链路落点与跨项目泄漏失败模式
 
 ### 3.1 隔离在链路上的落点（REQ-FUNC-IB-23）
@@ -1484,6 +1599,8 @@
 | **ARCH-ASSUMPTION-A11**（REV-16-4 新增） | **配置审计记录的保留策略（容量上界 / 轮转 / 清理）在 v1 未定**：`config_audit` 表**只增不删**（append-only），具体保留时长 / 条数上界 / 归档方式**由部署阶段标定** | REQ-NFR-IB-19 / AC-IB-32-02 只要求「存在可查询的记录」，**未规定保留策略**；需求侧无对应 REQ | 若需限额：新增一个清理任务即可（**上层零改动**）；若需长期留存：换/接外部存储只替换 `ConfigAuditStore` 适配器（IFC-IB-357） | **需 PM 知悉**（保留策略；架构层不自行拍板数值；与 [TBD-T25] 同源） |
 | **ARCH-ASSUMPTION-A12**（REV-18 新增） | **LLM Key「未配置态」的启动语义 + 承载库文件权限口径**（架构侧取值）：① 装配期 Key 解析结果 `configured` / `unconfigured`；**`unconfigured` 非致命**（服务正常启动；LLM 依赖路径 **fail-closed** 于调用期；`GET /api/llm-key` 返 `configured=false`）—— 见 **ADR-39**；② Key **承载库文件权限 0660（组 `ib` 共享）且属主对齐服务账号**（REQ-NFR-IB-20；部署检查清单 B22）—— **属主 = `ib-web`、组 = `ib`，`ib-web` 与 `ib-worker` 两个服务账号均在组内**；故字面 `0600` 在本部署拓扑下**不可满足**（非属主账号必然被挡），**DEFECT-R18-01**（2026-10-07 生产事故）后订正为 `0660`（**且须覆盖主库与 `-wal` / `-shm` 边车三者** —— DEFECT-R18-02）；③ **掩码口径** = **不含明文任何前 / 后缀字符的固定占位掩码**（避免长度 / 前缀侧信道）。**唯一写入口** = `PUT /api/llm-key`；**生效 = 保存 + 服务重启重装配**（ADR-32），**重启由用户手工执行** | REQ-FUNC-IB-47 / REQ-NFR-IB-20 规定「界面管理 Key」「载体 = DB」「库文件 0660」与「只回掩码 / 存在性 / 更新时间」，但**未规定首启缺 Key 的启动语义**（否则构成首启死锁，见 OI-2），亦未逐字规定掩码字面 | **用户裁决 2026-10-07 已采纳「未配置态」（ADR-39 Option C）**：缺 Key **非致命**、服务正常启动、LLM 依赖路径**调用期 fail-closed**，其余必填项**仍 fail-fast**；备选 Option B（部署期由用户手工预置 Key）**已评估未采纳**；掩码字面与库文件属主由施工期 / 部署期定 | **已决**（用户裁决 2026-10-07；与 [TBD-T27] 同源）—— **OI-2 已关闭**；**OI-3 保持 OPEN**（施工期定，不阻塞） |
 | **ARCH-ASSUMPTION-A13**（REV-19 新增） | **新建项目的默认 KB 问答 agent 的名称与文案为代码内置且待定**：ADR-45 落地的**创建期种子**使用「内置默认单例」专家（`is_default=True`，**内置不可删**）；其 `name` / `cn_name` / 默认编排流显示名在 v1 采用**代码内置默认值**，**具体字面由施工期 / 用户指定** | REQ-FUNC-IB-52 只规定「**1 个 KB 问答 agent + 1 个默认编排流**」，**未规定**其命名与文案 | 若用户要求特定命名，只需改**内置默认单例**的常量（**上层零改动**）；**不**新增 REQ / AC 亦可落地（属实现常量，非架构决策） | **登记 OPEN ITEM**（见 §10.1 REV-19 行）；**架构层不发明需求 / 不写死字面** |
+| **ARCH-ASSUMPTION-A14**（REV-20 新增） | **「两层提示词文件皆缺即拒绝装配」的**部署前提****：未配置 `IB_EXPERT_PROMPT_DIR`（或**离线 / 内存态**）时，每项目每专家的提示词**必须**由**创建期落盘（IFC-IB-390）+ 回填迁移（IFC-IB-391）** 或**种子预填**（`InMemoryExpertPromptStore`，ADR-51 决定 ③）提供 | REQ-FUNC-IB-54 / IB-55、REQ-NFR-IB-22 要求「创建期落盘 + 来源可核验」，但**未规定**「未落盘时装配如何表现」；删除代码兜底层（OQ-IB-42=B / ADR-48）后该分支**成为可达分支** | 若不成立（既无文件亦无种子预填）：该专家 / 项目的提示词域判据触发 `prompt_missing` ⇒ **拒绝装配**（与 ADR-16 fail-fast 一致）；纯离线演示部署**必须**走种子预填，否则 `build_deps` 失败。**不影响架构成立**，属部署说明的**显式前提** | **需 PM 知悉**（部署说明 / 检查清单须显式登记；架构层不自行放宽 fail-closed） |
+| **ARCH-ASSUMPTION-A15**（REV-20 新增） | **agent-builder 9 层架构的「平台承担层」边界**：**会话记忆 / 工具执行 / 流式交付 / 编排** 四类层由**平台**承担（MOD-IB-21 / 22 / 23），提示词内**仅引用**；其余层（静态身份 / 引用来源 / 无命中诚实应答 / 工具使用契约 / grounding 护栏 / 输出结构 / 自校验）**写进提示词** | OQ-IB-41=B 要求「按 9 层架构生成完整提示词（含 SC-1~SC-6 / 记忆模块 / 知识库模块）」，**未界定**其中哪些能力在**本基座**由平台而非提示词承担；S-9 已作限定 | 若不成立（要求把平台层**重复写入**提示词）：与 **ADR-09**（骨架业务零依赖）、**ADR-11-R1**（流式载体）、**ADR-30**（工具授权与执行）**冲突**（同一能力两处实现 ⇒ 行为分歧且不可测）；须回 GROUP_A / 重新裁决 | **需 PM 知悉**（已在 **ADR-49** 登记；GR-B 门控复核项） |
 
 ---
 
@@ -1524,6 +1641,7 @@
 | **TBD-T27（REV-18 新增）** | **LLM Key 承载库文件的实际权限与属主**：库文件（含 `llm_key` 表的 SQLite 文件）在目标机的**实际 mode（须 `0660`：属主 `ib-web`、组 `ib`，**不可为 `0600`** —— DEFECT-R18-01；**且须覆盖 `-wal` / `-shm` 边车**，见 DEFECT-R18-02）与 owner（须对齐服务账号）**、`busy_timeout` 下的写入耗时，以及 `SqliteLlmKeyStore` 的读写争用；另含 **AVX2 / SIGILL 与本轮无涉的确认**（本轮**未**引入任何新 wheel） | REQ-NFR-IB-20；REQ-FUNC-IB-47；C-IB-42；ADR-38 / ADR-39；[ARCH-ASSUMPTION-A12] | 定库文件权限 / 属主的**真机验证**口径（部署检查清单 B22）；确认「Key 不入 `.env` / 不进 git / 不进命令行」的端到端可复查证据。**未经实测前不得给出权限 / 时延结论** |
 | **TBD-T28（REV-19 新增）** | **每项目专家注册表的装配期成本**：`ExpertRegistryView`（IFC-IB-379）随 `Deps.derived_views[project_id]` 携带的**内存增量**（项目数 × 专家数），`resolve_expert_registry`（IFC-IB-380）的**解析耗时**，以及「按项目注入专家集」对装配期冷启动耗时的增量（与 [TBD-T24] / [TBD-T19] 同源） | REQ-FUNC-IB-49 / IB-53；REQ-NFR-IB-21；ADR-43 / ADR-47 | 定是否需要缓存 / 惰性派生（**缓存不得成为读源**）。**未经实测前不得给出容量 / 耗时结论** |
 | **TBD-T29（REV-19 新增）** | **创建期播种与历史迁移的成本与一致性**：① `POST /api/projects` → `seed_project`（IFC-IB-385）的**写盘耗时**与失败回滚的实际发生率；② `migrate_expert_history`（IFC-IB-386）**跨载体**（会话状态 + SQLite `sessions` 表 + citations）的**一致性窗口**与耗时；③ 目录化迁移 `migrate_legacy_definition_file`（IFC-IB-384）在目标机的实测 | REQ-FUNC-IB-52 / IB-53；C-IB-46 / C-IB-47；ADR-44 / ADR-45 / ADR-46 | 定播种 / 迁移的**真机验证口径**（部署检查清单 B24 / B25）。**未经实测前不得给出耗时 / 一致性结论** |
+| **TBD-T30（REV-20 新增）** | **提示词落盘（创建期 / 回填）的成本与效果**：① `seed_project` 的提示词落盘子步（IFC-IB-390）写 `main.md` 的**耗时**与**原子写失败发生率**；② **回填迁移**（IFC-IB-391）对**全量活动项目**的**迁移耗时 / 覆盖条数 / 备份体积 / 回滚演练结果**；③ 迁移后每项目「生效提示词来源 = `main_file`」的**可核验证据**（`prompt_source` 日志，IFC-IB-392）；④ 删除代码兜底层后**未落盘分支**的实际触发率（应为 0） | REQ-FUNC-IB-54 / IB-55；REQ-NFR-IB-22；ADR-48 / ADR-51；C-IB-52 | 定回填迁移的**真机验证口径**（部署检查清单 **B26**）；量化「覆盖既有用户编辑」的实际影响面（迁移报告）。**未经实测前不得给出耗时 / 影响结论** |
 
 ---
 
@@ -1550,6 +1668,8 @@
 | **（REV-18）OI-3：LLM Key 掩码口径** | REQ-FUNC-IB-47 约束①要求「只回掩码 / 存在性与更新时间」 | 架构侧将 `LlmKeyStatus.masked` 定为**不含明文任何前 / 后缀字符的固定占位掩码**（避免长度 / 前缀侧信道），并**以类型层排除明文**（响应类型无明文字段）；具体掩码字面由施工期定，**本包不写死** | **保持 OPEN（施工期定，不阻塞）**：口径已收敛到「无明文可分」；具体掩码字面由用户在施工期指定（**架构层不发明**） |
 | **（REV-19）OQ-IB-32 ~ OQ-IB-40 的架构承接与关闭** | ① 定义文档载体「一项目一文件」（OQ-IB-32）；② 新项目默认专家（OQ-IB-33）；③ 专家集硬隔离（OQ-IB-34）；④ 三专家在非 demo 的可见性（OQ-IB-35）；⑤ 新项目默认编排流（OQ-IB-36）；⑥-⑨ 其余边界（OQ-IB-37 ~ IB-39）；⑩ 三专家历史去向（OQ-IB-40） | ① 目录化 `<dir>/<project_id>.json`（**ADR-44**）；② 内置**不可删**默认单例（**ADR-45 / IFC-IB-381**）；③ 项目级**硬隔离**、**无跨项目回退**（**ADR-43**）；④ **种子差异**保证「三专家属 demo」（**ADR-45**）；⑤ **单一默认编排流**、**不自定 DAG**（**ADR-45 / OOS-21**）；⑥-⑨ 由 **fail-closed** 与 **C-IB-45 结构不变量**承接（**ADR-47**）；⑩ 归属改写为 demo、**记录保留**（**ADR-46**） | **由 REV-19 正式承接并关闭**（用户裁决 2026-10-11；DR-22 / DR-23）；架构侧只落地「**项目级硬隔离 / 目录化真源 / 创建期种子 / 种子差异归属 / fail-closed / 归属改写非删除**」的安全默认，**不发明**业务内容 |
 | **（REV-19）新建项目默认 KB 问答 agent 的名称 / 文案与默认编排流显示名** | REQ-FUNC-IB-52 只规定「**1 个 KB 问答 agent + 1 个默认编排流**」，**未规定**其 `name` / `cn_name` / 显示名 | 架构侧取**代码内置默认值**（`is_default=True`，**内置不可删**；见 **ADR-45** / **IFC-IB-381**）；**具体字面由施工期 / 用户指定**，**本包不写死** | **保持 OPEN（施工期定，不阻塞）**：口径已收敛到「**恰 1 个**默认 KB 问答 agent + 1 默认编排流」；命名 / 文案属实现常量，**架构层不发明需求、不新增 AC**（登记 `[ARCH-ASSUMPTION-A13]`） |
+| **（REV-20）OQ-IB-41 ~ OQ-IB-48 的架构承接与关闭** | ① 「优化」采纳范围（OQ-IB-41）；② 「删除代码提示词」边界（OQ-IB-42）；③ 「项目目录」语义（OQ-IB-43）；④ 「默认配置」落盘范围（OQ-IB-44）；⑤ 「让他工作」验收口径（OQ-IB-45）；⑥ 「三专家机制取消」范围（OQ-IB-46）；⑦ 既有三专家数据 / 项目处置（OQ-IB-47）；⑧ 「通用 kb-agent」通用化边界（OQ-IB-48） | ① **三件套 + 9 层架构**提示词（**ADR-49**）；② **删除全部代码内置提示词**、合并链收窄为两层（**ADR-48**）；③ **定义文档目录 + 提示词目录两者**（**ADR-51**）；④ **创建期落盘 + 一次性回填迁移**（**ADR-51** / IFC-IB-390 / 391）；⑤ **来源可核验 + 装配期 fail-closed**（**ADR-48** / IFC-IB-392）；⑥ **`_DEFAULT_SPECS` 与 demo 种子一并退役**，未落盘回落 = **唯一 kb-agent**（**ADR-50**）；⑦ **停用迁移口径、既有记录保持现状**（**ADR-50** 负向①；ADR-46 退役）；⑧ **默认集不含业务域专家**（**ADR-50**；ADR-31 退役） | **由 REV-20 正式承接并关闭**（用户裁决 2026-10-17；`requirements_spec.md` §2.13.4 / **C-IB-52**）；架构层只落地「**两层文件真源 / 创建期落盘 / 单 kb-agent 安全网 / fail-closed**」的安全默认，**不发明**业务内容 |
+| **（REV-20）OI-4：legacy `experts[].fallback_prompt` 键在生产定义文档中的残留** | REV-17 起定义文档已**交出**提示词文本（该字段**移出 schema**）；REV-20 删除代码内置兜底层（ADR-48 决定 3）后，原本的「与内置**逐字比对**后分级（相同→丢弃 / 不同→fail-closed）」**失去比对基准** | **架构默认取值**：**一律 fail-closed**（抛 `ConfigError`，附迁移目标 `<root>/<project_id>/<name>/main.md`，**只报长度、不回显正文**）；**部署前须检查** `<dir>/<project_id>.json` 是否残留该键，若有则**由用户手工迁移**（C-IB-38），迁移后再重启装配 | **须用户手工执行（部署步骤）**：不做则**装配失败**（在 `Restart=on-failure` 下表现为**崩溃循环**）；登记部署检查清单 **B26** 与 [TBD-T30] |
 
 **（REV-17）OPEN ITEM — 需求侧缺口（登记，不发明）**：REV-17 的收窄使「**提示词域**成为提示词文本的唯一可写载体」，但**聚合 / 无专家路径（`general`）的人格串**仍为代码内置且不可配置（见上表末行）。该不对称在 REV-17 **之前即已存在**，本包**只登记、不修复**：修复它须先有需求侧条目（新 REQ / AC）与「聚合人格是否属于提示词域」的定性，**架构层不发明需求**。
 

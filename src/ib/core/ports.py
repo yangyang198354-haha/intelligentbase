@@ -803,18 +803,20 @@ class ExpertPromptStore(Protocol):
     离线替身为 `InMemoryExpertPromptStore`。契约段落落在 `module_design.md §3 MOD-IB-01/02`。
 
     纪律：
-      * `load_bundle` **永不返回空白的系统提示词**：主缺失 → 回退兜底；兜底为空即非法（ADR-29）；
+      * `load_bundle` 的生效来源**只**来自本目录两层文件（`main.md` > `fallback.md`）；
+        **两层皆缺 → 抛 `PromptNotFoundError(code="prompt_missing")`**（REV-20 / ADR-48：
+        代码内置兜底已整体退役，非空性由创建期落盘 + 装配期 fail-closed 保证）；
       * `save_layer` 先写临时文件再**原子替换**；`expected_hash` 不匹配 → `saved=False` 且
         **拒绝覆盖**（乐观并发，同 IFC-IB-289 精神）；保存失败**不破坏在用配置**（fail-safe）；
       * 错误体**只出** `path` / `code` / `message`，**不回显**提示词正文或任何凭据值。
     """
 
-    def load_bundle(self, expert_name: str, *, builtin_fallback: str) -> ExpertPromptBundle:
+    def load_bundle(self, expert_name: str) -> ExpertPromptBundle:
         """按专家取「主 / 兜底 / 生效」分层合并结果（IFC-IB-343）。
 
-        `builtin_fallback` 是**代码内置兜底**（REV-17 / ADR-36；由
-        `ib.experts.builtin_fallback_for` 派生，非定义文档字段）；当提示词目录内
-        `fallback.md` 缺失时作为兜底层的来源。**两者皆空 → 抛 `PromptNotFoundError`**。
+        生效层来源恒为**项目提示词目录内**的 `main.md`（优先）或 `fallback.md`；
+        **两层皆缺 → 抛 `PromptNotFoundError(code="prompt_missing")`**（REV-20 / ADR-48：
+        原 `builtin_fallback` 形参与代码内置兜底一并退役）。
         """
         ...
 

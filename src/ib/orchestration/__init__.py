@@ -723,13 +723,13 @@ class Orchestrator:
 
     def _prompt_of(self, expert: str) -> str:
         """专家系统提示词。**REV-16-2（ADR-29）**：优先取跨域合并派生的**生效提示词**
-        （`effective_prompt` = 主提示文件 > 兜底文件 > **代码内置兜底**；装配期注入，
-        IFC-IB-349）。未注入分层结果时回退既有 `spec.fallback_prompt`。
+        （`effective_prompt` = 主提示文件 > 兜底文件；装配期注入，IFC-IB-349）。
 
-        **REV-17（ADR-36）**：`spec.fallback_prompt` 的口径由「定义文档兜底字段」改为
-        **代码内置安全网**（由 `_inject_derived_experts` 从 `builtin_fallback_for` 注入）。
-        本函数的返回值现在作为 `system_prompt` 传给 `build_expert`（见 `_run_expert`），
-        **真正落进 system 消息位** —— 此前它只是被拼进 human 前缀。
+        **REV-20（ADR-48）**：代码内置提示词安全网**整体退役**，故未注入分层结果时
+        `spec.fallback_prompt` 恒为空串（该字段已**去驱动化**，不参与运行期取值）。
+        正常装配下每个专家都有 `effective_prompt`（来源可核验：项目提示词目录两层文件，
+        ADR-48 决定 4）；本函数返回值作为 `system_prompt` 传给 `build_expert`
+        （见 `_run_expert`），**真正落进 system 消息位**。
         """
         from ib.experts import fallback_prompts, get, prompt_bundles
 

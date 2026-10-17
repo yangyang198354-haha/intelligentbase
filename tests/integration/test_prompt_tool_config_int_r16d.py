@@ -79,33 +79,33 @@ def test_TC_INT_134_visual_switch_off_returns_404(http_app, monkeypatch):
 
 
 def test_TC_INT_135_fallback_visible_when_main_missing(http_app):
+    """**REV-20（ADR-48 / ADR-51 ③）**：内置专家名改用 `kb-agent`；因离线种子已预填
+    `main.md`，本用例先**删除**该层以复现「主缺失 → 生效取兜底文件」的场景。"""
     deps, Client = http_app
     client = Client()
+    deps.prompt_stores["p_alpha"].delete_layer("kb-agent", "main")
 
     # 仅保存兜底层（main.md 依法可缺）
-    ok = _put_layer(client, "freeark-expert", "fallback", {"content": "兜底提示词：先问清需求"})
+    ok = _put_layer(client, "kb-agent", "fallback", {"content": "兜底提示词：先问清需求"})
     assert ok.status_code == 200, ok.content
     assert json.loads(ok.content)["saved"] is True
 
     listed = json.loads(client.get(LIST, **AUTH).content)
-    fe = next(e for e in listed["experts"] if e["name"] == "freeark-expert")
+    fe = next(e for e in listed["experts"] if e["name"] == "kb-agent")
     assert fe["layers"]["main"]["exists"] is False  # 主缺失
     assert fe["layers"]["fallback"]["exists"] is True  # 兜底在
 
     # 单层读：主 404，兜底 200 + 正文（重新读取与编辑内容一致，AC-IB-30-02）
-    assert client.get(_layer("freeark-expert", "main"), **AUTH).status_code == 404
-    got = client.get(_layer("freeark-expert", "fallback"), **AUTH)
+    assert client.get(_layer("kb-agent", "main"), **AUTH).status_code == 404
+    got = client.get(_layer("kb-agent", "fallback"), **AUTH)
     assert got.status_code == 200, got.content
     assert json.loads(got.content)["content"] == "兜底提示词：先问清需求"
 
-    # 装配派生：主缺失 → 生效提示词取自兜底文件，且恒非空
-    from ib.config import load_prompt_directory
-
-    deps.prompt_stores  # noqa: B018 - 端点族已装配（结构断言）
-    deps_doc = deps.definitions["p_alpha"]
-    bundles = {b.expert_name: b for b in deps.definition_store.derive(deps_doc).prompt_bundles}
-    # 内存 store 的兜底来自文档；此处主要验证「生效提示词恒非空」这一 ADR-29 事实
-    assert all(b.effective_prompt.strip() for b in bundles.values())
+    # 装配派生：主缺失 → 生效提示词取自**兜底文件**（来源可核验），且恒非空
+    store = deps.prompt_stores["p_alpha"]
+    bundle = store.load_bundle("kb-agent")
+    assert bundle.resolved_from == "fallback_file"
+    assert bundle.effective_prompt == "兜底提示词：先问清需求"
 
 
 # --------------------------------------------------------------------------- #
@@ -140,6 +140,10 @@ def test_TC_INT_137_admit_two_domains_rejects_and_passes(http_app):
     deps, Client = http_app
     doc = deps.definitions["p_alpha"]
     specs = deps.tool_param_specs()
+    # **REV-20（ADR-48）**：提示词域判据自足（两层皆缺 → `prompt_missing`），故须传入
+    # 本项目**真实 refs + store**（否则空 refs 会让合法文档也被提示词域拦下）。
+    store = deps.prompt_stores["p_alpha"]
+    refs = store.list_refs()
 
     bad = replace(
         doc,
@@ -152,11 +156,15 @@ def test_TC_INT_137_admit_two_domains_rejects_and_passes(http_app):
         ),
     )
     with pytest.raises(core.ConfigError) as ei:
-        admit_two_domains(bad, store=deps.definition_store, prompt_refs=(), tool_specs=specs)
+        admit_two_domains(
+            bad, store=deps.definition_store, prompt_refs=refs, tool_specs=specs, prompt_store=store
+        )
     assert "tool_param_unknown" in {i.code for i in ei.value.validation_items}
 
     # 合法文档 → 通过并产出跨域合并派生视图（生效提示词恒非空）
-    view = admit_two_domains(doc, store=deps.definition_store, prompt_refs=(), tool_specs=specs)
+    view = admit_two_domains(
+        doc, store=deps.definition_store, prompt_refs=refs, tool_specs=specs, prompt_store=store
+    )
     assert view.prompt_bundles and all(b.effective_prompt.strip() for b in view.prompt_bundles)
 
 
@@ -243,7 +251,7 @@ def test_TC_INT_140_definition_roundtrip_preserves_param_values_DEFECT_R16_01(ht
 
     # 重新读取定义（AC-IB-31-02）：GET→PUT 往返后参数取值须一致
     reloaded = _get_def(client)
-    grant = next(g for g in reloaded["tool_grants"] if g["expert_name"] == "freeark-expert")
+    grant = next(g for g in reloaded["tool_grants"] if g["expert_name"] == "kb-agent")
     assert grant.get("param_values") == [
         {"name": "search_knowledge.query", "value": "占位查询词"}
     ], (

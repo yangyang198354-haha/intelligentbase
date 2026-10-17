@@ -1936,3 +1936,74 @@ PASS  r19_project_expert_isolation：每项目专家集隔离 / 种子 / 目录�
 ### 26.6 冻结约束复核（REV-19）
 
 未新增模块（仍 **26**）/ **未新增端口（仍 19，逐行未改）** / 未新增第三方依赖（纯 stdlib）/ 未改模块边界 / **未新增 §4.1 依赖边** —— `ib.streaming` 中的三专家字面量**刻意重复而不 import `ib.experts`**，以守住 MOD-IB-21 既有依赖边界（同值由 `r19_project_expert_isolation` 断言兜底）/ 未改既有配置键名与默认值 / `IFC-IB-001~377` 一字不动（仅新增 378~388）/ 未 bump `schema_version` / **不引运行期热重载**（生效口径 = 保存 + 重启重装配，ADR-32）/ **未运行任何生产迁移**（C-IB-46 / C-IB-47 仅交付脚本与清单，**由用户手工执行 + 先备份 + 失败回滚**）/ **无任何口令 / Key / token / 证书字面量**（`migrate_expert_history` 的 `backup_path` 恒为 `None`，不写盘、不读环境变量、不碰 SQLite）/ 未 commit / 未 push / 未部署 / FreeArk 参考仓只读。
+
+---
+
+# REV-20 实现增量（2026-10-17）
+
+> 依据：`architecture_design.md` 1.12.0 / REV-20（ADR-48 ~ ADR-51）+ `module_design.md` 1.12.0 / REV-20
+> （IFC-IB-389 ~ 392 新增；IFC-IB-365 退役；6 组口径修订）+ `requirements_spec.md`／`user_stories.md`
+> 1.12.0 / REV-20（OQ-IB-41=B / 42=B / 43=C / 44=C / 45=C / 46=B / 47=C / 48=C；C-IB-52）。
+> 本轮**不新增模块（仍 26）/ 不新增端口（仍 19）/ 不新增 §4.1 依赖边 / 不新增第三方依赖 / 不改配置键名**。
+
+## 27.1 变更总览（REV-20）
+
+| 面 | 落点 | 变更 |
+|----|------|------|
+| 代码内置提示词安全网退役 | `ib/experts/__init__.py` | 删 `BUILTIN_FALLBACK_DEFAULT` / `_BUILTIN_FALLBACK_PROMPTS` / `BUILTIN_FALLBACKS` / `_BuiltinFallbackMap` / `builtin_fallback_for` / `builtin_fallbacks_for` / `DEMO_EXPERT_NAMES` / `_DEFAULT_SPECS`（IFC-IB-365 整体退役）；`EXPERT_SPECS` 初值 = 唯一 `BUILTIN_DEFAULT_KB_AGENT`；`builtin_expert_registry()` 与 `builtin_default_registry()` 同值；`fallback_prompt` 字段去驱动化（恒空串） |
+| 提示词域两层 + fail-closed | `ib/config/prompts.py` | 删 keyword-only `builtin_fallback(s)`（343 / 347 / 339）；两层皆缺 → `PromptNotFoundError(code="prompt_missing")`；`validate_prompt_directory` 判据改「main.md 与 fallback.md 皆缺」（旧码 `prompt_fallback_missing` 退役）；新增 **IFC-IB-389 `kb_agent_seed_prompt()`**（读 `src/ib/expert_seeds/kb-agent.md`，单次缓存，缺失抛 `DependencyUnavailableError`） |
+| legacy 键一律 fail-closed | `ib/config/definition.py` | `_check_legacy_fallback_keys` 去掉「与内置比对分级」，只要出现 `experts[].fallback_prompt` 即抛 `ConfigError`（指迁移目标 `main.md`，只报长度、不回显正文） |
+| 创建期落盘 + 回填迁移 | `ibweb/composition.py` | `seed_project` **删 demo 分支** + 新增 `main.md` 落盘子步（**IFC-IB-390**，已存在不覆盖）；新增 **IFC-IB-391 `backfill_project_prompts()`**（先备份 / 失败回滚 / 逐项目 `MigrationResult`）；`build_prompt_stores` 离线 / 内存态分支改为**用种子内容预填**（`_seed_prompt_documents()`，ADR-51 决定 ③） |
+| 来源可观测 | `ibweb/composition.py` + `ib/observability/__init__.py` | **IFC-IB-392**：`resolved_from` 收窄为 `{main_file, fallback_file}`；`_log_prompt_sources()` 装配期发结构化 `prompt_source` 日志（仅 `project_id` / `expert` / `source`，**不含正文**）；`LOG_FIELDS` 精确加键 `expert` / `source`（键 32 → 34，精确成员判据未放宽） |
+| 前端契约 | `frontend/src/api/client.ts` / `views/ConfigPage.vue` / `tests/frontend.smoke.test.js` | 删 `PromptExpertEntry.builtin_fallback` 字段；删内置兜底只读回显（`builtinFallbackOf`）；回退链第三值 `builtin_fallback` → `prompt_missing`；第 29 例冒烟翻转 |
+| 收尾产物 | `src/scripts/backfill_prompts.py` / `src/deploy/checklists.txt` / `ib/config/__init__.py` | 新增 IFC-IB-391 入口脚本（用户手工执行）；新增 **[B26]**（提示词落盘 / 回填 + legacy 键部署前检查 + `prompt_source` 日志 + 三单元严格断言），签署行 `B1–B26`；导出 `kb_agent_seed_prompt`（修 `composition` 函数内 `from ib.config import … kb_agent_seed_prompt` 的 ImportError） |
+
+## 27.2 **契约翻转清单（八条，须逐条可核验）**
+
+1. 「两层皆缺」由「回落代码内置兜底」→ **`PromptNotFoundError(code="prompt_missing")` fail-closed**；
+2. `resolved_from` 值域由 `{main_file, fallback_file, builtin_fallback}` → **`{main_file, fallback_file}`**；
+3. 内置注册表由三对齐专家 → **唯一通用 `kb-agent`**（`builtin_expert_registry()` ≡ `builtin_default_registry()`；`demo` 亦改 kb-agent）；
+4. legacy `experts[].fallback_prompt` 由「与内置逐字比对后分级」→ **一律 fail-closed**；
+5. `GET /api/config/prompts` 专家条目键集由 `{name, cn_label, layers, builtin_fallback}` → **`{name, cn_label, layers}`**；
+6. 新增专家由「无需任何提示词文件即可保存 / 装配」→ **必须先在项目提示词目录落盘 `main.md` / `fallback.md`**（破死锁手段由代码兜底改为创建期落盘 + 回填迁移）；
+7. `migrate_expert_history` 的 `experts` 默认值 `DEMO_EXPERT_NAMES` → **空元组**（迁移口径停用，显式传参能力保留）；
+8. `fallback_prompts()` / `ExpertSpec.fallback_prompt` **去驱动化**（恒空串，不参与任何运行期提示词取值）。
+
+> 每条翻转均在对应测试 docstring / 源码注释内写明理由（先例：TC-INT-161 按 ADR-45 翻转，用例改名 `usable_immediately_after_create`）。
+
+## 27.3 计划外但必要的 src 增量（三处，如实登记）
+
+| # | 落点 | 内容 | 必要性 |
+|---|------|------|--------|
+| ① | `ib/config/prompts.py` `derive_prompt_layers` | 增 keyword-only `store`（IFC-IB-347 号 / 名不变） | `InMemoryExpertPromptStore` 的 refs 为**合成路径**（无对应文件），refs-读盘路径无法消费「离线预填种子」；不打通则离线 / 测试装配一律 `prompt_missing`（ADR-51 决定 ③ 不可达） |
+| ② | `ibweb/composition.py` `admit_two_domains` | 增 keyword-only `prompt_store`（IFC-IB-353） | 同上；`_load_and_admit` 传本项目 store，使内存 / 文件两实现走同一语义 |
+| ③ | `ib/observability/__init__.py` `LOG_FIELDS` | 加 `expert` / `source` 两精确键 | ADR-48 决定 4 要求装配期 `prompt_source` 结构化日志；沿既有 `egress_*` / `backend` / `reason` 先例只加精确键名，不放宽匹配规则 |
+
+三处均**未改任何既有 IFC 号 / 名 / 签名**、**未新增端口 / 依赖边 / 第三方依赖**。
+
+## 27.4 测试与自检证据（REV-20）
+
+```
+$ python -m pytest tests -q
+403 passed, 2 skipped in 73.54s            # 收集 405（unit 169+2 / integration 186 / e2e 27 / agents 21）
+$ python src/scripts/selfcheck.py
+自检结果：52/52 通过
+$ node --test src/frontend/tests/frontend.smoke.test.js
+pass 35  fail 0
+```
+
+- 三层通过率 unit 169/169 = **100.00%** / integration 186/186 = **100.00%** / e2e 27/27（关键路径）**100%**；
+- 被退役符号（`BUILTIN_FALLBACK_DEFAULT` / `BUILTIN_FALLBACKS` / `DEMO_EXPERT_NAMES` / `_DEFAULT_SPECS` 等）全仓**零引用**（仅剩注释与退役说明）；
+- 16 个既有测试文件 + `selfcheck.py` 按新契约**逐条改写**，未删除覆盖点、未降阈值、未把失败转 skip / xfail；
+- `selfcheck` 中「交接 / 委派」「系统槽位」两处改为**用例内临时注入派生注册表**（`install_derived` + `finally` 恢复内置单例），使多专家机制在唯一内置专家下仍可覆盖且不跨用例污染。
+
+## 27.5 冻结约束复核（REV-20）
+
+未新增模块（仍 **26**）/ **未新增端口（仍 19，逐行未改）** / 未新增第三方依赖 / **未新增 §4.1 依赖边**（唯一新增 import = `ib/config/prompts` → `ib/core.ExpertPromptStore`，属既有 MOD-IB-02 → MOD-IB-01 边内）/ 未改既有配置键名与默认值（`IB_DEFINITION_DOC_PATH` 维持目录根语义）/ `IFC-IB-001 ~ 388` 号 / 名 / 签名一字不动（仅 6 组文字口径修订）+ 新增 389 ~ 392 / 未 bump `schema_version` / **不引运行期热重载**（生效口径 = 保存 + 重启重装配，ADR-32）/ **未运行任何生产迁移**（REV-20 回填与 C-IB-46 / C-IB-47 仅交付脚本与清单，由用户手工执行 + 先备份 + 失败回滚；**不得自动执行**，C-IB-38 / C-IB-50）/ **无任何口令 / Key / token 字面量** / 未 commit / 未 push / 未部署 / FreeArk 参考仓只读。
+
+## 27.6 部署面（待用户签发 PRODUCTION_DEPLOY_CONFIRM）
+
+1. **代码同步**：`src/ib/expert_seeds/kb-agent.md`（种子资产）与全部 src 变更须随代码到 `/opt/intelligentbase`；
+2. **[B26] 三件事**：① `IB_EXPERT_PROMPT_DIR` 指向**目录根**且与 `IB_DEFINITION_DOC_PATH` 不同值；② 既有项目**回填**（`src/scripts/backfill_prompts.py --backup-dir …`）；③ legacy `experts[].fallback_prompt` 键**部署前检查**（命中即须用户手工迁移，否则启动 `ConfigError`）；
+3. **三单元严格断言**：`ActiveState=active` + `NRestarts==0` + journal `startup succeeded` + `/healthz/deps==200`；
+4. **端到端验证**：生产可提问并命中资料（OQ-IB-45=C）；装配期 `prompt_source` 日志可见。

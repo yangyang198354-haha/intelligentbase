@@ -30,7 +30,7 @@ import shutil
 import tempfile
 from dataclasses import replace
 from hashlib import sha256
-from typing import Any, Mapping
+from typing import Any
 
 from ib.core import (
     RESERVED_GRAPH_ENDPOINTS,
@@ -297,8 +297,9 @@ def validate(
 
     # 5. 专家文本字段
     #    REV-17（ADR-36）：`fallback_prompt` 校验项已移除 —— 定义文档不再承载提示词文本。
-    #    「兜底非空」（ADR-29）改由**结构**保证：提示词域两层文件皆缺时回落到代码内置
-    #    安全网（`ib.experts.builtin_fallback_for`，恒非空），故无需在文档层设卡。
+    #    **REV-20（ADR-48）**：「兜底非空」（ADR-29）不再由代码内置安全网提供（该安全网已整体
+    #    退役），改由**提示词目录的两层文件** + **装配期 fail-closed**（`prompt_missing`）
+    #    保证；故文档层仍无需设卡（非空性判据落在提示词域，`validate_prompt_directory`）。
     for e in doc.experts:
         if not e.cn_label.strip():
             errors.append(_err(f"experts[{e.name}].cn_label", "expert_text_missing", "cn_label 不得为空"))
@@ -557,7 +558,6 @@ def validate_two_domains(
     known_tools: tuple[str, ...] | frozenset[str] | set[str] | None = None,
     tool_param_specs: tuple[ToolParamSpec, ...] = (),
     prompt_refs: tuple[ExpertPromptDocumentRef, ...] = (),
-    builtin_fallbacks: Mapping[str, str] | None = None,
 ) -> ValidationReport:
     """**跨域统合校验**（REV-17 / ADR-36）。**纯函数**：无 I/O、无副作用。
 
@@ -585,9 +585,7 @@ def validate_two_domains(
         doc, known_tools=known_tools, tool_param_specs=tool_param_specs
     )
     errors: list[ValidationErrorItem] = list(report.errors)
-    errors.extend(
-        validate_prompt_directory(prompt_refs, doc=doc, builtin_fallbacks=builtin_fallbacks)
-    )
+    errors.extend(validate_prompt_directory(prompt_refs, doc=doc))
     return ValidationReport(ok=not errors, errors=tuple(errors))
 
 
@@ -661,31 +659,24 @@ def document_to_json(doc: DefinitionDocument) -> str:
     return json.dumps(payload, sort_keys=True, ensure_ascii=False, indent=2) + "\n"
 
 
-def _check_legacy_fallback_keys(
-    data: dict[str, Any], builtin_fallbacks: Mapping[str, str] | None
-) -> None:
-    """REV-17（ADR-36）：处置旧文档残留的 `experts[].fallback_prompt`。
+def _check_legacy_fallback_keys(data: dict[str, Any]) -> None:
+    """**REV-20（ADR-48 决定 3）**：旧文档残留的 `experts[].fallback_prompt` **一律 fail-closed**。
 
-    只做**一件事** —— 值与该专家的内置兜底不一致时 fail-closed。相同的静默通过
-    （零信息损失），未注入映射的（`builtin_fallbacks is None`）一律通过。
-    错误消息**不回显提示词正文**（IFC-IB-348 纪律），只出路径、长度与迁移目标。
+    该字段自 REV-17 起已移出 schema；REV-20 **删除代码内置提示词兜底**后，「与内置逐字
+    比对后分级（相同→丢弃 / 不同→fail-closed）」的**比对基准不复存在**，无法再判「有无
+    信息损失」，故按 ADR-36 的「**信息损失绝不静默丢弃**」原则**从严**：只要出现即拒绝装载。
+    错误消息**不回显提示词正文**（IFC-IB-348 纪律），只出专家名、长度与迁移目标。
     """
-    if not builtin_fallbacks:
-        return
     for entry in data.get("experts", []) or []:
         if not isinstance(entry, dict) or "fallback_prompt" not in entry:
             continue
         name = str(entry.get("name", ""))
         raw = str(entry.get("fallback_prompt", "") or "").strip()
-        if not raw or name not in builtin_fallbacks:
-            continue
-        if raw == str(builtin_fallbacks[name]).strip():
-            continue
         raise ConfigError(
-            f"定义文档专家 '{name}' 仍带有 REV-17 已移除的 fallback_prompt 字段"
-            f"（{len(raw)} 字，与内置兜底不一致）。该字段不再是提示词载体，"
-            f"继续加载会**静默丢弃**这段文本。请把它迁移到提示词目录文件："
-            f"<IB_EXPERT_PROMPT_DIR>/<project_id>/{name}/fallback.md，"
+            f"定义文档专家 '{name}' 仍带有 REV-17 起已移除的 fallback_prompt 字段"
+            f"（{len(raw)} 字）。REV-20 起代码内置兜底已退役，无法判定该文本有无信息损失，"
+            f"故一律拒绝装载（fail-closed）。请把它迁移到提示词目录文件："
+            f"<IB_EXPERT_PROMPT_DIR>/<project_id>/{name}/main.md，"
             f"然后从定义文档中删除 fallback_prompt 键。",
             key="IB_DEFINITION_DOC_PATH",
         )
@@ -694,24 +685,15 @@ def _check_legacy_fallback_keys(
 def document_from_json(
     project_id: str,
     text: str,
-    *,
-    builtin_fallbacks: Mapping[str, str] | None = None,
 ) -> DefinitionDocument:
     """从 JSON 文本反序列化。结构非法 → 抛 `ConfigError`（可读原因，**不静默回退**）。
 
-    **REV-17（ADR-36）legacy 键处置**：旧文档可能仍带已移除的
-    `experts[].fallback_prompt`。本函数**分级**处理，绝不静默丢弃用户写的提示词文本：
-
-      * 该专家**不在** `builtin_fallbacks` 中（未注入，或本就不在映射里）→ 键被忽略；
-      * 值与该专家的内置兜底**逐字相同** → 静默丢弃（**零信息损失**：删字段后生效文本不变。
-        生产的种子文档正是这一支，因为它由 `_default_definition_document` 从
-        `spec.fallback_prompt` 直抄而来）；
-      * 值**不同** → 抛 `ConfigError`，指明迁移目标。这是真正的信息损失（用户改过这一栏），
-        必须 fail-closed，否则「保存成功但提示词不见了」会静默发生。
-
-    `builtin_fallbacks` 由**装配/端点层注入**（`ib.experts.builtin_fallbacks_for`）——
-    本模块只允许 stdlib + `ib.core`，不得 import `ib.experts`。不注入时退化为
-    「一律忽略 legacy 键」（向后兼容既有 2 参调用方），故真实装载路径必须注入。
+    **REV-20（ADR-48 决定 3）legacy 键处置**：旧文档若仍带已移除的
+    `experts[].fallback_prompt`，**一律 fail-closed**（抛 `ConfigError`，指明迁移目标
+    `<IB_EXPERT_PROMPT_DIR>/<project_id>/<name>/main.md`）。理由：REV-20 删除了代码内置
+    兜底层，原本的「与内置逐字比对后分级」失去比对基准，无法再判「有无信息损失」，
+    故按「信息损失绝不静默丢弃」**从严**（部署计划含「检查 + 用户手工迁移」步，见
+    `architecture_design.md` §10.1 **OI-4**）。
     """
     try:
         data = json.loads(text)
@@ -719,7 +701,7 @@ def document_from_json(
         raise ConfigError("定义文档缺失或不可解析（IB_DEFINITION_DOC_PATH）", key="IB_DEFINITION_DOC_PATH") from exc
     if not isinstance(data, dict):
         raise ConfigError("定义文档缺失或不可解析（IB_DEFINITION_DOC_PATH）", key="IB_DEFINITION_DOC_PATH")
-    _check_legacy_fallback_keys(data, builtin_fallbacks)
+    _check_legacy_fallback_keys(data)
     try:
         experts = tuple(
             ExpertSpecInput(
@@ -871,14 +853,12 @@ class FileDefinitionDocumentStore:
         path: str,
         *,
         known_tools: frozenset[str] | set[str] | None = None,
-        builtin_fallbacks: Mapping[str, str] | None = None,
     ) -> None:
         #: REV-19：`path` 语义 = **目录根**（键名 `IB_DEFINITION_DOC_PATH` 不变）。
         self._dir = path
         self._known_tools = frozenset(known_tools) if known_tools else None
-        #: REV-17（ADR-36）：旧文档 legacy `fallback_prompt` 键的比对基准，由组合根用
-        #: `ib.experts.BUILTIN_FALLBACKS` 注入（**全名域**映射，未知专家也有值）。
-        self._builtin_fallbacks = builtin_fallbacks
+        #: **REV-20（ADR-48）**：原 REV-17 的 `builtin_fallbacks` 比对基准**已删除**
+        #: （代码内置兜底退役）；legacy `fallback_prompt` 键改为一律 fail-closed。
 
     @property
     def path(self) -> str:
@@ -898,9 +878,7 @@ class FileDefinitionDocumentStore:
                 text = fh.read()
         except OSError as exc:
             raise ConfigError("定义文档缺失或不可解析（IB_DEFINITION_DOC_PATH）", key="IB_DEFINITION_DOC_PATH") from exc
-        return document_from_json(
-            project_id, text, builtin_fallbacks=self._builtin_fallbacks
-        )
+        return document_from_json(project_id, text)
 
     def save(
         self,

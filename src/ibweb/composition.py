@@ -55,6 +55,7 @@ from typing import Any, Sequence
 from ib.core import (
     ConfigAuditEntry,
     ConfigError,
+    DependencyUnavailableError,
     KbRecord,
     ProjectRecord,
     Scope,
@@ -568,8 +569,30 @@ def _load_and_admit(
         store=definition_store,
         prompt_refs=prompt_refs,
         tool_specs=tool_specs,
+        prompt_store=prompt_store,
     )
+    _log_prompt_sources(project_id, view)
     return doc, view
+
+
+def _log_prompt_sources(project_id: str, view: Any) -> None:
+    """**IFC-IB-392 / ADR-48 决定 4**：装配期发出 `prompt_source` 结构化日志（**不含正文**）。
+
+    为什么必须打这条：生效提示词来源收窄为 `{main_file, fallback_file}` 后，「回落
+    `fallback_file`」是**语义降级**（main.md 缺失或未落盘），ADR-48 明文要求它**不得静默**
+    —— 否则运维只看到「答得还行」，看不出「主提示词其实没生效」（对齐 REQ-NFR-IB-22）。
+    字段只出 `project_id` / `expert` / `source`（结构化短码），**不回显任何提示词正文**。
+    """
+    from ib.observability import log_event
+
+    for bundle in tuple(getattr(view, "prompt_bundles", ()) or ()):
+        log_event(
+            "prompt_source",
+            "resolved_from",
+            project_id=project_id,
+            expert=bundle.expert_name,
+            source=bundle.resolved_from,
+        )
 
 
 def _assemble() -> Deps:
@@ -1073,7 +1096,7 @@ def admit_two_domains(
     store: Any | None = None,
     prompt_refs: Any = (),
     tool_specs: Any = (),
-    builtin_fallbacks: Any = None,
+    prompt_store: Any | None = None,
 ) -> Any:
     """**[IFC-IB-353 装配序列] 两域聚合准入闸门 + 跨域派生**（REV-16-2）。
 
@@ -1096,8 +1119,13 @@ def admit_two_domains(
     **REV-17（ADR-36）**：改用 `validate_two_domains`，把**提示词域**也拉进这**同一个**
     入口 —— 此前提示词域只在装配期校验，保存期不查，于是「页面上存得下、重启装配才炸」
     成为可能。现在保存与装配共用一条判据、**同序同条**。
-    `builtin_fallbacks` 为 `None` 时按 `ib.experts.builtin_fallbacks_for(doc 专家名)` 取，
-    保证内置安全网在两条路径上**同源**。
+    **REV-20（ADR-48）**：原 `builtin_fallbacks` 传递链**已删除** —— 代码内置兜底退役后，
+    提示词域判据自足（两层皆缺 → `prompt_missing`），**无需**任何内置映射注入。
+
+    **REV-20（ADR-51 决定 ③）keyword-only `prompt_store`**：装配期由 `_load_and_admit`
+    传入该项目的 `ExpertPromptStore`，使正文经**端口方法** `load_bundle` 取值 ——
+    否则**离线 / 内存态**的 `InMemoryExpertPromptStore`（其 refs 为合成路径、无对应文件）
+    的「种子预填」无法被 refs-读盘路径消费，装配期会误报 `prompt_missing`。
     """
     if store is None:
         deps = get_deps(required=False)
@@ -1106,9 +1134,6 @@ def admit_two_domains(
         raise StartupError("准入闸门缺少定义文档存储：装配未完成或未注入 definition_store")
     from ib.config import derive_prompt_layers, validate_two_domains
 
-    if builtin_fallbacks is None:
-        builtin_fallbacks = builtin_fallbacks_of(doc)
-
     # IFC-IB-364：定义文档域（290）∪ 工具参数域（346）∪ 提示词目录域（345）；
     # 与保存路径同一入口（ADR-33 / ADR-36）。
     report = validate_two_domains(
@@ -1116,28 +1141,10 @@ def admit_two_domains(
         known_tools=_known_tool_names(),
         tool_param_specs=tuple(tool_specs),
         prompt_refs=prompt_refs,
-        builtin_fallbacks=builtin_fallbacks,
     )
     if report.errors:
         _raise_admission_error(report.errors)
-    return derive_prompt_layers(  # IFC-IB-347
-        doc, prompt_refs, builtin_fallbacks=builtin_fallbacks
-    )
-
-
-def builtin_fallbacks_of(doc: Any) -> dict[str, str]:
-    """给一份定义文档解析**完备**的内置兜底映射（REV-17 / ADR-36）。
-
-    `ibweb` 内**唯一**的安全网取用点：装配路径（`admit_two_domains`）、保存路径
-    （`PUT /api/config/definition`）与端点单专家查询（`_doc_fallback_of` 的替代）
-    都必须经此处，杜绝三处各自拼默认值而漂移。
-
-    值恒非空（自定义专家回落 `BUILTIN_FALLBACK_DEFAULT`），故下游 `ib.config` 侧
-    只需 `mapping.get(name, "")` 即可，**无需知道通用兜底常量的存在**。
-    """
-    from ib.experts import builtin_fallbacks_for
-
-    return builtin_fallbacks_for([str(getattr(e, "name", "")) for e in getattr(doc, "experts", ()) or ()])
+    return derive_prompt_layers(doc, prompt_refs, store=prompt_store)  # IFC-IB-347
 
 
 def _raise_admission_error(errors: Any) -> None:
@@ -1423,51 +1430,50 @@ def seed_project(
     definition_dir: str | None = None,
     prompt_root: str | None = None,
 ) -> Any:
-    """**项目创建播种**（IFC-IB-385；REQ-FUNC-IB-52 / IB-53；ADR-45）。
+    """**项目创建播种**（IFC-IB-385 扩展 / **IFC-IB-390**；REQ-FUNC-IB-52 / IB-54 / IB-57；ADR-45 / ADR-50 / ADR-51）。
 
     在项目注册表写入成功后由 `POST /api/projects` **同步**调用：
 
       * 写 `<definition_dir>/<project_id>.json`（该项目专家集 + **单一默认编排流**，OOS-21）；
-      * 建提示词目录骨架 `<prompt_root>/<project_id>/<expert>/`（每专家一子目录）。
+      * **IFC-IB-390（REV-20 新增）**：写 `<prompt_root>/<project_id>/<expert>/main.md`
+        —— 正文取自**仓库种子资产**（`ib.config.kb_agent_seed_prompt`，IFC-IB-389），
+        使新建项目的 kb-agent 提示词**有项目域可编辑载体**（REQ-FUNC-IB-54 / OQ-IB-43=C）；
+      * 建提示词目录骨架（每专家一子目录）。
 
-    **种子真源**：`demo` 项目 = **三对齐专家**（`DEMO_EXPERT_NAMES`，REQ-FUNC-IB-53）；
-    其余项目 = **内置默认单例**（1 个 KB 问答 agent，IFC-IB-381 / REQ-FUNC-IB-52）。
-    `registry_view` 省略时取内置默认单例视图。
+    **种子真源（REV-20 / ADR-50）**：**任何项目**（含 `demo`）= **内置默认单例**
+    （1 个 KB 问答 agent，IFC-IB-381 / REQ-FUNC-IB-57）—— `demo` 分支**已删除**、
+    三专家机制退役。`registry_view` 省略时取内置默认单例视图。
 
-    **幂等**（文档已存在不覆盖）；**原子回滚**（任一子步失败 → 删除已写入的半成品 + 明确
-    异常，**不静默**）。离线 / 未配置载体（`definition_dir` 与 `prompt_root` 均不可用）→
-    不落盘，返回 `created=False`（装配期兜底仍生效，等价既有逐项目种子）。
+    **幂等**（文档 / 提示词文件**已存在不覆盖** —— 避免重装配覆盖用户编辑）；
+    **原子回滚**（任一子步失败 → 删除已写入的半成品 + 明确异常，**不静默**）。
+    离线 / 未配置载体（`definition_dir` 与 `prompt_root` 均不可用）→ 不落盘，返回
+    `created=False`（装配期兜底仍生效，等价既有逐项目种子）。
+
+    **既有项目**的提示词回填**不**走本函数（受「已存在不覆盖」约束）—— 走**一次性回填
+    迁移** `backfill_project_prompts`（IFC-IB-391；ADR-51 决定 ②；**须用户手工执行**）。
     """
     import os as _os
 
     from ib.core import SeedResult
-    from ib.experts import DEMO_EXPERT_NAMES, builtin_default_registry, builtin_expert_registry
+    from ib.experts import builtin_default_registry
 
     if definition_dir is None:
         definition_dir = _os.environ.get("IB_DEFINITION_DOC_PATH", "").strip()
     if prompt_root is None:
         prompt_root = _os.environ.get("IB_EXPERT_PROMPT_DIR", "").strip()
 
-    demo = builtin_expert_registry()
-    default = registry_view if registry_view is not None else builtin_default_registry()
-    if project_id == "demo" or tuple(default.names()) == DEMO_EXPERT_NAMES:
-        chosen = demo
-        seed_note = "demo_three_experts_seed"
-    else:
-        chosen = default
-        seed_note = "builtin_default_seed"
+    chosen = registry_view if registry_view is not None else builtin_default_registry()
     names = tuple(chosen.names())
+    seed_note = "builtin_default_seed"
 
     written_doc: str | None = None
     created_dirs: list[str] = []
+    created_prompts: list[str] = []
     try:
         if definition_dir:
             from ib.config import FileDefinitionDocumentStore
-            from ib.experts import BUILTIN_FALLBACKS
 
-            store = FileDefinitionDocumentStore(
-                definition_dir, known_tools=_known_tool_names(), builtin_fallbacks=BUILTIN_FALLBACKS
-            )
+            store = FileDefinitionDocumentStore(definition_dir, known_tools=_known_tool_names())
             target = store._path_for(project_id)
             if _os.path.isfile(target):
                 return SeedResult(
@@ -1485,10 +1491,23 @@ def seed_project(
             written_doc = target
 
         if prompt_root:
+            from ib.config import FsExpertPromptStore, kb_agent_seed_prompt
+
+            seed_text = kb_agent_seed_prompt()
+            prompt_store = FsExpertPromptStore(prompt_root, project_id)
             for expert in names:
                 d = _os.path.join(prompt_root, project_id, expert)
                 _os.makedirs(d, exist_ok=True)
                 created_dirs.append(d)
+                # IFC-IB-390：落盘主提示词；**已存在不覆盖**（幂等，保护用户编辑）
+                main_path = _os.path.join(d, "main.md")
+                if not _os.path.isfile(main_path):
+                    result = prompt_store.save_layer(expert, "main", seed_text, expected_hash=None)
+                    if not result.saved:
+                        raise ConfigError(
+                            f"创建期提示词落盘失败（expert={expert}，IB_EXPERT_PROMPT_DIR）"
+                        )
+                    created_prompts.append(main_path)
 
         return SeedResult(
             created=True,
@@ -1500,6 +1519,12 @@ def seed_project(
         )
     except BaseException:
         # 原子回滚：删除半成品（不静默 —— 异常向上传播由调用方回滚注册表项）。
+        for p in created_prompts:
+            if _os.path.isfile(p):
+                try:
+                    _os.remove(p)
+                except OSError:
+                    pass
         if written_doc and _os.path.isfile(written_doc):
             try:
                 _os.remove(written_doc)
@@ -1513,6 +1538,94 @@ def seed_project(
         raise
 
 
+def backfill_project_prompts(
+    project_ids: Any = None,
+    *,
+    prompt_root: str | None = None,
+    backup_dir: str | None = None,
+) -> Any:
+    """**一次性回填迁移**（**IFC-IB-391**；ADR-51 决定 ②；OQ-IB-44=C）。
+
+    对**给定项目**（缺省 = 注册表全部活动项目）写 / **覆盖**
+    `<prompt_root>/<project_id>/kb-agent/main.md` 为**种子资产正文**（IFC-IB-389），
+    使既有项目具备项目域提示词载体（「提示词来自项目目录」成立，REQ-FUNC-IB-55）。
+
+    **纪律（强制，C-IB-38 / C-IB-52）**：
+      * **非运行期行为** —— 仅由运维脚本在**用户手工执行**时调用；**不**接入任何启动路径；
+      * **先备份**：`backup_dir` 非空时，把被覆盖的原文件**逐字复制**到
+        `<backup_dir>/<project_id>/<expert>/main.md`（不存在则跳过）；
+      * **失败即回滚**：任一项失败 → 用备份还原已覆盖项并抛异常（**不静默**）；
+      * **覆盖不静默**：逐项目返回结构化结果（**`MigrationResult` 元组**，IFC-IB-378），
+        供迁移报告与交付说明逐项目列出「被覆盖 / 新建」；
+      * **不含任何凭据**（只读写提示词文件）。
+
+    **返回**：`tuple[MigrationResult, ...]`（每项目一项；`affected=1`，`backup_path` 为备份
+    路径或 `None`，`notes` 记 `overwritten` / `created` 与专家名）。
+    """
+    import os as _os
+
+    from ib.config import EXPERT_PROMPT_DIR_KEY, FsExpertPromptStore, kb_agent_seed_prompt
+    from ib.core import MigrationResult
+    from ib.experts import BUILTIN_DEFAULT_KB_AGENT
+
+    root = (prompt_root or _os.environ.get("IB_EXPERT_PROMPT_DIR", "")).strip()
+    if not root:
+        raise DependencyUnavailableError(
+            "回填迁移缺少提示词目录（IB_EXPERT_PROMPT_DIR）", dependency="expert_prompt_dir"
+        )
+    if project_ids is None:
+        deps = get_deps(required=False)
+        project_ids = sorted(getattr(deps, "projects", {}) or {})
+
+    expert = BUILTIN_DEFAULT_KB_AGENT.name
+    seed_text = kb_agent_seed_prompt()  # 资产缺失即 fail-closed 上抛（不静默）
+
+    results: list[Any] = []
+    covered: list[tuple[str, str]] = []  # (target, backup_path) —— 失败回滚用
+    for project_id in list(project_ids):
+        target = _os.path.join(root, project_id, expert, "main.md")
+        existed = _os.path.isfile(target)
+        backup_path: str | None = None
+        if existed and backup_dir:
+            backup_path = _os.path.join(backup_dir, project_id, expert, "main.md")
+            try:
+                import shutil
+
+                _os.makedirs(_os.path.dirname(backup_path), exist_ok=True)
+                shutil.copy2(target, backup_path)
+            except OSError as exc:
+                raise ConfigError(
+                    f"回填迁移备份失败（project_id={project_id}，迁移中止，不静默）",
+                    key=EXPERT_PROMPT_DIR_KEY,
+                ) from exc
+        try:
+            store = FsExpertPromptStore(root, project_id)
+            res = store.save_layer(expert, "main", seed_text, expected_hash=None)
+            if not res.saved:
+                raise ConfigError(f"回填迁移落盘失败（project_id={project_id}）")
+        except BaseException:
+            # 失败即回滚：用备份还原已覆盖项，再上抛（不静默）。
+            import shutil
+
+            for tgt, bak in covered:
+                try:
+                    shutil.copy2(bak, tgt)
+                except OSError:
+                    pass
+            raise
+        if backup_path:
+            covered.append((target, backup_path))
+        results.append(
+            MigrationResult(
+                applied=True,
+                backup_path=backup_path,
+                affected=1,
+                notes=("overwritten" if existed else "created", f"expert={expert}"),
+            )
+        )
+    return tuple(results)
+
+
 def build_definition_store(cfg: Any, projects: dict[str, ProjectRecord]) -> Any:
     """按配置选择定义文档存储（IFC-IB-288/289 的实现选择）。
 
@@ -1522,18 +1635,15 @@ def build_definition_store(cfg: Any, projects: dict[str, ProjectRecord]) -> Any:
       （显式记录，**不静默当作空文档** —— 对齐 IFC-IB-288 的「不静默回退」纪律）。
     """
     from ib.config import FileDefinitionDocumentStore, InMemoryDefinitionDocumentStore
-    from ib.experts import BUILTIN_FALLBACKS
     from ib.observability import log_event
 
     first = next(iter(projects), "")
     known = _known_tool_names()
     path = os.environ.get("IB_DEFINITION_DOC_PATH", "").strip()
     if not cfg.offline_mode and path:
-        # REV-17（ADR-36）：注入**全名域**内置兜底映射，供 `load()` 处置旧文档残留的
-        # `fallback_prompt` 键（与内置一致 → 静默丢弃；不一致 → fail-closed 并给出迁移路径）。
-        return FileDefinitionDocumentStore(
-            path, known_tools=known, builtin_fallbacks=BUILTIN_FALLBACKS
-        )
+        # **REV-20（ADR-48 决定 3）**：不再注入任何内置兜底映射 —— legacy `fallback_prompt`
+        # 键改为一律 fail-closed（比对基准已随代码内置兜底层退役；见 `ib.config.definition`）。
+        return FileDefinitionDocumentStore(path, known_tools=known)
     if not cfg.offline_mode and not path:
         log_event(
             "definition_doc",
@@ -1570,8 +1680,25 @@ def build_prompt_stores(cfg: Any, projects: dict[str, ProjectRecord]) -> dict[st
         if use_fs:
             stores[project_id] = FsExpertPromptStore(root, project_id)
         else:
-            stores[project_id] = InMemoryExpertPromptStore(project_id)
+            # **REV-20（ADR-48 / ADR-51 决定 ③）**：离线 / 内存态**由种子内容预填**
+            # kb-agent 的 `main` 层 —— 代码内置兜底已退役，不预填则「两层皆缺」
+            # 会在装配期以 `prompt_missing` 拒绝装配（[ARCH-ASSUMPTION-A14]）。
+            stores[project_id] = InMemoryExpertPromptStore(
+                project_id, documents=_seed_prompt_documents()
+            )
     return stores
+
+
+def _seed_prompt_documents() -> dict[str, dict[str, str]]:
+    """离线 / 内存态预填文档（IFC-IB-389 / ADR-51 决定 ③）。
+
+    返回 `{专家名: {层: 正文}}` —— 用**仓库种子资产正文**预填内置 kb-agent 的 `main` 层。
+    仅用于**离线 / 内存态**（无 `IB_EXPERT_PROMPT_DIR`）；生产走 `FsExpertPromptStore`。
+    """
+    from ib.config import kb_agent_seed_prompt
+    from ib.experts import BUILTIN_DEFAULT_KB_AGENT
+
+    return {BUILTIN_DEFAULT_KB_AGENT.name: {"main": kb_agent_seed_prompt()}}
 
 
 def _inject_prompt_bundles(project_id: str, derived_views: dict[str, Any]) -> None:
@@ -1600,7 +1727,7 @@ def _inject_derived_experts(
     同 `ib.experts.install()` 文档既有口径）。`install_derived` 幂等，重复装配不抛。
     """
     from ib.core import ExpertSpec
-    from ib.experts import builtin_fallback_for, install_derived
+    from ib.experts import install_derived
 
     view = derived_views.get(project_id)
     if view is None:
@@ -1611,10 +1738,10 @@ def _inject_derived_experts(
             cn_label=e.cn_label,
             keywords=tuple(e.keywords),
             is_data_expert=e.is_data_expert,
-            # REV-17（ADR-36）：定义文档已不承载提示词文本，兜底据此从**代码内置安全网**
-            # 取（`_DEFAULT_SPECS` 派生 → 自定义专家回落 `BUILTIN_FALLBACK_DEFAULT`）。
-            # 与 `derive_prompt_layers` 的合并、`validate_prompt_directory` 的判据**同源**。
-            fallback_prompt=builtin_fallback_for(e.name),
+            # **REV-20（ADR-48 决定 1+4）**：代码内置兜底已整体退役，本字段**去驱动化**
+            # （不再参与任何运行期提示词取值）。提示词正文来自**项目提示词目录**
+            # （创建期落盘 / 回填迁移 / 离线预填），故此处恒为空串。
+            fallback_prompt="",
             is_delegating=e.is_delegating,
             is_default=e.is_default,
         )

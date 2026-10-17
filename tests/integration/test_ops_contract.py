@@ -372,17 +372,22 @@ def test_TC_INT_062_cold_hot_timeout_retry_policy_separated(deps):
 
 
 def test_TC_INT_063_delegation_capability_and_depth_cap():
-    """[TC-INT-063] 子委托是注册表显式标记；非委派专家不获该能力，编排步数有硬上限（AC-IB-10-05）。"""
+    """[TC-INT-063] 子委托是注册表显式标记；非委派专家不获该能力，编排步数有硬上限（AC-IB-10-05）。
+
+    **REV-20（ADR-50）修订**：内置注册表唯一专家 `kb-agent` **非委派**（通用知识库助手不派生
+    子任务），故「委派集合非空」不再是契约 —— 改为断言「委派集合与逐项 `is_delegating` 标记
+    **严格一致**」（标记错即失败），以及步数上限仍受约束。
+    """
     from ib.experts import EXPERT_SPECS, delegating_experts, validate_specs
     from ib.orchestration import MAX_EXPERT_STEPS
 
     validate_specs(EXPERT_SPECS)
     delegating = set(delegating_experts())
-    assert delegating, "无任何可委派专家（注册表契约异常）"
     for spec in EXPERT_SPECS:
         assert isinstance(spec.is_delegating, bool)
-        if spec.name not in delegating:
-            assert spec.is_delegating is False, f"{spec.name} 未在委派集合却标了 is_delegating"
+        assert (spec.name in delegating) is spec.is_delegating, (
+            f"{spec.name} 的委派标记与委派集合不一致"
+        )
     assert MAX_EXPERT_STEPS <= 8, "专家步数上限过大，子委托深度得不到约束"
 
 

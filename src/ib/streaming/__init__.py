@@ -301,10 +301,10 @@ class MemorySessionStore:
                 self._items.pop(key, None)
 
 
-#: REV-19：`demo` 项目内置三专家（与 `ib.experts.DEMO_EXPERT_NAMES` **同值**）。
-#: 此处重复字面量而**不** import `ib.experts`，是为守住 MOD-IB-21 的依赖边界
-#: （模块文档声明依赖 MOD-IB-01/02/04，引入 experts 会新增一条边）。同值由自检断言兜底。
-_DEMO_EXPERT_NAMES = ("freeark-expert", "inspection-expert", "sanheng-knowledge")
+# REV-20（ADR-50）：原 REV-19 的 `_DEMO_EXPERT_NAMES`（demo 内置三专家**同值字面量**）
+# **已退役** —— 「默认三专家」机制取消（REQ-FUNC-IB-57 / OQ-IB-46(b) / OQ-IB-47(c)），
+# 三专家不再归属任何项目。**对应的历史归属迁移（ADR-46 / IFC-IB-386）随之停用**
+# （OQ-IB-47=C：既有记录保持现状、不再迁移），故本模块不再持有任何三专家字面量。
 
 
 def migrate_expert_history(
@@ -312,7 +312,7 @@ def migrate_expert_history(
     *,
     sessions: Any = None,
     ledger: Any = None,
-    experts: tuple[str, ...] = _DEMO_EXPERT_NAMES,
+    experts: tuple[str, ...] = (),
     backup: bool = True,
 ) -> MigrationReport:
     """[IFC-IB-386] 把「引用 demo 三专家」的历史会话/问答记录**重归属**到目标项目。

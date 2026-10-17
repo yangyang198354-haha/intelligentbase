@@ -889,7 +889,6 @@ def _get_definition_config(request: Any) -> Any:
 
 def _put_definition_config(request: Any) -> Any:
     from ib.config import document_from_json, non_editable_changes, validate_two_domains
-    from ib.experts import BUILTIN_FALLBACKS
 
     deps = composition.get_deps()
     submitted = None
@@ -901,12 +900,11 @@ def _put_definition_config(request: Any) -> Any:
         form = DefinitionConfigInputSerializer(data=raw_body)
         form.is_valid(raise_exception=True)
         expected = form.validated_data.get("expected_content_hash") or None
+        # **REV-20（ADR-48 决定 3）**：legacy `fallback_prompt` 键改为一律 fail-closed
+        # （比对基准已随代码内置兜底层退役），故此处**不再**注入任何内置映射。
         submitted = document_from_json(
             project_id,
             json.dumps(form.validated_data["document"], ensure_ascii=False),
-            # REV-17（ADR-36）：旧文档残留的 `fallback_prompt` 键据此分级处置
-            # （同内置 → 静默丢弃；不同 → fail-closed 并给出迁移路径），故必须注入。
-            builtin_fallbacks=BUILTIN_FALLBACKS,
         )
         current = deps.definition_store.load(project_id)
     except ConfigError:
@@ -940,7 +938,6 @@ def _put_definition_config(request: Any) -> Any:
         known_tools=composition.known_tool_names(),
         tool_param_specs=deps.tool_param_specs(),
         prompt_refs=prompt_refs,
-        builtin_fallbacks=composition.builtin_fallbacks_of(submitted),
     )
     if not report.ok:
         _audit_definition_save(deps, project_id, actor, changed, "rejected", report.errors)
@@ -1191,17 +1188,6 @@ def _prompt_refs_for(deps: Any, project_id: str) -> tuple[Any, ...]:
     return tuple(store.list_refs())
 
 
-def _builtin_fallback_of(deps: Any, project_id: str, expert: str) -> str:
-    """该专家的**代码内置兜底**（REV-17 / ADR-36）。
-
-    取代原 `_doc_fallback_of`（后者读定义文档字段，该字段已删）：兜底层不再来自任何
-    可写入口，改由 `ib.experts.builtin_fallback_for` 统一解析（与装配期**同源**）。
-    """
-    from ib.experts import builtin_fallback_for
-
-    return builtin_fallback_for(expert)
-
-
 def _tool_param_spec_payload(spec: Any) -> dict[str, Any]:
     return {
         "name": spec.name,
@@ -1245,9 +1231,8 @@ def _get_prompts_list(request: Any) -> Any:
                 "name": e.name,
                 "cn_label": e.cn_label,
                 "layers": layers,
-                # 加成式（REV-17 / ADR-36）：代码内置兜底**只读展示**，供界面在两层文件皆缺时
-                # 说明「当前生效的是什么」。它**不是**可写载体 —— 界面不为它开第二写入口。
-                "builtin_fallback": _builtin_fallback_of(deps, project_id, e.name),
+                # **REV-20（ADR-48）**：原「代码内置兜底只读展示」字段（`builtin_fallback`）
+                # **已删除** —— 兜底层整体退役，前端不再有该回执项（契约变更，见 CONTRACT-REV-20）。
             }
         )
 
@@ -1262,11 +1247,11 @@ def _get_prompts_list(request: Any) -> Any:
         "layout": {
             "root_key": "IB_EXPERT_PROMPT_DIR",
             "file_pattern": "<root>/<project_id>/<expert_name>/{main.md|fallback.md}",
-            # REV-17（ADR-36）：`fallback.md` 亦可缺 —— 两层文件皆缺时回落到**代码内置兜底**，
-            # 由 `merge_prompt_layers` 的结构保证「兜底恒非空」。
+            # **REV-20（ADR-48）**：`fallback.md` 亦可缺；**两层文件皆缺 → `prompt_missing`**
+            #（装配期 fail-closed；代码内置兜底已退役，提示词正文由创建期落盘 / 回填迁移提供）。
             "naming_rule": (
                 "子目录名 = 专家 name；main.md 可缺，fallback.md 亦可缺"
-                "（皆缺时回落代码内置兜底）"
+                "（两者皆缺 → prompt_missing）"
             ),
         },
         # **只登记键名，不含任何值**（IFC-IB-348）。
@@ -1297,12 +1282,9 @@ def _get_prompt_layer(request: Any, expert: str, layer: str) -> Any:
             status.HTTP_404_NOT_FOUND,
         )
     try:
-        # REV-17（ADR-36）：兜底只取**代码内置**（与装配期同源），不再读定义文档字段。
-        # 本端点只在 `ref.exists` 为真的分支里取值，故 `builtin_fallback` 在此仅作
-        # `load_bundle` 的形式参数（该层文件已在，合并结果不会用到它）。
-        bundle = store.load_bundle(
-            expert, builtin_fallback=_builtin_fallback_of(deps, project_id, expert)
-        )
+        # **REV-20（ADR-48）**：`load_bundle` 不再接收任何 `builtin_fallback` 形参
+        # （代码内置兜底已退役）；本端点只在 `ref.exists` 为真的分支里取值。
+        bundle = store.load_bundle(expert)
     except Exception as exc:  # noqa: BLE001
         return error_response(exc)
     content = bundle.main_prompt if layer == "main" else bundle.fallback_prompt

@@ -117,9 +117,14 @@ def _run_graph(deps, registry, project_id: str, question: str, session_key: str)
 
 
 def test_TC_E2E_R19_001_project_question_routes_only_within_project_set(deps):
-    """US-IB-43：项目内提问只在**本项目专家集**内路由 / 聚合，绝不调用他项目（demo）专家。"""
+    """US-IB-43：项目内提问只在**本项目专家集**内路由 / 聚合，绝不调用他项目专家。
+
+    **REV-20（ADR-50）契约翻转**：原「对照组 = demo 三专家集命中 `inspection-expert`」不再
+    成立（三专家退役，`builtin_expert_registry()` 亦为唯一 `kb-agent`）；隔离改由「项目 A 的
+    路由结果 ∈ A 的项目集」+「端到端链路不出现任何业务域专家名」表达。
+    """
     from ib.core import Scope
-    from ib.experts import DEMO_EXPERT_NAMES, builtin_expert_registry, resolve_expert_registry
+    from ib.experts import builtin_expert_registry, resolve_expert_registry
     from ib.routing import IntentRouter
 
     q = "巡检一下 PLC 故障，顺便看看能耗"
@@ -133,26 +138,21 @@ def test_TC_E2E_R19_001_project_question_routes_only_within_project_set(deps):
         ),
     )
 
-    # 控制组：同一问句在 demo 三专家集下**确实**命中 inspection-expert —— 证明问句有区分力，
-    # 之后的「未命中」才是真隔离而非问句不相关。
-    d_demo = IntentRouter(experts=builtin_expert_registry()).classify_experts(
-        q, scope=Scope(project_id="demo")
-    )
-    assert "inspection-expert" in set(d_demo.experts), "问句未触发 demo 专属专家，负向断言无意义"
+    # REV-20：内置注册表 == 唯一通用 kb-agent（无任何业务域专家）
+    assert builtin_expert_registry().names() == ("kb-agent",)
 
     # AC-IB-43-01 / 43-03：项目 A 内提问只在 A 的专家集内路由，不回退他项目专家
     d_a = IntentRouter(experts=reg_a).classify_experts(q, scope=Scope(project_id="p_alpha"))
     assert set(d_a.experts) <= {"alpha-agent", "alpha-ops"}, d_a.experts
-    assert not (set(d_a.experts) & set(DEMO_EXPERT_NAMES)), "路由命中三专家（跨项目泄漏）"
 
-    # 端到端跑通一问一答：单版融合答案 + 终结 done；事件面不出现三专家
+    # 端到端跑通一问一答：单版融合答案 + 终结 done；事件面不出现业务域专家
     events = _run_graph(deps, reg_a, "p_alpha", q, "p_alpha:e2e_r19_1")
     kinds = [str(e.kind) for e in events]
     assert kinds.count("content") == 1, f"非单版答案：{kinds}"
     assert kinds[-1] == "done", kinds
     blob = " ".join(str(e) for e in events)
-    for demo in DEMO_EXPERT_NAMES:
-        assert demo not in blob, f"端到端链路出现 demo 专家：{demo}"
+    for retired in ("freeark-expert", "inspection-expert", "sanheng-knowledge"):
+        assert retired not in blob, f"端到端链路出现业务域专家：{retired}"
 
 
 # --------------------------------------------------------------------------- #
@@ -162,34 +162,35 @@ def test_TC_E2E_R19_001_project_question_routes_only_within_project_set(deps):
 
 
 def test_TC_E2E_R19_002_new_project_seed_then_closed_loop(deps, tmp_path):
-    """US-IB-44 + US-IB-45：创建期播种 → 「重启」重装配 → 新项目开箱完成问答闭环。"""
+    """US-IB-44：创建期播种 → 「重启」重装配 → 新项目开箱完成问答闭环。
+
+    **REV-20（ADR-48 / ADR-51）**：种子提示词**在创建期落盘**（`<root>/<pid>/<expert>/main.md`），
+    文件载体构造不再注入任何内置兜底映射。
+    """
     from ib.config import FileDefinitionDocumentStore
     from ib.core import Scope
-    from ib.experts import BUILTIN_FALLBACKS, DEMO_EXPERT_NAMES, resolve_expert_registry
+    from ib.experts import resolve_expert_registry
     from ibweb.composition import known_tool_names, seed_project
 
     defs = tmp_path / "defs"
     prompts = tmp_path / "prompts"
 
-    # ① 创建期播种（AC-IB-44-01 / 44-03）：按项目落地定义 + 提示词目录骨架
+    # ① 创建期播种（AC-IB-44-01 / 44-03）：按项目落地定义 + **提示词落盘**
     res = seed_project("proj_new", definition_dir=str(defs), prompt_root=str(prompts))
     assert res.created is True
     assert res.expert_names == ("kb-agent",), res.expert_names
     assert res.orchestration == "default"
     assert (defs / "proj_new.json").is_file(), "未按项目落地种子定义文档"
-    assert (prompts / "proj_new" / "kb-agent").is_dir(), "未建按项目 / 按专家的提示词目录"
+    assert (prompts / "proj_new" / "kb-agent" / "main.md").is_file(), "未落盘种子提示词 main.md"
 
     # ② 「重启」重装配视角：从磁盘读回 → 准入派生
-    store = FileDefinitionDocumentStore(
-        str(defs), known_tools=known_tool_names(), builtin_fallbacks=BUILTIN_FALLBACKS
-    )
+    store = FileDefinitionDocumentStore(str(defs), known_tools=known_tool_names())
     doc = store.load("proj_new")
 
-    # AC-IB-44-01 / 44-04：默认专家恰一个（内置不可删兜底 KB agent）；AC-IB-45-02：不含三专家
+    # AC-IB-44-01 / 44-04：默认专家恰一个（内置不可删兜底 KB agent）；AC-IB-45-02：无业务域专家
     reg = resolve_expert_registry("proj_new", view=store.derive(doc))
     assert reg.names() == ("kb-agent",)
     assert reg.default_name() == "kb-agent"
-    assert not (set(reg.names()) & set(DEMO_EXPERT_NAMES)), "非 demo 项目种子出现三专家"
 
     # AC-IB-44-06：单一默认编排流程（无用户自定义 DAG 入口，OOS-21）
     nodes = set(doc.orchestration.nodes)
@@ -210,17 +211,18 @@ def test_TC_E2E_R19_002_new_project_seed_then_closed_loop(deps, tmp_path):
 
 
 def test_TC_E2E_R19_003_save_definition_takes_effect_only_after_restart(accounts_app, tmp_path):
-    """US-IB-42：定义保存后**未重启**仍用既有配置（图对象未重建），**重启重装配**后生效。"""
-    from ib.config import FileDefinitionDocumentStore
-    from ib.experts import BUILTIN_FALLBACKS
+    """US-IB-42：定义保存后**未重启**仍用既有配置（图对象未重建），**重启重装配**后生效。
+
+    **REV-20（ADR-48）**：文件载体构造不再注入内置兜底映射；同时按定义文档专家集**预填
+    提示词层**（否则保存期会以 `prompt_missing` fail-closed 拒绝）。
+    """
+    from ib.config import FileDefinitionDocumentStore, InMemoryExpertPromptStore
     from ibweb.composition import build_application, known_tool_names
 
     deps, Client = accounts_app
 
     # 以**文件载体**落盘项目 A / B 的现行定义（生产形态 = 独立目录），再重装配
-    store = FileDefinitionDocumentStore(
-        str(tmp_path), known_tools=known_tool_names(), builtin_fallbacks=BUILTIN_FALLBACKS
-    )
+    store = FileDefinitionDocumentStore(str(tmp_path), known_tools=known_tool_names())
     store.save("p_alpha", _doc("p_alpha", ("alpha-agent",), tau=0.65), expected_content_hash=None)
     store.save("p_beta", _doc("p_beta", ("beta-agent",)), expected_content_hash=None)
     deps.definition_store = store
@@ -228,6 +230,10 @@ def test_TC_E2E_R19_003_save_definition_takes_effect_only_after_restart(accounts
         loaded = store.load(pid)
         deps.definitions[pid] = loaded
         deps.derived_views[pid] = store.derive(loaded)
+        # REV-20（ADR-48 / ADR-51 ③）：每位专家都要在提示词域有可取值
+        deps.prompt_stores[pid] = InMemoryExpertPromptStore(
+            pid, documents={e.name: {"main": f"# {e.name} 主提示词\n"} for e in loaded.experts}
+        )
     build_application(deps)
 
     client = Client()
@@ -253,9 +259,7 @@ def test_TC_E2E_R19_003_save_definition_takes_effect_only_after_restart(accounts
     assert deps.orchestrator_for("p_alpha") is graph_before, "保存触发了运行期热重载（违反 ADR-32）"
 
     # ③ 「重启」= 新进程视角：新 store 实例从磁盘读回 → 变更生效
-    fresh = FileDefinitionDocumentStore(
-        str(tmp_path), known_tools=known_tool_names(), builtin_fallbacks=BUILTIN_FALLBACKS
-    )
+    fresh = FileDefinitionDocumentStore(str(tmp_path), known_tools=known_tool_names())
     reloaded = fresh.load("p_alpha")
     assert reloaded.route.tau == 0.72, "重启重装配后未取到新配置"
 

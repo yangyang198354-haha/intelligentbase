@@ -533,7 +533,7 @@ describe('R16 前端冒烟：提示词分层 + 工具勾选/参数 + 生效口�
     assert.match(clientTs, /param_values\?: ToolParamValue\[\]/, '客户端类型须声明 param_values');
   });
 
-  it('29. REV-17（ADR-36）：定义文档域不再承载提示词 —— 内置兜底只读、无第二写入口', () => {
+  it('29. REV-20（ADR-48）：定义文档域不再承载提示词、代码内置兜底已退役', () => {
     const text = page();
     // 定义文档域**不得**再出现提示词文本的编辑入口（白名单字段已删除，改了也存不下）
     assert.doesNotMatch(
@@ -546,29 +546,31 @@ describe('R16 前端冒烟：提示词分层 + 工具勾选/参数 + 生效口�
       /expert\.fallback_prompt/,
       '定义文档草稿不得再持有 fallback_prompt 字段',
     );
-    // 内置兜底**只读回显**：正文来自后端回执（不硬编码），控件为 readonly
-    assert.match(text, /builtinFallbackOf\(/, '缺少内置兜底回显派生');
-    assert.match(text, /builtin_fallback/, '内置兜底正文须来自后端提示词回执');
-    assert.match(
-      text,
-      /class="readonly"[\s\S]{0,80}readonly/,
-      '内置兜底文本域必须声明 readonly（只读展示，非写入口）',
-    );
-    // 回退链第三值同步为 builtin_fallback（不再是 definition_doc_fallback）
-    assert.match(text, /'builtin_fallback'/, '回退链第三值应为 builtin_fallback');
+    // **契约翻转（REV-20 / ADR-48 / OQ-IB-42=B）**：原「内置兜底只读回显」区（`builtinFallbackOf`
+    // + `builtin_fallback` 回执字段）随代码内置兜底一并删除；回退链只剩两层文件，
+    // 两层皆缺即为 `prompt_missing`（装配期 fail-closed）。
+    assert.doesNotMatch(text, /builtinFallbackOf\(/, '内置兜底回显派生应已删除');
+    assert.doesNotMatch(text, /builtin_fallback/, '页面不得再引用 builtin_fallback');
+    assert.doesNotMatch(text, /代码内置兜底（只读）/, '不得残留内置兜底只读回显文案');
+    // 回退链状态值收窄为 {main_file, fallback_file, prompt_missing}（不再是 builtin_fallback）
+    assert.match(text, /'prompt_missing'/, '回退链须能表达「两层皆缺 → 无法装配」');
     assert.doesNotMatch(
       text,
       /definition_doc_fallback/,
       '不得残留旧口径 definition_doc_fallback',
     );
-    // 客户端类型契约：定义文档输入不再有 fallback_prompt；提示词回执新增 builtin_fallback
+    // 客户端类型契约：定义文档输入不再有 fallback_prompt；提示词回执亦不再有 builtin_fallback
     const clientTs = stripComments(readText(r13.client));
     assert.doesNotMatch(
       clientTs,
       /fallback_prompt/,
       '客户端 ExpertSpecInput 不得再声明 fallback_prompt',
     );
-    assert.match(clientTs, /builtin_fallback: string/, '客户端须声明 builtin_fallback（只读回显）');
+    assert.doesNotMatch(
+      clientTs,
+      /builtin_fallback/,
+      '客户端 PromptExpertEntry 不得再声明 builtin_fallback（REV-20 已退役）',
+    );
   });
 });
 

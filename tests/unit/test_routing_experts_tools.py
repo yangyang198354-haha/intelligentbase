@@ -1,11 +1,50 @@
 """单元测试层 2/N —— 语义路由 / 意图路由 / 专家注册表 / 工具绑定 / 护栏。
 
 覆盖 AC-IB-09-01~07、AC-IB-10-01~05、AC-IB-15-02/03；全部纯逻辑、离线。
+
+**REV-20（ADR-48 / ADR-50）修订说明**：内置注册表已收敛为**唯一通用 `kb-agent`**
+（原 FreeArk 三专家退役）。故「多专家路由机制」（关键词并列命中 / 复合意图 / 护栏改派）
+改由**注入项目级只读视图**（`IntentRouter(experts=…)`，ADR-43/47 的正式路径）覆盖 ——
+`parse_route_output` 无注入点（按**全局**注册表过滤），故其用例改用 `kb-agent`。
 """
 
 from __future__ import annotations
 
 import pytest
+
+
+def _project_view():
+    """构造一份**项目级**三专家只读视图（`ExpertRegistryView`）。
+
+    REV-20 起进程级内置注册表只有 `kb-agent`，多专家路由机制不能再依赖全局注册表；
+    `IntentRouter(experts=…)` 是 ADR-43/47 指定的**本项目专家集**注入点（生产装配主路径）。
+    """
+    from ib.core import DerivedView, ExpertSpecInput, OrchestrationSpecInput
+    from ib.experts import resolve_expert_registry
+
+    def _spec(name, label, kws, *, data=False, default=False):
+        return ExpertSpecInput(
+            name=name,
+            cn_label=label,
+            keywords=kws,
+            exemplars=(),
+            is_data_expert=data,
+            is_delegating=False,
+            is_default=default,
+        )
+
+    return resolve_expert_registry(
+        "p1",
+        view=DerivedView(
+            experts=(
+                _spec("freeark-expert", "系统管家", ("数据", "报表", "能耗", "用量"), data=True, default=True),
+                _spec("inspection-expert", "巡检诊断", ("巡检", "故障", "设备"), data=True),
+                _spec("sanheng-knowledge", "三恒知识", ("知识", "问答", "原理", "三恒")),
+            ),
+            capability_digest="",
+            graph_config=OrchestrationSpecInput(nodes=("START", "END"), conditional_edges=(), edges=()),
+        ),
+    )
 
 # --------------------------------------------------------------------------- #
 # MOD-IB-18 语义路由纯函数（IFC-IB-191/192；AC-IB-15-03）
@@ -74,11 +113,10 @@ def test_TC_UNIT_027_parse_route_output_dirty():
     """[TC-UNIT-027] 脏输出解析：代码围栏 / 散文 / 非法名 / 空数组（AC-IB-15-03）。"""
     from ib.routing.intent import parse_route_output, parse_route_output_ex
 
-    assert parse_route_output('```json\n["freeark-expert"]\n```') == ["freeark-expert"]
-    assert parse_route_output('好的，结果是 ["inspection-expert", "sanheng-knowledge"] 请查收') == [
-        "inspection-expert",
-        "sanheng-knowledge",
-    ]
+    # REV-20（ADR-48/ADR-50）：`parse_route_output` 按**全局内置注册表**过滤，该表已收敛为
+    # 唯一 `kb-agent`，故本用例改用 `kb-agent`（多专家名过滤语义不变：非登记名仍被过滤）。
+    assert parse_route_output('```json\n["kb-agent"]\n```') == ["kb-agent"]
+    assert parse_route_output('好的，结果是 ["kb-agent"] 请查收') == ["kb-agent"]
     # 非法专家名被过滤
     assert parse_route_output('["nonexistent-expert"]') == []
     # 畸形输入不抛异常
@@ -106,7 +144,9 @@ def test_TC_UNIT_029_keyword_unique_single_expert():
     from ib.core import Scope
     from ib.routing.intent import IntentRouter
 
-    decision = IntentRouter().classify_experts("设备故障怎么排查", scope=Scope(project_id="p1"))
+    decision = IntentRouter(experts=_project_view()).classify_experts(
+        "设备故障怎么排查", scope=Scope(project_id="p1")
+    )
     assert decision.experts == ["inspection-expert"]
     assert decision.tier == "L0_keyword_unique"
 
@@ -116,7 +156,9 @@ def test_TC_UNIT_030_composite_multi_expert_parallel_candidates():
     from ib.core import Scope
     from ib.routing.intent import IntentRouter
 
-    decision = IntentRouter().classify_experts("能耗数据和设备故障一起看看", scope=Scope(project_id="p1"))
+    decision = IntentRouter(experts=_project_view()).classify_experts(
+        "能耗数据和设备故障一起看看", scope=Scope(project_id="p1")
+    )
     assert set(decision.experts) >= {"freeark-expert", "inspection-expert"}, decision.experts
     assert len(decision.experts) <= 3
 
@@ -126,8 +168,9 @@ def test_TC_UNIT_031_never_empty_answer():
     from ib.core import Scope
     from ib.routing.intent import IntentRouter
 
+    view = _project_view()
     for query in ("随便聊聊天气", "……", "?????", "一个完全没有任何领域信号的问题"):
-        decision = IntentRouter().classify_experts(query, scope=Scope(project_id="p1"))
+        decision = IntentRouter(experts=view).classify_experts(query, scope=Scope(project_id="p1"))
         assert decision.experts, f"出现无人应答：{query!r}"
         assert decision.tier == "default"
 
@@ -144,7 +187,7 @@ def test_TC_UNIT_032_ood_when_allowed():
 
             return _R()
 
-    router = IntentRouter(llm_provider=_Llm())
+    router = IntentRouter(llm_provider=_Llm(), experts=_project_view())
     assert router.classify_experts("你好", scope=Scope(project_id="p1"), allow_ood=True).tier == "ood"
     # 不允许 OOD 时退回默认专家（保守：宁可多用一个专家）
     assert router.classify_experts("你好", scope=Scope(project_id="p1")).experts == ["freeark-expert"]
@@ -159,7 +202,7 @@ def test_TC_UNIT_033_llm_failure_falls_back_deterministically():
         def build_router(self):
             raise RuntimeError("router unavailable")
 
-    decision = IntentRouter(llm_provider=_BrokenLlm()).classify_experts(
+    decision = IntentRouter(llm_provider=_BrokenLlm(), experts=_project_view()).classify_experts(
         "设备故障", scope=Scope(project_id="p1")
     )
     assert decision.experts == ["inspection-expert"]
@@ -171,7 +214,7 @@ def test_TC_UNIT_034_sticky_expert_from_history():
     from ib.routing.intent import IntentRouter
 
     history = [Message(role="user", content="设备故障怎么处理"), Message(role="assistant", content="…")]
-    decision = IntentRouter().classify_experts(
+    decision = IntentRouter(experts=_project_view()).classify_experts(
         "那再详细点", history=history, scope=Scope(project_id="p1")
     )
     assert decision.experts == ["inspection-expert"]
@@ -179,17 +222,22 @@ def test_TC_UNIT_034_sticky_expert_from_history():
 
 
 def test_TC_UNIT_035_guard_reroutes_to_data_expert():
-    """[TC-UNIT-035] 护栏：无工具专家接了数据问题且语义高置信指向数据专家 → 改派（IFC-IB-203）。"""
+    """[TC-UNIT-035] 护栏：无工具专家接了数据问题且语义高置信指向数据专家 → 改派（IFC-IB-203）。
+
+    **REV-20（ADR-50）修订**：护栏的「数据专家集」取自**全局**注册表（`data_experts()`），
+    该表已收敛为唯一 `kb-agent`；故本用例改为「选中一个**不在**数据专家集中的名字，
+    语义打分高置信指向 `kb-agent`」→ 改派（判据与门限逻辑不变）。
+    """
     from ib.core import RouteDecision
     from ib.routing.intent import guard_against_misroute
 
-    decision = RouteDecision(experts=["sanheng-knowledge"], tier="L2_llm", confidence=0.0)
-    scores = {"freeark-expert": 0.9, "sanheng-knowledge": 0.1}
+    decision = RouteDecision(experts=["reserved-helper"], tier="L2_llm", confidence=0.0)
+    scores = {"kb-agent": 0.9, "reserved-helper": 0.1}
     fixed = guard_against_misroute(decision, scores)
-    assert fixed.experts == ["freeark-expert"]
+    assert fixed.experts == ["kb-agent"]
     assert fixed.tier == "L3_keyword_fallback"
     # 无证据时不介入（护栏不得成为新的误路由源）
-    assert guard_against_misroute(decision, {}).experts == ["sanheng-knowledge"]
+    assert guard_against_misroute(decision, {}).experts == ["reserved-helper"]
 
 
 def test_TC_UNIT_036_router_determinism_same_input_same_route():
@@ -197,7 +245,7 @@ def test_TC_UNIT_036_router_determinism_same_input_same_route():
     from ib.core import Scope
     from ib.routing.intent import IntentRouter
 
-    router = IntentRouter()
+    router = IntentRouter(experts=_project_view())
     results = {tuple(router.classify_experts("能耗看板", scope=Scope(project_id="p1")).experts) for _ in range(5)}
     assert results == {("freeark-expert",)}
 
@@ -245,11 +293,14 @@ def test_TC_UNIT_038_validate_specs_rejects_bad_registry():
 
 
 def test_TC_UNIT_039_get_missing_expert_returns_none():
-    """[TC-UNIT-039] 取不存在的专家返回 None 而非抛异常（路由优雅未命中）。"""
+    """[TC-UNIT-039] 取不存在的专家返回 None 而非抛异常（路由优雅未命中）。
+
+    **REV-20（ADR-50）修订**：内置注册表唯一专家名为 `kb-agent`（原 `freeark-expert` 退役）。
+    """
     from ib.experts import get
 
     assert get("definitely-not-an-expert") is None
-    assert get("freeark-expert") is not None
+    assert get("kb-agent") is not None
 
 
 # --------------------------------------------------------------------------- #

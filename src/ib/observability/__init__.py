@@ -102,6 +102,14 @@ LOG_FIELDS: frozenset[str] = frozenset(
         # `reason="deleted_concurrently"`（src/ib/lifecycle/__init__.py:462）此前也被本白名单
         # 静默丢弃，本键一并使其可见（同一键名的既有用法，非新造字段）。
         "reason",
+        # --- 提示词来源可观测的两键（IFC-IB-392 / ADR-48 决定 4 / REQ-NFR-IB-22）---
+        # 为什么必须新增：ADR-48 要求「回落 `fallback_file` **不得静默**」——装配期须发出
+        # 结构化 `prompt_source` 日志（**不含提示词正文**）。沿用上面两处先例：只新增**两个
+        # 精确键名**（`expert` = 专家名短标签；`source` = 结构化短码 `main_file` /
+        # `fallback_file`），值受 `redact()` 的 120 字符截断兜底 —— 不引入任何可用于输出
+        # 任意正文的通道。
+        "expert",
+        "source",
     }
 )
 

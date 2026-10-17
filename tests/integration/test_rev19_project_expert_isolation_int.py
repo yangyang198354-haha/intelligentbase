@@ -102,13 +102,26 @@ def _valid_doc(project_id: str, expert_names: tuple[str, ...]):
 
 
 def _inject_definitions(deps, docs: dict):
-    """把**按项目不同**的定义文档注入当前 deps 并重绑全局（供端点按项目域加载）。"""
-    from ib.config import InMemoryDefinitionDocumentStore
+    """把**按项目不同**的定义文档注入当前 deps 并重绑全局（供端点按项目域加载）。
+
+    **REV-20（ADR-48 / ADR-51 决定 ③）**：定义文档内**每位专家**都必须在提示词域有可取
+    值（`main.md` / `fallback.md` 两层皆缺 → `prompt_missing` fail-closed），故同步为该项目的
+    每位专家预填 `main` 层（等价于生产里项目提示词目录已落盘）。
+    """
+    from ib.config import InMemoryDefinitionDocumentStore, InMemoryExpertPromptStore
     from ibweb.composition import build_application, known_tool_names
 
     deps.definition_store = InMemoryDefinitionDocumentStore(
         documents=docs, known_tools=known_tool_names()
     )
+    for project_id, doc in docs.items():
+        documents = {
+            e.name: {"main": f"# {e.name} 主提示词\n"}
+            for e in getattr(doc, "experts", ()) or ()
+        }
+        deps.prompt_stores[project_id] = InMemoryExpertPromptStore(
+            project_id, documents=documents
+        )
     build_application(deps)
 
 
@@ -418,19 +431,20 @@ def test_TC_INT_R19_008_create_project_seeds_default_document(accounts_app, monk
 
 
 # --------------------------------------------------------------------------- #
-# TC-INT-R19-009 —— AC-IB-45-02 / AC-IB-45-03：非 demo 种子不含 / 不可调用三专家
+# TC-INT-R19-009 —— AC-IB-45-02 / AC-IB-45-03：种子不含 / 不可调用业务域专家
 # --------------------------------------------------------------------------- #
 
 
-def test_TC_INT_R19_009_non_demo_seed_excludes_demo_experts(tmp_path):
-    """US-IB-45 / AC-IB-45-02、AC-IB-45-03；OQ-IB-35(a) / OQ-IB-34(a) / ADR-45。
+def test_TC_INT_R19_009_seed_excludes_business_domain_experts(tmp_path):
+    """**契约翻转（REV-20 / OQ-IB-48=C / ADR-50）**：原口径「非 demo 项目种子不含 demo
+    三专家」；三专家机制退役后，判据强化为「**任何**新建项目种子只含唯一通用 `kb-agent`，
+    且路由恒不落入任何业务域专家」。
 
-    非 demo 项目（新建）的种子定义**不出现**三专家中任何一个；以该种子视图路由「本应由
-    demo 专属专家处理」的问句 → 由本项目专家集处理，**不调用**三专家（硬隔离）。
+    US-IB-45 / AC-IB-45-02、AC-IB-45-03；OQ-IB-34(a) / ADR-45 / ADR-50。
     """
     from ib.config import FileDefinitionDocumentStore
     from ib.core import Scope
-    from ib.experts import DEMO_EXPERT_NAMES, resolve_expert_registry
+    from ib.experts import resolve_expert_registry
     from ib.routing import IntentRouter
     from ibweb.composition import seed_project
 
@@ -441,13 +455,13 @@ def test_TC_INT_R19_009_non_demo_seed_excludes_demo_experts(tmp_path):
     store = FileDefinitionDocumentStore(str(defs), known_tools=frozenset())
     doc = store.load("proj_nondemo")
     names = {e.name for e in doc.experts}
-    assert not (names & set(DEMO_EXPERT_NAMES)), f"非 demo 项目种子出现三专家：{names}"
+    assert names == {"kb-agent"}, f"新建项目种子应恰为唯一 kb-agent，实为 {names}"
 
     view = resolve_expert_registry("proj_nondemo", view=store.derive(doc))
     d = IntentRouter(experts=view).classify_experts(
         "巡检一下 PLC 故障", scope=Scope(project_id="proj_nondemo")
     )
-    assert not (set(d.experts) & set(DEMO_EXPERT_NAMES)), "非 demo 项目调用了三专家"
+    assert d.experts == ["kb-agent"], "业务域问句亦只由通用 kb-agent 承接"
 
 
 # --------------------------------------------------------------------------- #

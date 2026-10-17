@@ -4,10 +4,10 @@
             IFC-IB-175 fallback_prompts / 176 data_experts / 177 delegating_experts
             IFC-IB-178 default_expert / 179 get
             IFC-IB-349（REV-16-2 加成式）install_prompt_bundles / prompt_bundles / main_prompts
-            IFC-IB-365（REV-17 加成式）BUILTIN_FALLBACK_DEFAULT / BUILTIN_FALLBACKS /
-            builtin_fallback_for / builtin_fallbacks_for
+            IFC-IB-365（REV-17）—— **REV-20 整体退役**（代码内置提示词安全网删除；ADR-48 / ADR-50）
             IFC-IB-379（REV-19）ExpertRegistryView / 380 resolve_expert_registry /
-            381 builtin_default_registry（+ builtin_expert_registry）
+            381 builtin_default_registry（+ builtin_expert_registry；**REV-20 口径修订**：
+                二者同值 = 唯一 kb-agent 单例，三专家机制退役）
 @depends MOD-IB-01
 @author software-developer
 
@@ -53,7 +53,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Iterator, Mapping, Sequence
+from typing import Mapping, Sequence
 
 from ib.core import DerivedView, ExpertPromptBundle, ExpertRegistryError, ExpertSpec
 
@@ -74,167 +74,52 @@ __all__ = [
     "install_prompt_bundles",
     "prompt_bundles",
     "main_prompts",
-    # REV-17（ADR-36）
-    "BUILTIN_FALLBACK_DEFAULT",
-    "BUILTIN_FALLBACKS",
-    "builtin_fallback_for",
-    "builtin_fallbacks_for",
     # REV-19（IFC-IB-379 ~ 381）
     "ExpertRegistryView",
     "resolve_expert_registry",
     "builtin_default_registry",
     "builtin_expert_registry",
     "BUILTIN_DEFAULT_KB_AGENT",
-    "DEMO_EXPERT_NAMES",
+    # REV-20（ADR-48 / ADR-50）：
+    #   * 原 REV-17（ADR-36）的 BUILTIN_FALLBACK_DEFAULT / BUILTIN_FALLBACKS /
+    #     builtin_fallback_for / builtin_fallbacks_for **整体退役**（不在此导出）；
+    #   * 原 REV-19 的 DEMO_EXPERT_NAMES **退役**（三专家机制取消）。
 ]
 
 # --------------------------------------------------------------------------- #
 # 默认专家表（**单一真源**）
 # --------------------------------------------------------------------------- #
 
-#: 默认注册表（**REV-16-2 起与 FreeArk 严格对齐，含专家名**；ADR-31）。
-#: 三个专家对应「系统管家 / 设备巡检 / 三恒知识」三类正交职责；顺序 = 全系统专家顺序
-#: （freeark → inspection → sanheng），与 FreeArk `experts.py` 的 `EXPERT_SPECS` 逐位一致。
+#: **内置默认 KB 检索 agent**（IFC-IB-381；REQ-FUNC-IB-52 / IB-57 / OQ-IB-33(a) / OQ-IB-46(b)）。
 #:
-#: **硬改名、无并存窗口**（[ARCH-ASSUMPTION-A10] P-3）：专家的 `name` 与 `cn_label` 已按
-#: ADR-31 的 10 维对齐表整体改名（映射见 `docs/architecture_design.md` ADR-31），**不保留
-#: 旧名的并存窗口**；升级后基于文件的定义文档须使用新专家名。
+#: **REV-20（ADR-50）起「默认三专家」机制整体退役** —— 原先的 `_DEFAULT_SPECS`
+#: （`freeark-expert` / `inspection-expert` / `sanheng-knowledge`，ADR-31 的 FreeArk 严格对齐集）
+#: **一并退役**（`builtin_expert_registry()` 不再返回它们、`DEMO_EXPERT_NAMES` 删除）。
+#: 本单例是**唯一**内置专家：既是**新建项目的种子真源**，也是**未落盘 / 未配置项目的回落**。
 #:
-#: `fallback_prompt` 是**提示文件缺失时的内置兜底**，不是主提示 —— 主提示由独立 markdown
-#: 提示词目录（`ExpertPromptStore`，IFC-IB-339）按 `ExpertSpec.name` 加载，缺失时回落到这里，
-#: 保证「提示缺失」不会退化成无系统提示（ADR-29）。
+#: **`fallback_prompt` 字段已「去驱动化」**（REV-20 / ADR-48 决定 1+4）：定义文档早已不承载
+#: 提示词文本（REV-17），代码内置提示词安全网（原 IFC-IB-365）**整体退役**后，本字段
+#: **不再参与任何运行期提示词取值**，故留空串。提示词正文由**仓库 markdown 种子资产**
+#: （`ib.config.kb_agent_seed_prompt`，IFC-IB-389）经**创建期落盘**（ADR-51）写入
+#: `<root>/<project_id>/kb-agent/main.md`。
 #:
-#: **REV-17（ADR-36）**：`fallback_prompt` 现在是三层合并（`main.md` > `fallback.md` >
-#: 内置）的**第三层**，也是唯一一层的**不可配置**来源。装配期由
-#: `builtin_fallback_for()` 注入（`_inject_derived_experts`），故本表的取值**不再是**
-#: 手写文案的直接后果，而是 `_DEFAULT_SPECS` 经安全网解析的结果 —— 改这里等于改兜底行为。
-#:
-#: **兜底提示词必须保留 grounding 护栏**（不得编造 / 说明局限 / 说明适用边界）—— 生产未配
-#: `IB_EXPERT_PROMPT_DIR` 时，兜底层**就是生效系统提示词**（`build_prompt_stores` 走
-#: `InMemoryExpertPromptStore`，无主提示可回落）。REV-16-2 改名时曾把三条护栏一并删去，
-#: 等于**静默降低 groundedness**（DEFECT-R16-4-02），现已补回；后续任何改写都不得只留职责描述。
-_DEFAULT_SPECS: list[ExpertSpec] = [
-    ExpertSpec(
-        name="freeark-expert",
-        cn_label="系统管家",
-        keywords=(
-            "能耗",
-            "用电",
-            "用量",
-            "电费",
-            "看板",
-            "节能",
-            "kwh",
-            "刷新",
-            "采集",
-            "下发",
-            "触发",
-            "设定",
-            "状态",
-            "查询",
-            "参数",
-            "温度",
-            "湿度",
-            "CO₂",
-            "风量",
-        ),
-        is_data_expert=True,
-        fallback_prompt=(
-            "你是 FreeArk（自由方舟）系统管家，负责能耗看板、设备实时参数、"
-            "设备参数确认式控制和业主人格偏好。故障巡检与三恒知识由专职专家处理。"
-            "你无法取得所需数据时应直接说明，不得编造。"
-        ),
-        is_delegating=True,
-        is_default=True,
-    ),
-    ExpertSpec(
-        name="inspection-expert",
-        cn_label="巡检诊断",
-        keywords=("故障", "巡检", "plc", "离线", "在线", "传感器", "报警", "诊断", "修复"),
-        is_data_expert=True,
-        fallback_prompt=(
-            "你是 FreeArk 巡检诊断专家，结合 PLC 状态与故障汇总定位设备问题。"
-            "缺少实时参数或知识库资料时，可转交对应同侪专家获取支撑；"
-            "无法取得支撑时，据现场信息给出可执行的排查步骤并说明局限。"
-        ),
-        is_delegating=True,
-        is_default=False,
-    ),
-    ExpertSpec(
-        name="sanheng-knowledge",
-        cn_label="三恒知识",
-        keywords=(
-            "三恒",
-            "恒温",
-            "恒湿",
-            "恒氧",
-            "原理",
-            "为什么",
-            "接口",
-            "型号",
-            "说明书",
-            "接线",
-            "图纸",
-            "尺寸",
-            "热量表",
-            "计量表",
-            "主控箱",
-            "手操器",
-            "新风机",
-            "modbus",
-            "485",
-            "毛细管",
-        ),
-        is_data_expert=False,
-        fallback_prompt=(
-            "你是三恒系统知识专家，依循三层知识源（RAG 检索 > 三恒行业知识 > 模型已有通用技术知识）"
-            "回答原理性问题。需要实时数据支撑时，可委托系统管家获取数据；"
-            "无法委托时据已有知识作答，并说明结论的适用边界。"
-        ),
-        is_delegating=True,
-        is_default=False,
-    ),
-]
-
-# --------------------------------------------------------------------------- #
-# REV-17 内置兜底（ADR-36）：提示词域的**代码安全网**
-#
-# 提示词的可配置载体**只有**提示词目录（`ExpertPromptStore`，IFC-IB-339）。定义文档
-# 已不再承载任何提示词文本（`ExpertSpecInput.fallback_prompt` 已移除）。但「兜底恒非空」
-# （ADR-29）仍需一个**不可配置**的最后防线，否则提示词域两层文件皆缺时会退化成
-# 「无系统提示词」——这正是 ADR-29 要杜绝的失败模式。
-#
-# 本映射由 `_DEFAULT_SPECS` 派生，**不是** `EXPERT_SPECS`：
-#   * `EXPERT_SPECS` 会被 `install()` / `install_derived()` **rebind**（装配期每次注入
-#     派生结果都会整体换掉它），而 `build_deps(force=True)` 在测试与生产复装配里是常态；
-#     若按「装配时快照当前注册表」取值，第二次装配就会漂移到文档派生值上，
-#     安全网将不再独立于真源，失去兜底意义；
-#   * `_DEFAULT_SPECS` 是**模块级私有常量，永不被 rebind**，元素是 frozen dataclass。
-# 故本映射是**进程生命周期内的稳定常量**（import 时求值一次）。
-# --------------------------------------------------------------------------- #
-
-#: 内置兜底映射（ADR-36）：由 `_DEFAULT_SPECS` 派生的**不可配置安全网**。
-_BUILTIN_FALLBACK_PROMPTS: dict[str, str] = {s.name: s.fallback_prompt for s in _DEFAULT_SPECS}
-
-#: 通用内置安全网（ADR-36）：**不在** `_BUILTIN_FALLBACK_PROMPTS` 中的专家（典型是
-#: 界面新增的自定义专家）回落到此串。
-#:
-#: 它的存在破掉一个真实死锁：`PUT /api/config/definition` 要求新专家有兜底提示词，
-#: 而 `PUT /api/config/prompts/<expert>/fallback` 又要求专家**已登记**（否则 404）
-#: —— 两端口互为前提，界面上永远加不进新专家。有了通用兜底，「先存专家、再写提示词」
-#: 成为唯一可行且合理的顺序。
-#:
-#: **护栏不可删**：与 `_DEFAULT_SPECS` 的兜底同纪律（DEFECT-R16-4-02）—— 提示词域
-#: 两层文件皆缺时，本串**就是**生效系统提示词，必须保留 grounding 约束。
-BUILTIN_FALLBACK_DEFAULT: str = (
-    "你是企业知识助手。严格依据检索到的资料与工具返回的数据作答，"
-    "不得编造数据、来源或结论；无法取得依据时应直接说明，并说明结论的适用边界。"
+#: **标签不得与 ADR-31 已退场的旧标签同字**（旧值见 `selfcheck.py` 的反向断言）：
+#: 仓库级 grep 归零由 `test_TC_UNIT_122_repo_grep_zero_old_slugs_and_labels` 把关。
+BUILTIN_DEFAULT_KB_AGENT: ExpertSpec = ExpertSpec(
+    name="kb-agent",
+    cn_label="知识库助手",
+    keywords=("知识库", "资料", "文档", "检索", "问答", "知识", "查资料"),
+    is_data_expert=True,
+    fallback_prompt="",
+    is_delegating=False,
+    is_default=True,
 )
 
 #: 当前生效的注册表（`install()` 可整体替换）。
-EXPERT_SPECS: list[ExpertSpec] = list(_DEFAULT_SPECS)
+#: **REV-20（ADR-50）**：初始值 = **唯一**内置单例（三专家退役；未落盘项目回落 = 本单例）。
+EXPERT_SPECS: list[ExpertSpec] = [BUILTIN_DEFAULT_KB_AGENT]
 
-#: 派生索引（`install()` 时重建）。
+#: 派生索引（`install()` / `install_derived()` 时重建）。
 _BY_NAME: dict[str, ExpertSpec] = {spec.name: spec for spec in EXPERT_SPECS}
 
 #: 是否已被接入方显式 `install()`（用于「装配期一次」的校验）。
@@ -242,6 +127,18 @@ _installed = False
 
 #: **REV-16-2 提示词分层派生注册表**（IFC-IB-349）：装配期由两域合并注入的只读视图。
 _PROMPT_BUNDLES: dict[str, ExpertPromptBundle] = {}
+
+# --------------------------------------------------------------------------- #
+# REV-20（ADR-48）：**代码内置提示词安全网已整体退役**
+#
+# 原 REV-17 / ADR-36 的代码安全网（`_BUILTIN_FALLBACK_PROMPTS` /
+# `BUILTIN_FALLBACK_DEFAULT` 及其派生访问器）**整体删除**。理由与后果见 ADR-48：
+#   * 提示词文本的**唯一可写载体** = 项目提示词目录（`main.md` / `fallback.md`）；
+#   * 「生效系统提示词恒非空」**不再**由代码常量保证，改由**创建期落盘**（ADR-51 / IFC-IB-390）
+#     + **装配期 fail-closed**（`prompt_missing`，`ib.config.validate_prompt_directory`）保证；
+#   * 因 `ib.config` 侧不再需要「全名域内置兜底映射」，本模块**不再导出**任何兜底常量
+#     （原 IFC-IB-365 整体退役）。
+# --------------------------------------------------------------------------- #
 
 
 # --------------------------------------------------------------------------- #
@@ -339,59 +236,22 @@ def cn_map() -> dict[str, str]:
 
 
 def fallback_prompts() -> dict[str, str]:
-    """专家 -> 提示文件缺失时的内置兜底提示。[IFC-IB-175]
+    """专家 -> 派生注册表 `ExpertSpec.fallback_prompt` 字段的只读投影。[IFC-IB-175]
 
-    **REV-17（ADR-36）语义澄清**：本视图取自**当前派生注册表** `EXPERT_SPECS`，
-    因此装配期由 `install_derived` 注入的内置兜底会如实反映。它**不是**安全网真源 ——
-    真源是 `builtin_fallback_for()`（恒取 `_DEFAULT_SPECS`，不受 rebind 影响）。
+    **REV-20（ADR-48 决定 1）语义澄清**：该字段已**去驱动化** —— 代码内置提示词安全网
+    （原 `builtin_fallback_for()`，真源 `_DEFAULT_SPECS`）**整体删除**后，本视图取自
+    `EXPERT_SPECS`，其 `fallback_prompt` **恒为空串**（装配期 `_inject_derived_experts`
+    显式置空）。**本视图不再参与任何运行期提示词取值** —— 生效提示词来自项目提示词目录
+    （`main.md` / `fallback.md`），两层皆缺即装配期 `prompt_missing` fail-closed。
     """
     return {spec.name: spec.fallback_prompt for spec in EXPERT_SPECS}
 
 
-def builtin_fallback_for(name: str) -> str:
-    """专家 `name` 的**内置兜底**（REV-17 / ADR-36；恒非空）。
-
-    取值：`_DEFAULT_SPECS` 里同名专家的兜底 → 否则 `BUILTIN_FALLBACK_DEFAULT`。
-    这是提示词域「主 / 兜底」两层皆缺时的**唯一**最后防线，也是
-    `derive_prompt_layers` 合并、`validate_prompt_directory` 判据与
-    `_inject_derived_experts` 注入三者**共用的同一份映射**（单一真源）。
-    """
-    return _BUILTIN_FALLBACK_PROMPTS.get(name) or BUILTIN_FALLBACK_DEFAULT
-
-
-def builtin_fallbacks_for(names: Sequence[str]) -> dict[str, str]:
-    """给一组专家名解析出**完备**的内置兜底映射（供跨域合并按名查表）。
-
-    返回的每个值都非空（自定义专家回落到 `BUILTIN_FALLBACK_DEFAULT`），故下游
-    `ib.config` 侧只需 `mapping.get(name, "")`，**无需知道通用兜底常量的存在** ——
-    这正是把默认值解析收在本模块的原因（`ib.config` 不得 import `ib.experts`）。
-    """
-    return {name: builtin_fallback_for(name) for name in names}
-
-
-class _BuiltinFallbackMap(Mapping[str, str]):
-    """按名即取的内置兜底映射：**任意** name 都有值（未知者回落通用安全网）。
-
-    存在的理由：定义文档的**解析期**（`document_from_json` 的 legacy 键检查）需要在
-    知道文档里有谁之前就回答「这个专家的内置兜底是什么」—— 此时专家名尚未解析出来，
-    无法用 `builtin_fallbacks_for(names)` 预先生成静态字典。
-    """
-
-    def __getitem__(self, name: str) -> str:
-        return builtin_fallback_for(name)
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(_BUILTIN_FALLBACK_PROMPTS)
-
-    def __len__(self) -> int:
-        return len(_BUILTIN_FALLBACK_PROMPTS)
-
-
-#: 全名域内置兜底映射（REV-17 / ADR-36）：**单例**，供 `ibweb` 注入给 `ib.config`。
-#:
-#: `__getitem__` 恒不抛 `KeyError`，故 `in` / `.get()` 对任意 name 都成立且非空 ——
-#: 下游（`validate_prompt_directory` 的缺兜底判据、legacy 键比对）因此无需特殊分支。
-BUILTIN_FALLBACKS: Mapping[str, str] = _BuiltinFallbackMap()
+# --------------------------------------------------------------------------- #
+# REV-20（ADR-48）退役说明：原 `builtin_fallback_for` / `builtin_fallbacks_for` /
+# `_BuiltinFallbackMap` / `BUILTIN_FALLBACKS` 已**整体删除**（见上方退役说明段）。
+# 「生效提示词恒非空」现由创建期落盘 + 装配期 fail-closed 保证。
+# --------------------------------------------------------------------------- #
 
 
 def data_experts() -> tuple[str, ...]:
@@ -476,8 +336,9 @@ def main_prompts() -> dict[str, str | None]:
 # `None`/缺失），故「默认专家恰好一个 / 永不无应答」不依赖任何运行期「校验放行」。
 # --------------------------------------------------------------------------- #
 
-#: `demo` 项目种子含的**三对齐专家**（REQ-FUNC-IB-53 / ADR-45；「三专家属 demo」）。
-DEMO_EXPERT_NAMES: tuple[str, ...] = ("freeark-expert", "inspection-expert", "sanheng-knowledge")
+# REV-20（ADR-50）：`DEMO_EXPERT_NAMES` **已退役** —— 「默认三专家」机制取消，
+# `demo` 项目种子亦为唯一内置 kb-agent（`builtin_expert_registry()` 与
+# `builtin_default_registry()` 同值）。
 
 
 @dataclass(frozen=True, slots=True)
@@ -537,7 +398,9 @@ class ExpertRegistryView:
 def _spec_from_input(entry: "object") -> ExpertSpec:
     """把定义文档派生条目（`ExpertSpecInput`）转成运行期 `ExpertSpec`。
 
-    兜底提示词按名取**代码内置安全网**（ADR-36）—— 定义文档已不承载提示词文本；
+    **REV-20（ADR-48 决定 1+4）**：定义文档不承载提示词文本、代码内置兜底已退役，
+    故 `fallback_prompt` 恒为空串 —— 提示词正文由**创建期落盘**（ADR-51）+ **装配期
+    fail-closed**（`prompt_missing`）保证，**不**在此处解析任何兜底。
     与 `ibweb.composition._inject_derived_experts` 的转换**同源**（单一真源）。
     """
     return ExpertSpec(
@@ -545,7 +408,7 @@ def _spec_from_input(entry: "object") -> ExpertSpec:
         cn_label=entry.cn_label,  # type: ignore[attr-defined]
         keywords=tuple(entry.keywords),  # type: ignore[attr-defined]
         is_data_expert=entry.is_data_expert,  # type: ignore[attr-defined]
-        fallback_prompt=builtin_fallback_for(entry.name),  # type: ignore[attr-defined]
+        fallback_prompt="",
         is_delegating=entry.is_delegating,  # type: ignore[attr-defined]
         is_default=entry.is_default,  # type: ignore[attr-defined]
     )
@@ -569,34 +432,16 @@ def resolve_expert_registry(project_id: str, *, view: DerivedView) -> ExpertRegi
     return ExpertRegistryView(project_id=project_id, experts=experts, default_expert=defaults[0])
 
 
-#: **内置默认 KB 检索 agent**（IFC-IB-381，REQ-FUNC-IB-52 / OQ-IB-33(a)）。
-#:
-#: 新建项目的**种子真源** = **恰 1 个**知识库检索 agent（`is_default=True`，内置**不可删**）。
-#: `name` / `cn_label` 为**代码内置默认值**（[ARCH-ASSUMPTION-A13]：具体字面由施工期 /
-#: 用户指定，架构层不发明需求）—— 改这里即改新建项目的默认种子，上层零改动。
-#: **标签不得与 ADR-31 已退场的旧标签同字**（旧值见 `selfcheck.py` 的反向断言）：
-#: 仓库级 grep 归零由 `test_TC_UNIT_122_repo_grep_zero_old_slugs_and_labels` 把关。
-#: 兜底提示词保留 grounding 护栏（同 `_DEFAULT_SPECS` 纪律）：生产未配提示词目录时，
-#: 本串**就是**生效系统提示词。
-BUILTIN_DEFAULT_KB_AGENT: ExpertSpec = ExpertSpec(
-    name="kb-agent",
-    cn_label="知识库助手",
-    keywords=("知识库", "资料", "文档", "检索", "问答", "知识", "查资料"),
-    is_data_expert=True,
-    fallback_prompt=(
-        "你是项目知识库助手，严格依据检索到的资料与工具返回的数据作答，"
-        "不得编造数据、来源或结论；无法取得依据时应直接说明，并说明结论的适用边界。"
-    ),
-    is_delegating=False,
-    is_default=True,
-)
+#: **内置默认 KB 检索 agent**（IFC-IB-381）—— 定义见本文件上部「默认专家表」段
+#: （REV-20 / ADR-50：三专家退役后本单例是**唯一**内置专家；`fallback_prompt` 已去驱动化）。
 
 
 def builtin_default_registry() -> ExpertRegistryView:
-    """**新建项目的种子视图**（IFC-IB-381，REQ-FUNC-IB-52 / OQ-IB-33(a)）。
+    """**新建项目 / 未落盘项目的种子视图**（IFC-IB-381，REQ-FUNC-IB-52 / IB-57）。
 
     = **恰 1 个** 内置默认 KB 问答 agent（`is_default=True`，内置**不可删**）。
     `project_id` 取空串（本视图**与项目无关**，是「新建项目」的**模板**）。
+    **REV-20（ADR-50）**：本视图**同时是「未落盘 / 未配置项目」的回落**。
     """
     return ExpertRegistryView(
         project_id="", experts=(BUILTIN_DEFAULT_KB_AGENT,), default_expert=BUILTIN_DEFAULT_KB_AGENT
@@ -604,11 +449,11 @@ def builtin_default_registry() -> ExpertRegistryView:
 
 
 def builtin_expert_registry() -> ExpertRegistryView:
-    """**内置默认专家集**视图（代码内置安全网，`_DEFAULT_SPECS` 派生；IFC-IB-381 语义）。
+    """**内置默认专家集**视图（IFC-IB-381 语义；**REV-20 / ADR-50 口径修订**）。
 
-    即 `demo` 项目种子含的三对齐专家（REQ-FUNC-IB-53）。它是**代码兜底安全网**，
-    **不是**任何项目的运行期真源 —— 运行期真源一律是项目自身的 `ExpertRegistryView`。
+    **REV-20 起与 `builtin_default_registry()` 同值**：三专家（`freeark-expert` /
+    `inspection-expert` / `sanheng-knowledge`）机制**退役**，`DEMO_EXPERT_NAMES` 已删除，
+    `demo` 项目种子**亦**为唯一 kb-agent（REQ-FUNC-IB-57 / OQ-IB-46(b) / OQ-IB-47(c)）。
+    函数的**号 / 名 / 签名一字不变**（仅语义澄清）。
     """
-    specs = tuple(_DEFAULT_SPECS)
-    default = next(spec for spec in specs if spec.is_default)
-    return ExpertRegistryView(project_id="", experts=specs, default_expert=default)
+    return builtin_default_registry()

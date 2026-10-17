@@ -83,6 +83,8 @@ __all__ = [
     "with_prompt_bundles",
     "FsExpertPromptStore",
     "InMemoryExpertPromptStore",
+    # REV-20（IFC-IB-389）：内置 kb-agent 提示词种子资产读取器
+    "kb_agent_seed_prompt",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -908,4 +910,5 @@ from .prompts import (  # noqa: E402  (REV-16-2 提示词域；同「置于模�
     validate_prompt_directory,
     validate_tool_params,
     with_prompt_bundles,
+    kb_agent_seed_prompt,
 )

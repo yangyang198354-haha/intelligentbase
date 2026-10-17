@@ -1,14 +1,17 @@
-"""[REV-17 / ADR-36] 提示词兜底层重定位的**通道与安全网**单元覆盖。
+"""[REV-17 → **REV-20 修订**] 提示词「通道 + 非空性 + legacy 键」单元覆盖。
 
-覆盖三件在 REV-17 之前**没有覆盖面**的事（都是本次修订要堵的真缺陷）：
+覆盖三件真缺陷（原 REV-17 引入，本文件在 REV-20 下按新契约改写）：
 
   1. **system 位真的生效**：合并后的生效提示词必须进 `build_expert(system_prompt=...)`，
-     human 位只留用户问题本身。此前它被拼进 human 前缀，system 位恒为代码内置兜底 ——
+     human 位只留用户问题本身。此前它被拼进 human 前缀，system 位恒为兜底 ——
      即「配置页编辑的 markdown 主提示词从未成为系统提示」。
-  2. **内置安全网恒非空**：`main.md` / `fallback.md` 两层皆缺时回落
-     `BUILTIN_FALLBACK_DEFAULT`，由此 ADR-29 的「兜底恒非空」由**结构**保证。
-  3. **legacy 键分级处置**：旧定义文档残留的 `experts[].fallback_prompt` 与内置一致时
-     静默丢弃、不一致时 fail-closed 并指明迁移目标（绝不静默丢用户写的提示词）。
+  2. **代码内置安全网退役**（**契约翻转**，REV-20 / OQ-IB-42=B / ADR-48）：
+     内置注册表的 `ExpertSpec.fallback_prompt` 字段已**去驱动化**（恒为空串，不参与任何
+     运行期提示词取值）；「生效系统提示词恒非空」改由**创建期落盘 + 装配期 fail-closed**
+     （`prompt_missing`）保证 —— 两层皆缺不再回落内置文案，而是**抛错**。
+  3. **legacy 键一律 fail-closed**（**契约翻转**）：旧定义文档残留的
+     `experts[].fallback_prompt` 不再「与内置逐字比对后分级」，因比对基准已随安全网删除
+     —— 只要出现即拒绝装载并指明迁移目标 `main.md`（绝不静默丢用户写的提示词）。
 
 另附 `_clients` 缓存上界断言（装配期常量不变式；ADR-36 硬规则）。
 
@@ -21,13 +24,7 @@ import json
 
 import pytest
 
-from ib.core import ConfigError, LlmRole
-from ib.experts import (
-    BUILTIN_FALLBACK_DEFAULT,
-    BUILTIN_FALLBACKS,
-    builtin_fallback_for,
-    builtin_fallbacks_for,
-)
+from ib.core import ConfigError, ExpertSpec, LlmRole, PromptNotFoundError
 from ib.llm import OpenAiCompatibleProvider
 
 from tests.conftest import offline_raw
@@ -60,60 +57,61 @@ class _RecordingLlm:
         return LlmRole(role="expert", temperature=0.0, impl=_RecordingImpl(self.record))
 
 
+def _kb_agent_spec() -> ExpertSpec:
+    """内置注册表唯一专家（`fallback_prompt` 已去驱动化 = 空串）。"""
+    from ib.experts import BUILTIN_DEFAULT_KB_AGENT
+
+    return BUILTIN_DEFAULT_KB_AGENT
+
+
+def _synthetic_spec(*, fallback_prompt: str) -> ExpertSpec:
+    """合成一个带非空 `fallback_prompt` 字段的专家 —— 仅用于验证**通用透传机制**仍在
+    （内置注册表已不再使用该字段，故不能用内置专家来验证这条机制）。"""
+    return ExpertSpec(
+        name="synthetic",
+        cn_label="合成",
+        keywords=("合成",),
+        is_data_expert=False,
+        fallback_prompt=fallback_prompt,
+        is_delegating=False,
+        is_default=True,
+    )
+
+
 # --------------------------------------------------------------------------- #
 # 1 · system 位（通道矫正）
 # --------------------------------------------------------------------------- #
 
 
-def test_TC_UNIT_R17_effective_prompt_goes_to_system_slot():
+def test_TC_UNIT_R20_effective_prompt_goes_to_system_slot():
     """合并后的生效提示词进 system 位；human 位**只**含用户问题（不重复人格文本）。"""
     from ib.orchestration import _run_expert
 
     llm = _RecordingLlm()
-    merged = "你是系统管家（装配期由两域合并派生）。"
-    result = _run_expert(
-        {"expert": "freeark-expert", "query": "设备怎么巡检？", "prompt": merged}, llm, {}
-    )
+    merged = "你是知识库助手（装配期由项目提示词目录派生）。"
+    result = _run_expert({"expert": "kb-agent", "query": "资料里怎么说的？", "prompt": merged}, llm, {})
 
     assert result.degraded is False, result.degrade_reason
-    assert llm.calls == [("freeark-expert", merged)], "生效提示词必须经 system_prompt 传入"
-    assert llm.record["human"] == "设备怎么巡检？", "human 位只能有用户问题"
+    assert llm.calls == [("kb-agent", merged)], "生效提示词必须经 system_prompt 传入"
+    assert llm.record["human"] == "资料里怎么说的？", "human 位只能有用户问题"
     # 旧口径的 human 前缀拼接（`f"{prompt}\n\n用户问题：{query}"`）**必须**消失
     assert "用户问题：" not in llm.record["human"]
     assert merged not in llm.record["human"], "人格文本不得回填 human（否则同一段出现两次）"
 
 
-def test_TC_UNIT_R17_empty_prompt_becomes_none_not_empty_string():
+def test_TC_UNIT_R20_empty_prompt_becomes_none_not_empty_string():
     """空串 `prompt` → 传 `None`（`prompt or None`）。
 
-    空串会让 `_make_langchain_client` 返回**裸客户端**（无 system 注入、无 `run_tool_loop`），
-    症状是**静默**同时失去 system 消息与 function-calling。传 `None` 则让 `build_expert`
-    明确回落到 `spec.fallback_prompt`（内置安全网），两个能力都保住。
+    `_clients` 以 `(temperature, system_prompt)` 为键；空串与 `None` 语义不同，
+    故本函数保证「未取到提示词」时统一走 `None`，两种情形都可观测、可断言。
     """
     from ib.orchestration import _run_expert
 
     llm = _RecordingLlm()
-    result = _run_expert({"expert": "freeark-expert", "query": "q", "prompt": ""}, llm, {})
+    result = _run_expert({"expert": "kb-agent", "query": "q", "prompt": ""}, llm, {})
     assert result.degraded is False
-    assert llm.calls == [("freeark-expert", None)]
+    assert llm.calls == [("kb-agent", None)]
     assert llm.record["human"] == "q"
-
-
-def test_TC_UNIT_R17_whitespace_prompt_never_reaches_client_bare(monkeypatch):
-    """全空白 `prompt` 虽被原样传下（`"   "` 真值），但实现 `strip()` 后回落内置兜底 ——
-    **真实的 `build_expert`** 必须把它变成非空系统提示，system 位不得塌成裸客户端。
-
-    这条走真实 provider（拦掉客户端构造），断言的是「两段式防线的第二段」真的在：
-    `_run_expert` 的 `or None` 挡不住空白串，靠的是 `build_expert` 的 `strip()`。
-    """
-    from ib.experts import get
-    from ib.orchestration import _run_expert
-
-    provider, recorded = _bare_provider(monkeypatch)
-    _run_expert({"expert": "freeark-expert", "query": "q", "prompt": "   "}, provider, {})
-
-    assert recorded[-1]["system_prompt"] == get("freeark-expert").fallback_prompt
-    assert recorded[-1]["system_prompt"].strip(), "system 位恒非空（否则静默失去工具循环）"
 
 
 # --------------------------------------------------------------------------- #
@@ -140,7 +138,7 @@ def _bare_provider(monkeypatch) -> tuple[OpenAiCompatibleProvider, list]:
 
     monkeypatch.setattr(llm_mod, "_make_langchain_client", _fake_client)
     provider = object.__new__(OpenAiCompatibleProvider)
-    provider._base_url = "http://127.0.0.1:1/v1"  # noqa: SLF001 - 占位，永不发出请求
+    provider._base_url = "http://127.0.0.1:1/v1"  # noqa: S105 - 占位，永不发出请求
     provider._model = "placeholder-model"
     provider._api_key = "placeholder"  # noqa: S105 - 占位，非真实凭据
     provider._timeout = 1.0
@@ -152,26 +150,31 @@ def _bare_provider(monkeypatch) -> tuple[OpenAiCompatibleProvider, list]:
     return provider, recorded
 
 
-def test_TC_UNIT_R17_build_expert_uses_system_prompt_else_builtin_fallback(monkeypatch):
-    """给了 `system_prompt` 就用它；缺省 / 全空白 → 回落 `spec.fallback_prompt`（内置安全网）。"""
-    from ib.experts import get
+def test_TC_UNIT_R20_build_expert_passthrough_and_de_driven_registry(monkeypatch):
+    """**契约翻转（REV-20 / ADR-48）**：原 REV-17 断言「缺省 / 全空白 → 回落
+    `spec.fallback_prompt`（代码内置安全网）且恒非空」；REV-20 后：
 
+      * 内置注册表唯一专家的 `fallback_prompt` 已**去驱动化**（恒空串）；
+      * `build_expert` 的「缺省 → 回落 `spec.fallback_prompt`」**通用透传机制仍在**
+        （对任何显式构造的 spec 都成立），但**不再是**代码内置安全网。
+    """
     provider, recorded = _bare_provider(monkeypatch)
-    spec = get("freeark-expert")
 
-    provider.build_expert(spec, system_prompt="装配期合并结果")
+    # 显式给了 system_prompt 就用它
+    provider.build_expert(_kb_agent_spec(), system_prompt="装配期合并结果")
     assert recorded[-1]["system_prompt"] == "装配期合并结果"
 
-    provider.build_expert(spec)
-    assert recorded[-1]["system_prompt"] == spec.fallback_prompt
+    # 通用透传机制：合成 spec 的字段值被如实回落
+    provider.build_expert(_synthetic_spec(fallback_prompt="SB"))
+    assert recorded[-1]["system_prompt"] == "SB"
 
-    provider.build_expert(spec, system_prompt="   ")
-    assert recorded[-1]["system_prompt"] == spec.fallback_prompt
-    # 恒非空 —— 专家路径永不塌成裸客户端
-    assert all(r["system_prompt"] for r in recorded)
+    # 内置注册表：该字段恒空串（去驱动化 —— 提示词取值不再来自代码常量）
+    provider.build_expert(_kb_agent_spec())
+    assert recorded[-1]["system_prompt"] == ""
+    assert _kb_agent_spec().fallback_prompt == ""
 
 
-def test_TC_UNIT_R17_clients_cache_bounded_by_experts(monkeypatch):
+def test_TC_UNIT_R20_clients_cache_bounded_by_experts(monkeypatch):
     """`_clients` 上界 = 专家数 + 3（路由 / 专家 / 聚合三类固定角色各一份）。
 
     该断言守的是 ADR-36 的**硬规则**：`system_prompt` 只允许是装配期常量。一旦有人把
@@ -195,42 +198,26 @@ def test_TC_UNIT_R17_clients_cache_bounded_by_experts(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# 3 · 通用内置安全网（破「界面新增专家」死锁）
+# 3 · 未落盘专家的 fail-closed（**替代原「通用内置安全网」**）
 # --------------------------------------------------------------------------- #
 
 
-def test_TC_UNIT_R17_builtin_fallback_covers_unregistered_expert():
-    """未登记专家（`_DEFAULT_SPECS` 之外）也**恒**有非空内置兜底 —— 死锁由此打破。
-
-    死锁原形：`PUT definition`（加专家 c）要求非空兜底 → `PUT prompts/c/fallback` 又因
-    「专家未登记」直接 404。故**必须**有通用兜底，而不是「每个专家各自登记一份」。
+def test_TC_UNIT_R20_expert_without_prompt_files_fails_closed():
+    """**契约翻转（REV-20 / ADR-48）**：原口径下「未登记 / 未落盘专家恒有非空内置兜底」
+    用于打破「界面新增专家」死锁；REV-20 删除代码内置提示词后，同场景改为
+    **`PromptNotFoundError(code="prompt_missing")`** —— 死锁改由**创建期落盘**
+    （ADR-51 / IFC-IB-390）+ **回填迁移**（IFC-IB-391）打破，不再由代码兜底打破。
     """
     from ib.config import merge_prompt_layers
 
-    ghost = "brand-new-expert-not-in-defaults"
-    assert ghost not in set(BUILTIN_FALLBACKS)
-    assert builtin_fallback_for(ghost) == BUILTIN_FALLBACK_DEFAULT
-    assert BUILTIN_FALLBACK_DEFAULT.strip()
-
-    bundle = merge_prompt_layers(
-        ghost,
-        main_content=None,
-        fallback_content=None,
-        builtin_fallback=builtin_fallback_for(ghost),
-    )
-    assert bundle.resolved_from == "builtin_fallback"
-    assert bundle.effective_prompt == BUILTIN_FALLBACK_DEFAULT
-    # 「兜底非空」（ADR-29）由结构保证，不再依赖文档层校验放行
-    assert bundle.fallback_prompt.strip()
-
-
-def test_TC_UNIT_R17_builtin_fallbacks_for_is_total():
-    """`builtin_fallbacks_for` 对任意名字列表都是**全函数**（无 KeyError / 无空洞）。"""
-    names = ["freeark-expert", "幽灵专家", ""]
-    got = builtin_fallbacks_for(names)
-    assert set(got) == set(names)
-    assert all(v.strip() for v in got.values())
-    assert got["freeark-expert"] != BUILTIN_FALLBACK_DEFAULT, "已登记专家应取自己的专属兜底"
+    ghost = "brand-new-expert-not-in-registry"
+    with pytest.raises(PromptNotFoundError) as excinfo:
+        merge_prompt_layers(ghost, main_content=None, fallback_content=None)
+    assert excinfo.value.code == "prompt_missing"
+    # 落盘两层之一即恢复可用（新的破死锁路径）
+    bundle = merge_prompt_layers(ghost, main_content="# 新专家提示词\n", fallback_content=None)
+    assert bundle.resolved_from == "main_file"
+    assert bundle.effective_prompt.strip()
 
 
 def test_TC_UNIT_R17_definition_doc_no_longer_requires_fallback_prompt():
@@ -277,7 +264,7 @@ def test_TC_UNIT_R17_definition_doc_no_longer_requires_fallback_prompt():
 
 
 # --------------------------------------------------------------------------- #
-# 4 · legacy 键分级处置
+# 4 · legacy 键：**REV-20 起一律 fail-closed**
 # --------------------------------------------------------------------------- #
 
 
@@ -302,57 +289,32 @@ def _legacy_doc_text(*, name: str, fallback: str) -> str:
     )
 
 
-def test_TC_UNIT_R17_legacy_key_identical_to_builtin_is_dropped_silently():
-    """与内置兜底**逐字相同** → 静默丢弃（零信息损失）—— 生产种子文档正是这一支。"""
+@pytest.mark.parametrize(
+    ("name", "fallback"),
+    [
+        ("kb-agent", ""),            # 与「曾经的内置兜底」相同的情形（现在无从比对）
+        ("kb-agent", "用户手写的、绝不能静默丢掉的一段提示词"),
+        ("幽灵", "x"),               # 未登记专家
+    ],
+)
+def test_TC_UNIT_R20_legacy_key_always_fails_closed(name: str, fallback: str):
+    """**契约翻转（REV-20 / ADR-48 决定 3）**：原 REV-17 口径按「与内置逐字比对」分级
+    （相同→静默丢弃 / 不同→fail-closed）；比对基准随代码内置提示词一并删除后，
+    **一律 fail-closed** —— 只要残留 `fallback_prompt` 键即拒绝装载。
+
+    断言：① 抛 `ConfigError`；② 指明专家名与迁移目标 `main.md`；③ **不回显正文**、
+    只报长度（IFC-IB-348 纪律）。
+    """
     from ib.config import document_from_json
 
-    name = "freeark-expert"
-    builtins = builtin_fallbacks_for([name])
-    doc = document_from_json(
-        "p1", _legacy_doc_text(name=name, fallback=builtins[name]), builtin_fallbacks=builtins
-    )
-    assert [e.name for e in doc.experts] == [name]
-    # 字段已被移除：解析结果里根本没有承载这段文本的位置（也就无从「静默生效」）
-    assert not hasattr(doc.experts[0], "fallback_prompt")
-
-
-def test_TC_UNIT_R17_legacy_key_differing_from_builtin_fails_closed():
-    """与内置**不同** → 抛 `ConfigError` 并指明迁移目标；错误消息**不回显正文**。"""
-    from ib.config import document_from_json
-
-    name = "freeark-expert"
-    builtins = builtin_fallbacks_for([name])
-    secret_body = "用户手写的、绝不能静默丢掉的一段提示词"
     with pytest.raises(ConfigError) as excinfo:
-        document_from_json(
-            "p1", _legacy_doc_text(name=name, fallback=secret_body), builtin_fallbacks=builtins
-        )
+        document_from_json("p1", _legacy_doc_text(name=name, fallback=fallback))
     message = str(excinfo.value)
     assert name in message
-    assert "fallback.md" in message, "必须指明迁移目标"
-    assert secret_body not in message, "错误消息不得回显提示词正文（IFC-IB-348 纪律）"
-    # 只报长度，便于运维核对是哪一处
-    assert str(len(secret_body)) in message
-
-
-def test_TC_UNIT_R17_legacy_key_without_injected_map_is_ignored():
-    """未注入内置映射（2 参调用方）→ 一律忽略：向后兼容既有调用点，不制造假失败。"""
-    from ib.config import document_from_json
-
-    doc = document_from_json(
-        "p1", _legacy_doc_text(name="freeark-expert", fallback="任意文本")
-    )
-    assert [e.name for e in doc.experts] == ["freeark-expert"]
-
-
-def test_TC_UNIT_R17_unregistered_expert_legacy_key_is_ignored():
-    """映射里查不到该专家（空映射）→ 忽略：无从判定「是否等价」，故不误杀。"""
-    from ib.config import document_from_json
-
-    doc = document_from_json(
-        "p1", _legacy_doc_text(name="幽灵", fallback="x"), builtin_fallbacks={}
-    )
-    assert [e.name for e in doc.experts] == ["幽灵"]
+    assert "main.md" in message, "必须指明迁移目标"
+    assert str(len(fallback.strip())) in message, "只报长度，便于运维核对"
+    if fallback.strip():
+        assert fallback not in message, "错误消息不得回显提示词正文（IFC-IB-348 纪律）"
 
 
 # --------------------------------------------------------------------------- #

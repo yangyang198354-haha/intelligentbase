@@ -149,22 +149,54 @@ def test_TC_E2E_003_delete_removes_from_retrieval(http_app):
 
 
 def test_TC_E2E_004_composite_multi_expert_fused_single_answer(deps):
-    """US-IB-09 复合问题选多专家并行处理，且只给一版融合答案（关键路径）。"""
-    from ib.core import Scope
-    from ib.experts import EXPERT_SPECS
+    """US-IB-09 复合问题选多专家并行处理，且只给一版融合答案（关键路径）。
+
+    **REV-20（ADR-50）**：内置注册表已收敛为唯一 `kb-agent`，故「多专家」由**项目级注入视图**
+    （`IntentRouter(experts=…)`，ADR-43/47 的正式路径）表达；融合与单版交付机制不变。
+    """
+    from ib.core import (
+        DerivedView,
+        ExpertSpecInput,
+        GraphConfig,
+        OrchestrationSpecInput,
+        Scope,
+    )
+    from ib.experts import resolve_expert_registry
     from ib.orchestration import build_graph
     from ib.routing.intent import IntentRouter
     from ib.streaming import MemorySessionStore
-    from ib.core import GraphConfig
 
-    decision = IntentRouter().classify_experts("能耗数据和设备故障一起看看", scope=Scope(project_id="p_alpha"))
-    assert len(decision.experts) >= 2 and len(decision.experts) <= 3, decision.experts
+    def _spec(name, label, kws, *, data=True, default=False):
+        return ExpertSpecInput(
+            name=name,
+            cn_label=label,
+            keywords=kws,
+            exemplars=(),
+            is_data_expert=data,
+            is_delegating=False,
+            is_default=default,
+        )
+
+    view = resolve_expert_registry(
+        "p_alpha",
+        view=DerivedView(
+            experts=(
+                _spec("energy-agent", "能耗助手", ("能耗", "数据"), default=True),
+                _spec("ops-agent", "巡检诊断", ("设备", "故障")),
+            ),
+            capability_digest="",
+            graph_config=OrchestrationSpecInput(nodes=("START", "END"), conditional_edges=(), edges=()),
+        ),
+    )
+    router = IntentRouter(experts=view)
+    decision = router.classify_experts("能耗数据和设备故障一起看看", scope=Scope(project_id="p_alpha"))
+    assert 2 <= len(decision.experts) <= 3, decision.experts
 
     bound = deps.bind_tools(Scope(project_id="p_alpha"))
     orch = build_graph(
-        llm=deps.llm, experts=EXPERT_SPECS, tools=bound, sessions=MemorySessionStore(),
-        config=GraphConfig(), scope=Scope(project_id="p_alpha"),
-        tools_by_expert={s.name: bound for s in EXPERT_SPECS},
+        llm=deps.llm, experts=view.experts, tools=bound, sessions=MemorySessionStore(),
+        config=GraphConfig(), scope=Scope(project_id="p_alpha"), router=router,
+        tools_by_expert={name: bound for name in view.names()},
     )
     events = list(orch.run("能耗数据和设备故障一起看看", ctx=request_ctx("p_alpha"), session_key="p_alpha:u:e2e4"))
     kinds = [str(e.kind) for e in events]
@@ -563,9 +595,11 @@ def test_TC_E2E_016_invalid_config_refused_at_assembly(http_app):
     envelope = json.loads(client.get(path, **AUTH).content)
     baseline_tau = envelope["document"]["route"]["tau"]
 
-    # 2) 非法配置（默认专家不唯一）→ 400 且定位到条目；不得静默生效
+    # 2) 非法配置（**零个**默认专家）→ 400 且定位到条目；不得静默生效
+    # **REV-20（ADR-50）**：默认文档只有一位专家（`kb-agent`），无法再造「两个默认」，
+    # 故改为「把唯一专家的 `is_default` 置 False」→ 同样触发 `expert_default_count`。
     dup = json.loads(json.dumps(envelope["document"]))
-    dup["experts"][1]["is_default"] = True
+    dup["experts"][0]["is_default"] = False
     bad = client.put(path, data=json.dumps({"document": dup}), content_type="application/json", **AUTH)
     assert bad.status_code == 400
     items = json.loads(bad.content)["error"]["items"]
@@ -581,8 +615,8 @@ def test_TC_E2E_016_invalid_config_refused_at_assembly(http_app):
                 "schema_version": 1,
                 "project_id": "p_alpha",
                 "experts": [
-                    {"name": "a", "cn_label": "A", "keywords": ["k"], "is_default": True, "fallback_prompt": "p"},
-                    {"name": "a", "cn_label": "A2", "keywords": ["k"], "is_default": True, "fallback_prompt": "p"},
+                    {"name": "a", "cn_label": "A", "keywords": ["k"], "is_default": True},
+                    {"name": "a", "cn_label": "A2", "keywords": ["k"], "is_default": True},
                 ],
                 "route": {"tau": 1.5, "margin": 0.05, "max_expert_steps": 0, "default_expert": "ghost"},
                 "orchestration": {"nodes": ["route"], "conditional_edges": []},
