@@ -347,3 +347,44 @@ sudo systemctl restart ib-web ib-worker
 
 **DELIVERED** —— REV-20 三组门控（GR-B-012 / GR-C-016 / GR-D-018）与 GROUP_E 部署门控（GR-E-008，条件闭合后升为 PASS）全部通过；代码、资产、脚本、清单、前端、测试与文档全部落地并推送（`ea51c97` / `18d1bb5`）；**生产部署已执行并通过严格断言，端到端问答已由用户 UI 复核验收**；PHASE_11 由冻结转为 **APPROVED**。残留开放项 3 条（`demo` 启用前置、worker env 现状、新增专家工作流从严）均为**非阻塞且有明确处置办法**。
 
+
+---
+
+# §R21 REV-21 交付报告（可视化配置「编排图」实显项目已配置的专家）
+
+> 追加式；不影响上文历史结论。日期 2026-10-17。用户诉求：「可视化配置的编排图要实际抵显示配置的专家。不能用一个"expert" 代替」；用户裁决「全部按推荐（A）」，并授权「commit + push 然后部署」。
+
+## §R21.1 需求与设计要点
+
+- **问题**：编排图由定义文档 `orchestration` 派生，而**定义文档与运行期 LangGraph 均以单一结构节点 `expert` 表达全部专家**（运行期由 `_fan_out` 以 `Send("expert", …)` 扇出同名节点多实例），故界面专家方块**恒为字面量 `expert`**，与项目实际专家集无关。
+- **决定（ADR-52）**：改动面收在**显示投影层**（Option A；B 前端层展开 / C 定义文档承载 / D 运行期多节点 均**已评估未采纳** —— C 违反 OQ-IB-52=A 与 C-IB-56①，D 违反 C-IB-54）。
+- **契约（IFC-IB-393 / 394）**：① `definition_derived_summary` 按 `view.experts` **逐专家展开** `nodes` / `conditional_edges` / `edges`，并新增 `derived.experts`（`name`/`cn_label`/`is_default`）；② 前端节点标签取 `cn_label`、专家节点加 `graph-expert` class 与图例、**仍只读**。
+- **纪律**：**未动**运行期编排拓扑、`derive()`、`DerivedView`、定义文档 schema ⇒ **既有定义文档零迁移**；信封顶层键与 `config_key_names` 不变；撞名结构节点 / `START` / `END` ⇒ **显式报错（不静默改名）**；无新第三方依赖。
+- **变更面**：源码 4 文件（`src/ibweb/serializers.py` / `src/ibweb/views.py` / `ConfigPage.vue` / `api/client.ts`）+ 测试（新增 unit 19 / integration 4 / e2e 2 / 前端 5）+ 文档 12 份（含检查清单新增 `[B27]`）。本地实跑：pytest **428 passed / 2 skipped**、selfcheck **52/52**、前端 **40/40**、typecheck / build EXIT 0。
+
+## §R21.2 门控汇总
+
+| 阶段 | 门控 | 结论 |
+|------|------|------|
+| GROUP_A | GR-A-013 | **PASS**（OQ-IB-49 ~ OQ-IB-56 全部采纳推荐默认 A；条件闭合） |
+| GROUP_B | GR-B-013 | PASS_WITH_CONDITIONS（ADR-52 + §2.0.12 + IFC-IB-393/394） |
+| GROUP_C | GR-C-017 | PASS_WITH_CONDITIONS（CRITICAL 0 / MAJOR 0） |
+| GROUP_D | GR-D-019 | **PASS**（12 组 AC 全覆盖；三层 100%/100%/100%） |
+| GROUP_E（PHASE_10） | GR-E-009 | PASS_WITH_CONDITIONS（仅计划） |
+| GROUP_E（PHASE_11） | GR-E-010 | PASS_WITH_CONDITIONS（**部署已执行 + 严格断言通过**；条件 = 用户 UI 复核） |
+
+## §R21.3 生产部署执行记录（2026-10-17）
+
+- **提交**：`7bfdf3f`（父 `bc0ef6d`），已 push `origin/main`（经本机 SOCKS5 代理 `127.0.0.1:10808`；HTTP 代理模式报 TLS eof，改 `socks5h://` 成功）。
+- **DEPLOY-041**：`/opt/intelligentbase` `git pull` → HEAD = **7bfdf3f**；REV-21 代码在树（`_expand_expert_nodes` / `DerivedExpertEntry` / `graph-expert` grep 命中）。
+- **DEPLOY-043**：`src/frontend` `npm ci` + `npm run build` 成功 → `rsync -a --delete dist/ /var/www/intelligentbase/`（产物 19:49，asset 哈希更新，`vendor-flow` 保留）。
+- **DEPLOY-042**：`sudo -n systemctl restart ib-web`、`sudo -n systemctl restart ib-worker`（**须逐条命令**；免密 sudoers 只匹配单条 unit）→ `rc=0`。
+- **DEPLOY-044 严格断言（全 PASS）**：三单元 `active` + `running` + `NRestarts=0`；`/healthz=200`、`/healthz/deps=200`；`GET /api/config/definition` = **401**（路由存活、鉴权正常）；`startup` 命中 16 行、`prompt_source` 命中（ib-web 2 / ib-worker 1）⇒ REV-20 来源可核验未被破坏。
+- **回滚锚点**：代码 = `git checkout bc0ef6d` + 重启两单元；前端 = **旧产物未备份**（`/var/www` 不可写致同级 `cp` 失败）⇒ 回退代码后重新 `npm ci && npm run build` 并发布（git 可完整重建）。**如实登记**。
+- **边界**：**无 schema 迁移 / 无数据变更 / 无新 env 键**；未读取或回显凭据；未用临时 sudo 授权文件。
+
+## §R21.4 最终状态（REV-21）
+
+**DEPLOYED / 待用户 UI 验收** —— 代码已推送、生产已部署并通过全部严格断言；**唯一未闭合项 = 用户在可视化配置页肉眼确认编排图「逐专家成节点、不再只有一个 `expert` 方块」**（AC-IB-51-01 ~ 51-03，属 `[NOT_TESTABLE]` 的视觉观感）。经用户确认后 GR-E-010 可升为 **PASS**，PHASE_11 置 APPROVED。
+
+> **残留开放项（非阻塞，承前）**：① `demo` 仍为三专家 + legacy `fallback_prompt`（disabled，启用前须先迁移）；② `ib-worker.env` 未设 `IB_DEFINITION_DOC_PATH`（既有常态）；③ `deployment_plan.md` 未补登 REV-20 部署步骤（本轮自 DEPLOY-041 续编号）。
