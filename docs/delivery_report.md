@@ -155,3 +155,195 @@ R13 交付后回归：**全局管理员**（`users.project_id IS NULL` ⇒ `Auth
 
 ## 最终状态
 **DELIVERED_WITH_ISSUES** —— REV-14（回归缺陷修复轮，PARTIAL_FLOW：GROUP_B → C → D → E）四组门控全部通过（GR-B-007 / GR-C-010 / GR-D-011 / GR-E-005，均为 PASS_WITH_CONDITIONS），REV-14 的设计、实现、测试与部署计划均已交付且经独立只读复核与独立实跑证实（Python 245/245 + 前端 21/21）；**PHASE_11 生产部署按用户指令冻结未执行**。承载前遗留项（bcrypt pin / `[INFERRED]` 需求 / TTL 阈值 / 偏差 D-01 / FND-GROUP-D-03 / 环境版本）并新增本轮开放项（CRED-01 提交前脱敏、R14-OBS-01/02/03、R14-L-01），故判 DELIVERED_WITH_ISSUES 而非 DELIVERED。
+
+---
+
+# REV-20 收口段（2026-10-17）
+
+> **注**：本文件 file_header 仍标注 REV-14（历史增量）—— REV-16 ~ REV-20 的增量未逐轮回写本摘要视图。
+> **权威状态一律以 `docs/phase_status.md` 为准**（见 GR-A-012 / GR-B-012 / GR-C-016 / GR-D-018 / GR-E-008）。
+
+## §R20.1 交付范围与依据
+
+用户诉求（2026-10-17，REV-20）：① 默认 `kb-agent` 按 agent-builder 意见优化；② 删除代码里的提示词，改为新建项目目录默认落盘并使其工作；③ 取消默认三专家机制（新建项目只有一个通用 `kb-agent`）。
+
+依据：`requirements_spec.md` / `user_stories.md`（1.12.0 / REV-20；OQ-IB-41=B / 42=B / 43=C / 44=C / 45=C / 46=B / 47=C / 48=C；约束 C-IB-52）+ `architecture_design.md`（1.12.0 / REV-20，ADR-48 ~ 51）+ `module_design.md`（1.12.0 / REV-20，IFC-IB-389 ~ 392）。
+
+## §R20.2 交付物（提交引用）
+
+| 类别 | 内容 | 提交 |
+|------|------|------|
+| 代码 | `ib/experts`（安全网 + 三专家退役）、`ib/config/prompts`（两层 fail-closed + `kb_agent_seed_prompt`）、`ib/config/definition`（legacy 键一律 fail-closed）、`ib/core/{ports,types}`、`ibweb/composition`（创建期落盘 + 回填迁移 + `prompt_source` 日志）、`ibweb/views`、`ib/observability`、`ib/llm`、`ib/orchestration`、`ib/streaming` | `ea51c97` |
+| 资产 | `src/ib/expert_seeds/kb-agent.md`（9 层架构提示词种子，8514B） | `ea51c97` |
+| 脚本 | `src/scripts/backfill_prompts.py`（IFC-IB-391 入口，用户手工执行） | `ea51c97` |
+| 清单 | `src/deploy/checklists.txt` 新增 **[B26]**（签署行 → `B1–B26`） | `ea51c97` |
+| 前端 | `client.ts`（删 `builtin_fallback`）/ `ConfigPage.vue`（删内置兜底回显 + 回退链第三值 → `prompt_missing`）/ `frontend.smoke.test.js`（第 29 例翻转） | `ea51c97` |
+| 测试 | 16 个既有测试文件 + `src/scripts/selfcheck.py` 按新契约逐条改写 | `ea51c97` |
+| 文档 | 需求 / 架构 / 模块 / 实现计划（§27）/ phase_status（GR-C-016 / GR-D-018 / GR-E-008） | `ea51c97` / `18d1bb5` |
+| 本段 | `docs/delivery_report.md` 追加 REV-20 收口段 | 见本次收口提交 |
+
+## §R20.3 契约翻转清单（八条）
+
+1. 「两层皆缺」由「回落代码内置兜底」→ **`PromptNotFoundError(code="prompt_missing")` fail-closed**；
+2. `resolved_from` 值域由 `{main_file, fallback_file, builtin_fallback}` → **`{main_file, fallback_file}`**；
+3. 内置注册表由三对齐专家 → **唯一通用 `kb-agent`**（`builtin_expert_registry()` ≡ `builtin_default_registry()`，`demo` 亦改 kb-agent）；
+4. legacy `experts[].fallback_prompt` 由「与内置逐字比对后分级」→ **一律 fail-closed**；
+5. `GET /api/config/prompts` 专家条目键集由 `{name, cn_label, layers, builtin_fallback}` → **`{name, cn_label, layers}`**；
+6. 新增专家由「无需提示词文件即可保存 / 装配」→ **必须先在项目提示词目录落盘 `main.md` / `fallback.md`**；
+7. `migrate_expert_history` 的 `experts` 默认值 → **空元组**（迁移口径停用，显式传参能力保留）；
+8. `fallback_prompts()` / `ExpertSpec.fallback_prompt` **去驱动化**（恒空串，不参与运行期取值）。
+
+## §R20.4 验证证据
+
+### 本机（提交前）
+```
+python -m pytest tests -q        →  403 passed / 2 skipped / 0 failed（收集 405）
+python src/scripts/selfcheck.py  →  52/52 通过（EXIT 0）
+node --test frontend.smoke…      →  35 pass / 0 fail
+```
+逐层：unit 169/169 = **100.00%**（2 skipped 为既有）、integration 186/186 = **100.00%**、e2e 27/27（关键路径）**100%**。被退役符号（`BUILTIN_FALLBACK_DEFAULT` / `BUILTIN_FALLBACKS` / `DEMO_EXPERT_NAMES` / `_DEFAULT_SPECS`）全仓**零引用**。
+
+### 生产（192.168.31.133）
+| 断言 | 结果 |
+|------|------|
+| `ActiveState` / `SubState` | ib-web = active / running；ib-worker = active / running（ib-embed 未触碰） |
+| `NRestarts` | ib-web = **0**；ib-worker = **0** |
+| journal | `Started ib-web.service`；`{"stage": "startup", "outcome": "succeeded"}` |
+| `GET /healthz/deps` / `GET /healthz` | **200** / **200**（qdrant ok / embed ok / llm ok / egress 已声明） |
+| 来源可核验（IFC-IB-392） | ib-web 与 ib-worker 各一条 `{"stage": "prompt_source", "outcome": "resolved_from", "expert": "kb-agent", "source": "main_file"}` |
+| 端到端（OQ-IB-45=C） | **用户 UI 复核通过**：项目 `New` 提问命中已上传资料、答复带引用来源 |
+
+## §R20.5 生产部署执行记录
+
+1. **备份（回滚点）**：`/root/ib-rev20-backup_20261017_153448/`（`/var/lib/intelligentbase` 全量 tar 341KB + `ib-web.env` + `config.json`）。
+2. **只读检查结论**：注册表**仅 `New` 为 `active`**（`demo` / `Freeark` 均 `disabled`，不参与装配）；`IB_EXPERT_PROMPT_DIR=/var/lib/intelligentbase/prompts` 与 `IB_DEFINITION_DOC_PATH=/var/lib/intelligentbase` 为不同值；`IB_EXPERT_PROMPT_ENABLED` 未设 → 默认**启用**（fs 模式）。唯一硬阻塞 = `New` 的定义文档列 `kb-agent` 但 `prompts/New/kb-agent/` 为空。
+3. **停服窗口（一次收敛）**：`git pull`（→ 代码面 `ea51c97`）→ `systemctl stop ib-web ib-worker` → 回填 → `systemctl start ib-web ib-worker`。
+4. **回填**：`sudo -u ib-web … backfill_prompts.py --prompt-root /var/lib/intelligentbase/prompts --projects New` → `New: created`；产物 `prompts/New/kb-agent/main.md`（8514B，`0640 ib-web:ib`）。**以服务账号执行是必须的**（`_atomic_write` 经 `mkstemp` 0600；以 root 执行会写出 `root:ib 0600` → 服务读不到）。
+5. **刻意未做**：未对 `demo` / `Freeark` 回填提示词（二者 `disabled` 且文档不含 `kb-agent`，写入即成孤儿文件 → 日后启用即 fail-fast）。
+6. **收尾纪律**：临时授权 `/etc/sudoers.d/90-ib-temp` 与 `/tmp` 检查脚本已删除；未读取 / 未回显任何口令或 Key 字面量；未 push 任何生产侧改动。
+
+## §R20.6 回滚方案
+
+```
+sudo tar -C /var/lib -xzf /root/ib-rev20-backup_20261017_153448/intelligentbase.tar.gz
+sudo chown -R ib-web:ib /var/lib/intelligentbase
+git -C /opt/intelligentbase checkout 8b5755f
+sudo systemctl restart ib-web ib-worker
+```
+
+## §R20.7 开放项与残留风险（均非阻塞）
+
+1. **`demo` 项目**：仍为 FreeArk 三专家 + 带 legacy `fallback_prompt` 键（OQ-IB-47=C 要求「demo 改 kb-agent」）。因其 `disabled` 不参与装配，当前无运行期影响。**若日后启用**，须先 ① 迁移三个 `fallback_prompt` 文本为提示词目录文件；② 专家集改为 `kb-agent`（或落盘其提示词文件），否则启动即 `ConfigError` / `prompt_missing`。
+2. **`ib-worker.env` 未设 `IB_DEFINITION_DOC_PATH`**：worker 启动打 `path_not_configured_using_in_memory_default`（warning 级）并使用内存默认定义文档；既有常态，不影响其取用 fs 提示词与开工。
+3. **新增专家工作流已变更**：现在必须先落盘提示词文件再登记专家（代码兜底不再兜底），属 ADR-48 的**预期从严**行为。
+
+## §R20.8 门控汇总
+
+| 阶段 | 门控 | 结论 |
+|------|------|------|
+| GROUP_A | GR-A-012 | PASS（八处 OQ 裁决闭合） |
+| GROUP_B | GR-B-012 | PASS_WITH_CONDITIONS（ADR-48 ~ 51 + IFC-IB-389 ~ 392） |
+| GROUP_C | GR-C-016 | PASS_WITH_CONDITIONS（实现 + 八条契约翻转 + 3 处计划外必要增量） |
+| GROUP_D | GR-D-018 | PASS_WITH_CONDITIONS（403 passed / 2 skipped，三层 100%） |
+| GROUP_E | GR-E-008 | **PASS**（部署已执行 + 用户 UI 验收通过；唯一条件已闭合） |
+
+## §R20.9 最终状态（REV-20）
+
+**DELIVERED** —— REV-20 三组门控（GR-B-012 / GR-C-016 / GR-D-018）与 GROUP_E 部署门控（GR-E-008，条件闭合后升为 PASS）全部通过；代码、资产、脚本、清单、前端、测试与文档全部落地并推送（`ea51c97` / `18d1bb5`）；**生产部署已执行并通过严格断言，端到端问答已由用户 UI 复核验收**；PHASE_11 由冻结转为 **APPROVED**。残留开放项 3 条（`demo` 启用前置、worker env 现状、新增专家工作流从严）均为**非阻塞且有明确处置办法**。
+
+
+---
+
+# REV-20 收口段（2026-10-17）
+
+> **注**：本文件 file_header 仍标注 REV-14（历史增量）—— REV-16 ~ REV-20 的增量未逐轮回写本摘要视图。
+> **权威状态一律以 `docs/phase_status.md` 为准**（见 GR-A-012 / GR-B-012 / GR-C-016 / GR-D-018 / GR-E-008）。
+
+## §R20.1 交付范围与依据
+
+用户诉求（2026-10-17，REV-20）：① 默认 `kb-agent` 按 agent-builder 意见优化；② 删除代码里的提示词，改为新建项目目录默认落盘并使其工作；③ 取消默认三专家机制（新建项目只有一个通用 `kb-agent`）。
+
+依据：`requirements_spec.md` / `user_stories.md`（1.12.0 / REV-20；OQ-IB-41=B / 42=B / 43=C / 44=C / 45=C / 46=B / 47=C / 48=C；约束 C-IB-52）+ `architecture_design.md`（1.12.0 / REV-20，ADR-48 ~ 51）+ `module_design.md`（1.12.0 / REV-20，IFC-IB-389 ~ 392）。
+
+## §R20.2 交付物（提交引用）
+
+| 类别 | 内容 | 提交 |
+|------|------|------|
+| 代码 | `ib/experts`（安全网 + 三专家退役）、`ib/config/prompts`（两层 fail-closed + `kb_agent_seed_prompt`）、`ib/config/definition`（legacy 键一律 fail-closed）、`ib/core/{ports,types}`、`ibweb/composition`（创建期落盘 + 回填迁移 + `prompt_source` 日志）、`ibweb/views`、`ib/observability`、`ib/llm`、`ib/orchestration`、`ib/streaming` | `ea51c97` |
+| 资产 | `src/ib/expert_seeds/kb-agent.md`（9 层架构提示词种子，8514B） | `ea51c97` |
+| 脚本 | `src/scripts/backfill_prompts.py`（IFC-IB-391 入口，用户手工执行） | `ea51c97` |
+| 清单 | `src/deploy/checklists.txt` 新增 **[B26]**（签署行 → `B1–B26`） | `ea51c97` |
+| 前端 | `client.ts`（删 `builtin_fallback`）/ `ConfigPage.vue`（删内置兜底回显 + 回退链第三值 → `prompt_missing`）/ `frontend.smoke.test.js`（第 29 例翻转） | `ea51c97` |
+| 测试 | 16 个既有测试文件 + `src/scripts/selfcheck.py` 按新契约逐条改写 | `ea51c97` |
+| 文档 | 需求 / 架构 / 模块 / 实现计划（§27）/ phase_status（GR-C-016 / GR-D-018 / GR-E-008） | `ea51c97` / `18d1bb5` |
+| 本段 | `docs/delivery_report.md` 追加 REV-20 收口段 | 见本次收口提交 |
+
+## §R20.3 契约翻转清单（八条）
+
+1. 「两层皆缺」由「回落代码内置兜底」→ **`PromptNotFoundError(code="prompt_missing")` fail-closed**；
+2. `resolved_from` 值域由 `{main_file, fallback_file, builtin_fallback}` → **`{main_file, fallback_file}`**；
+3. 内置注册表由三对齐专家 → **唯一通用 `kb-agent`**（`builtin_expert_registry()` ≡ `builtin_default_registry()`，`demo` 亦改 kb-agent）；
+4. legacy `experts[].fallback_prompt` 由「与内置逐字比对后分级」→ **一律 fail-closed**；
+5. `GET /api/config/prompts` 专家条目键集由 `{name, cn_label, layers, builtin_fallback}` → **`{name, cn_label, layers}`**；
+6. 新增专家由「无需提示词文件即可保存 / 装配」→ **必须先在项目提示词目录落盘 `main.md` / `fallback.md`**；
+7. `migrate_expert_history` 的 `experts` 默认值 → **空元组**（迁移口径停用，显式传参能力保留）；
+8. `fallback_prompts()` / `ExpertSpec.fallback_prompt` **去驱动化**（恒空串，不参与运行期取值）。
+
+## §R20.4 验证证据
+
+### 本机（提交前）
+```
+python -m pytest tests -q        →  403 passed / 2 skipped / 0 failed（收集 405）
+python src/scripts/selfcheck.py  →  52/52 通过（EXIT 0）
+node --test frontend.smoke…      →  35 pass / 0 fail
+```
+逐层：unit 169/169 = **100.00%**（2 skipped 为既有）、integration 186/186 = **100.00%**、e2e 27/27（关键路径）**100%**。被退役符号（`BUILTIN_FALLBACK_DEFAULT` / `BUILTIN_FALLBACKS` / `DEMO_EXPERT_NAMES` / `_DEFAULT_SPECS`）全仓**零引用**。
+
+### 生产（192.168.31.133）
+| 断言 | 结果 |
+|------|------|
+| `ActiveState` / `SubState` | ib-web = active / running；ib-worker = active / running（ib-embed 未触碰） |
+| `NRestarts` | ib-web = **0**；ib-worker = **0** |
+| journal | `Started ib-web.service`；`{"stage": "startup", "outcome": "succeeded"}` |
+| `GET /healthz/deps` / `GET /healthz` | **200** / **200**（qdrant ok / embed ok / llm ok / egress 已声明） |
+| 来源可核验（IFC-IB-392） | ib-web 与 ib-worker 各一条 `{"stage": "prompt_source", "outcome": "resolved_from", "expert": "kb-agent", "source": "main_file"}` |
+| 端到端（OQ-IB-45=C） | **用户 UI 复核通过**：项目 `New` 提问命中已上传资料、答复带引用来源 |
+
+## §R20.5 生产部署执行记录
+
+1. **备份（回滚点）**：`/root/ib-rev20-backup_20261017_153448/`（`/var/lib/intelligentbase` 全量 tar 341KB + `ib-web.env` + `config.json`）。
+2. **只读检查结论**：注册表**仅 `New` 为 `active`**（`demo` / `Freeark` 均 `disabled`，不参与装配）；`IB_EXPERT_PROMPT_DIR=/var/lib/intelligentbase/prompts` 与 `IB_DEFINITION_DOC_PATH=/var/lib/intelligentbase` 为不同值；`IB_EXPERT_PROMPT_ENABLED` 未设 → 默认**启用**（fs 模式）。唯一硬阻塞 = `New` 的定义文档列 `kb-agent` 但 `prompts/New/kb-agent/` 为空。
+3. **停服窗口（一次收敛）**：`git pull`（→ 代码面 `ea51c97`）→ `systemctl stop ib-web ib-worker` → 回填 → `systemctl start ib-web ib-worker`。
+4. **回填**：`sudo -u ib-web … backfill_prompts.py --prompt-root /var/lib/intelligentbase/prompts --projects New` → `New: created`；产物 `prompts/New/kb-agent/main.md`（8514B，`0640 ib-web:ib`）。**以服务账号执行是必须的**（`_atomic_write` 经 `mkstemp` 0600；以 root 执行会写出 `root:ib 0600` → 服务读不到）。
+5. **刻意未做**：未对 `demo` / `Freeark` 回填提示词（二者 `disabled` 且文档不含 `kb-agent`，写入即成孤儿文件 → 日后启用即 fail-fast）。
+6. **收尾纪律**：临时授权 `/etc/sudoers.d/90-ib-temp` 与 `/tmp` 检查脚本已删除；未读取 / 未回显任何口令或 Key 字面量；未 push 任何生产侧改动。
+
+## §R20.6 回滚方案
+
+```
+sudo tar -C /var/lib -xzf /root/ib-rev20-backup_20261017_153448/intelligentbase.tar.gz
+sudo chown -R ib-web:ib /var/lib/intelligentbase
+git -C /opt/intelligentbase checkout 8b5755f
+sudo systemctl restart ib-web ib-worker
+```
+
+## §R20.7 开放项与残留风险（均非阻塞）
+
+1. **`demo` 项目**：仍为 FreeArk 三专家 + 带 legacy `fallback_prompt` 键（OQ-IB-47=C 要求「demo 改 kb-agent」）。因其 `disabled` 不参与装配，当前无运行期影响。**若日后启用**，须先 ① 迁移三个 `fallback_prompt` 文本为提示词目录文件；② 专家集改为 `kb-agent`（或落盘其提示词文件），否则启动即 `ConfigError` / `prompt_missing`。
+2. **`ib-worker.env` 未设 `IB_DEFINITION_DOC_PATH`**：worker 启动打 `path_not_configured_using_in_memory_default`（warning 级）并使用内存默认定义文档；既有常态，不影响其取用 fs 提示词与开工。
+3. **新增专家工作流已变更**：现在必须先落盘提示词文件再登记专家（代码兜底不再兜底），属 ADR-48 的**预期从严**行为。
+
+## §R20.8 门控汇总
+
+| 阶段 | 门控 | 结论 |
+|------|------|------|
+| GROUP_A | GR-A-012 | PASS（八处 OQ 裁决闭合） |
+| GROUP_B | GR-B-012 | PASS_WITH_CONDITIONS（ADR-48 ~ 51 + IFC-IB-389 ~ 392） |
+| GROUP_C | GR-C-016 | PASS_WITH_CONDITIONS（实现 + 八条契约翻转 + 3 处计划外必要增量） |
+| GROUP_D | GR-D-018 | PASS_WITH_CONDITIONS（403 passed / 2 skipped，三层 100%） |
+| GROUP_E | GR-E-008 | **PASS**（部署已执行 + 用户 UI 验收通过；唯一条件已闭合） |
+
+## §R20.9 最终状态（REV-20）
+
+**DELIVERED** —— REV-20 三组门控（GR-B-012 / GR-C-016 / GR-D-018）与 GROUP_E 部署门控（GR-E-008，条件闭合后升为 PASS）全部通过；代码、资产、脚本、清单、前端、测试与文档全部落地并推送（`ea51c97` / `18d1bb5`）；**生产部署已执行并通过严格断言，端到端问答已由用户 UI 复核验收**；PHASE_11 由冻结转为 **APPROVED**。残留开放项 3 条（`demo` 启用前置、worker env 现状、新增专家工作流从严）均为**非阻塞且有明确处置办法**。
+
