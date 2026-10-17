@@ -959,36 +959,18 @@ async function savePromptLayer(expertName: string, layer: PromptLayer): Promise<
         </div>
       </div>
 
-      <h3>代码内置兜底（只读 · 终级回退：提示词目录两层皆缺时生效）</h3>
-      <p class="hint">
-        提示词文本**只**由下方「提示词分层」承载（<code>main.md</code> / <code>fallback.md</code>）。
-        两层文件皆缺时回落到**代码内置兜底** —— 它是随服务发布的进程常量，界面**不可编辑**，
-        因此同一份兜底提示词**不存在第二个写入口**（ADR-36）。
-      </p>
-      <p v-if="promptPhase === 'unavailable'" class="blocked">
-        提示词域当前不可用，无法回显内置兜底正文。请在下方「提示词分层」区域确认状态。
-      </p>
-      <div v-else-if="promptPhase === 'loading'">载入中…</div>
-      <template v-else>
-        <div v-for="expert in promptExperts" :key="`p-${expert.name}`" class="prompt">
-          <div class="prompt-head">
-            <strong>{{ expert.cn_label || expert.name }}</strong>
-            <code>{{ expert.name }}</code>
-            <span class="hint">只读 · 不可界面编辑</span>
-          </div>
-          <p class="hint">提示词域不可用时无法回显提示词（代码内置兜底已退役）。</p>
-        </div>
-      </template>
-
       <h3>提示词分层（独立提示词目录 · 与定义文档分属两个真源）</h3>
       <p v-if="promptPhase === 'unavailable'" class="blocked">
-        提示词域当前不可用（可视化配置总开关关闭或服务端 fail-closed）。请检查部署后重试。
+        提示词域当前不可用（服务端 fail-closed，或可视化配置总开关关闭）。
+        <span v-if="promptBanner">服务端返回：{{ promptBanner }}</span>
+        若刚部署完成，请强刷页面（Ctrl+F5）后重试。
       </p>
       <p v-else-if="promptPhase === 'loading'">提示词载入中…</p>
       <template v-else-if="promptEnvelope">
         <p class="hint">
           两层文件**皆可缺**；合并优先序为 主 <code>main.md</code> &gt; 兜底
-          <code>fallback.md</code> &gt; 代码内置兜底。保存**不热重载** ——
+          <code>fallback.md</code>（**代码内置兜底已退役**；**两层皆缺 ⇒ <code>prompt_missing</code>，
+          该专家无法装配**，ADR-48）。保存**不热重载** ——
           重启 <code>ib-web</code> / <code>ib-worker</code> 后装配期才重新合并生效（ADR-32）。
         </p>
         <p class="hint">
