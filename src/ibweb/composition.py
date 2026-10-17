@@ -184,9 +184,15 @@ class Deps:
         `derived_views`）：此前只刷新 `projects`，导致热登记项目在 `prompt_stores` 中缺条目，
         `/api/config/prompts` 对该项目 fail-closed 返回 503（定义文档因经单实例存储按需读取
         而不受影响，故此前表现为「配置页提示词区不可用、定义页正常」）。
+
+        **同时补齐台账侧的项目行与知识库行**（`kb_id == project_id`）：缺行会让该项目的
+        资料上传被归属断言拦成 403（详见 `_ensure_project_ledger_rows`）。
         """
         fresh = _projects_from_registry(self.cfg, self.ledger, self.project_registry)
         _ensure_collections(self.vectors, self.collections, fresh)
+        # 运行期新建项目同样需要台账的 `projects` 行与 `kb_id == project_id` 的知识库行，
+        # 否则该项目的资料上传恒 403（`_seed_projects` 只覆盖 `cfg.projects`）。
+        _ensure_project_ledger_rows(self.ledger, fresh)
         with self._lock:
             self.projects = fresh
             self._orchestrators = {}
@@ -633,6 +639,8 @@ def _assemble() -> Deps:
 
     # 3b) collection 就绪 + 前缀断言（FM-5 / AC-IB-12-03）
     _ensure_collections(vectors, collections, projects)
+    # 3c) 逐项目补齐台账项目行 + 知识库行（IFC-IB-130 归属断言的判定依据；幂等）
+    _ensure_project_ledger_rows(ledger, projects)
 
     read_provider = _make_read_provider(ledger, cfg)
     write_provider = RebuildAwareProjectProvider(ledger, read_provider)
@@ -927,6 +935,33 @@ def _seed_accounts(store: Any, settings: Any, *, offline: bool) -> None:
         username=settings.default_admin_username,
         password_hash=hash_password(password),
     )
+
+
+def _ensure_project_ledger_rows(ledger: Any, projects: dict[str, ProjectRecord]) -> None:
+    """逐项目补齐台账侧的 `projects` 行与 `kb_id == project_id` 的知识库行（**幂等**）。
+
+    REV-18（IFC-IB-375 / ADR-41）起，项目域资料上传的 kb 由主体 `project_id` **推导**
+    （`kb_id ≡ project_id`），服务端以台账 `kbs` 表做归属断言
+    （`assert_kb_in_project` → 失败抛 `ScopeViolationError` → HTTP **403**）。
+
+    这两行**只**在 `_seed_projects` 里按 **`cfg.projects`** 登记；而 ADR-37 之后
+    `Deps.projects` 的数据源是**注册表活动项目** —— 运行期经 `POST /api/projects`
+    新建的项目不在 `cfg.projects` 里 ⇒ 台账缺 `projects` 行 ⇒ `upsert_kb` 先抛
+    「知识库所属项目未登记」，`kbs` 行随之缺失 ⇒ **对该项目的任何上传恒 403**
+    （前端表现为「当前令牌无权操作该项目或该知识库」）。
+
+    顺序**必须**「先项目行、后知识库行」：`upsert_kb` 会校验项目已登记。
+    `upsert_project` 的 `ON CONFLICT` 只更新 `name` / `embedding_model_id` / `dim`，
+    **不**回写 `active_collection_version` / `created_at`，故对既有行无副作用。
+
+    与 `_ensure_collections` 同级收敛：装配期与热重载（`reload_projects`）各调一次，
+    既覆盖运行期新建项目，也使既有缺行项目在下次装配 / 项目 CRUD 后自愈。
+    """
+    for project_id, project in projects.items():
+        ledger.upsert_project(project)
+        ledger.upsert_kb(
+            KbRecord(kb_id=project_id, project_id=project_id, name=project_id, created_at="")
+        )
 
 
 def _ensure_collections(vectors: Any, collections: Any, projects: dict[str, ProjectRecord]) -> None:

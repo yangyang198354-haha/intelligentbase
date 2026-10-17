@@ -522,3 +522,53 @@ def test_TC_INT_R19_011_hot_registered_project_gets_prompt_store(accounts_app, m
     payload = json.loads(resp.content)
     assert [e["name"] for e in payload["experts"]] == ["kb-agent"]
     assert set(payload["experts"][0]["layers"]) == {"main", "fallback"}
+
+
+# --------------------------------------------------------------------------- #
+# TC-INT-R19-012 —— 运行期新建项目的资料上传必须可用（归属断言的 kb 行）
+# --------------------------------------------------------------------------- #
+
+
+def test_TC_INT_R19_012_hot_registered_project_is_upload_ready(accounts_app, monkeypatch, tmp_path):
+    """US-IB-42 延伸；IFC-IB-130（归属断言）× REV-18 IFC-IB-375 × ADR-37 / ADR-45。
+
+    缺陷现象：项目域上传前服务端以台账 `kbs` 表做归属断言（`kb_id ≡ project_id`，失败抛
+    `ScopeViolationError` → HTTP **403**），前端表现为「当前令牌无权操作该项目或该知识库」
+    且列表 0 项；而该行**只在 `_seed_projects` 里按 `cfg.projects` 登记** —— ADR-37 之后
+    `Deps.projects` 取自**注册表活动项目**，运行期经 `POST /api/projects` 新建的项目不在
+    配置里 ⇒ 缺该行 ⇒ **对该项目的任何上传恒 403**。
+
+    本用例断言：`POST /api/projects` 之后，(1) 归属断言通过；(2) 真实上传返回 **201**。
+    """
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from ib.config import FileDefinitionDocumentStore
+    from ibweb.composition import known_tool_names
+
+    monkeypatch.setenv("IB_DEFINITION_DOC_PATH", str(tmp_path))
+    deps, Client = accounts_app
+    deps.definition_store = FileDefinitionDocumentStore(
+        str(tmp_path), known_tools=known_tool_names()
+    )
+
+    client = Client()
+    h = bearer(_login_admin(client))
+    r = client.post(
+        "/api/projects",
+        data=json.dumps({"project_id": "uploadable", "name": "可上传项目"}),
+        content_type="application/json",
+        **h,
+    )
+    assert r.status_code == 201, r.content
+
+    # (1) 归属断言必须通过 —— 修复前此处抛 `ScopeViolationError`（→ 403）
+    deps.ledger.assert_kb_in_project("uploadable", "uploadable")
+
+    # (2) 上传必须 201（修复前 403）
+    up = SimpleUploadedFile(
+        "note.txt", "新项目上传正文。".encode("utf-8"), content_type="text/plain"
+    )
+    resp = client.post("/api/files", {"file": up}, **h, **{DEF_PATH_HEADER: "uploadable"})
+    assert resp.status_code == 201, resp.content
+    # REV-18 起 `kb_id ≡ project_id`，故响应的归属字段是 `kb_id`。
+    assert json.loads(resp.content)["kb_id"] == "uploadable"

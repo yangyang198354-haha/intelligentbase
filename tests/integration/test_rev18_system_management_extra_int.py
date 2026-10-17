@@ -372,16 +372,22 @@ def test_TC_INT_160_no_response_body_contains_plaintext_key(accounts_app):
 
 
 # --------------------------------------------------------------------------- #
-# TC-INT-161 D-R18-01：运行期新建项目的可用性边界（**按裁决属预期行为**）
+# TC-INT-161 D-R18-01：运行期新建项目的可用性（**ADR-45 口径：创建即可用，含上传**）
 # --------------------------------------------------------------------------- #
 
 
-def test_TC_INT_161_runtime_project_usable_only_after_config_registration_and_restart(accounts_app):
-    """US-IB-36 / US-IB-37 / US-IB-44；ADR-32 / ADR-37 / ADR-41。
+def test_TC_INT_161_runtime_project_usable_immediately_after_create(accounts_app):
+    """US-IB-36 / US-IB-37 / US-IB-44；ADR-32 / ADR-37 / ADR-41 / **ADR-45**。
 
-    运行期经 `POST /api/projects` 新建的项目：**热重载后立即可用于知识问答**
-    （`deps.projects` 刷新 + 编排器缓存清空，无需重启 ib-web）。
-    上传路径仍须 kb 归属登记（`assert_kb_in_project`），属台账侧独立约束。
+    运行期经 `POST /api/projects` 新建的项目：**热重载后立即可用**（`deps.projects` 刷新 +
+    编排器缓存清空 + 台账 `projects` / `kbs` 行补齐），无需重启 ib-web —— **含资料上传**。
+
+    **契约变更（2026-10-17）**：REV-18 原文为「上传路径仍须 kb 归属登记（台账侧独立约束），
+    故 403」。该口径只让**配置侧**项目登记 `projects` / `kbs` 行，而 ADR-37 之后
+    `Deps.projects` 源自**注册表活动项目** ⇒ 运行期新建项目在台账缺行 ⇒ 上传恒 403；
+    这与 REV-19 / ADR-45「创建期播种、创建即可用」的整体口径矛盾（同一接缝的另一面是
+    提示词域曾经的 503，见 TC-INT-R19-011）。故按 ADR-45 口径统一为**创建即可上传**，
+    回归由 `TC-INT-R19-012` 把关。
     """
     deps, _ = accounts_app
     client = _client(accounts_app)
@@ -415,11 +421,12 @@ def test_TC_INT_161_runtime_project_usable_only_after_config_registration_and_re
     )
     assert chat.status_code == 200, _body(chat)
 
-    # 上传路径仍须 kb 归属登记（台账侧独立约束，不受 deps.projects 热重载影响）—— 403。
+    # 上传路径的 kb 归属登记（`kb_id ≡ project_id`）随热重载一并补齐 —— 运行期新建项目
+    # **创建即可上传**（ADR-45 创建期播种口径；`reload_projects` 补齐台账 `projects` + `kbs` 行）。
     up = SimpleUploadedFile("g.txt", "内容".encode("utf-8"))
     upload = client.post("/api/files", {"file": up}, HTTP_X_IB_PROJECT="p_gamma", **h)
-    assert upload.status_code == 403, upload.content
-    assert json.loads(upload.content)["error"]["code"] == "scope_violation"
+    assert upload.status_code == 201, upload.content
+    assert json.loads(upload.content)["kb_id"] == "p_gamma"
 
     # 对照：已登记项目（配置侧播种）上传正常。
     ok = client.post(
