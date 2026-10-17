@@ -498,3 +498,177 @@ def test_TC_UNIT_122_repo_grep_zero_old_slugs_and_labels():
     selfcheck_text = (repo / "src" / "scripts" / "selfcheck.py").read_text(encoding="utf-8")
     assert all(s in selfcheck_text for s in _OLD_SLUGS)
     assert _OLD_LABELS[0] in selfcheck_text
+
+
+# --------------------------------------------------------------------------- #
+# **REV-23**：检索参数（`top_k` / `score_threshold`）**按专家可配**
+# 溯源：REQ-FUNC-IB-39（既有工具参数可配；**不新增工具本体**）/ AC-IB-31-04
+# 派生链：`SEARCH_TOOL_SPEC.parameters` →（`derive_tool_param_specs`）→ `ToolParamSpec`
+#        → 配置页控件 / `validate_tool_params` 校验 / `build_authorized_tools` 注入
+# --------------------------------------------------------------------------- #
+
+
+def test_TC_UNIT_123_search_tool_spec_exposes_optional_retrieval_param_specs():
+    """参数面：两个新参数**可选**（`query` 必填性逐字不变）、带上下界；scope 仍不暴露。"""
+    from ibweb.composition import SEARCH_TOOL_SPEC, known_tool_param_specs
+
+    schema = SEARCH_TOOL_SPEC.parameters or {}
+    props = schema["properties"]
+    assert set(props) == {"query", "top_k", "score_threshold"}
+    assert schema["required"] == ["query"]  # 新参数不进 required（运行期仍可选）
+    assert props["top_k"]["type"] == "integer"
+    assert (props["top_k"]["minimum"], props["top_k"]["maximum"]) == (1, 50)
+    assert props["score_threshold"]["type"] == "number"
+    assert (props["score_threshold"]["minimum"], props["score_threshold"]["maximum"]) == (0, 1)
+    # ADR-09 铁律：`scope` / `retrieval` **绝不**进入参数面（模型无从指定范围）
+    assert not ({"scope", "retrieval", "project_id", "kb_ids"} & set(props))
+
+    by_name = {s.name: s for s in known_tool_param_specs()}
+    assert set(by_name) == {
+        "search_knowledge.query",
+        "search_knowledge.top_k",
+        "search_knowledge.score_threshold",
+    }
+    assert by_name["search_knowledge.top_k"].type == "int"
+    assert (by_name["search_knowledge.top_k"].minimum, by_name["search_knowledge.top_k"].maximum) == (
+        1.0,
+        50.0,
+    )
+    assert by_name["search_knowledge.score_threshold"].type == "float"
+    assert (
+        by_name["search_knowledge.score_threshold"].minimum,
+        by_name["search_knowledge.score_threshold"].maximum,
+    ) == (0.0, 1.0)
+
+
+def test_TC_UNIT_124_search_as_tool_passes_retrieval_params_through():
+    """透传链：`search_as_tool` 把 `top_k` / `score_threshold` **原样**交给 `search`；
+    未给时传 `None`（不覆盖构造期配置 `cfg.retrieval.*`）。"""
+    from ib.core import RetrievalResult, Scope
+    from ib.retrieval import RetrievalService
+
+    seen: list[dict] = []
+
+    class _Recording(RetrievalService):
+        def __init__(self) -> None:  # 不触达构造期依赖：只验证透传链
+            pass
+
+        def search(self, query, *, scope, top_k=None, score_threshold=None):
+            seen.append({"query": query, "top_k": top_k, "score_threshold": score_threshold})
+            return RetrievalResult(
+                hits=[], degraded=False, degrade_reason=None,
+                scope=scope, elapsed_ms=0, candidate_count=0,
+            )
+
+    svc = _Recording()
+    scope = Scope(project_id="p1")
+    out = svc.search_as_tool("问题", scope=scope, top_k=7, score_threshold=0.25)
+    assert out.ok is True
+    assert seen[-1] == {"query": "问题", "top_k": 7, "score_threshold": 0.25}
+
+    svc.search_as_tool("问题", scope=scope)
+    assert seen[-1] == {"query": "问题", "top_k": None, "score_threshold": None}, (
+        "未给参数时应原样传 None（否则会静默覆盖装配期配置）"
+    )
+
+
+def test_TC_UNIT_125_authorized_binding_injects_retrieval_params_as_defaults():
+    """注入链：专家级配置经 partial 作**默认值**；调用方显式实参优先；scope 不可指定。"""
+    from ib.core import Scope, ToolResult
+    from ib.tools import ToolRegistry, bind_scope, build_authorized_tools, derive_tool_param_specs
+    from ibweb.composition import register_builtin_tools
+
+    class _Recording:
+        def search_as_tool(self, query, *, scope, top_k=None, score_threshold=None):
+            return ToolResult(
+                ok=True, content=f"{query}|{top_k}|{score_threshold}|{scope.project_id}"
+            )
+
+    reg = register_builtin_tools(ToolRegistry())
+    specs = derive_tool_param_specs(reg)
+    expert_params = (
+        core.ToolParamValue("search_knowledge.top_k", "2"),
+        core.ToolParamValue("search_knowledge.score_threshold", "0.5"),
+    )
+    bound = bind_scope(
+        build_authorized_tools(
+            (core.ToolGrantSpec("kb-agent", ("search_knowledge",), expert_params),),
+            registry=reg,
+            specs=specs,
+        ),
+        Scope(project_id="p_a"),
+        _Recording(),
+    )[0]
+    # 配置值作默认值 ⇒ 模型不显式传时配置生效（REV-23 的「按专家调检索条数」常态）
+    assert bound.callable("Q").content == "Q|2|0.5|p_a"
+    # 既有优先级契约（IFC-IB-350）不变：调用方显式实参优先
+    assert bound.callable("Q", top_k=9).content == "Q|9|0.5|p_a"
+    assert bound.callable("Q", score_threshold=0.1).content == "Q|2|0.1|p_a"
+    # scope 铁律：调用方传 scope 也改不了检索范围（构造期绑定是唯一真源）
+    assert bound.callable("Q", scope=Scope(project_id="p_evil")).content == "Q|2|0.5|p_a"
+    # 同参名不进工具签名（结构性隐藏）
+    assert not ({"scope", "retrieval"} & set(inspect.signature(bound.callable).parameters))
+
+    # 未配置 → `None` 透传（装配期默认由检索服务回落 `cfg.retrieval.*`）
+    plain = bind_scope(
+        build_authorized_tools(
+            (core.ToolGrantSpec("kb-agent", ("search_knowledge",)),), registry=reg, specs=specs
+        ),
+        Scope(project_id="p_a"),
+        _Recording(),
+    )[0]
+    assert plain.callable("Q").content == "Q|None|None|p_a"
+
+
+def test_TC_UNIT_126_retrieval_params_validation_rejects_oob_type_and_unauthorized():
+    """负例：越界 / 类型不符 / 未授权工具带参 —— **显式拒绝**（不静默钳制），装配期同 fail-fast。"""
+    from ib.tools import ToolRegistry, build_authorized_tools, derive_tool_param_specs
+    from ibweb.composition import register_builtin_tools
+
+    reg = register_builtin_tools(ToolRegistry())
+    specs = derive_tool_param_specs(reg)
+
+    def _codes(grants) -> set[str]:
+        return {e.code for e in cfg.validate_tool_params(grants, specs=specs)}
+
+    authorized = ("search_knowledge",)
+    assert "tool_param_out_of_range" in _codes(
+        (core.ToolGrantSpec("kb-agent", authorized, (core.ToolParamValue("search_knowledge.top_k", "999"),)),)
+    )
+    assert "tool_param_type_mismatch" in _codes(
+        (core.ToolGrantSpec("kb-agent", authorized, (core.ToolParamValue("search_knowledge.top_k", "abc"),)),)
+    )
+    assert "tool_param_out_of_range" in _codes(
+        (
+            core.ToolGrantSpec(
+                "kb-agent",
+                authorized,
+                (core.ToolParamValue("search_knowledge.score_threshold", "1.5"),),
+            ),
+        )
+    )
+    assert "tool_param_unauthorized_tool" in _codes(
+        (core.ToolGrantSpec("kb-agent", (), (core.ToolParamValue("search_knowledge.top_k", "5"),)),)
+    )
+    # 边界值合法（含上下界）
+    assert cfg.validate_tool_params(
+        (
+            core.ToolGrantSpec(
+                "kb-agent",
+                authorized,
+                (
+                    core.ToolParamValue("search_knowledge.top_k", "1"),
+                    core.ToolParamValue("search_knowledge.score_threshold", "1"),
+                ),
+            ),
+        ),
+        specs=specs,
+    ) == ()
+
+    # 装配期 fail-fast（既有行为不得回退）：未授权工具带参 → ToolParamValidationError
+    with pytest.raises(core.ToolParamValidationError):
+        build_authorized_tools(
+            (core.ToolGrantSpec("kb-agent", (), (core.ToolParamValue("search_knowledge.top_k", "5"),)),),
+            registry=reg,
+            specs=specs,
+        )

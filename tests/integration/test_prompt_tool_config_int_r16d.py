@@ -15,9 +15,12 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import replace
 
 import pytest
+
+from conftest import ingest_text
 
 import ib.core as core
 
@@ -119,7 +122,12 @@ def test_TC_INT_136_single_registration_point_tools_and_params(http_app):
 
     assert known_tool_names() == ("search_knowledge",)
     specs = known_tool_param_specs()
-    assert [s.name for s in specs] == ["search_knowledge.query"]
+    # **REV-23**：参数面含检索条数 / 相似度阈值（可选，随 schema 派生 → 配置页可见）
+    assert [s.name for s in specs] == [
+        "search_knowledge.query",
+        "search_knowledge.top_k",
+        "search_knowledge.score_threshold",
+    ]
 
     deps, Client = http_app
     payload = json.loads(Client().get(LIST, **AUTH).content)
@@ -258,3 +266,95 @@ def test_TC_INT_140_definition_roundtrip_preserves_param_values_DEFECT_R16_01(ht
         "DEFECT-R16-01：GET 未回读 param_values —— 一次「GET 草稿 → PUT 保存」往返即"
         "静默清空已配置的工具参数"
     )
+
+
+# --------------------------------------------------------------------------- #
+# **REV-23**：检索条数 / 相似度阈值**按专家生效**（装配期授权绑定路径）
+# 溯源：AC-IB-31-04（工具参数随授权保存并生效）/ REQ-FUNC-IB-39（既有工具参数可配）
+# --------------------------------------------------------------------------- #
+
+def _hit_count(content: str | None) -> int:
+    """工具回执里的命中条数（格式 `[n] 文档名 (位置)`，见 `search_as_tool`）。"""
+    return len(re.findall(r"(?m)^\[\d+\] ", content or ""))
+
+
+def test_TC_INT_141_per_expert_retrieval_params_take_effect_at_assembly(deps):
+    """配置 `search_knowledge.top_k` → 该专家绑定工具的**检索条数按配置生效**；未配置 → 装配期默认。"""
+    from ib.core import Scope, ToolGrantSpec, ToolParamValue
+
+    for i in range(6):
+        ingest_text(deps, "p_alpha", "kb_a", f"规程{i}.txt", f"轴承温度报警处置规程第 {i} 条。")
+    scope = Scope(project_id="p_alpha", kb_ids=("kb_a",))
+    base = deps.definitions["p_alpha"]
+    expert = base.experts[0].name
+
+    def _tool():
+        return next(t for t in deps.bind_tools(scope) if t.name == "search_knowledge")
+
+    # 未配置 → 装配期默认（conftest 离线装配 `retrieval.top_k=3`）
+    assert _hit_count(_tool().callable("轴承温度报警").content) == 3
+
+    # 配 `top_k=1` → 检索条数随配置收敛
+    deps.definitions["p_alpha"] = replace(
+        base,
+        tool_grants=(
+            ToolGrantSpec(
+                expert, ("search_knowledge",), (ToolParamValue("search_knowledge.top_k", "1"),)
+            ),
+        ),
+    )
+    assert _hit_count(_tool().callable("轴承温度报警").content) == 1
+
+    # 配 `score_threshold=1.0`（严于任意非同向量相似度）→ 全部被滤掉（空结果 ≠ 降级）
+    deps.definitions["p_alpha"] = replace(
+        base,
+        tool_grants=(
+            ToolGrantSpec(
+                expert,
+                ("search_knowledge",),
+                (ToolParamValue("search_knowledge.score_threshold", "1.0"),),
+            ),
+        ),
+    )
+    strict = _tool().callable("轴承温度报警")
+    assert strict.ok is True and strict.degraded is False
+    assert _hit_count(strict.content) == 0
+
+    # 未授权工具带参：装配期仍 fail-fast（既有行为不回退）
+    deps.definitions["p_alpha"] = replace(
+        base,
+        tool_grants=(
+            ToolGrantSpec(expert, (), (ToolParamValue("search_knowledge.top_k", "1"),)),
+        ),
+    )
+    with pytest.raises(core.ToolParamValidationError):
+        deps.bind_tools(scope)
+
+
+def test_TC_INT_142_retrieval_param_write_path_validates_and_applies(http_app):
+    """保存路径：越界 / 类型不符 → 400 且**既有配置不变**（fail-safe）；合法值 → 200 且写回生效。"""
+    deps, Client = http_app
+    client = Client()
+    doc = _get_def(client)
+    base = doc["content_hash"]
+
+    cases = (
+        ({"name": "search_knowledge.top_k", "value": "999"}, "tool_param_out_of_range"),
+        ({"name": "search_knowledge.top_k", "value": "abc"}, "tool_param_type_mismatch"),
+        ({"name": "search_knowledge.score_threshold", "value": "1.5"}, "tool_param_out_of_range"),
+    )
+    for pv, code in cases:
+        bad = json.loads(json.dumps(doc))
+        bad["tool_grants"][0]["param_values"] = [pv]
+        resp = _put_def(client, bad, expected=base)
+        assert resp.status_code == 400, resp.content
+        assert code in {i["code"] for i in json.loads(resp.content)["error"]["items"]}
+        assert deps.definition_store.load("p_alpha").content_hash == base, "非法保存改写了在用配置"
+
+    # 合法取值（界内）→ 保存成功且写回生效（配置页「按专家调检索条数」的写入路径）
+    ok = json.loads(json.dumps(doc))
+    ok["tool_grants"][0]["param_values"] = [{"name": "search_knowledge.top_k", "value": "5"}]
+    resp = _put_def(client, ok, expected=base)
+    assert resp.status_code == 200, resp.content
+    stored = deps.definition_store.load("p_alpha")
+    assert core.ToolParamValue("search_knowledge.top_k", "5") in stored.tool_grants[0].param_values

@@ -84,7 +84,12 @@ def test_TC_INT_R16_prompt_list_contract(http_app):
     assert all(e["layers"]["main"]["exists"] for e in payload["experts"])
     assert all(not e["layers"]["fallback"]["exists"] for e in payload["experts"])
     # 参数规格由既有工具派生（不含新增工具本体）
-    assert {s["name"] for s in payload["tool_param_specs"]} == {"search_knowledge.query"}
+    # **REV-23**：新增 `top_k` / `score_threshold` 两个**可选**参数规格（检索条数 / 阈值按专家可配）
+    assert {s["name"] for s in payload["tool_param_specs"]} == {
+        "search_knowledge.query",
+        "search_knowledge.top_k",
+        "search_knowledge.score_threshold",
+    }
     # **只登记键名，不含任何值**
     assert payload["config_key_names"] == ["IB_EXPERT_PROMPT_DIR", "IB_EXPERT_PROMPT_ENABLED"]
     # **只读回执不含正文**（凭据与正文均不外泄）；令牌值不出现在响应体

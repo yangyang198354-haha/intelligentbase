@@ -2067,3 +2067,54 @@ pass 35  fail 0
 ## 28.6 [ARCH-ASSUMPTION-A16] 实测结论
 
 `derived` **新增键** `experts`：既有消费方若对键集做**强断言**须同步。本轮**实跑复核**：① 全量 `pytest`（403 passed）中**无**任何用例对 `derived` 键集做强断言（既有断言均为 `derived["nodes"] and derived["expert_names"]` 之类**取值**断言）；② 前端 `client.ts` 为**结构类型**（非 exact），新增键不影响类型检查（`vue-tsc` EXIT 0）；③ HTTP 层断言 `set(payload) == {"document","derived","editable_fields","config_key_names"}`（**顶层**键，非 `derived` 内键）**不受影响**。⇒ **A16 实测无破坏面**：仅**新增**键，既有 5 键**键名 / 位置**不变。
+
+---
+
+# REV-23 实现增量（2026-10-17）
+
+> 依据：用户诉求（**按专家调检索条数**）+ `docs/requirements_spec.md` **REQ-FUNC-IB-39 / A-4 / OQ-IB-19**（「工具可配置」口径 =
+> **对既有工具集的授权勾选 + 工具参数可配**；**不新增工具本体**）+ `docs/module_design.md` **IFC-IB-340**（`ToolParamSpec`）/ **IFC-IB-346**
+> （`validate_tool_params`）/ **IFC-IB-350**（`build_authorized_tools`：参数经 `functools.partial` 作**默认值**注入、**调用方显式实参优先**；
+> `validate_grants` fail-fast）/ **IFC-IB-161 / 162**（`search` / `search_as_tool`）+ `docs/architecture_design.md` **ADR-30**。
+> 本轮**不新增模块（仍 26）/ 不新增端口（仍 19）/ 不新增第三方依赖 / 不改配置键名与默认值 / 不改定义文档 schema（`experts` / `tool_grants` 结构不变）/
+> 不改运行期编排拓扑 / 不放宽 `needs_scope` 与 scope 闭包（`scope` 绝不进入参数面）/ 既有定义文档零迁移**。
+
+## 29.1 变更总览（REV-23；2 个 src 行为落点 + 1 处自检同步 + 2 处测试契约同步 + 6 条新增用例）
+
+| 面 | 落点 | 变更 |
+|----|------|------|
+| 参数面（**唯一真源**） | `src/ibweb/composition.py`（`SEARCH_TOOL_SPEC`，L103~L135） | `parameters.properties` **追加**两个**可选**参数：`top_k`（`integer`，`minimum=1`、`maximum=50`）与 `score_threshold`（`number`，`minimum=0`、`maximum=1`）；`required` **仍为 `["query"]`**（必填性逐字不变）；**未**加入 `scope` / `retrieval` / `project_id` / `kb_ids` |
+| 参数规格（**自动派生，零手写登记**） | `src/ib/tools/__init__.py::derive_tool_param_specs`（IFC-IB-340，L282~L315；**本轮零改动**） | 规格集由注册表内工具 JSON Schema **纯函数派生** ⇒ 两条新参数自动成为 `search_knowledge.top_k` / `search_knowledge.score_threshold`（类型 `int` / `float`，上下界随 `minimum` / `maximum` 带出）。故**无需**在 `ToolParamSpec` 侧另写登记：配置页保存校验（`validate_tool_params`）与装配注入（`build_authorized_tools`）**自动同源可用** |
+| 透传链（工具实现） | `src/ibweb/composition.py::_search_tool`（L387~L408） | 签名追加 keyword-only 可选参 `top_k` / `score_threshold`（**裸参名**与 schema 参数名一致 ⇒ `functools.partial` 注入命中），**原样透传** `retrieval.search_as_tool(...)`，**不做**任何取值裁决 |
+| 透传链（检索服务） | `src/ib/retrieval/__init__.py::search_as_tool`（IFC-IB-162，L211~L233） | 签名追加 `top_k` / `score_threshold`（`None` ⇒ 取构造期配置），**原样透传** `self.search(...)`（IFC-IB-161 既有签名一字未改） |
+| 前端 | `src/frontend/src/views/ConfigPage.vue` | **零改动** —— 控件由后端 `tool_param_specs` 回执派生（`paramsForTool(tool)` 按 `<tool>.` 前缀过滤 + `spec.type ∈ {int,float}` → number 输入 + `:min`/`:max` 绑定），故两条新规格**自动出现输入框**。证据见 §29.4 第 5 项 |
+| 自检契约同步（1 处，**非放宽**） | `src/scripts/selfcheck.py`（`r16_prompt_tool_endpoints`，L3867~L3899） | ① 参数规格集合断言由 `{search_knowledge.query}` 订正为**三元集**；② 替身 `_R.search_as_tool` 补两条可选关键字（透传链新增形参的必要适配）；③ 既有「调用方显式实参优先 / 配置值作默认」断言**升级为**同时核对 `top_k` 注入值，并**新增**一条「调用方显式 `top_k` 覆盖配置值」断言 |
+| 测试契约同步（2 处，**非放宽**） | `tests/integration/test_prompt_tool_config_int_r16d.py`（原 `:122`）、`tests/integration/test_prompt_config_r16.py`（原 `:87`） | 两处「参数规格集合 == `{search_knowledge.query}`」的断言按新参数面**就地订正**（前者按派生顺序给出三元列表）—— 意图不变（仍是「与唯一登记点同源」的防漂移断言），**未引入 skip / xfail** |
+
+## 29.2 派生链结论（实现前独立复核，**逐条给出 path:line**）
+
+1. **`ToolParamSpec` 的声明处**：`src/ib/tools/__init__.py:282-315`（`derive_tool_param_specs`，IFC-IB-340）。**不存在**第二处手写登记 —— 全仓 `ToolParamSpec(` 仅出现在该函数与测试用例中。JSON 类型映射见 `src/ib/tools/__init__.py:274-279`（`_JSON_TYPE_TO_PARAM`：`integer→int`、`number→float`）；归属判据为 `<tool>.<param>` 限定名（`_owner_tool` / `_bare_param` / `_param_belongs`，L261~L270 与 L414~L421）。
+2. **「可配参数」清单的前端来源**：后端 `GET /api/config/prompts` 回执字段 `tool_param_specs`（`src/ibweb/views.py:1245-1247`，值 = `composition.known_tool_param_specs()`，`src/ibweb/composition.py:1327-1335`）；前端 `src/frontend/src/views/ConfigPage.vue:551`（`toolParamSpecs` computed）→ `:380-382`（`paramsForTool`）→ `:904-960`（渲染：`choices`→select、`bool`→checkbox、`int`/`float`→number 且 `:min`/`:max`/`:placeholder` 取自规格、其余→text）。⇒ **清单由 schema 派生**，「加进 schema 即自动出现输入框」成立，**前端零改动**。
+3. **`tool_grants[].param_values[].name` 的确切格式**：**限定名** `search_knowledge.top_k` / `search_knowledge.score_threshold`（前端按 `startsWith(\`${tool}.\`)` 归属，`ConfigPage.vue:375-382`）；后端校验两段 —— 保存期 `src/ibweb/views.py:939-944`（`validate_two_domains(..., tool_param_specs=deps.tool_param_specs())` → `src/ib/config/prompts.py:402-470` 产出 `tool_param_out_of_range` / `tool_param_type_mismatch` / `tool_param_unknown` / `tool_param_unauthorized_tool` → **400 且在用配置不变**），装配期 `src/ib/tools/__init__.py:329-361`（`validate_grants`）+ `:364-411`（`build_authorized_tools`：未声明参数 / 未授权工具带参 → `ToolParamValidationError` fail-fast）。
+
+## 29.3 取值语义（**既有契约不变，不引入例外**）
+
+* 配置值经 `functools.partial(fn, **裸参名)` 作**默认值**（`src/ib/tools/__init__.py:424-441`）⇒ 模型不显式传时配置生效（**常态**，即「按专家调检索条数」）；模型显式传同名实参时**以调用方为准**（IFC-IB-350 既有优先级，一字未改）。
+* **残余语义（如实登记）**：两条新参数进入工具 function-calling schema（`BoundTool.parameters` ← `SEARCH_TOOL_SPEC.parameters`），故模型**看得到也可以传**；一旦显式传 `top_k`，该次调用以模型实参为准（配置被本次覆盖）。已在参数 `description` 与 `_search_tool` docstring 写明「**由平台按专家配置给定，通常无需设置**」作为行为指引。
+* `None`（未配置）⇒ 原样传 `None`，由 `RetrievalService.search` 回落构造期 `cfg.retrieval.top_k` / `score_threshold`（`src/ib/retrieval/__init__.py:109-110`）。
+* **scope 铁律未松动**：`scope` / `retrieval` 仍**不**在参数面内；`bind_scope` 的 `_bound` 仍**强制覆盖** `scope`（`src/ib/tools/__init__.py:225-238`）。
+
+## 29.4 自验证据（真实执行，命令可被第三方重跑）
+
+| # | 命令（cwd = 仓库根） | 实际结果 | EXIT |
+|---|----------------------|----------|------|
+| 1 | `python -m pytest tests -q` | **434 passed, 2 skipped**（基线 428 passed / 2 skipped ⇒ **零回归**；新增 6 条用例计入 434） | **0** |
+| 2 | `python src/scripts/selfcheck.py` | **51/52 通过** —— 唯一失败 = `r13_deploy_discipline`：`AssertionError: 签署行未同步到 B26`。**经取证为既存失败、与本轮无关**：`src/deploy/checklists.txt`（**本轮一字未动**，`git status` 无该文件）在 HEAD 即为 `[ ] B1–B27 全部勾选`（`git show HEAD:src/deploy/checklists.txt` 实测），而自检仍断言 `B1–B26`。⇒ 属引入 B27 那一轮的自检同步义务，**本轮不越界修改**，如实上报 | **1** |
+| 3 | `npm run typecheck`（cwd = `src/frontend`） | `vue-tsc --noEmit` **无输出** | **0** |
+| 4 | `npm test`（cwd = `src/frontend`） | **pass 40 / fail 0**（基线 40/40；**零改动零回归**） | **0** |
+| 5 | `python -c` 直跑派生链 | `{s.name for s in known_tool_param_specs()}` == `{search_knowledge.query, search_knowledge.top_k, search_knowledge.score_threshold}`；`top_k` = `int` / `1..50`，`score_threshold` = `float` / `0..1` | **0** |
+| 6 | `python -m pytest tests/integration/test_prompt_tool_config_int_r16d.py -q` | 含 `TC-INT-141`（按专家配置 `top_k` ⇒ 检索条数 3→1 实效；`score_threshold=1.0` 全滤；未授权带参 fail-fast）与 `TC-INT-142`（保存期越界/类型 → 400 且配置不变；合法值 → 200 且写回生效） | **0** |
+
+## 29.5 冻结约束复核（REV-23）
+
+未新增模块（仍 **26**）/ **未新增端口（仍 19）** / 未新增第三方依赖 / 未新增 §4.1 依赖边 / 未改既有配置键名与默认值 / 未改任何既有 IFC 号或签名文本（`IFC-IB-001~394` 一字未改 —— 本轮做的是**在既有 IFC-IB-340 / 346 / 350 / 161 / 162 的既有派生链上扩充一处已声明工具的既有参数面**）/ 未 bump `schema_version` / **未改定义文档 schema**（`experts` / `tool_grants` 结构不变）/ **未改运行期编排拓扑**（`ib/orchestration/__init__.py` 一字未动）/ **未放宽 `needs_scope` 与 scope 闭包** / **未新增工具本体 / 未新增可选工具** / **未改 `build_authorized_tools` 的既有优先级契约**（`src/ib/tools/__init__.py` 一字未动）/ **无任何口令 / Key / token 字面量** / 未 commit / 未 push / 未部署 / FreeArk 参考仓只读。

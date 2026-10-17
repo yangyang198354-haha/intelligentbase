@@ -111,6 +111,24 @@ SEARCH_TOOL_SPEC = ToolSpec(
                 "type": "string",
                 "description": "检索关键词或问题，尽量具体、贴近用户原始提问",
             },
+            # **REV-23**：检索条数 / 相似度阈值暴露为**可选**参数，从而经
+            # `derive_tool_param_specs`（IFC-IB-340）自动成为「按专家可配」的参数规格
+            #（配置页出现输入框，取值经 `tool_grants[].param_values` 随定义文档保存）。
+            # 语义：**由平台按专家配置给定，通常无需模型设置** —— 配置值经 `functools.partial`
+            # 作**默认值**注入，故模型不显式传时配置生效（常态）；模型若显式传同名实参，
+            # 按既有优先级契约（IFC-IB-350）以调用方实参为准。`scope` 仍**不**在此暴露。
+            "top_k": {
+                "type": "integer",
+                "description": "返回的检索片段条数；由平台按专家配置给定，通常无需设置",
+                "minimum": 1,
+                "maximum": 50,
+            },
+            "score_threshold": {
+                "type": "number",
+                "description": "相似度阈值（0~1）：低于该值的片段被丢弃；由平台按专家配置给定，通常无需设置",
+                "minimum": 0,
+                "maximum": 1,
+            },
         },
         "required": ["query"],
     },
@@ -366,14 +384,28 @@ class Deps:
             pass
 
 
-def _search_tool(query: str, *, scope: Scope, retrieval: Any) -> ToolResult:
+def _search_tool(
+    query: str,
+    *,
+    scope: Scope,
+    retrieval: Any,
+    top_k: int | None = None,
+    score_threshold: float | None = None,
+) -> ToolResult:
     """知识库检索工具的实现体。
 
     `scope` / `retrieval` 由 `bind_scope` 在构造期注入（**不由调用方指定**）——
     因此 LLM 传什么都改变不了检索范围。`search_as_tool` 永不抛异常（降级时 `ok=True`
     + `degraded=True`），故这里不需要 try。
+
+    **REV-23**：`top_k` / `score_threshold` 的**裸参名**与 `SEARCH_TOOL_SPEC` 中的参数名
+    一致，于是 `build_authorized_tools`（IFC-IB-350）能把专家级配置经
+    `functools.partial` 注入成**默认值**；此处**原样透传**给检索服务（`None` ⇒ 用装配期
+    配置），不做任何取值裁决 —— 优先级语义仍由既有契约（调用方显式实参优先）唯一确定。
     """
-    return retrieval.search_as_tool(query, scope=scope)
+    return retrieval.search_as_tool(
+        query, scope=scope, top_k=top_k, score_threshold=score_threshold
+    )
 
 
 def register_builtin_tools(registry: Any) -> Any:

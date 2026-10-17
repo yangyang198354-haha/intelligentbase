@@ -208,7 +208,14 @@ class RetrievalService:
     # IFC-IB-162 工具形态
     # ================================================================== #
 
-    def search_as_tool(self, query: str, *, scope: Scope) -> ToolResult:
+    def search_as_tool(
+        self,
+        query: str,
+        *,
+        scope: Scope,
+        top_k: int | None = None,
+        score_threshold: float | None = None,
+    ) -> ToolResult:
         """供 MOD-IB-17 绑定的工具形态：把 `RetrievalResult` 压成**可进 LLM 上下文**的文本。
 
         设计取舍：
@@ -216,8 +223,14 @@ class RetrievalService:
           * **`ok` 表示「本次调用是否正常完成」**，与 `degraded` 不同：降级时 `ok=True`
             （调用本身成功了，只是没拿到资料），避免编排层把它当异常处理；
           * 无命中时返回 `EMPTY_HINT` 而非空串 —— 空串会让 LLM 以为「工具没输出」而重复调用。
+
+        **REV-23**：`top_k` / `score_threshold` 为**可选**关键字（`None` ⇒ 取构造期配置），
+        由调用方（组合根的工具实现，经 `build_authorized_tools` 注入专家级配置后）给定，
+        **原样透传**给 `self.search` —— 本方法不做任何取值裁决。
         """
-        result = self.search(query, scope=scope)
+        result = self.search(
+            query, scope=scope, top_k=top_k, score_threshold=score_threshold
+        )
         if result.degraded:
             return ToolResult(
                 ok=True,

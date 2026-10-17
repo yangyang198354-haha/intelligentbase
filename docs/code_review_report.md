@@ -2996,3 +2996,66 @@ EXIT=2
 ## 24.6 守约复核（REV-21）
 
 未新增模块（仍 **26**）/ **未新增端口（仍 19）** / 未新增第三方依赖 / **未新增 §4.1 依赖边**（唯一新增 import = `ib.core` 常量与异常，属既有 MOD-IB-23 → MOD-IB-01 边内）/ 未改既有配置键名与默认值 / `IFC-IB-001~392` 号 / 名 / 签名一字不动（仅新增 393 / 394）/ 未 bump `schema_version` / **未改运行期编排拓扑**（`ib/orchestration/__init__.py` 一字未动，C-IB-54）/ **未改定义文档 schema**（C-IB-56②）/ **未改 `derive()` 与 `DerivedView.graph_config` 语义** / **未改信封顶层键与 `config_key_names`** / 图**仍只读**（`:nodes-draggable="false"` / `:nodes-connectable="false"` 未改；**无**任何 `addNode` / `removeNode` / `addEdge` 类运行期改图标识）/ **无任何口令 / Key / token 字面量** / 未 `git add` / `commit` / `push` / 部署 / FreeArk 参考仓**只读**。
+
+---
+
+# §25 REV-23 增量自评（检索条数 / 相似度阈值**按专家可配**：`SEARCH_TOOL_SPEC` 参数面扩充）
+
+**设计侧口径**：`docs/requirements_spec.md` REQ-FUNC-IB-39 / A-4 / OQ-IB-19（口径 = **既有工具授权勾选 + 工具参数可配**，**不含新增工具本体**）+ `docs/module_design.md` **IFC-IB-340 / 346 / 350 / 161 / 162** + `docs/architecture_design.md` **ADR-30**。**本节五维评分与 finding 覆盖被触及文件**（2 个 src + 1 个自检脚本 + 3 个测试文件）：`src/ibweb/composition.py`、`src/ib/retrieval/__init__.py`、`src/scripts/selfcheck.py`、`tests/unit/test_prompt_tool_config_unit_r16d.py`、`tests/integration/test_prompt_tool_config_int_r16d.py`、`tests/integration/test_prompt_config_r16.py`（**前端 `src/frontend` 零改动**）。
+
+## 25.1 评审摘要
+
+| 维度 | 评分 | 说明 |
+|---|---|---|
+| Correctness | 9/10 | 语义与契约逐条对齐：可选性（`required` 仍为 `["query"]`）、原样透传、优先级沿用既有契约；无取值裁决导致的漂移路径 |
+| Security | 10/10 | 参数面**不含** `scope` / `retrieval` / `project_id` / `kb_ids`；`bind_scope` 仍**强制覆盖** `scope`（跨项目防线未动）；无新增凭据面或日志面 |
+| Performance | 9/10 | 零新增往返；参数仅在装配期注入，运行期无查表 |
+| Maintainability | 9/10 | 参数规格由 schema **派生**（不手写第二真源）；描述文案自解释「由平台按专家配置给定，通常无需设置」；残余语义在 `description` + docstring 双处写明 |
+| Test Coverage | 9/10 | 新增 6 条用例（单测 4 + 集成 2）覆盖参数面 / 透传链 / 注入 / 负例 / scope 不变式；前端渲染由既有第 27 例源级断言 + 后端回执同源断言共同守护 |
+
+**Finding 统计**：CRITICAL **0**（已修复 0）/ MAJOR **0** / MINOR **2**。
+
+## 25.2 逐条 finding
+
+| Finding ID | 严重级别 | 文件:行号 | 描述 | 状态 |
+|---|---|---|---|---|
+| FND-R23-001 | MINOR | `src/ibweb/composition.py:114-131` | **残余语义**：模型在 function-calling schema 中可见两条新参数，若显式传 `top_k` 则**本次调用**以模型实参为准（配置被本次覆盖）。处置：**不改** IFC-IB-350 既有优先级契约（配置经 partial 作默认值是契约明文），改以 `description` + `_search_tool` docstring 双处行为指引「由平台按专家配置给定，通常无需设置」 | DOCUMENTED |
+| FND-R23-002 | MINOR | `src/scripts/selfcheck.py:3867-3899` | 自检的「参数规格集合」断言随参数面扩充**就地订正**（`{query}` → 三元集），并按透传链新增形参适配替身 `_R.search_as_tool`；**非放宽**（断言更强：同时核对 `top_k` 注入值与「调用方显式传参覆盖配置」） | FIXED |
+
+**未解决的 CRITICAL 问题**：**无**（CRITICAL = 0）。
+
+## 25.3 新增用例编号（6 条）
+
+| # | 编号 | 文件 | 覆盖点 | 结果 |
+|---|------|------|--------|------|
+| 1 | `TC-UNIT-123` | `tests/unit/test_prompt_tool_config_unit_r16d.py` | 参数面：`top_k` / `score_threshold` **可选**、`query` 必填性不变、上下界、**scope 不暴露**；派生规格三元集与类型 / 界 | PASS |
+| 2 | `TC-UNIT-124` | 同上 | **透传链**：`search_as_tool(query, scope, top_k, score_threshold)` 原样传 `search`；未给时传 `None`（**不覆盖构造期默认**） | PASS |
+| 3 | `TC-UNIT-125` | 同上 | 注入链：配置经 partial 作**默认值**（模型不传时生效）；调用方显式实参优先；`scope=别的项目` **改不了范围**；未配置 → `None` | PASS |
+| 4 | `TC-UNIT-126` | 同上 | 负例：越界 / 类型不符 / 未授权带参 → `tool_param_out_of_range` / `tool_param_type_mismatch` / `tool_param_unauthorized_tool`；边界值合法；装配期 `ToolParamValidationError` **fail-fast** | PASS |
+| 5 | `TC-INT-141` | `tests/integration/test_prompt_tool_config_int_r16d.py` | 集成：定义文档 `tool_grants[].param_values` 配 `top_k=1` ⇒ **绑定工具检索条数按配置生效**（装配期默认 3 → 1）；`score_threshold=1.0` ⇒ 全滤（**空结果 ≠ 降级**）；未授权带参装配期仍 fail-fast | PASS |
+| 6 | `TC-INT-142` | 同上 | 保存路径：`top_k=999` / `top_k=abc` / `score_threshold=1.5` → **400 且在用配置逐字节不变**（fail-safe）；界内 `top_k=5` → **200 且写回生效** | PASS |
+
+**scope 不变式**：模型侧无法传 `scope` —— 既有 `tests/integration/test_composition_retrieval.py::test_TC_INT_008`（调用方传 `scope` 改不了检索范围）继续守护；本轮 `TC-UNIT-125` 追加 schema 级 + 闭包级双断言，**引用而非改写**。
+
+## 25.4 自验证据（真实执行，命令可被第三方重跑）
+
+| # | 命令 | 实际结果 | EXIT |
+|---|------|----------|------|
+| 1 | `python -m pytest tests -q`（cwd = 仓库根） | **434 passed, 2 skipped**（基线 428 + 2 ⇒ **零回归**；含新增 6 条） | **0** |
+| 2 | `python src/scripts/selfcheck.py` | **51/52**；唯一失败 `r13_deploy_discipline`「签署行未同步到 B26」——**既存失败、与本轮无关**（`src/deploy/checklists.txt` 本轮未动，HEAD 即 `B1–B27`，见 §25.5 第 1 条）；**未放宽 / 未 skip / 未 xfail** | **1** |
+| 3 | `npm run typecheck`（cwd = `src/frontend`） | `vue-tsc --noEmit` 无输出 | **0** |
+| 4 | `npm test`（cwd = `src/frontend`） | **pass 40 / fail 0** | **0** |
+| 5 | 前端渲染零改动核验（读源 + 既有冒烟第 27 例） | 控件由 `tool_param_specs` 派生（`spec.type ∈ {int,float}` → number + `:min`/`:max`）；`npm test` 第 27 例断言源级派生链仍成立 | **0** |
+| 6 | 越界直跑（`python -c` 调 `validate_tool_params` / `build_authorized_tools`） | `top_k="999"` → `tool_param_out_of_range`；`top_k="abc"` → `tool_param_type_mismatch`；未授权带参 → `ToolParamValidationError` | **0** |
+
+**「无证据不下结论」自查**：以上均为**本机实跑**原始输出；**未**引用任何子代理自报数字；`npm run build` 本轮**未执行**（无构建产物需求）—— 故**不宣称**构建绿灯。
+
+## 25.5 未决 / 需 PM 或 GROUP_D 复核的点
+
+1. **`selfcheck.py` 的越界失败归属**：`r13_deploy_discipline` 的 `B1–B26` 断言与 `src/deploy/checklists.txt` 的 `B1–B27` 签署行**已失同步**（HEAD 状态，本轮未触碰两文件）⇒ 提请 **PM 路由**给引入 B27 清单项的那一轮补齐自检同步（本轮不越界修改）。
+2. **模型显式传参的残余面**（FND-R23-001）：若后续产品口径要求「配置绝对优先」，须走 **ADR 变更**（改 IFC-IB-350 契约），本轮**未越界**。
+3. **前端渲染无新增自动化断言**：两条新参数控件由既有第 27 例（源级派生链断言）+ 后端 `tool_param_specs` 同源断言覆盖，**未**新增「两个输入框存在」的 UI 断言 —— 提请 GROUP_D 视需要补。
+
+## 25.6 守约复核（REV-23）
+
+未新增模块（仍 **26**）/ **未新增端口（仍 19）** / 未新增第三方依赖 / 未新增 §4.1 依赖边 / 未改既有配置键名与默认值 / `IFC-IB-001~394` 号 / 名 / 签名一字不动 / 未 bump `schema_version` / **未改定义文档 schema**（`experts` / `tool_grants` 结构不变）/ **未改运行期编排拓扑** / **未放宽 `needs_scope` 与 scope 闭包** / **未新增工具本体或可选工具** / **未改 IFC-IB-350 优先级契约**（`src/ib/tools/__init__.py` 一字未动）/ **无任何口令 / Key / token 字面量** / 未 `git add` / `commit` / `push` / 部署 / FreeArk 参考仓**只读**。

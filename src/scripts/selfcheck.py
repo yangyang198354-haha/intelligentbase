@@ -3490,9 +3490,10 @@ def r13_deploy_discipline() -> None:
         "[B24]",
         "[B25]",
         "[B26]",
+        "[B27]",
     ):
         assert item in checklists, f"checklists.txt 缺少验收项 {item}"
-    assert "B1–B26" in checklists, "签署行未同步到 B26"
+    assert "B1–B27" in checklists, "签署行未同步到 B27"
 
     # 4b) REV-18 迁移：005 / 006 存在、幂等（IF EXISTS）、且**纯追加**（只建新表 / 不回改旧表）。
     for name, table in (
@@ -3864,21 +3865,39 @@ def r16_prompt_tool_endpoints() -> None:
     from ib.core import Scope, ToolGrantSpec, ToolParamValue, ToolResult
     from ib.tools import ToolRegistry, bind_scope, build_authorized_tools, derive_tool_param_specs
 
-    assert {s.name for s in known_tool_param_specs()} == {"search_knowledge.query"}
+    # **REV-23**：参数面扩到 top_k / score_threshold（检索条数 / 相似度阈值可**按专家**配置）；
+    #   三者全部由既有 `SEARCH_TOOL_SPEC` 的 JSON Schema 派生（仍不新增工具本体）。
+    assert {s.name for s in known_tool_param_specs()} == {
+        "search_knowledge.query",
+        "search_knowledge.top_k",
+        "search_knowledge.score_threshold",
+    }
     reg = register_builtin_tools(ToolRegistry())
     authorized = build_authorized_tools(
-        (ToolGrantSpec("e1", ("search_knowledge",), (ToolParamValue("search_knowledge.query", "PIN"),)),),
+        (
+            ToolGrantSpec(
+                "e1",
+                ("search_knowledge",),
+                (
+                    ToolParamValue("search_knowledge.query", "PIN"),
+                    ToolParamValue("search_knowledge.top_k", "7"),
+                ),
+            ),
+        ),
         registry=reg,
         specs=derive_tool_param_specs(reg),
     )
 
     class _R:
-        def search_as_tool(self, q: str, *, scope: Any) -> Any:
-            return ToolResult(ok=True, content="HIT:" + q)
+        def search_as_tool(self, q: str, *, scope: Any, top_k: Any = None, score_threshold: Any = None) -> Any:
+            return ToolResult(ok=True, content=f"HIT:{q}:top_k={top_k}")
 
     bound = bind_scope(authorized, Scope(project_id="p_alpha"), _R())[0]
-    assert bound.callable(query="caller").content == "HIT:caller"  # 调用方显式实参优先
-    assert bound.callable().content == "HIT:PIN"  # 未给实参时配置值生效
+    # 调用方显式实参优先（既有优先级契约不变）；配置值作**默认值**
+    assert bound.callable(query="caller").content == "HIT:caller:top_k=7"
+    assert bound.callable().content == "HIT:PIN:top_k=7"  # 未给实参时配置值生效
+    # **REV-23**：专家级配置的 top_k 确实到达检索服务；调用方显式传时以调用方为准
+    assert bound.callable(query="caller", top_k=2).content == "HIT:caller:top_k=2"
 
     from django.test import Client
 
