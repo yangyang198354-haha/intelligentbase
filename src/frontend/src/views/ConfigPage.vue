@@ -1171,12 +1171,52 @@ h3 {
 table {
   border-collapse: collapse;
   width: 100%;
+  /* 9 列表格在窄容器下必须定宽：此前为 auto 布局，「工具授权」列的
+     `white-space: nowrap` 会让长工具名撑破列宽并**溢出到右侧「删除」列**，
+     造成删除按钮与 `search_knowledge` 文字视觉重叠。 */
+  table-layout: fixed;
 }
 th,
 td {
   border: 1px solid var(--ib-border);
   padding: 4px 6px;
   font-size: 13px;
+  vertical-align: middle;
+}
+/* 列宽由 thead 首行决定（`table-layout: fixed`）；合计 = 100%。 */
+th:nth-child(1) {
+  width: 13%;
+} /* 名称 */
+th:nth-child(2) {
+  width: 13%;
+} /* 中文标签 */
+th:nth-child(3) {
+  width: 17%;
+} /* 关键词 */
+th:nth-child(4) {
+  width: 17%;
+} /* 示例句 */
+th:nth-child(5) {
+  width: 6%;
+} /* 数据专家 */
+th:nth-child(6) {
+  width: 6%;
+} /* 可委托 */
+th:nth-child(7) {
+  width: 6%;
+} /* 默认 */
+th:nth-child(8) {
+  width: 15%;
+} /* 工具授权 */
+th:nth-child(9) {
+  width: 7%;
+} /* 删除 */
+/* 勾选列与删除列居中（定宽后贴左不好看，且避免与相邻内容视觉粘边）。 */
+td:nth-child(5),
+td:nth-child(6),
+td:nth-child(7),
+td:nth-child(9) {
+  text-align: center;
 }
 th {
   background: var(--ib-bg-sunken);
@@ -1218,7 +1258,9 @@ td input {
 .tool-check {
   display: block;
   font-size: 13px;
-  white-space: nowrap;
+  /* 允许换行：`nowrap` 会让长工具名撑破定宽列并溢出到相邻单元格。 */
+  white-space: normal;
+  word-break: break-word;
 }
 .tool-params {
   display: flex;
@@ -1259,5 +1301,7 @@ button.link {
   border: none;
   color: var(--ib-danger);
   cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
 }
 </style>
