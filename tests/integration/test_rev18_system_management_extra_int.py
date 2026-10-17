@@ -437,6 +437,58 @@ def test_TC_INT_161_runtime_project_usable_immediately_after_create(accounts_app
 
 
 # --------------------------------------------------------------------------- #
+# TC-INT-163 运行期新建项目的读路径：上传→入库→检索端到端不降级（ADR-37 接缝）
+# --------------------------------------------------------------------------- #
+
+
+def test_TC_INT_163_runtime_project_retrieval_not_degraded(accounts_app):
+    """ADR-37 / ADR-45；`load_project_record` 读路径不得硬取 `cfg.projects[pid]`。
+
+    接缝（与 TC-INT-161 同源，是同一枚硬币的另一面）：ADR-37 之后 `Deps.projects`
+    的数据源是**注册表活动项目**，运行期新建的项目**不在** `cfg.projects` 里。而读路径
+    `load_project_record` 曾硬取 `cfg.projects[project_id]` ⇒ 对新建项目抛 `KeyError` ⇒
+    被 `RetrievalService.search` 的 step1 `except Exception` 吞成 `degraded` 空结果 ⇒
+    **上传成功但问答永远检索不到**（前端表现为「知识库中没有检索到相关资料」/「未接入
+    知识资料库」，用户无从判断是「真的没有」还是「读路径坏了」）。
+
+    本用例断言**端到端读路径畅通**：`degraded is False` **且** `hits` 非空 —— 只看
+    degraded 会被 fail-open 语义掩盖（见 selfcheck `retrieval_happy_path` 的注释）。
+    """
+    from conftest import ingest_text
+
+    from ib.core import Scope
+
+    deps, _ = accounts_app
+    client = _client(accounts_app)
+    token = _login_admin(client)
+    h = bearer(token)
+
+    created = client.post(
+        "/api/projects",
+        data=json.dumps({"project_id": "p_gamma", "name": "伽马项目"}),
+        content_type="application/json",
+        **h,
+    )
+    assert created.status_code == 201, created.content
+
+    # 经**真实上传 + 处理管线**入库（与生产同一条路径；kb_id ≡ project_id）。
+    content = "伽马项目专属检索语料 GAMMA-ONLY-42：反应釜温度上限 180 摄氏度。"
+    record = ingest_text(deps, "p_gamma", "p_gamma", "gamma.txt", content)
+    scoped = Scope(project_id="p_gamma", kb_ids=("p_gamma",))
+    indexed = deps.ledger.get_document(scoped, record.doc_id)
+    assert indexed is not None and indexed.status == "indexed", indexed
+
+    result = deps.retrieval.search(content, scope=scoped)
+    assert result.degraded is False, (
+        f"运行期新建项目的读路径处于降级（degrade_reason={result.degrade_reason}）—— "
+        "`load_project_record` 仍在硬取 cfg.projects（KeyError 被 fail-open 吞成空结果）"
+    )
+    assert result.hits, "新建项目检索为空——入库与读路径未接通"
+    assert result.hits[0].doc_id == record.doc_id
+    assert "GAMMA-ONLY-42" in result.hits[0].content
+
+
+# --------------------------------------------------------------------------- #
 # TC-INT-162 资料列表按项目域隔离（AC-IB-40-03）
 # --------------------------------------------------------------------------- #
 

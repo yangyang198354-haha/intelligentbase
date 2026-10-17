@@ -111,14 +111,31 @@ class RetrievalService:
 
         with Timer() as timer:
             # --- 1) 绑定读路径 collection（重建期间读旧版本，AC-IB-16-03） ---
+            #  拆成 1a/1b 两段，是为了让**降级原因如实指向失败依赖**（AC-IB-13-02）：
+            #  此前这两段共用一个 `except` 并一律报 `vectorstore_unavailable`，于是
+            #  「项目记录取不到（台账 / 注册表与配置错位）」这种**与向量库无关**的故障
+            #  被报成向量库故障，把运维引向 Qdrant 去排查一个没坏的依赖。
             log_event("retrieval", "step1_start", project_id=scope.project_id)
             with Timer() as step1:
+                #  1a) 台账 / 配置域：项目记录 → 读路径 collection 名（resolver + FM-5 前缀断言）。
                 try:
                     project = self._project_provider(scope.project_id)
                     collection = self._resolver.resolve(scope, project)
                     self._resolver.assert_prefix(collection, scope.project_id)
-                    self._vectors.bind_collection(collection)
                 except Exception as exc:  # noqa: BLE001 - 端口契约要求无异常出口
+                    log_event(
+                        "retrieval",
+                        "step1_failed",
+                        project_id=scope.project_id,
+                        error_code=type(exc).__name__,
+                    )
+                    return self._degrade(
+                        scope, DegradeReason.LEDGER_UNAVAILABLE, timer, exc, stage="retrieval"
+                    )
+                #  1b) 向量库域：绑定 collection。**这一段才是**真正的向量库故障。
+                try:
+                    self._vectors.bind_collection(collection)
+                except Exception as exc:  # noqa: BLE001
                     log_event(
                         "retrieval",
                         "step1_failed",

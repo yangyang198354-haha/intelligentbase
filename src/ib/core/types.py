@@ -31,7 +31,7 @@ DistanceLiteral: TypeAlias = Literal["cosine"]
 SourceKindLiteral: TypeAlias = Literal["text", "image_ocr", "page_scan"]
 DocStatusLiteral: TypeAlias = Literal["pending", "parsing", "indexed", "failed"]
 DegradeReasonLiteral: TypeAlias = Literal[
-    "embedding_unavailable", "vectorstore_unavailable", "timeout"
+    "embedding_unavailable", "vectorstore_unavailable", "timeout", "ledger_unavailable"
 ]
 
 #: 提示词分层（IFC-IB-337，REV-16-2；ADR-29）：`main` 主提示词（**可缺**）/

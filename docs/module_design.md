@@ -160,7 +160,7 @@
 | `ParsedChunk` | `content: str`；`page_or_section: str`；`source_kind: Literal["text","image_ocr","page_scan"]`；`locator: str`；`image_ref: str \| None` |
 | `ParsedDocument` | `chunks: list[ParsedChunk]`；`page_count: int`；`warnings: list[str]` |
 | `RetrievedChunk` | `doc_id: str`；`doc_name: str`；`content: str`；`score: float`；`page_or_section: str`；`source_kind: str`；`locator: str` |
-| `RetrievalResult` | `hits: list[RetrievedChunk]`；`degraded: bool`；`degrade_reason: Literal["embedding_unavailable","vectorstore_unavailable","timeout"] \| None`；`scope: Scope`；`elapsed_ms: int`；`candidate_count: int` |
+| `RetrievalResult` | `hits: list[RetrievedChunk]`；`degraded: bool`；`degrade_reason: Literal["embedding_unavailable","vectorstore_unavailable","timeout","ledger_unavailable"] \| None`；`scope: Scope`；`elapsed_ms: int`；`candidate_count: int` |
 | `DocumentRecord` | `doc_id: str`；`project_id: str`；`kb_id: str`；`doc_name: str`；`ext: str`；`size_bytes: int`；`content_sha256: str`；`blob_ref: str \| None`；`status: Literal["pending","parsing","indexed","failed"]`；`error_code: str \| None`；`chunk_count: int`；`indexed_collection_version: str \| None`；`target_collection_version: str \| None`；`lease_owner: str \| None`；`lease_expires_at: str \| None`；`created_at: str`；`updated_at: str` |
 | `KbRecord` | `kb_id: str`；`project_id: str`；`name: str`；`created_at: str` |
 | `ProjectRecord` | `project_id: str`；`name: str`；`active_collection_version: str`；`embedding_model_id: str`；`dim: int`；`created_at: str` |
@@ -1369,6 +1369,7 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 | **ib-embed 服务（MOD-IB-26）** | 不可达 / 未预热（`model_not_ready`）/ 队列满（`overloaded`）/ 服务端推理超时（`inference_timeout`） | 检索侧 `degraded=True`：不可达 → `degrade_reason=embedding_unavailable`；热路径超时 → `timeout`；**问答继续**。冷路径（入库）**不在此列**：由客户端重试预算承载，耗尽则**文档级** `failed` + `error_code`（**不阻塞其他文档**） | 「当前未接入知识资料库」 | WARN | fail-open（读路径）；冷路径为文档级失败隔离 |
 | **页面图（M-02）** | 关联行缺失 / 图片字节不可得（Blob `503`、原文件已删、`blob_ref` 为空） | `related_images` **不发事件**（有图才发）；图片端点返回 `404` / `503`；**检索与回答不受影响**（图是增强项，不是前提） | 无感（缩略图静默隐藏） | WARN | fail-open（增强项） |
 | **VectorStore** | 不可达 / 查询报错 | `degraded=True, degrade_reason=vectorstore_unavailable` | 「当前未接入知识资料库」 | ERROR | fail-open |
+| **台账（读路径 step1）** | 项目记录取不到（项目未登记 / 注册表与配置错位）或读路径 collection 名推导 / 前缀断言失败（FM-5） | `degraded=True, degrade_reason=ledger_unavailable, hits=[]`；**问答继续**（ADR-13-R19 订正新增值） | 「当前未接入知识资料库」 | ERROR | fail-open |
 | **知识库为空** | 正常但无数据 | `degraded=False, hits=[]`（**与上两行可区分**，AC-IB-14-02） | 「未找到相关资料」 | INFO | 非降级 |
 | **LLM 端点** | 不可达 / 限流 | 问答返回 `error` 事件 + 可读文案；路由降级到关键词档位 | 「模型服务暂时不可用」 | ERROR | fail-open（问答层） |
 | **路由分类器** | LLM 分类失败 | 逐级降级 → 关键词 → 粘性 → 默认专家 | 无感（不暴露内部分工） | WARN | fail-open |

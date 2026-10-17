@@ -753,11 +753,13 @@
 
 - **载体变更**：`RetrievalResult` 的载体**明确为 frozen dataclass（端口层，定义于 MOD-IB-01）+ DRF Serializer（HTTP 边界）**（1.0.0 的 FastAPI / Pydantic 载体已随框架切换**撤销**，见 ADR-11-R1）。
 - **分层理由**：端口契约位于 **L0 契约层（MOD-IB-01）**，该层**零第三方依赖**（REQ-NFR-IB-01），**不得引入 Pydantic**；DRF Serializer 仅承担 **HTTP 边界**的请求校验、响应序列化与错误聚合（Web 层关注点）。
-- **类型完整度不得降级（门控标准 4）**：`RetrievalResult` 的全部字段名 + 类型 + 可空性**逐字段保留**（`module_design.md` §2.1 / IFC-IB-007）：`hits: list[RetrievedChunk]`、`degraded: bool`、`degrade_reason: Literal["embedding_unavailable","vectorstore_unavailable","timeout"] | None`、`scope: Scope`、`elapsed_ms: int`、`candidate_count: int`。**「空知识库」与「依赖故障」的可区分性（AC-IB-14-02）不因载体变更而改变。**
+- **类型完整度不得降级（门控标准 4）**：`RetrievalResult` 的全部字段名 + 类型 + 可空性**逐字段保留**（`module_design.md` §2.1 / IFC-IB-007）：`hits: list[RetrievedChunk]`、`degraded: bool`、`degrade_reason: Literal["embedding_unavailable","vectorstore_unavailable","timeout","ledger_unavailable"] | None`、`scope: Scope`、`elapsed_ms: int`、`candidate_count: int`。**「空知识库」与「依赖故障」的可区分性（AC-IB-14-02）不因载体变更而改变。**（`ledger_unavailable` 为 REV-19 订正新增值，见下）
 - **不变项**：检索服务**永不抛异常**（任何依赖故障一律转 `degraded=True` 的结果）；`degrade_reason` 以**枚举约束**（非自由字符串）；`candidate_count` 与分数量级仍作为 [TBD-T12] 阈值校准的证据出口。
 - **复核结论**：仅**载体表达形式**变化，契约为**等价升级**；对上层（MOD-IB-15 调用方、MOD-IB-17 工具、MOD-IB-21 流事件）**零语义改动**。
 
 **ADR-13-R2 复核**：**R2 不受影响** —— `RetrievalResult` 的字段与降级语义未动；`related_images` 走**独立的流事件**而**不并入** `RetrievalResult`，故「依赖故障 vs 空知识库可区分」（AC-IB-14-02）的不变式保持；R2 另在 `module_design.md` §7.4 为「`ib-embed` 服务不可达」与「页面图不可得」各补一格降级行（前者映射到既有 `degrade_reason`，**不新增枚举值**）。
+
+**ADR-13-R19 订正（2026-10-17）**：`DegradeReason` / `DegradeReasonLiteral` **新增 `ledger_unavailable`**（既有三值**不删不改**）。理由：检索 step1（绑定读路径 collection）此前把「台账 / 配置域」失败（项目记录取不到 —— 项目未登记 / 注册表与配置错位）与「向量库域」失败（`bind_collection`）共用同一个 `except` 并一律报 `vectorstore_unavailable`，**违反本 ADR 的「取值唯一对应失败依赖」不变项**，把运维引向 Qdrant 去排查一个没坏的依赖。新增值使 step1 的两域失败**如实可分**（`ledger_unavailable` / `vectorstore_unavailable`）；`module_design.md` §7.4 降级矩阵同步补一格。此订正**只增枚举值**，`RetrievalResult` 字段名 / 类型 / 可空性**逐字段不变**（门控标准 4 不受影响）。
 
 ### ADR-14 可视化配置的编辑模型（定义文档唯一真源 + 显式 round-trip 编辑事务）
 

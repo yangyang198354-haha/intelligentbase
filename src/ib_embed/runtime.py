@@ -316,6 +316,23 @@ class _OnnxRuntime:
     def embed(self, texts: Sequence[str], *, batch_size: int, max_tokens: int) -> RuntimeBatch:
         if self._session is None or self._tokenizer is None:
             raise InferenceUnavailable("模型权重尚未加载完成")
+        # ONNX 路径**显式**按 `batch_size` 切窗推理：本路径一次性 tokenize 整批，
+        # 若不切窗，非零 `batch_size` 形同虚设（`padding=True` 会把整批 pad 到该批最长序列，
+        # 单次张量 = 批大小 × 最长序列 —— 长批会把内存顶爆，见 server.INFERENCE_SUB_BATCH）。
+        size = max(1, int(batch_size))
+        vectors: list[tuple[float, ...]] = []
+        truncated: list[int] = []
+        for start in range(0, len(texts), size):
+            window = list(texts[start : start + size])
+            window_vectors, window_truncated = self._embed_window(window, max_tokens)
+            vectors.extend(window_vectors)
+            truncated.extend(start + index for index in window_truncated)
+        return RuntimeBatch(vectors=tuple(vectors), truncated_indices=tuple(truncated))
+
+    def _embed_window(
+        self, texts: Sequence[str], max_tokens: int
+    ) -> tuple[list[tuple[float, ...]], list[int]]:
+        """单窗推理：tokenize → session.run → mean-pool → L2；返回（向量, 窗内截断下标）。"""
         encoded = self._tokenizer(
             list(texts),
             padding=True,
@@ -331,17 +348,15 @@ class _OnnxRuntime:
         array = outputs[0]
         mask = encoded.get("attention_mask")
         pooled = _masked_mean_pool(array, mask)
-        vectors = tuple(_l2(row) for row in pooled)
-        lengths = encoded.get("attention_mask")
-        truncated: tuple[int, ...] = ()
-        if lengths is not None:
-            hits = [
+        vectors = [_l2(row) for row in pooled]
+        truncated: list[int] = []
+        if mask is not None:
+            truncated = [
                 index
-                for index, row in enumerate(lengths)
+                for index, row in enumerate(mask)
                 if int(sum(int(v) for v in row)) >= int(max_tokens)
             ]
-            truncated = tuple(hits)
-        return RuntimeBatch(vectors=vectors, truncated_indices=truncated)
+        return vectors, truncated
 
     def descriptor(self) -> RuntimeDescriptor:
         dim = 0

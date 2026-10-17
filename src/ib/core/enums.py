@@ -65,6 +65,12 @@ class DegradeReason(WireStrEnum):
     EMBEDDING_UNAVAILABLE = "embedding_unavailable"
     VECTORSTORE_UNAVAILABLE = "vectorstore_unavailable"
     TIMEOUT = "timeout"
+    #: REV-19 订正（2026-10-17）：检索 step1（绑定读路径 collection）的**台账 / 配置**域
+    #: 失败 —— 项目记录取不到（未登记 / 注册表与配置错位）或读路径 collection 名推导 / 前缀
+    #: 断言失败（FM-5）。此前这一类被一律报成 `vectorstore_unavailable`，把运维引向 Qdrant
+    #: 去排查一个**根本没坏**的依赖（正是 AC-IB-13-02 要防的误导）。取值与
+    #: `DependencyUnavailableError(dependency="ledger")` 的既有约定同源。
+    LEDGER_UNAVAILABLE = "ledger_unavailable"
 
 
 class RouteTier(WireStrEnum):

@@ -633,22 +633,48 @@ def _replace(record: Any, **changes: Any) -> Any:
 
 
 def load_project_record(ledger: Any, cfg: Any, project_id: str) -> ProjectRecord:
-    """构造 `ProjectRecord`：**元数据来自配置，active 版本来自台账**（ADR-05）。
+    """构造 `ProjectRecord`：**元数据来自台账行，active 版本来自台账**（ADR-05 / ADR-37）。
 
-    拆分的理由：`active_collection_version` 是**运行期可变**的（重建会改），
-    其余字段（名称/维度/模型）是**部署期固定**的。把可变的放进台账、固定的放进配置，
-    就避免了「重建时去改配置文件」这种危险做法。
+    数据源与 `_seed_projects` / `_projects_from_registry` **同源**：项目名的权威是台账
+    `projects` 行（装配期经注册表活动项目派生写入），`cfg.projects.<id>` **仅作回退**
+    （离线替身 / 尚未播种的部署期项目），最后回退 `project_id`。
+
+    **REV-19 订正（ADR-37 / ADR-45，2026-10-17）**：旧实现硬取 `cfg.projects[project_id]`，
+    而 ADR-37 之后**运行期新建项目不在 `cfg.projects`**（`Deps.projects` 源已切到注册表）
+    ⇒ 抛 `KeyError`。本函数是**读写两路径共用**的 provider（写路径在入库 step6、读路径在
+    检索 step1），检索侧 `except Exception` 会把它吞成 `degraded` 空结果 ⇒ 缺陷表现为
+    「上传成功但问答永远检索不到」这一静默故障（不报错、只显示「知识库中没有相关资料」）。
+    故此处**不得**因「项目不在 config」而抛：读路径只取名称回退值；写路径若需**强制**
+    config 的目标口径，由 `resolve_project_config` 另行 fail-closed，不在本函数。
     """
-    project_cfg = cfg.project(project_id) if hasattr(cfg, "project") else cfg.projects[project_id]
+    project_cfg = _optional_project_config(cfg, project_id)
+    existing = ledger.get_project(project_id) if hasattr(ledger, "get_project") else None
     version = ledger.active_collection_version(project_id)
     return ProjectRecord(
         project_id=project_id,
-        name=getattr(project_cfg, "name", project_id),
+        name=getattr(existing, "name", "") or getattr(project_cfg, "name", "") or project_id,
         active_collection_version=version,
         embedding_model_id=cfg.embedding.model_id,
         dim=cfg.embedding.dim,
-        created_at=getattr(project_cfg, "created_at", "") or utc_now_iso(),
+        created_at=getattr(existing, "created_at", "")
+        or getattr(project_cfg, "created_at", "")
+        or utc_now_iso(),
     )
+
+
+def _optional_project_config(cfg: Any, project_id: str) -> Any:
+    """取项目配置但**缺失即返回 `None`**（不抛）—— 仅供读路径回退值使用。
+
+    与 `resolve_project_config`（**写路径**，缺失即 `ConfigError` fail-closed）刻意区分：
+    读路径只需名称 / 创建时间的**回退**，权威值在台账行；写路径必须知道目标 collection，
+    缺失就该 fail。把二者混用正是本接缝此前出问题的原因。
+    """
+    if hasattr(cfg, "project"):
+        try:
+            return cfg.project(project_id)
+        except Exception:  # noqa: BLE001 - 回退语义：取不到就落到台账行 / 默认值
+            return None
+    return getattr(cfg, "projects", {}).get(project_id)
 
 
 def build_ledger(cfg: Any) -> Any:

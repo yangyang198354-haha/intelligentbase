@@ -74,6 +74,18 @@ QUEUE_WAIT_S: float = 30.0
 #: 打挂进程（输入校验：边界检查，见安全约束 SC-2）。
 MAX_BODY_BYTES: int = 8 * 1024 * 1024
 
+#: **单次库调用**的批上限（实现常量，**不是配置键**）。请求级上限仍是 `IB_EMBED_MAX_BATCH`
+#: （默认 64，语义 = 「一次请求最多多少条」）；本值约束的是**底层 encode 一次吃多少条**。
+#:
+#: 为什么必须把二者分开（2026-10-17，一次真实故障）：XLM-R 类模型（bge-m3）的显存/内存占用
+#: 与 `批大小 × 该批最长序列` 成正比。此前 `_work` 直接传 `batch_size=len(texts)`，等于
+#: 「不要上限」；客户端冷路径一次可发 16 条，若其中含长文本，单次 encode 的张量可膨胀到
+#: GB 级 —— 实测出现过一次编码把进程内存顶到 2.3G 并触发 `SIGILL`（`code=dumped, status=4/ILL`）
+#: ⇒ `/embed` 失败 ⇒ 该文档入库 `failed`，且**只影响这一篇**（文档级失败隔离）。
+#: 切成小批后单次张量有界；吞吐略降，但 `max_concurrency=1` 时并发本就不是瓶颈。
+#: **只改这一个参数，不动模型与权重**。
+INFERENCE_SUB_BATCH: int = 4
+
 _VALID_MODES = ("document", "query")
 
 #: 统一错误体的固定短语（**不含正文、不含路径**）。
@@ -299,7 +311,11 @@ class EmbedService:
             try:
                 started = time.perf_counter()
                 batch = self._runtime.embed(
-                    list(texts), batch_size=len(texts), max_tokens=self._cfg.max_tokens
+                    list(texts),
+                    # **单次库调用的批上限**（见 INFERENCE_SUB_BATCH）：防长批把内存顶爆。
+                    # 请求级上限仍是 IB_EMBED_MAX_BATCH；运行时空量保序契约不变。
+                    batch_size=min(len(texts), INFERENCE_SUB_BATCH),
+                    max_tokens=self._cfg.max_tokens,
                 )
                 holder["batch"] = batch
                 self._last_elapsed_ms = int((time.perf_counter() - started) * 1000)

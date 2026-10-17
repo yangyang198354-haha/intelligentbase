@@ -347,3 +347,47 @@ def test_TC_INT_028_unknown_path_and_query_string_dropped(loaded_server):
     # 带查询串的 /healthz 仍按 /healthz 路由（查询串被丢弃）
     status2, body2 = server.get("/healthz?token=SHOULD-NOT-MATTER")
     assert status2 == 200 and body2["ok"] is True
+
+
+def test_TC_INT_029_sub_batch_bound_is_enforced():
+    """[TC-INT-029] 单次库调用的批上限（`INFERENCE_SUB_BATCH`）必须被强制 ——
+    请求级上限（`IB_EMBED_MAX_BATCH`）**不等于**单次 encode 上限。
+
+    2026-10-17 订正（一次真实 `SIGILL` 故障）：`_work` 曾传 `batch_size=len(texts)`
+    （等于「不要上限」），客户端冷路径一次可发多条，其中含长文本时单次张量膨胀到 GB 级，
+    实测把 ib-embed 顶到 2.3G 内存并 `code=dumped, status=4/ILL` ⇒ 该文档入库 `failed`。
+    本用例以记录型运行时断言：无论请求多少条，**单次**传给运行时的 `batch_size`
+    不超过 `INFERENCE_SUB_BATCH`，且**向量条数仍与入参一致**（空量保序契约不因切批而变）。
+    """
+    from ib_embed.runtime import RuntimeBatch, RuntimeDescriptor
+    from ib_embed.server import INFERENCE_SUB_BATCH
+
+    seen: dict[str, int] = {}
+
+    class _Recording:
+        def load(self):
+            return 1
+
+        def is_loaded(self):
+            return True
+
+        def embed(self, texts, *, batch_size, max_tokens):
+            seen["batch_size"] = int(batch_size)
+            seen["count"] = len(texts)
+            return RuntimeBatch(vectors=tuple((0.5, 0.5) for _ in texts))
+
+        def descriptor(self):
+            return RuntimeDescriptor(
+                model_id="fake-bge-m3", dim=2, normalized=True, max_tokens=8, device="cpu"
+            )
+
+    with _Server(_cfg(IB_EMBED_MODEL_ID="fake-bge-m3"), _Recording()) as server:
+        status, body = server.post(
+            "/embed",
+            {"texts": [f"t{i}" for i in range(16)], "mode": "document", "model": "fake-bge-m3"},
+        )
+    assert status == 200 and body["count"] == 16
+    assert seen["count"] == 16, "切批改变了入参条数（空量保序契约被破坏）"
+    assert seen["batch_size"] <= INFERENCE_SUB_BATCH, (
+        f"单次库调用批上限未被约束：batch_size={seen['batch_size']} > {INFERENCE_SUB_BATCH}"
+    )

@@ -121,6 +121,59 @@ def test_TC_INT_006_retrieval_failopen_vectorstore_down(deps):
     assert result.degrade_reason == DegradeReason.VECTORSTORE_UNAVAILABLE
 
 
+def test_TC_INT_164_step1_degrade_reason_points_at_real_dependency(deps):
+    """[TC-INT-164] 检索 step1 的降级原因必须**如实指向失败依赖**（AC-IB-13-02 / AC-IB-15-01）。
+
+    **契约变更（2026-10-17）**：`DegradeReason` 新增 `ledger_unavailable`（`DegradeReasonLiteral`
+    同步扩一值，**不删不改**既有三值）。理由：step1 此前把「台账 / 配置域」失败（项目记录取不到
+    —— 未登记 / 注册表与配置错位）与「向量库域」失败（`bind_collection`）共用同一个 `except`
+    并一律报 `vectorstore_unavailable`，把运维引向 Qdrant 排查一个**没坏**的依赖。
+    这类失败恰是最难查的静默故障（检索侧 `except Exception` 吞掉 `KeyError`，表现为
+    「上传成功却检索不到」），原因码是该失败依赖的**第一手线索**，不得指错。
+
+    同时断言**反向守卫**：真正的向量库绑定失败仍报 `vectorstore_unavailable`
+    —— 修复不得退化为「一律 ledger」。
+    """
+    from ib.core import DegradeReason, Scope
+    from ib.retrieval import RetrievalService
+
+    class _UnregisteredProvider:
+        """模拟「项目记录取不到」（读路径 provider 抛 `KeyError`）：台账 / 配置域失败。"""
+
+        def __call__(self, project_id):
+            raise KeyError(project_id)
+
+    ledger_broken = RetrievalService(
+        embedder=deps.embedder, vectors=deps.vectors, resolver=deps.collections,
+        project_provider=_UnregisteredProvider(),
+    )
+    result = ledger_broken.search("任意问题", scope=Scope(project_id="p_ghost"))
+    assert result.degraded is True and result.hits == []
+    assert result.degrade_reason == DegradeReason.LEDGER_UNAVAILABLE, (
+        f"step1 台账/配置域失败被报成 {result.degrade_reason} —— 误导运维去排查一个没坏的依赖"
+    )
+    assert result.degrade_reason != DegradeReason.VECTORSTORE_UNAVAILABLE
+
+    class _BrokenBindVectors:
+        """真正的向量库域失败：`bind_collection` 抛错。"""
+
+        def bind_collection(self, collection):
+            raise RuntimeError("bind down")
+
+        def query(self, *a, **kw):
+            raise RuntimeError("unreachable")
+
+    vs_broken = RetrievalService(
+        embedder=deps.embedder, vectors=_BrokenBindVectors(), resolver=deps.collections,
+        project_provider=lambda pid: deps.projects[pid],
+    )
+    r2 = vs_broken.search("任意问题", scope=Scope(project_id="p_alpha"))
+    assert r2.degraded is True and r2.hits == []
+    assert r2.degrade_reason == DegradeReason.VECTORSTORE_UNAVAILABLE, (
+        "向量库绑定失败被误报为其它原因（修复不得退化为『一律 ledger』）"
+    )
+
+
 def test_TC_INT_007_search_as_tool_shapes(deps):
     """[TC-INT-007] 工具形态：降级/空/命中三态均为 ok=True（不触发编排层异常路径）。"""
     from ib.core import Scope
