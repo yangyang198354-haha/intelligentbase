@@ -4,6 +4,7 @@
             IFC-IB-294/295（R7）定义文档读写字段契约
             IFC-IB-356（REV-16-4）`ConfigAuditEntry` 投影（字段名 / 结果码白名单）
             IFC-IB-361（REV-16-4）`StorageState` 投影（只出存储态）
+            IFC-IB-393（REV-21）`definition_derived_summary` 的**显示投影展开**（专家节点实显）
 @depends MOD-IB-01（领域类型）, MOD-IB-11/12/14（台账/Blob/重建类型）
 @author software-developer
 
@@ -32,6 +33,8 @@ from __future__ import annotations
 from typing import Any
 
 from rest_framework import serializers
+
+from ib.core import RESERVED_GRAPH_ENDPOINTS, ConfigError
 
 __all__ = [
     "DocumentRecordSerializer",
@@ -347,18 +350,108 @@ class LlmKeyStatusSerializer(serializers.Serializer):
         }
 
 
+# --------------------------------------------------------------------------- #
+# REV-21 编排图「专家节点实显」的显示投影展开（IFC-IB-393；ADR-52 决定 1 ~ 6）
+#
+# 定义文档的编排拓扑以**单一结构占位节点** `expert` 表达全部专家
+# （见 `ibweb/composition.py::_definition_document_from_specs`）；运行期 LangGraph 同样是
+# 同一节点经 `Send` 多次扇出（`ib/orchestration/__init__.py::_fan_out`）。
+# **两者本轮一律不改**（C-IB-54 / C-IB-56②）；定义文档 schema 与既有文档亦零迁移。
+#
+# 界面需要「逐专家成节点」。若把展开规则留在客户端，节点 / 边集合就由客户端推导，
+# 与「服务端唯一裁决者」口径相悖且两处实现必然漂移（ADR-52 Option B 已评估未采纳）。
+# 故展开**收敛在此处（显示投影）**：只读 `DerivedView`，产出展开后的节点 / 边
+# （ADR-52 Option A）。这是一处**有意的解释差**：`nodes` / `edges` 不再是
+# `doc.orchestration` 的原样镜像，由本函数契约 + 测试固定。
+# --------------------------------------------------------------------------- #
+
+#: 结构节点名（ADR-52 决定 1 / 5）：编排拓扑里**不代表某一专家**的固定节点。
+_STRUCTURAL_GRAPH_NODE_NAMES: frozenset[str] = frozenset({"route", "general", "gate", "aggregate"})
+
+#: 定义文档编排拓扑中代表「全部专家」的单一占位节点（ADR-52 决定 1 / 3 / 4）。
+_EXPERT_PLACEHOLDER_NODE = "expert"
+
+
+def _expand_expert_nodes(view: Any) -> tuple[list[str], list[dict[str, Any]], list[dict[str, Any]]]:
+    """把「单一 `expert` 占位节点」展开为**逐专家**节点 / 条件边 / 普通边（ADR-52 决定 1 ~ 5）。**纯函数**。
+
+    **只读**：输入仅为既有派生结果（`view.experts` + `view.graph_config`），不写任何真源、
+    不新增写入口（C-IB-55）。专家节点来源 = `view.experts`（= 定义文档派生），
+    **不读**任何代码内置默认专家集。
+
+    展开规则：
+
+    1. 节点 `id` = 专家 `name`；与结构节点名 / 合成端点同名 ⇒ **显式报错**（`ConfigError`），
+       **不隐式改名**（改名会静默改变图上的身份，让「这就是文档里那个节点」的误读成真）。
+    2. 结构节点**保留**；占位节点在**原位置**展开为逐专家节点（保序）。
+    3. 条件边**仍为一条**，`branch_map` 中落向占位节点的分支改为逐专家 `(name, name)`；
+       其它分支（如 `general`）**原样保留**。
+    4. 普通边**逐专家镜像**：占位节点出现在哪一端就在那一端展开；
+       `START → route` / `gate → aggregate` / `general → aggregate` / `aggregate → END` 原样保留。
+
+    若文档本就**逐专家声明**节点（未使用占位节点），本函数对其节点 / 边为**无操作**
+    （即「既有定义文档零迁移」，OQ-IB-55=A）。
+    """
+    conflicts = [e.name for e in view.experts if e.name in _STRUCTURAL_GRAPH_NODE_NAMES | RESERVED_GRAPH_ENDPOINTS]
+    if conflicts:
+        raise ConfigError(
+            "编排图专家节点名与结构节点 / 合成端点同名（ADR-52 决定 1）："
+            + "、".join(sorted(conflicts))
+            + f"（结构节点 {'/'.join(sorted(_STRUCTURAL_GRAPH_NODE_NAMES))}；"
+            + f"合成端点 {'/'.join(sorted(RESERVED_GRAPH_ENDPOINTS))}）"
+        )
+
+    names = [e.name for e in view.experts]
+    graph = view.graph_config
+
+    nodes: list[str] = []
+    for node in graph.nodes:
+        for emitted in (names if node == _EXPERT_PLACEHOLDER_NODE else [node]):
+            if emitted not in nodes:  # 节点 `id` 必须唯一（同名节点会在图上互相覆盖）
+                nodes.append(emitted)
+
+    conditional_edges: list[dict[str, Any]] = []
+    for ce in graph.conditional_edges:
+        branch_map: list[list[str]] = []
+        for key, target in ce.branch_map:
+            if key == _EXPERT_PLACEHOLDER_NODE or target == _EXPERT_PLACEHOLDER_NODE:
+                branch_map.extend([name, name] for name in names)
+            else:
+                branch_map.append([str(key), str(target)])
+        conditional_edges.append({"from_node": ce.from_node, "branch_map": branch_map})
+
+    edges: list[dict[str, Any]] = []
+    seen_edges: set[tuple[str, str]] = set()
+    for e in graph.edges:
+        for src in (names if e.from_node == _EXPERT_PLACEHOLDER_NODE else [e.from_node]):
+            for dst in (names if e.to_node == _EXPERT_PLACEHOLDER_NODE else [e.to_node]):
+                if src == dst or (src, dst) in seen_edges:
+                    continue  # 自环已被定义文档校验器禁止；去重避免逐专家展开产生重复边
+                seen_edges.add((src, dst))
+                edges.append({"from_node": src, "to_node": dst})
+
+    return nodes, conditional_edges, edges
+
+
 def definition_derived_summary(view: Any) -> dict[str, Any]:
-    """派生视图摘要（IFC-IB-294 的「+ 派生视图摘要」）。
+    """派生视图摘要（IFC-IB-294 的「+ 派生视图摘要」；**REV-21 / IFC-IB-393 口径扩展**）。
 
     只暴露**只读派生结果**（专家名 / 能力摘要 / 图节点与条件边）—— 供界面只读渲染，
     **不含**任何真源写入口（视图侧零持久化，ADR-14）。凭据一律不出现。
+
+    **REV-21 起**：`nodes` / `conditional_edges` / `edges` 由 `view.experts` **逐专家展开**
+    （ADR-52 决定 1 ~ 6，见 `_expand_expert_nodes`），并**新增** `experts` 键
+    （`{name, cn_label, is_default}`，供界面取标签；**不含**工具授权摘要，OQ-IB-53=A）；
+    既有 5 键**键名不变**（[ARCH-ASSUMPTION-A16]）。运行期拓扑与定义文档 schema **均未改动**。
     """
+    nodes, conditional_edges, edges = _expand_expert_nodes(view)
     return {
         "capability_digest": view.capability_digest,
         "expert_names": [e.name for e in view.experts],
-        "nodes": list(view.graph_config.nodes),
-        "conditional_edges": [
-            _ConditionalEdgeSpecSerializer().to_representation(ce) for ce in view.graph_config.conditional_edges
+        "nodes": nodes,
+        "conditional_edges": conditional_edges,
+        "edges": edges,
+        "experts": [
+            {"name": e.name, "cn_label": e.cn_label, "is_default": bool(e.is_default)} for e in view.experts
         ],
-        "edges": [_EdgeSpecSerializer().to_representation(e) for e in view.graph_config.edges],
     }

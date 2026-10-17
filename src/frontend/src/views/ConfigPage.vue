@@ -4,6 +4,7 @@
  * @implements IFC-IB-296（R7 可视化配置页约束；REQ-FUNC-IB-25 主 / IB-26 并列主）
  *             IFC-IB-354（REV-16-2 提示词分层编辑器 + 工具授权勾选 + 工具参数）
  *             IFC-IB-363（REV-16-4 内存态非静默提示：任一 store == "memory" 即提示）
+ *             IFC-IB-394（REV-21 专家节点渲染契约：逐专家成节点 / 标签取 cn_label / 可区分 / 仍只读）
  * @depends MOD-IB-23（IFC-IB-294 / 295 / 352 / 362；**仅** HTTP 契约，不 import 任何后端模块）
  * @author software-developer
  *
@@ -57,6 +58,7 @@ import {
   ApiClientError,
   type DefinitionConfigEnvelope,
   type DefinitionDocument,
+  type DerivedExpertEntry,
   type PromptExpertEntry,
   type PromptLayer,
   type PromptListEnvelope,
@@ -90,9 +92,14 @@ const keyNames = computed<string[]>(() => envelope.value?.config_key_names ?? []
 // --------------------------------------------------------------------------- //
 // 编排图（只读）渲染
 //
-// 两类边**缺一不可**：**普通边**（无条件转移，如 `expert → gate → aggregate`）与
-// **条件边**（按分支键择一，如 `route → expert / general`）。只画条件边时，`gate` /
+// 两类边**缺一不可**：**普通边**（无条件转移，如 `专家节点 → gate → aggregate`）与
+// **条件边**（按分支键择一，如 `route → 各专家 / general`）。只画条件边时，`gate` /
 // `aggregate` 这类只靠普通边相连的节点会渲染成孤立方块 —— 看着像断链，其实拓扑是通的。
+//
+// **REV-21（IFC-IB-394 / ADR-52）**：专家不再是单个字面量 `expert` 占位节点 —— 后端
+// 显示投影（`definition_derived_summary`）已把该占位节点按 `derived.experts` **逐专家展开**，
+// 本页只按 `derived.nodes` / `derived.conditional_edges` / `derived.edges` 纯渲染，
+// 标签取 `derived.experts[].cn_label`（结构节点 / 合成端点仍用字面量名）。**仍只读**。
 //
 // 节点坐标**按拓扑分层算**，不再按数组下标摆：下标顺序与拓扑无关，图一有分支/汇合，
 // 边就会横穿画面（`general → aggregate` 会从 `gate` 上方掠过）。
@@ -191,20 +198,49 @@ const graphNodeNames = computed<string[]>(() => {
   return [...declared, ...extra];
 });
 
+/**
+ * REV-21（IFC-IB-394 / ADR-52 决定 2）：图上**专家节点**的显示元数据，逐专家一项。
+ *
+ * 节点 `id` = 专家 `name`（后端 `derived.nodes` 已按 `derived.experts` 逐专家展开），
+ * 标签取 `cn_label`；`name` 为次级信息（本页在图例区列出，供与定义文档核对）。
+ */
+const expertMeta = computed<Map<string, DerivedExpertEntry>>(
+  () => new Map((envelope.value?.derived.experts ?? []).map((e) => [e.name, e])),
+);
+
+/** 专家节点清单（图例区展示 `cn_label`（`name`）与默认标记 —— 供与定义文档核对）。 */
+const expertEntries = computed<DerivedExpertEntry[]>(() => envelope.value?.derived.experts ?? []);
+
+/**
+ * 节点 class（IFC-IB-394）：专家节点 / 结构节点（`route` / `general` / `gate` / `aggregate`）/
+ * 合成端点（`START` / `END`）三者在**视觉 / 图例**上必须可区分（AC-IB-53-02）。
+ * 合成端点 = 只出现在边端点里、**不**在 `derived.nodes` 中的节点。
+ */
+function nodeClassOf(name: string, isExpert: boolean, declared: Set<string>): string {
+  if (isExpert) return 'graph-expert';
+  if (declared.has(name)) return '';
+  return 'graph-endpoint';
+}
+
 /** 编排图**只读**渲染：节点 + 普通边（实线）+ 条件边（虚线带分支标签）。 */
 const graphNodes = computed<Node[]>(() => {
   const names = graphNodeNames.value;
   const declared = new Set(declaredNodes.value);
+  const experts = expertMeta.value;
   const positions = layeredPositions(names, graphLinks.value);
-  return names.map((name) => ({
-    id: name,
-    position: positions.get(name) ?? { x: 0, y: 0 },
-    data: { label: name },
-    // 合成端点单独一个 class：它不是可编排节点，只是图的入口 / 出口。
-    class: declared.has(name) ? '' : 'graph-endpoint',
-    draggable: false,
-    connectable: false,
-  }));
+  return names.map((name) => {
+    const meta = experts.get(name);
+    return {
+      id: name,
+      position: positions.get(name) ?? { x: 0, y: 0 },
+      // 专家节点标签取 `cn_label`（默认专家带标记）；无 `derived.experts` 匹配则回落节点名
+      // （结构节点 / 合成端点本就没有 `cn_label`）。
+      data: { label: meta ? `${meta.cn_label}${meta.is_default ? '（默认）' : ''}` : name },
+      class: nodeClassOf(name, Boolean(meta), declared),
+      draggable: false,
+      connectable: false,
+    };
+  });
 });
 
 const graphEdges = computed<Edge[]>(() => {
@@ -698,13 +734,21 @@ async function savePromptLayer(expertName: string, layer: PromptLayer): Promise<
 
       <h3>编排图（只读）</h3>
       <p class="hint">
-        节点与边由定义文档派生，**运行期不可编辑**（无增删节点 / 改边入口）。
+        节点与边由定义文档派生（**专家节点按定义文档的专家集合逐专家展开**，结构节点 `route` /
+        `general` / `gate` / `aggregate` 保留），**运行期不可编辑**（无增删节点 / 改边入口）。
         拓扑变更路径 = 改定义文档 → 装配期校验 → 重新编译。
       </p>
       <p class="legend">
         <span class="legend-item"><span class="legend-line solid"></span>普通边（无条件转移）</span>
         <span class="legend-item"><span class="legend-line dashed"></span>条件边（按分支键择一）</span>
+        <span class="legend-item"><span class="legend-box expert"></span>专家节点（本项目已配置的专家，逐专家一项）</span>
         <span class="legend-item"><span class="legend-box"></span>START / END（合成端点，非可编排节点）</span>
+      </p>
+      <p v-if="expertEntries.length" class="experts-legend">
+        专家节点标签取中文标签（默认专家带「（默认）」标记）；括号内为专家名（`name`，供与定义文档核对）：
+        <span v-for="e in expertEntries" :key="e.name" class="experts-legend-item">
+          {{ e.cn_label }}（{{ e.name }}）{{ e.is_default ? '· 默认专家' : '' }}
+        </span>
       </p>
       <div class="graph">
         <VueFlow
@@ -1084,11 +1128,34 @@ h3 {
   border: 1px dashed var(--ib-text-faint);
   border-radius: 3px;
 }
+/* REV-21（IFC-IB-394）：专家节点图例块 —— 实线蓝框，与「合成端点」的虚线/灰底可区分。 */
+.legend-box.expert {
+  border-style: solid;
+  border-color: var(--ib-accent-blue);
+  background: var(--ib-accent-blue-soft);
+}
+/* 专家节点清单：标签（`cn_label`）为主、括号内为专家名（`name`），供与定义文档核对。 */
+.experts-legend {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--ib-text-muted);
+}
+.experts-legend-item {
+  margin-right: 12px;
+  white-space: nowrap;
+}
 /* 节点元素由 Vue Flow 在运行期创建，scoped 样式需经 :deep 才能命中自定义 class。 */
 .graph :deep(.graph-endpoint) {
   border-style: dashed;
   background: var(--ib-bg-sunken);
   color: var(--ib-text-muted);
+}
+/* 专家节点与结构节点在视觉上可区分（AC-IB-53-02）：专家为高亮蓝框 + 加粗。 */
+.graph :deep(.graph-expert) {
+  border: 1px solid var(--ib-accent-blue);
+  background: var(--ib-accent-blue-soft);
+  color: var(--ib-accent-blue);
+  font-weight: 600;
 }
 .grid {
   display: flex;

@@ -194,12 +194,27 @@ export type DefinitionDocument = {
   updated_at: string;
 };
 
+/**
+ * REV-21（IFC-IB-393）：`derived` 新增的**专家节点显示元数据**（逐专家一项）。
+ * 节点 `id` = `name`（与 `nodes` 中展开出来的专家节点一致），标签取 `cn_label`；
+ * 仅出这三字段（**不含**工具授权摘要，OQ-IB-53=A）。
+ */
+export type DerivedExpertEntry = { name: string; cn_label: string; is_default: boolean };
+
+/**
+ * 派生视图摘要（IFC-IB-294）。
+ *
+ * **REV-21 起**（IFC-IB-393 / ADR-52）`nodes` / `conditional_edges` / `edges` 已是
+ * **逐专家展开**后的取值（不再是 `document.orchestration` 的原样镜像）—— 既有键名不变；
+ * 新增 `experts` 供界面取标签。
+ */
 export type DerivedViewSummary = {
   capability_digest: string;
   expert_names: string[];
   nodes: string[];
   conditional_edges: ConditionalEdgeSpec[];
   edges: EdgeSpec[];
+  experts: DerivedExpertEntry[];
 };
 
 export type ValidationErrorItem = { path: string; code: string; message: string };

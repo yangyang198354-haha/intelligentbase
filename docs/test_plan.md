@@ -1801,3 +1801,124 @@ selfcheck 31/31；含抖动靶点复跑）见 `docs/test_report.md` **§14**。
 
 **新增文件（3）**：`tests/unit/test_rev19_expert_isolation_unit.py`（15 例）、`tests/integration/test_rev19_project_expert_isolation_int.py`（10 例）、`tests/e2e/test_rev19_project_expert_journeys.py`（3 例）。
 **未删除 / 未削弱任何既有断言，未将任何失败转 skip / xfail，未降低任何阈值**。**未改 `src/**`**（全程只读）。
+
+---
+
+## §25 REV-21 增量 —— 编排图「专家节点实显」显示投影展开（US-IB-51 ~ US-IB-54；追加，不改写 §1~§24）
+
+> **调用 ID**（续）：INV-GROUP_D-INTELBASE-021（REV-21 独立补测：测试计划 + 执行 + 用例实现）。
+> **覆盖对象**：REQ-FUNC-IB-59 ~ IB-63 + REQ-NFR-IB-23 ⇔ US-IB-51 ~ US-IB-54，**12 组 AC**（AC-IB-51-01 ~ AC-IB-54-02）。
+> **只读被测对象**：`src/ibweb/serializers.py`（`_expand_expert_nodes` + `definition_derived_summary`；IFC-IB-393）/
+> `src/ibweb/views.py`（展开冲突经既有 fail-closed 通道回 503）/
+> `src/frontend/src/views/ConfigPage.vue`（IFC-IB-394）/ `src/frontend/src/api/client.ts`（`DerivedExpertEntry`）/ `src/ibweb/composition.py`（**仅**只读校验：派生的图配置来源）。
+> **本轮锚定决策**：ADR-52（Option A：显示投影层展开）/ IFC-IB-393 / IFC-IB-394；[ARCH-ASSUMPTION-A16]（加成式契约）。
+
+### 25.1 测试策略与范围
+
+- **目标**：独立核验「编排图按项目专家集合**逐专家成节点**、不再以单一 `expert` 占位节点代替」这一
+  REV-21 核心承诺，并覆盖其配套的「标签口径 / 单条件边 / 边镜像 / 结构节点可区分 / 冲突 fail-closed /
+  零迁移 / 既有消费者不受影响（A16）/ 前端只读」交付面。
+- **in-scope**：① 逐专家成节点（多专家 / 单专家 / 三专家 / n=6）；② 标签口径 `{name, cn_label, is_default}`；
+  ③ `route` 单条件边 `branch_map` 逐专家 + `general`；④ 普通边逐专家镜像 + 主干边保留；
+  ⑤ 结构节点保留且与专家节点不相交；⑥ 冲突负例（专家名 = 结构节点 / 合成端点）⇒ `ConfigError` / 端点 503；
+  ⑦ 逐专家声明文档 ⇒ 展开为**无操作**（零迁移）；⑧ 信封键加成式契约（[ARCH-ASSUMPTION-A16]）；
+  ⑨ 运行期 LangGraph 拓扑**一字未动**（introspect 运行期图，仍为含占位 `expert` 的单一默认流）；
+  ⑩ 前端冒烟：`cn_label` 标签 / `graph-expert` 区分 class + 图例 / 仍只读。
+- **out-of-scope（不在本层）**：真实运行期**渲染**（Vue 挂载 / 画布拖拽交互）—— 离线不可验，
+  见 `docs/test_report.md` §25.x NOT_TESTABLE；真实 Qdrant / embedding / LLM / 网络链路的问答（与 REV-21 无关）。
+- **环境约束**：全离线 —— 内存替身定义文档 / 提示词存储 + `derive()` 纯函数 + Django test `Client`；
+  前端为 `node:test` **源码结构**断言（零新增依赖）；**不触网、不碰生产路径**。
+
+### 25.2 测试用例清单（TC ↔ US ↔ AC 追溯矩阵）
+
+**新增单元用例（`tests/unit/test_orchestration_expert_nodes_r21.py`，TC-UNIT-R21-001~013）**
+
+| TC-ID | 所属 US | 关联 AC | 级别 | 描述 | 预期 |
+|-------|--------|--------|------|------|------|
+| TC-UNIT-R21-001 | US-IB-51 | AC-IB-51-01 | UNIT | 多专家逐专家成节点 | `nodes` 含每位专家 `name`，**不含**字面量 `expert` |
+| TC-UNIT-R21-002 | US-IB-51 | AC-IB-51-02 | UNIT | 唯一 kb-agent 单专家 | 恰一个专家节点；`experts` == `kb-agent` 三项 |
+| TC-UNIT-R21-003 | US-IB-51 | AC-IB-51-03 | UNIT | 三专家分别成节点 | 三节点齐现，非一个占位 |
+| TC-UNIT-R21-004 | US-IB-51 | AC-IB-51-04 | UNIT | 标识取自定义文档专家集合 | `experts[]` 仅 `{name, cn_label, is_default}` |
+| TC-UNIT-R21-005 | US-IB-53 | AC-IB-53-01 | UNIT | 条件边仍为一条 | `branch_map == [[a,a],[b,b],[general,general]]` |
+| TC-UNIT-R21-006 | US-IB-53 | AC-IB-53-02 | UNIT | 结构节点保留且可区分 | 4 结构节点在内；与专家名不相交；端点不进 `nodes` |
+| TC-UNIT-R21-007 | US-IB-53 / US-IB-52 | AC-IB-53-03、AC-IB-52-03 | UNIT | 运行期拓扑未变 | introspect 运行期图仍为含占位 `expert` 的 5 节点 / 单条件边 |
+| TC-UNIT-R21-008 | US-IB-52 | AC-IB-52-01 | UNIT | 新增专家 ⇒ 新增节点 | 节点 +1；条件边分支与镜像边同步增 |
+| TC-UNIT-R21-009 | US-IB-52 / US-IB-54 | AC-IB-52-02、AC-IB-54-02 | UNIT | 删除专家 ⇒ 节点消失；计数一致 | 节点 / 分支 / 镜像边同步删；专家节点数 == 集合规模 |
+| TC-UNIT-R21-010 | US-IB-51 / US-IB-53 | AC-IB-51-01、AC-IB-53-02 | UNIT | 冲突负例（6 名参数化） | `ConfigError` 且信息含原名；**不静默改名**；无兜底输出 |
+| TC-UNIT-R21-011 | US-IB-52 | AC-IB-52-01 | UNIT | 逐专家声明文档 ⇒ 无操作 | `nodes` / 边 / 条件边与文档逐项一致（零迁移） |
+| TC-UNIT-R21-012 | US-IB-51 | [ARCH-ASSUMPTION-A16] | UNIT | 加成式契约 | 既有 5 键名不变 + 新增 `experts`；条目不含工具摘要 |
+| TC-UNIT-R21-013 | US-IB-54 | AC-IB-54-01 | UNIT | n=6 完整可见 | 6 专家节点 + 逐专家边 + 分支齐全，不漏 |
+
+**新增集成用例（`tests/integration/test_definition_config_rev21_int.py`，TC-INT-R21-001~003b）**
+
+| TC-ID | 所属 US | 关联 AC | 级别 | 集成边界 | 描述 | 预期 |
+|-------|--------|--------|------|---------|------|------|
+| TC-INT-R21-001 | US-IB-51 | AC-IB-51-02、AC-IB-51-04、A16 | INT | 端点 ↔ 显示投影 | 默认文档信封契约 | 顶层 4 键不变；`derived` 6 键（5 旧名 + `experts`）；单专家无占位 |
+| TC-INT-R21-002 | US-IB-51/53/54 | AC-IB-51-01、51-03、53-01、53-02、54-02 | INT | 端点 ↔ 显示投影 ↔ 存储 | 多专家逐专家展开 | 逐专家节点 / 单条件边 / 边镜像 / 结构节点 |
+| TC-INT-R21-003 | US-IB-51/53 | AC-IB-51-01、AC-IB-53-02 | INT | 端点 ↔ fail-closed 通道 | 冲突（`route`） | **503**（非 500）；不返回半成品信封 |
+| TC-INT-R21-003b | US-IB-51/53 | AC-IB-51-01、AC-IB-53-02 | INT | 端点 ↔ fail-closed 通道 | 冲突（`gate`/`START`/`END`） | 各得 503；无改名字面量 |
+
+**新增 E2E 用例（`tests/e2e/test_rev21_expert_graph_journeys.py`，TC-E2E-R21-001~002）**
+
+| TC-ID | 所属 US | 关联 AC | 级别 | 关键路径描述 |
+|-------|--------|--------|------|-------------|
+| TC-E2E-R21-001 | US-IB-52 / US-IB-51 / US-IB-54 | AC-IB-52-01、AC-IB-51-01、AC-IB-51-03、AC-IB-52-03、AC-IB-54-02 | E2E | 打开配置页（2 专家）→ 保存新增第 3 位 → 以文档为准重读：图上出现 3 节点、占位零残留、编排不可编辑 |
+| TC-E2E-R21-002 | US-IB-52 / US-IB-54 | AC-IB-52-02、AC-IB-54-01、AC-IB-54-02 | E2E | 3 专家项目 → 保存删除第 3 位 → 重读：该节点消失，图仍可读 + 完整（结构节点 / 主干边齐全） |
+
+**新增前端冒烟用例（`src/frontend/tests/frontend.smoke.test.js`，用例 36~40）**
+
+| TC-ID | 所属 US | 关联 AC | 级别 | 描述 | 预期 |
+|-------|--------|--------|------|------|------|
+| TC-FE-R21-36 | US-IB-51 | AC-IB-51-02、AC-IB-51-04 | FE（源码结构） | 标签取 `cn_label` +「（默认）」+ 回落节点名 + `name` 回显 | 断言通过 |
+| TC-FE-R21-37 | US-IB-53 | AC-IB-53-02 | FE | `graph-expert` / `graph-endpoint` 区分 + 图例 | 断言通过 |
+| TC-FE-R21-38 | US-IB-52 | AC-IB-52-03 | FE | 仍只读（不可拖拽 / 连线 + 无增删图节点/边标识） | 断言通过 |
+| TC-FE-R21-39 | US-IB-51 | AC-IB-51-04、A16 | FE | `DerivedExpertEntry` 三字段且不含工具摘要 | 断言通过 |
+| TC-FE-R21-40 | US-IB-54 | AC-IB-54-01 | FE | 节点/边集合由后端 `derived` 派生，前端不硬编码 `expert` | 断言通过 |
+
+### 25.3 覆盖性结论（AC ↔ TC）
+
+| US | AC | 覆盖 TC |
+|----|----|---------|
+| US-IB-51 | AC-IB-51-01 | TC-UNIT-R21-001 / TC-INT-R21-002 / TC-E2E-R21-001 |
+| US-IB-51 | AC-IB-51-02 | TC-UNIT-R21-002 / TC-INT-R21-001 / TC-FE-R21-36 |
+| US-IB-51 | AC-IB-51-03 | TC-UNIT-R21-003 / TC-INT-R21-002 / TC-E2E-R21-001 |
+| US-IB-51 | AC-IB-51-04 | TC-UNIT-R21-004 / TC-INT-R21-001 / TC-FE-R21-36 / TC-FE-R21-39 |
+| US-IB-52 | AC-IB-52-01 | TC-UNIT-R21-008 / TC-UNIT-R21-011 / TC-E2E-R21-001 |
+| US-IB-52 | AC-IB-52-02 | TC-UNIT-R21-009 / TC-E2E-R21-002 |
+| US-IB-52 | AC-IB-52-03 | TC-UNIT-R21-007 / TC-E2E-R21-001 / TC-FE-R21-38 |
+| US-IB-53 | AC-IB-53-01 | TC-UNIT-R21-005 / TC-INT-R21-002 |
+| US-IB-53 | AC-IB-53-02 | TC-UNIT-R21-006 / TC-UNIT-R21-010 / TC-INT-R21-002/003/003b / TC-FE-R21-37 |
+| US-IB-53 | AC-IB-53-03 | TC-UNIT-R21-007 |
+| US-IB-54 | AC-IB-54-01 | TC-UNIT-R21-013 / TC-E2E-R21-002 / TC-FE-R21-40 |
+| US-IB-54 | AC-IB-54-02 | TC-UNIT-R21-009 / TC-UNIT-R21-013 / TC-INT-R21-002 / TC-E2E-R21-001/002 |
+
+**覆盖结论**：US-IB-51 ~ US-IB-54 全部 **4 个 US、12 组 AC 均有至少一条 TC**，**无悬空 AC**，
+亦无无溯源用例（每个 TC 均挂 ≥1 个 AC-NN-NN）。
+
+### 25.4 门控阈值与判定口径（与 §24.4 同；无阈值调整）
+
+| 层 | 阈值 | 通过率口径 |
+|----|------|-----------|
+| unit | ≥ **80%** | `pass / (pass + fail)`；skip / blocked 不入分母 |
+| integration | ≥ **90%** | 同上 |
+| e2e 关键路径 | **100%** | US-IB-51 / 52 / 53 / 54（Must Have）覆盖的 E2E 全绿 |
+| metrics 算术 | 精确等式 | `total = pass + fail + skip + block` |
+
+**串行门控（强制）**：unit 达标方可跑 integration；integration 达标方可跑 e2e。本轮结果见 `docs/test_report.md` §25。
+
+### 25.5 不可验证子句 / 施工前置（如实登记，不臆造）
+
+| # | 项 | 类型 | 处置 |
+|---|----|------|------|
+| 1 | AC-IB-54-01 的「**不重叠到不可读**」真实**视觉**判定（Vue Flow 分层布局在 n 专家时的画面观感） | `[NOT_TESTABLE]` | 离线无浏览器渲染；本层只做**结构性**完整可见断言（节点 / 边不漏、`layeredPositions` 分层纯函数输入完整）+ 前端源码结构断言 |
+| 2 | AC-IB-52-03 的「**尝试拖拽连线**」交互实测 | `[NOT_TESTABLE]` | 离线无渲染；以**源码结构**断言（`:nodes-draggable/connectable="false"` + 无增删图节点/边入口标识）覆盖 |
+| 3 | 「保存后经**生产服务重启**生效」 | `[DEPLOY_REQUIRED]` | 红线：不重启生产；以 E2E「端点写回 → 以文档为准重读」机制层覆盖（ADR-32），与既有 R7 / REV-19 同 |
+| 4 | 「真实运行期 LangGraph 拓扑未被改变」的**第三方核对** | 已可测 | 由 TC-UNIT-R21-007 直接 introspect `get_graph()` 覆盖（非复述硬编码清单） |
+
+### 25.6 本轮 `tests/**` 改动面（边界声明）
+
+**新增文件（3）**：`tests/unit/test_orchestration_expert_nodes_r21.py`（13 例 / 19 收集项）、
+`tests/integration/test_definition_config_rev21_int.py`（4 例）、`tests/e2e/test_rev21_expert_graph_journeys.py`（2 例）；
+**修改文件（2）**：`src/frontend/tests/frontend.smoke.test.js`（追加用例 36~40，**未改** `src/frontend/src/**`）、
+`tests/integration/test_definition_config_r7.py`（**仅追加** 2 条独立断言：占位节点不残留 / 专家节点计数一致；**未删改** 开发方订正断言）。
+**未删除 / 未削弱任何既有断言，未将任何失败转 skip / xfail，未降低任何阈值**。**未改 `src/**` 生产源码**（全程只读）。

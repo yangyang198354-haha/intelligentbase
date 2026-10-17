@@ -729,3 +729,88 @@ describe('REV-18 前端冒烟：系统管理三分 IA + 项目域上传 + LLM Ke
     );
   });
 });
+
+// --------------------------------------------------------------------------- //
+// REV-21 前端冒烟：编排图「专家节点实显」（IFC-IB-393 / 394；ADR-52）
+//
+// 溯源：US-IB-51（实显本项目实际配置的专家）、US-IB-52（专家集合变更后图随之更新、图仍只读）、
+//       US-IB-53（结构节点与专家节点可区分）、US-IB-54（n 专家规模完整可见）。
+// 策略：与既有 R10/R13/R14/R16/REV-18 层一致 —— **源码结构**断言（零新增依赖，Node 20 可跑）。
+//       真实运行期渲染（Vue 挂载 / 画布交互）**离线不可验**，见 docs/test_report.md NOT_TESTABLE。
+// --------------------------------------------------------------------------- //
+
+const r21 = {
+  config: configPagePath,
+  client: join(root, 'src', 'api', 'client.ts'),
+};
+
+describe('REV-21 前端冒烟：编排图专家节点实显（cn_label / graph-expert / 仍只读）', () => {
+  const page = () => stripComments(readText(r21.config));
+
+  it('36. 专家节点标签取 derived.experts[].cn_label（默认专家带「（默认）」标记，无匹配回落节点名）', () => {
+    const text = page();
+    // 逐专家显示元数据来自后端派生（不是前端自造）
+    assert.match(text, /DerivedExpertEntry/, '缺少 DerivedExpertEntry 类型引用');
+    assert.match(text, /derived\.experts/, '页面未消费 derived.experts（专家节点显示元数据）');
+    assert.match(text, /expertMeta/, '缺少按 name 索引的专家元数据');
+    // 标签取 cn_label；默认专家带「（默认）」标记；无匹配时回落节点名（结构节点 / 合成端点）
+    assert.match(text, /meta\.cn_label/, '节点标签未取 cn_label');
+    assert.ok(text.includes('（默认）'), '默认专家缺少「（默认）」标记');
+    assert.match(text, /label:\s*meta\s*\?/, '无 derived.experts 匹配时应回落节点名');
+    // 专家节点清单区列出 cn_label（name）供与定义文档核对（OQ-IB-53=A：name 作次级信息）
+    assert.match(text, /expertEntries/, '缺少专家节点清单（图例区）');
+    assert.ok(text.includes('（{{ e.name }}）'), '清单未回显专家名 name 供核对');
+  });
+
+  it('37. 专家节点与结构节点 / 合成端点在视觉 / 图例上可区分（graph-expert / graph-endpoint）', () => {
+    const text = page();
+    assert.ok(text.includes('graph-expert'), '缺少专家节点区分类 graph-expert');
+    assert.ok(text.includes('graph-endpoint'), '缺少合成端点区分类 graph-endpoint');
+    assert.match(text, /nodeClassOf\(/, '缺少节点 class 派生');
+    // 图例项：专家节点（实线蓝框）与 START / END（虚线）各有一项
+    assert.ok(text.includes('legend-box expert'), '缺少专家节点图例块');
+    assert.ok(text.includes('专家节点'), '缺少「专家节点」图例文案');
+    assert.ok(text.includes('START / END'), '缺少合成端点图例文案');
+  });
+
+  it('38. 编排图仍只读：节点不可拖拽 / 不可连线，且无运行期增删图节点 / 边的入口', () => {
+    const text = page();
+    assert.match(text, /:nodes-draggable="false"/, '节点必须不可拖拽（只读）');
+    assert.match(text, /:nodes-connectable="false"/, '节点必须不可连线（只读）');
+    // 无任何运行期改图（增删图节点 / 边）的入口标识
+    assert.doesNotMatch(
+      text,
+      /\b(addNode|removeNode|deleteNode|addEdge|removeEdge|deleteEdge)\b/,
+      '配置页出现图拓扑编辑入口（REQ-FUNC-IB-26 ② / AC-IB-52-03）',
+    );
+    // 拓扑不可编辑：编排不在可编辑白名单（页面仍以服务端 editable_fields 为准）
+    assert.match(text, /editable_fields/, '可编辑白名单来源缺失');
+  });
+
+  it('39. 客户端类型契约：DerivedExpertEntry 三字段 + DerivedViewSummary.experts', () => {
+    const clientTs = stripComments(readText(r21.client));
+    const typeMatch = clientTs.match(/export type DerivedExpertEntry = \{[\s\S]*?\};/);
+    assert.ok(typeMatch, '缺少 `export type DerivedExpertEntry`');
+    for (const name of ['name', 'cn_label', 'is_default']) {
+      assert.ok(typeMatch[0].includes(name), `DerivedExpertEntry 缺字段 ${name}`);
+    }
+    // **不含**工具授权摘要（OQ-IB-53=A）
+    assert.doesNotMatch(
+      typeMatch[0],
+      /\b(tools|tool_names|tool_grants|capability_digest)\b/,
+      'DerivedExpertEntry 出现了工具授权摘要字段（不应含）',
+    );
+    assert.match(clientTs, /experts:\s*DerivedExpertEntry\[\]/, 'DerivedViewSummary 缺少 experts 字段');
+  });
+
+  it('40. 节点 / 边集合由后端派生（前端不自展开占位节点、不硬编码 expert 字面量）', () => {
+    const text = page();
+    // 节点集合来自 derived.nodes / derived.conditional_edges / derived.edges（后端唯一裁决者）
+    assert.match(text, /derived\.nodes/, '节点集合未取 derived.nodes');
+    assert.match(text, /derived\.conditional_edges/, '条件边未取 derived.conditional_edges');
+    assert.match(text, /derived\.edges/, '普通边未取 derived.edges');
+    // **不得**在前端硬编码占位节点 `expert` 或复刻展开规则
+    assert.doesNotMatch(text, /EXPERT_PLACEHOLDER/, '前端不得持有占位节点常量（展开属服务端显示投影）');
+    assert.doesNotMatch(text, /'expert'/, "前端不得硬编码字面量 'expert' 节点名");
+  });
+});

@@ -870,6 +870,9 @@ def _get_definition_config(request: Any) -> Any:
         project_id = composition.resolve_scope(ctx).project_id
         doc = deps.definition_store.load(project_id)  # IFC-IB-288
         view = deps.definition_store.derive(doc)  # IFC-IB-291
+        # IFC-IB-393：显示投影展开（专家节点实显）。专家名与结构节点 / 合成端点同名属
+        # **装配期错误**（ADR-52 决定 1）—— 经既有 fail-closed 通道回 503，**不**返回半成品信封。
+        derived = definition_derived_summary(view)
     except ConfigError:
         return _read_failure_response()
     except IbError as exc:
@@ -879,7 +882,7 @@ def _get_definition_config(request: Any) -> Any:
 
     payload = {
         "document": DefinitionDocumentSerializer().to_representation(doc),
-        "derived": definition_derived_summary(view),
+        "derived": derived,
         "editable_fields": sorted(deps.definition_store.editable_field_whitelist()),
         # **只登记键名，不含任何值**（凭据 / 路径值一律不回显；AC-IB-17-05 / IFC-IB-297）。
         "config_key_names": ["IB_DEFINITION_DOC_PATH", "IB_VISUAL_CONFIG_ENABLED"],

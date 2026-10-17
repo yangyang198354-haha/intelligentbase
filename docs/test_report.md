@@ -3046,3 +3046,183 @@ PASS  r19_project_expert_isolation：每项目专家集隔离 / 种子 / 目录�
 
 **未改 `src/**`**（`src/ib/**` / `src/ibweb/**` / `src/ib_embed/**` / `src/frontend/src/**` 全程只读）。
 **未 commit / push / deploy**；**未 SSH 目标机**；**未进入 GROUP_E**。
+
+---
+
+# §25 REV-21 增量回归报告 —— 编排图「专家节点实显」显示投影展开（追加，不改写 §1~§24）
+
+> **调用 ID**：INV-GROUP_D-INTELBASE-021（REV-21 独立补测）。
+> **覆盖对象**：REQ-FUNC-IB-59 ~ IB-63 + REQ-NFR-IB-23 ⇔ US-IB-51 ~ US-IB-54，**12 组 AC**。
+> **本轮锚定决策**：ADR-52（Option A：显示投影层展开）/ IFC-IB-393 / IFC-IB-394；[ARCH-ASSUMPTION-A16]（加成式契约）。
+> **对应测试计划**：`docs/test_plan.md` §25。
+
+## 25.1 结论摘要
+
+**三层门控数值全部达标、零失败、相对基线零回归**：基线 `403 passed / 2 skipped`（EXIT 0）→
+加测后 `428 passed / 2 skipped`（EXIT 0），**+25 新增用例**（unit 19 / integration 4 / e2e 2）。
+
+* **未发现任何实现缺陷**（`src/**` 全程只读；无缺陷需回 GROUP_C）。
+* **未将任何失败改判为 skip / xfail / blocked**（skip 仍为 2，与基线同数 —— 均为既有环境自适应项）。
+* **关键负例（冲突报错）原始输出已取证**：4 个冲突名均显式抛 `ConfigError`；端点面回 **503**（非 500）。
+* **GR-C-017 condition_2 的既有 1 处断言订正**：独立判定为 **充分（SUFFICIENT）**，且已**追加独立断言**补强（见 §25.5）。
+* **[ARCH-ASSUMPTION-A16] 实测结论**：**成立**（既有 5 键键名不变、仅加成新增 `experts`；既有消费者无需改动）。
+
+## 25.2 原始执行证据（命令 + 原始输出 + exit code）
+
+取证文件：`docs/evidence/groupd_r21_test_evidence.log`；冲突负例原文：`docs/evidence/groupd_r21_negative_conflict.log`。
+
+**① 基线复现**：`python -m pytest tests -q`
+
+```
+403 passed, 2 skipped in 61.32s (0:01:01)      # EXIT 0
+```
+
+与开发方自报 **403 passed / 2 skipped** **一致**（无差异需查明）。
+
+**② 全量复跑**：`python -m pytest tests -q`
+
+```
+428 passed, 2 skipped in 61.65s (0:01:01)      # EXIT 0
+```
+
+**③ 分层**（串行门控）：
+
+```
+unit         : 188 passed, 2 skipped in 5.60s      # EXIT 0
+integration  : 190 passed in 53.72s                # EXIT 0
+e2e          :  29 passed in 3.53s                 # EXIT 0
+agents（附属）:  21 passed in 0.03s                 # EXIT 0
+```
+
+**④ 装配自检**：`python src/scripts/selfcheck.py` → `自检结果：52/52 通过`（EXIT 0）。
+
+**⑤ 前端**（`src/frontend`）：`npm test` → `tests 40 / pass 40 / fail 0`（EXIT 0）；
+`npm run typecheck` → EXIT 0；`npm run build` → `✓ built in 16.48s`（EXIT 0，仅 1 条非阻塞 chunk 体积告警）。
+
+**⑥ 关键负例原始失败输出**（`python tests/_evidence_negative_rev21.py`，临时探针已删除）：
+
+```
+route: ConfigError: [config_error] 编排图专家节点名与结构节点 / 合成端点同名（ADR-52 决定 1）：route（结构节点 aggregate/gate/general/route；合成端点 END/START）
+gate : ConfigError: [config_error] ... ：gate（...）
+START: ConfigError: [config_error] ... ：START（...）
+END  : ConfigError: [config_error] ... ：END（...）
+```
+
+**不得静默改名**：四名均**显式抛错**且信息含原名；端点面经既有 fail-closed 通道回 **503**（非 500）。
+
+## 25.3 三层度量与算术自洽
+
+| 层 | Total | Pass | Fail | Skip | Blocked | 通过率 = pass/(pass+fail) | 门控 | 结论 |
+|----|-------|------|------|------|---------|--------------------------|------|------|
+| unit | 190 | 188 | 0 | 2 | 0 | 188/188 = **100%** | ≥80% | **PASSED** |
+| integration | 190 | 190 | 0 | 0 | 0 | 190/190 = **100%** | ≥90% | **PASSED** |
+| e2e | 29 | 29 | 0 | 0 | 0 | 29/29 = **100%**（关键路径） | 100% | **PASSED** |
+| agents（附属） | 21 | 21 | 0 | 0 | 0 | 21/21 = **100%** | — | — |
+
+**算术自洽**：unit 188 + integration 190 + e2e 29 + agents 21 = **428** = 全量 `428 passed`（+2 skipped，
+与基线同数）。**基线分层反推**：169 + 186 + 27 + 21 = 403 ✓。
+
+## 25.4 新增用例逐条结果（25 条，全 PASS）
+
+**单元（`tests/unit/test_orchestration_expert_nodes_r21.py`，13 例 / 19 收集项）**
+TC-UNIT-R21-001~013 全 **PASS**（含 TC-UNIT-R21-010 的 6 名参数化冲突负例 + 010b 行为面）。
+
+**集成（`tests/integration/test_definition_config_rev21_int.py`，4 例）**
+TC-INT-R21-001 / 002 / 003 / 003b 全 **PASS**（003b 逐名断言 `gate` / `START` / `END` 均得 503）。
+
+**E2E（`tests/e2e/test_rev21_expert_graph_journeys.py`，2 例）**
+TC-E2E-R21-001 / 002 全 **PASS**（专家集合新增 / 删除 → 图随之更新且仍「可读 + 完整」）。
+
+**前端（`src/frontend/tests/frontend.smoke.test.js`，用例 36~40）**
+TC-FE-R21-36 / 37 / 38 / 39 / 40 全 **PASS**（`npm test`：40 passed / 0 fail）。
+
+**未失败项、无 BLOCKED。** 全部 PASS 均有实际执行证据（§25.2）。
+
+## 25.5 既有 1 处断言订正的**独立复核结论**（GR-C-017 condition_2）
+
+**订正位置**：`tests/integration/test_definition_config_r7.py::test_TC_INT_084_definition_endpoint_contract_matrix`
+（原 `assert after["derived"]["edges"] == seed_edges` → 改为「按 `document.experts` 展开后相等」）。
+
+**独立结论：充分（SUFFICIENT），且相对原意图未被削弱 —— 属必要订正而非放宽。** 理由：
+
+1. **原意图在文档面仍被独立钉住**：同用例中 `assert edge_topo["orchestration"]["edges"] == seed_edges`（字面相等）
+   **未被改动**，故「主干边（`START→route` / `gate→aggregate` / `general→aggregate` / `aggregate→END`）恒存在、
+   `gate`/`aggregate` 不成孤立方块」这一原始意图在**文档侧**一字未弱。
+2. **订正后的断言更强（对专家集合敏感）**：期望值由 `document.experts` **逐专家展开**生成，且用**顺序敏感的列表相等**。
+   少一条镜像边、少一条主干边、多一条边、次序错乱 —— 均会转红。相较原「字面等于文档 `edges`」，
+   它对「专家集合变化」更敏感（原断言对 `experts[]` 的任何变化**完全不敏感**）。
+3. **订正是必要的**：ADR-52 / IFC-IB-393 之后，`derived.edges` 按契约**不再**是 `document.orchestration` 的原样镜像，
+   若沿用字面相等会得到**假失败**。故此处换口径属订正、非放水。
+4. **残余点（非阻断，已由本代理闭合）**：`expected_derived_edges` 由被测文档自身的 `experts` 派生，存在「自引用」环
+   —— 单独看它无法排除「专家集合本身错误」的形态。为此本代理在**不改动**该订正断言的前提下，
+   **追加 2 条独立断言**（见下），从旁侧钉死节点集合，闭合该残余。
+
+**本代理追加的独立断言（位于同用例、订正断言之后；`tests/**` 属本代理写入范围，`src/**` 未动）**：
+
+```python
+assert "expert" not in after["derived"]["nodes"], ...
+assert sorted(n for n in after["derived"]["nodes"]
+              if n not in {"route","general","gate","aggregate"}) == sorted(expert_names), ...
+```
+
+即「**占位节点 `expert` 不残留于 `derived.nodes`**」+「专家节点计数 == 专家集合规模」——正是任务点名要求补测的两项。
+另在单元层以 **TC-UNIT-R21-011**（逐专家声明文档 ⇒ 展开为无操作）从**相反方向**独立验证展开函数语义边界，
+不需依赖上述订正断言即成立。
+
+**综上**：订正**充分**；原意图**未削弱**；残余自引用已由独立断言闭合。
+
+## 25.6 [ARCH-ASSUMPTION-A16] 实测结论
+
+**成立（CONFIRMED）。** 证据：
+
+* **顶层信封键未增**：`GET /api/config/definition` 响应顶层恒为 `{document, derived, editable_fields, config_key_names}`
+  （TC-INT-R21-001 断言 `set(payload) == {...}`，通过）。
+* **`derived` 既有 5 键键名不变**：`set(derived) == {capability_digest, expert_names, nodes, conditional_edges, edges} | {"experts"}`
+  （TC-UNIT-R21-012 / TC-INT-R21-001 断言通过）—— 新增 `experts` 为**唯一**差异，属**加成式**变更。
+* **新增条目不含工具授权摘要**：`experts[]` 每项恰 3 键 `{name, cn_label, is_default}`（单元 + 集成 + 前端类型三面断言通过）。
+* **既有消费者不受影响**：既有断言面（如 r7 的 `payload["derived"]["expert_names"] and payload["derived"]["nodes"]`、
+  前端 `DerivedViewSummary` 既有字段）在加测后**全绿**，无一处因新增键而失败。
+
+## 25.7 如实失败 / 未覆盖项
+
+| 项 | 结论 |
+|----|------|
+| 本代理测试中的**失败** | **0**（25 新增用例 + 全量 428 全绿；无 FAIL / BLOCKED） |
+| 实现缺陷 | **未发现**（无需回 GROUP_C；`src/**` 全程只读） |
+| 未覆盖（本层边界内可覆盖者） | 无 —— 12 组 AC 全部有 ≥1 条 TC，无悬空 |
+
+> 独立复跑**未**降低任何通过率阈值、**未**将任何失败转 skip / xfail / blocked，skip 恒为 2（既有两项，与基线同）。
+
+## 25.8 NOT_TESTABLE / 诚实边界（不声称已通过）
+
+| # | 项 | 为何本地不可验 | 处置 |
+|---|----|----------------|------|
+| 1 | AC-IB-54-01 的「**不重叠到不可读**」真实**视觉**观感 | 离线无浏览器渲染（Vue Flow 画面） | `[NOT_TESTABLE]`；以**结构性**完整可见（节点/边不漏）+ 前端源码结构断言（用例 40）替代，**不**声称画面已可读 |
+| 2 | AC-IB-52-03 的「**尝试在图上拖拽连线**」交互实测 | 同上 | `[NOT_TESTABLE]`；以源码结构断言（`:nodes-draggable/connectable="false"` + 无增删图节点/边入口标识）替代 |
+| 3 | 「保存后经**生产服务重启**才生效」的**生产运行期**实测 | 需目标机 + 用户手工重启（红线） | `[DEPLOY_REQUIRED]`；以 E2E「端点写回 → 以文档为准重读」**机制层**覆盖（ADR-32），与 §12 / §24 同 |
+
+## 25.9 门控自评（4 项 GROUP_D 判据）
+
+| 判据 | 结论 | 证据 |
+|------|------|------|
+| 单元 ≥ 80% | **SATISFIED** | 188/188 = 100%（EXIT 0） |
+| 集成 ≥ 90% | **SATISFIED** | 190/190 = 100%（EXIT 0） |
+| E2E 关键路径 100% | **SATISFIED** | 29/29 = 100%（US-IB-51/52/53/54 关键路径全覆盖） |
+| 全 US 有测试 + metrics 算术一致 | **SATISFIED** | 4 US / 12 AC 无悬空（`test_plan.md` §25.3）；算术精确等式（§25.3） |
+
+**自评结论：SUCCESS** —— 三层门控全部达标、零失败、相对基线零回归（+25 用例）；
+关键负例已取证；[A16] 成立；GR-C-017 condition_2 订正独立判定为充分并已补强。
+
+## 25.10 边界声明与护栏合规证据
+
+**本轮 `tests/**` 改动面**：**新增** 3 文件（unit 13 例 / integration 4 例 / e2e 2 例）；
+**追加** 1 前端测试文件用例 36~40；**追加** r7 用例 2 条独立断言。**未删除 / 未削弱任何既有断言**。
+
+| # | 护栏 | 合规证据 |
+|---|------|---------|
+| 1 | 测试必须真跑 | §25.2 贴出**基线**（403/2，EXIT 0）+ **终态**（428/2，EXIT 0）原始输出；分层尾行 + EXIT；selfcheck 52/52；前端 test/typecheck/build |
+| 2 | 不执行生产迁移 / 不重启生产 | 全程内存替身 + `tmp_path`；**未**触目标机 |
+| 3 | 不改 `src/**` | `src/ib/**` / `src/ibweb/**` / `src/frontend/src/**` 全程**只读**（本轮 `tests/**` 与 `docs/**` 之外零写入） |
+| 4 | 凭据纪律 | 仅用环境变量占位符（`groupd-offline-token` 性质）；无任何真实 token/key/口令字面量 |
+| 5 | 不新增依赖 / 不 commit / 不 push | 前端仍零新增依赖（`node:test` 内建）；**未** commit / push / deploy |
+| 6 | 不降低阈值 / 不粉饰失败 | 阈值原样；skip 恒 2；无一例失败被改判 |

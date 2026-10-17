@@ -2007,3 +2007,63 @@ pass 35  fail 0
 2. **[B26] 三件事**：① `IB_EXPERT_PROMPT_DIR` 指向**目录根**且与 `IB_DEFINITION_DOC_PATH` 不同值；② 既有项目**回填**（`src/scripts/backfill_prompts.py --backup-dir …`）；③ legacy `experts[].fallback_prompt` 键**部署前检查**（命中即须用户手工迁移，否则启动 `ConfigError`）；
 3. **三单元严格断言**：`ActiveState=active` + `NRestarts==0` + journal `startup succeeded` + `/healthz/deps==200`；
 4. **端到端验证**：生产可提问并命中资料（OQ-IB-45=C）；装配期 `prompt_source` 日志可见。
+
+---
+
+# REV-21 实现增量（2026-10-17）
+
+> 依据：`architecture_design.md` 1.13.0 / REV-21（**ADR-52**，L1486 起；Option A = **显示投影层展开**）+ `module_design.md`
+> 1.13.0 / REV-21（**IFC-IB-393 / IFC-IB-394** 新增；既有 IFC 号 / 名 / 签名一字不动）+ `requirements_spec.md` /
+> `user_stories.md` 1.13.0 / REV-21（REQ-FUNC-IB-59 ~ IB-63 / REQ-NFR-IB-23；OQ-IB-49 ~ OQ-IB-56 **全部采纳默认 A**；
+> C-IB-54 / C-IB-55 / C-IB-56 / OOS-24；US-IB-51 ~ US-IB-54）。
+> 本轮 invocation = **INV-GROUP_C-INTELBASE-024**（按既有编号序列推定；PM 委派未附显式 ID，**待 PM 核对**）。
+> 本轮**不新增模块（仍 26）/ 不新增端口（仍 19）/ 不新增 §4.1 依赖边 / 不新增第三方依赖 / 不改配置键名与默认值 /
+> 不改定义文档 schema / 不改运行期编排拓扑 / 既有定义文档零迁移**。
+
+## 28.1 变更总览（REV-21）
+
+| 面 | 落点 | 变更 |
+|----|------|------|
+| 显示投影展开（**唯一规则落点**） | `src/ibweb/serializers.py` | `definition_derived_summary(view)`（IFC-IB-393）：新增纯函数 `_expand_expert_nodes(view)` 与两个模块内常量（`_STRUCTURAL_GRAPH_NODE_NAMES` / `_EXPERT_PLACEHOLDER_NODE`）；既有 5 键**键名不变**、`nodes` / `conditional_edges` / `edges` 的**取值改为逐专家展开**，**新增** `experts: [{name, cn_label, is_default}]`。**不改** `derive()` / `DerivedView.graph_config`（仍为 `doc.orchestration` 的只读镜像） |
+| 前端专家节点渲染 | `src/frontend/src/views/ConfigPage.vue` | IFC-IB-394：节点 `id` = 专家 `name`（已由后端展开进 `derived.nodes`）；标签取 `derived.experts[].cn_label`（无匹配回落字面量名）；默认专家带「（默认）」标记；新增 **`graph-expert`** class（蓝框加粗）与图例项 + 专家清单行（`cn_label`（`name`）+ 默认标记，即 `name` 的**次级信息面**）；**仍只读**（`:nodes-draggable="false"` / `:nodes-connectable="false"` / `:elements-selectable="false"` 一字未改，**无**任何增删节点 / 改边入口） |
+| 前端类型契约 | `src/frontend/src/api/client.ts` | 新增 `DerivedExpertEntry` 类型；`DerivedViewSummary` **追加** `experts: DerivedExpertEntry[]`（既有键不动） |
+| 计划外但必要的后端最小改动 | `src/ibweb/views.py`（`_get_definition_config`） | 把 `definition_derived_summary(view)` 的**调用移入既有 `try` 块**（1 行位置调整 + 2 行注释），使「专家名与结构节点 / 合成端点同名」这一 ADR-52 决定 1 的**装配期错误**经**既有 fail-closed 通道**回 `503`，而非未捕获异常 → 500。**信封顶层键、`config_key_names`、端点号 / 名 / 签名 / 状态码语义一字未改** |
+| 测试契约同步（**就地订正 1 处断言，非放宽**） | `tests/integration/test_definition_config_r7.py`（原 `:432`） | 原断言 `after["derived"]["edges"] == seed_edges`（要求 `derived.edges` 与文档 `edges` **字面相等**）与 ADR-52 决定 4 直接冲突（`derived` 取值已逐专家展开）。订正为「按 `document.experts` 展开后相等」——**意图不变**（主干 `gate` / `aggregate` 不得成孤立方块），且对专家集合**更敏感**（详见 §28.3） |
+
+## 28.2 展开规则实现要点（ADR-52 决定 1 ~ 6）
+
+1. **专家节点集合** = `view.experts` **逐专家一项**（= 定义文档派生，**不读**任何代码内置默认集）；节点 `id` = 专家 `name`（**不**新增第二真源，C-IB-55）。
+2. **冲突检测（决定 1）—— 显式报错、不隐式改名**：逐专家检查 `name ∈ _STRUCTURAL_GRAPH_NODE_NAMES ∪ RESERVED_GRAPH_ENDPOINTS`（= `{route, general, gate, aggregate}` ∪ `{START, END}`）；命中即抛 `ib.core.ConfigError`，消息列出冲突专家名 + 参与比较的结构节点 / 合成端点集合。**无静默改名 / 无丢弃 / 无 fallback**。`RESERVED_GRAPH_ENDPOINTS` 复用 `ib.core` 的唯一真源（不复制字面量）。
+3. **节点展开（决定 1 / 5）**：按 `graph_config.nodes` 原序遍历；遇占位节点 `expert` 即**原位**展开为逐专家节点（保序，保持既有分层布局观感），其它节点（结构节点 / 合成端点）**原样保留**；同名节点只保留首次出现（图上 `id` 必须唯一）。
+4. **条件边（决定 3）**：`route` 的条件边**仍为一条**；其 `branch_map` 中 `(expert, expert)` → 逐专家 `(name, name)`，`(general, general)` **原样保留**（保序输出，供界面判定可达性）。
+5. **普通边（决定 4）**：占位节点出现在哪一端就在那一端展开 —— `expert → gate` → 逐专家 `name → gate`；`START → route` / `gate → aggregate` / `general → aggregate` / `aggregate → END` **原样保留**；自环与重复边跳过（自环已被定义文档校验器禁止）。
+6. **纯函数、只读（C-IB-55）**：无 I/O、无副作用、不依赖运行期图或 LLM；确定性可复现（同一 `view` 恒得同一信封）。
+7. **零迁移（OQ-IB-55=A）**：文档若本就**逐专家声明**节点（未使用占位节点，如 `tests/unit/test_prompt_tool_config_unit_r16d.py` 的 `("route","freeark-expert","sanheng-knowledge")`），本函数对其节点 / 边为**无操作**（实跑见 §28.4 第 7 条）。
+
+## 28.3 契约订正条目（逐条说明；共 1 条）
+
+| # | 落点 | 原断言 | 订正后 | 为何不是「凑绿」 |
+|---|------|--------|--------|------------------|
+| ① | `tests/integration/test_definition_config_r7.py`（`TC-INT-080` 段内，原 `:432`） | `after["derived"]["edges"] == seed_edges`（`seed_edges` = 文档 `orchestration.edges` 字面量，含 `expert → gate`） | 期望值改为按 `after["document"]["experts"]` 逐专家展开的边序列（`START→route` → 逐专家 `name→gate` → `gate→aggregate` → `general→aggregate` → `aggregate→END`） | 原断言要求 `derived` **原样镜像**文档编排，与 ADR-52 决定 4（`expert → gate` 逐专家镜像）**不可兼得**；订正后仍断言「主干存在、`gate` / `aggregate` 不成孤立方块」这一**原意**，并额外要求每条镜像边落在**真实专家**上 —— 是收窄而非放宽（未改 `seed_edges` 本身、未动同段其它断言、未引入 skip / xfail） |
+
+**测试文件改动范围**：**仅**上述 1 处（含 6 行说明注释）；`tests/**` 内**无其它改动**、**无新增 / 删除测试文件**。
+
+## 28.4 自验证据（真实执行，命令可被第三方重跑）
+
+| # | 命令（cwd = 仓库根；`PYTHONUTF8=1`） | 实际结果 | EXIT |
+|---|--------------------------------------|----------|------|
+| 1 | `python -m pytest tests -q -p no:cacheprovider` | **403 passed, 2 skipped**（收集 405） | **0** |
+| 2 | `python src/scripts/selfcheck.py` | **52/52 通过**（未触碰该脚本；现有用例集无需适配） | **0** |
+| 3 | `npm run typecheck`（cwd = `src/frontend`） | `vue-tsc --noEmit` **无输出** | **0** |
+| 4 | `npm test`（cwd = `src/frontend`） | **pass 35 / fail 0** | **0** |
+| 5 | 展开行为直跑（`python -c` 调 `definition_derived_summary`；专家 = `kb-agent`（默认）+ `ops-agent`） | `nodes` = `['route','kb-agent','ops-agent','general','gate','aggregate']`；`branch_map` = `[['kb-agent','kb-agent'],['ops-agent','ops-agent'],['general','general']]`；`edges` 含逐专家 `name→gate`；`experts` 三字段齐备 | **0** |
+| 6 | 冲突检测直跑（专家名取 `route` / `gate` / `START` / `END`） | 四例**全部** `ConfigError`（消息列出冲突名与比较集合），**无一**静默改名 | **0** |
+| 7 | 零迁移直跑（文档已逐专家声明 `("route","freeark-expert")`） | `nodes` / `conditional_edges` / `edges` **与文档一致**（无操作），仅新增 `experts` 键 | **0** |
+
+## 28.5 冻结约束复核（REV-21）
+
+未新增模块（仍 **26**）/ **未新增端口（仍 19）** / 未新增第三方依赖（纯 stdlib + 既有 `ib.core` 常量复用）/ 未新增 §4.1 依赖边 / 未改既有配置键名与默认值 / `IFC-IB-001 ~ 392` 号 / 名 / 签名一字不动（仅新增 393 / 394）/ 未 bump `schema_version` / **未改运行期编排拓扑**（`ib/orchestration/__init__.py` 一字未动，C-IB-54）/ **未改定义文档 schema**（C-IB-56②）/ **未改 `derive()` 与 `DerivedView.graph_config` 语义**（仍为文档编排的只读镜像）/ 图**仍只读**（无任何运行期改图入口，OQ-IB-56=A）/ 信封顶层键与 `config_key_names` 未变 / **无任何口令 / Key / token 字面量** / 未 commit / 未 push / 未部署 / FreeArk 参考仓只读。
+
+## 28.6 [ARCH-ASSUMPTION-A16] 实测结论
+
+`derived` **新增键** `experts`：既有消费方若对键集做**强断言**须同步。本轮**实跑复核**：① 全量 `pytest`（403 passed）中**无**任何用例对 `derived` 键集做强断言（既有断言均为 `derived["nodes"] and derived["expert_names"]` 之类**取值**断言）；② 前端 `client.ts` 为**结构类型**（非 exact），新增键不影响类型检查（`vue-tsc` EXIT 0）；③ HTTP 层断言 `set(payload) == {"document","derived","editable_fields","config_key_names"}`（**顶层**键，非 `derived` 内键）**不受影响**。⇒ **A16 实测无破坏面**：仅**新增**键，既有 5 键**键名 / 位置**不变。

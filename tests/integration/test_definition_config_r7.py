@@ -428,8 +428,36 @@ def test_TC_INT_084_definition_endpoint_contract_matrix(http_app):
     assert edge_topo["orchestration"]["edges"] == seed_edges, (
         "文档契约要求 `edges` 恒存在且为内置默认主干（缺则配置页 gate/aggregate 渲染成孤立方块）"
     )
-    # 派生视图摘要同样要出 `edges` —— 配置页画图读的是 `derived`，不是 `document`
-    assert after["derived"]["edges"] == seed_edges, "派生视图摘要漏掉 edges，配置页拿不到主干"
+    # 派生视图摘要同样要出 `edges` —— 配置页画图读的是 `derived`，不是 `document`。
+    # **REV-21 契约订正（ADR-52 决定 4 / IFC-IB-393）**：`derived` 的取值不再是文档编排的
+    # **原样镜像** —— 占位节点 `expert` 的普通边按定义文档专家集合**逐专家镜像**
+    # （`expert → gate` → 逐专家 `name → gate`），其余主干边原样保留。
+    # 断言意图不变（主干 `gate` / `aggregate` 不得成孤立方块），只把「字面相等」换成
+    # 「按专家集合展开后相等」；这是**订正**而非放宽（对专家集合更敏感）。
+    expert_names = [e["name"] for e in after["document"]["experts"]]
+    expected_derived_edges = [
+        {"from_node": "START", "to_node": "route"},
+        *({"from_node": name, "to_node": "gate"} for name in expert_names),
+        {"from_node": "gate", "to_node": "aggregate"},
+        {"from_node": "general", "to_node": "aggregate"},
+        {"from_node": "aggregate", "to_node": "END"},
+    ]
+    assert after["derived"]["edges"] == expected_derived_edges, (
+        "派生视图摘要的边须按 ADR-52 逐专家展开，且主干（gate/aggregate）不得缺"
+    )
+    # **REV-21 / GROUP_D 独立补强断言**（不改动上方订正断言，仅追加）：除「边按专家集合展开后
+    # 相等」外，独立断言**占位节点 `expert` 不残留**于派生节点集合，且专家节点数 == 专家集合规模
+    # —— 堵住「展开时把占位节点也一并留在 `nodes` 里」这一上述订正断言覆盖不到的形态。
+    assert "expert" not in after["derived"]["nodes"], (
+        f"占位节点 `expert` 残留于派生节点集合（ADR-52 / IFC-IB-393）：{after['derived']['nodes']}"
+    )
+    assert sorted(
+        n
+        for n in after["derived"]["nodes"]
+        if n not in {"route", "general", "gate", "aggregate"}
+    ) == sorted(expert_names), (
+        "派生节点集合的专家节点数须与定义文档专家集合规模一致"
+    )
     edge_topo["orchestration"]["edges"] = seed_edges + [{"from_node": "expert", "to_node": "aggregate"}]
     edge_blocked = client.put(
         PATH, data=json.dumps({"document": edge_topo}), content_type="application/json", **AUTH

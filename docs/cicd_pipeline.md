@@ -6,14 +6,14 @@
 | 文档 ID | DOC-IB-CICD-001 |
 | 标题 | intelligentbase 智能知识库基座 —— CI/CD 流水线定义 |
 | 产出代理 | devops-engineer (author_agent) |
-| 调用 ID | INV-GROUP_E-INTELBASE-007（**REV-19 增量**；前序 -006 / -005 / -004 / -002 / -003） |
+| 调用 ID | INV-GROUP_E-INTELBASE-010（**REV-21 增量**，*编号为拟、以 PM 派发为准*；前序 -009 / -007 / -006 / -005 / -004 / -002 / -003） |
 | 项目 | intelligentbase |
 | 阶段 | GROUP_E / PHASE_10（部署计划配套；**仅定义，不执行**） |
-| revision | **REV-19**（每项目专家集隔离（`ExpertRegistryView` / `resolve_expert_registry`，IFC-IB-379/380/381）/ 定义文档**目录化**（`IB_DEFINITION_DOC_PATH` 语义 **文件 → 目录**，C-IB-46，IFC-IB-383/384，ADR-44）/ 新项目创建期种子（IFC-IB-385）/ 三专家属 `demo`（C-IB-47，IFC-IB-386）/ 前端项目域闭环（IFC-IB-387）；**无新 SQL 迁移 / 无新 env 键 / 无新第三方依赖**）。前序 REV-18 = 系统管理三分（项目注册表 CRUD / 唯一运维账号 / LLM Key 管理（载体 = DB）/ 项目域资料上传；含 2 个新迁移 `005`/`006` + 2 个新 env 键） |
-| 版本 | **1.5.1**（REV-19 增量 + 2026-10-11 用户裁决回填轮（**回填轮对 CI 净影响 = 零**）；同步 REV-19 测试基线 Python **382** = unit **174** / integration **181** / e2e **27**（**本机 Windows 实测 380 passed / 2 skipped**，2 项为 POSIX 权限位语义平台性跳过）/ 前端 **35**（**计数未变、本轮未实跑**）/ selfcheck **52/52**） |
-| status | **REVISED_PENDING_REVIEW**（**1.5.1/REV-19；1.5.0 已经 GR-E-007 = PASS_WITH_CONDITIONS（PHASE_10 计划层），1.5.1 为用户裁决回填轮、未过门控**）。前序：**APPROVED**（**GR-E-006 = PASS_WITH_CONDITIONS**，经协调者独立核验并由用户 2026-10-07 接受；GR-E-005 对 1.3.0/REV-14 有效、GR-E-004 对 1.2.0/REV-13 有效、GR-E-003 对 1.1.1/R10 有效、GR-E-002 对 1.1.0 有效、GR-E-001 对 R4 前版本有效）。**GR-E-006 协调者复核订正**：§2 后「R18 基线同步说明」的 REV-18 前端增量由 `+14` 改为 `+6`（29 → 35；原值算术有误）。§9.2 基线表本即正确（35/35），未改 |
+| revision | **REV-21**（可视化配置「编排图」实显项目已配置的专家 —— 后端**显示投影层展开**（`_expand_expert_nodes` / `definition_derived_summary` 新增 `experts` 键，IFC-IB-393）+ 前端**渲染契约**（`ConfigPage.vue` 标签取 `cn_label` / `graph-expert` class / **仍只读**，IFC-IB-394；`client.ts` 新增 `DerivedExpertEntry`；ADR-52）；**无 SQL / schema 迁移、无新第三方依赖、无新 env 键、无新增模块 / 端口 / 依赖边、无 unit / nginx 站点改动**；含测试增量（unit +19 / integration +4 / e2e +2 / 前端用例 36~40）；**无新 SQL 迁移**（承前结转 R18 缺口 `005`/`006` 不变）。前序 REV-19 = 每项目专家集隔离（`ExpertRegistryView` / `resolve_expert_registry`，IFC-IB-379/380/381）/ 定义文档**目录化**（`IB_DEFINITION_DOC_PATH` 语义 **文件 → 目录**，C-IB-46，IFC-IB-383/384，ADR-44）/ 新项目创建期种子（IFC-IB-385）/ 三专家属 `demo`（C-IB-47，IFC-IB-386）/ 前端项目域闭环（IFC-IB-387） |
+| 版本 | **1.6.0**（REV-21 增量；同步 REV-21 测试基线 Python **采集 430** = unit **190** / integration **190** / e2e **29**（另 `tests/agents` **21**）（**本机 Windows 实测 428 passed / 2 skipped**，2 项为 POSIX 权限位语义平台性跳过）/ 前端 **40**（**本机 `npm test` 40/40**，`typecheck` / `build` EXIT 0）/ selfcheck **52/52**） |
+| status | **REVISED_PENDING_REVIEW**（**1.6.0/REV-21 待 PM 门控**；**前序 1.5.1/REV-19；1.5.0 已经 GR-E-007 = PASS_WITH_CONDITIONS（PHASE_10 计划层），1.5.1 为用户裁决回填轮、未过门控**）。前序：**APPROVED**（**GR-E-006 = PASS_WITH_CONDITIONS**，经协调者独立核验并由用户 2026-10-07 接受；GR-E-005 对 1.3.0/REV-14 有效、GR-E-004 对 1.2.0/REV-13 有效、GR-E-003 对 1.1.1/R10 有效、GR-E-002 对 1.1.0 有效、GR-E-001 对 R4 前版本有效）。**GR-E-006 协调者复核订正**：§2 后「R18 基线同步说明」的 REV-18 前端增量由 `+14` 改为 `+6`（29 → 35；原值算术有误）。§9.2 基线表本即正确（35/35），未改 |
 | 创建日期 | 2026-09-26 |
-| 更新日期 | 2026-10-11（REV-19 增量） |
+| 更新日期 | 2026-10-17（REV-21 增量） |
 | 凭据纪律 | 本文件不含任何真实凭据；CI 凭据一律经 CI secret / 环境变量注入，不入仓库 |
 | 前置 | **git 仓库与 remote 尚未建立**（见 `deployment_plan.md` §1.1 B-01）——本流水线在其闭合前**无法被触发** |
 
@@ -29,6 +29,9 @@
 
 > **REV-19 增量声明（本轮，INV-GROUP_E-INTELBASE-007）**：本文件为 **PHASE_10 定义层增量**——**仅定义，未执行**；**未连接、未触碰目标机 `192.168.31.133`**；**未执行**任何部署 / SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传 / 迁移；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未触发 PHASE_11**（本轮 `special_instructions` **不含 `PRODUCTION_DEPLOY_CONFIRM`**，PHASE_11 保持冻结）。**本轮仅更新两个文档**（本文件 `cicd_pipeline.md` 1.4.0 → **1.5.0/REV-19** 与 `docs/deployment_plan.md` 1.4.0 → **1.5.0/REV-19**），**未改 `.github/workflows/ci.yml`**（R19 无 CI 逻辑改动）。R19 增量见 **§2 基线同步 / §3 版本门 / §3.2 迁移门登记 / §5 矩阵 / §7 smoke / §8 工作流 / §10 增量节**。
 > **R19 变更面对 CI 的影响（关键）**：R19 为**纯代码 + 契约增量**（每项目专家集隔离 / 定义文档目录化 / 新项目创建期种子 / 三专家属 `demo` / 前端项目域闭环），**零新第三方依赖（`tech_stack.md` NO_CHANGE，维持 1.4.1/REV-18）、零新增模块（仍 26）、零新增端口（仍 19）、零新增依赖边、零新 env 键、零新 SQL 迁移（无新 `.sql`）、无 `package.json` / `package-lock.json` 改动**。故本流水线的**阶段结构（10 阶段）与硬门集合均不变**，仅需 ① **同步测试基线**（Python **382** = unit **174** / integration **181** / e2e **27**；**本机 Windows 实测 380 passed / 2 skipped**，2 项为 `tests/unit/test_rev18_system_mgmt_unit.py` 的 **POSIX 权限位语义**在 Windows 平台性跳过——**非失败、非 xfail**，于 CI（ubuntu-24.04）应实跑；前端冒烟 **35**（**计数未变**）；selfcheck **52/52**）与 ② **版本标识升位**。**须如实登记**：① R19 **无新 SQL 迁移**，§3.2 迁移门**无新增缺口**，但**承前结转 R18 的缺口**（`005`/`006` 仍未纳入，见 §3.2 / §10.3）；② R19 的 **C-IB-46 定义文档目录化迁移** 是**文件级迁移（非 SQL）**，**CI 不可测**（须部署后由用户手工执行，见 `deployment_plan.md` §16）；③ **前端从未实跑构建**（承 `GR-C-014.condition_3`）——CI 阶段 9 与部署面是**首次实跑**的落点（见 §2 阶段 9 / §10.6）。**本代理未改 `.github/workflows/ci.yml`**（超出本轮授权面）。
+
+> **REV-21 增量声明（本轮，INV-GROUP_E-INTELBASE-010，拟）**：本文件为 **PHASE_10 定义层增量**——**仅定义，未执行**；**未连接、未触碰目标机 `192.168.31.133`**；**未执行**任何部署 / SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传 / 迁移；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未触发 PHASE_11**（本轮 `special_instructions` **不含 `PRODUCTION_DEPLOY_CONFIRM`**，须用户当次授权）。**本轮仅更新两个文档**（本文件 `cicd_pipeline.md` 1.5.1 → **1.6.0/REV-21** 与 `docs/deployment_plan.md` 1.5.1 → **1.6.0/REV-21**），**未改 `.github/workflows/ci.yml`**（R21 无 CI 逻辑改动，仅同步基线标签与如实登记迁移门）。R21 增量见 **§2 基线同步 / §3 版本门 / §3.2 迁移门登记 / §7 smoke / §8 工作流 / §11 增量节**。
+> **R21 变更面对 CI 的影响（关键）**：R21 为**纯代码 + 前端渲染契约增量**（编排图专家节点实显：显示投影层展开 `_expand_expert_nodes` + `derived.experts` 键 + 前端标签取 `cn_label` / `graph-expert` class / **仍只读**），**零新第三方依赖（`tech_stack.md` NO_CHANGE，维持 1.4.1/REV-18）、零新增模块（仍 26）、零新增端口（仍 19）、零新增依赖边、零新 env 键、零新 SQL 迁移、无 `package.json` / `package-lock.json` 改动**。故本流水线的**阶段结构（10 阶段）与硬门集合均不变**，仅需 ① **同步测试基线**（Python **采集 430 = 428 passed / 2 skipped / 0 failed**；分层 unit **190** / integration **190** / e2e **29**（另 `tests/agents` **21**）；**2 skip 为 `tests/unit/test_rev18_system_mgmt_unit.py` 的 POSIX 权限位语义**在 Windows 平台性跳过——**非失败、非 xfail、非本轮引入**，于 CI（ubuntu-24.04）应实跑；前端冒烟 **40**（**R21 新增用例 36~40**）；selfcheck **52/52**）与 ② **版本标识升位**。**须如实登记**：① R21 **无新 SQL 迁移**，§3.2 迁移门**无新增缺口**，**承前结转** R18 缺口（`005` / `006` 仍未纳入，见 §3.2 / §11.3）；② CI 阶段 9（`npm ci && npm run build && npm test`）**已含前端构建 + 测试**，R21 仅**同步计数**（35 → **40**）；目标机首跑风险（Node 版本差）见 `deployment_plan.md` §17。**本代理未改 `.github/workflows/ci.yml`**（超出本轮授权面）。
 
 ## 1. 流水线概览
 
@@ -49,13 +52,13 @@
 |---|------|----------|------------------------------|----------|----------|
 | 1 | **Source** | push / PR | `git checkout` / `git fetch` | 拉取成功 | abort & notify |
 | 2 | **Config + Schema Check** | 前阶段成功 | `python -m compileall -q src` + **迁移/模式检查**（见 §3.2） | 两者 exit 0 | abort & notify |
-| 3 | **Unit** | 前阶段成功 | `python -m pytest tests/unit -q` | **全通过**（**基线 174/174 = 100%**，**R19**；R18 为 157，R14 为 95） | abort & notify |
-| 4 | **Integration** | 前阶段成功 | `python -m pytest tests/integration -q` | **全通过**（**基线 181/181 = 100%**，**R19**；R18 为 170，R14 为 129） | abort & notify |
-| 5 | **E2E** | 前阶段成功 | `python -m pytest tests/e2e -q` | **全通过**（**基线 27/27 = 100%**，**R19**；R18 为 24；含**端到端问答 smoke**，见 §7） | abort & notify |
-| 6 | **Full Suite + Coverage** | 前阶段成功 | `python -m pytest tests --cov=ib --cov=ibweb --cov=ib_embed -q` | **382 采集 / 380 通过 / 2 skipped / 0 failed**（**R19** 基线 = unit 174 + integration 181 + e2e 27；**2 skip 为 Windows 平台性 POSIX 权限位断言**，CI（ubuntu）应实跑）；覆盖率 **仅记录不设门** | abort & notify |
+| 3 | **Unit** | 前阶段成功 | `python -m pytest tests/unit -q` | **全通过**（**基线 190**，**R21**：188 passed / 2 skipped（**Windows 平台性 POSIX 权限位**，CI 应 190 passed）；R19 为 174，R18 为 157，R14 为 95） | abort & notify |
+| 4 | **Integration** | 前阶段成功 | `python -m pytest tests/integration -q` | **全通过**（**基线 190/190 = 100%**，**R21**；R19 为 181，R18 为 170，R14 为 129） | abort & notify |
+| 5 | **E2E** | 前阶段成功 | `python -m pytest tests/e2e -q` | **全通过**（**基线 29/29 = 100%**，**R21**；R19 为 27，R18 为 24；含**端到端问答 smoke**，见 §7） | abort & notify |
+| 6 | **Full Suite + Coverage** | 前阶段成功 | `python -m pytest tests --cov=ib --cov=ibweb --cov=ib_embed -q` | **采集 430 / 428 passed / 2 skipped / 0 failed**（**R21** 基线 = unit 190 + integration 190 + e2e 29 + `tests/agents` 21；**2 skip 为 Windows 平台性 POSIX 权限位断言**，CI（ubuntu）应实跑）；覆盖率 **仅记录不设门** | abort & notify |
 | 7 | **Offline Selfcheck** | 前阶段成功 | `python src/scripts/selfcheck.py` | 全 `PASS`，exit 0（任一 `FAIL` 非零退出；**R19 后 52/52**） | abort & notify |
 | 8 | **Version Gate** | 前阶段成功 | 见 §3 | 全部断言通过 | abort & notify |
-| 9 | **Frontend Build + Test** | 前阶段成功 | `cd src/frontend && npm ci && npm run build && npm test` | `vue-tsc --noEmit` 零错 + `vite build` 成功 + **前端冒烟测试（`node:test`）35/35 全通过**（**R19 计数未变**，35 沿用 R18；R14 为 21，R13 为 13；**R19 为首次实跑**） | abort & notify |
+| 9 | **Frontend Build + Test** | 前阶段成功 | `cd src/frontend && npm ci && npm run build && npm test` | `vue-tsc --noEmit` 零错 + `vite build` 成功 + **前端冒烟测试（`node:test`）40/40 全通过**（**R21**：新增用例 36~40；R19 为 35，R18 为 35，R14 为 21） | abort & notify |
 | 10 | **Package Artifact** | 前阶段成功 | 归档 `src/frontend/dist/` + 记录 `git rev-parse HEAD` | 产物归档、commit 可追溯 | abort & notify |
 
 > **R13 基线修正说明（关键）**：本表旧值（unit 55 / integration 69→73 / e2e 14 / full 142 / 前端 6）**已作废**。**以实测为准**：全量 Python 用例 **239**（unit **95** / integration **123** / e2e **21**），**0 skip / 0 xfail**；前端冒烟层 **13**（**独立一层，不并入 239 算术**——跨运行时 / 跨框架）。**依据**：`docs/phase_status.md`（REV-13，GROUP_D **GR-D-010 APPROVED，condition_1「DEFECT-R13-01 已修复并独立复跑闭合」**）+ `docs/test_report.md` 1.9.0 §18（collect 口径 239；其文件副本仍记 238 pass / 1 fail，系**闭合后未回写**的同源副本，**以 phase_status 闭合结论为准**）。
@@ -66,6 +69,8 @@
 > **R18 基线同步说明（本轮，关键）**：R18（系统管理三分 + 项目 CRUD 软删 + 顺序依赖 + 唯一运维账号 + LLM Key 管理 + 项目域资料上传）相对 **REV-17**（327 = unit 149 / integration 154 / e2e 24）新增 **unit +8 / integration +16 / e2e +0 = Python 全量 +24**，前端冒烟 **+6**（29 → **35**）。**分层实测（`pytest -q --collect-only` 逐层）**：`tests/unit` = **157**、`tests/integration` = **170**、`tests/e2e` = **24** ⇒ 157 + 170 + 24 = **351** ✓。**依据**：`docs/test_report.md` **1.14.0 / §23**（`351/351` 全绿、`0 skip / 0 xfail / 0 blocked`、EXIT=0，`docs/evidence/groupd_r18_pytest_final.log`）+ `docs/phase_status.md` **GR-D-015 = PASS_WITH_CONDITIONS**（用户 2026-10-07 接受，四项数值 PASS 标准 SATISFIED）。**R18 测试文件**：新建 `tests/unit/test_rev18_system_mgmt_unit.py`（TC-UNIT-R18-001~008）+ `tests/integration/test_rev18_system_management_int.py`（GROUP_C 首跑 TC-INT-148~153）+ `tests/integration/test_rev18_system_management_extra_int.py`（TC-INT-154~162，补 HTTP 契约缺口）；前端冒烟 `src/frontend/tests/frontend.smoke.test.js` 追加**第 35 例**（既有 34 例未改）。**selfcheck** `51/51`（**R17 起即 51**，R18 **未新增**自检项，命令不变）。**备注**：R18 用例**未撞号**（R14-DEF-01 的撞号问题本轮未复现）；**e2e 层计数不变**（R18 的 e2e 相关断言在 `tests/e2e/test_user_journeys.py` 内**增强既有 TC-E2E-001** —— 断言上传 `kb_id ≡ project_id` 推导，**计数中性**）。R18 对 CI 为**标签层同步 + 一迁移门如实登记**——命令计数无关，**不新增 / 不删除 step**。
 
 > **R19 基线同步说明（本轮，关键）**：R19（每项目专家集隔离 / 定义文档目录化 / 新项目创建期种子 / 三专家属 `demo` / 前端项目域闭环）相对 **REV-18**（351 = unit 157 / integration 170 / e2e 24）新增 **unit +17 / integration +11 / e2e +3 = Python 全量 +31**，前端冒烟 **±0**（35 不变），selfcheck **+1**（51 → **52**，新增 `r19_project_expert_isolation`）。**分层实测（`pytest -q --collect-only` 逐层，独立复跑）**：`tests/unit` = **174**、`tests/integration` = **181**、`tests/e2e` = **27** ⇒ 174 + 181 + 27 = **382** ✓；`pytest tests -q` 实测 **380 passed / 2 skipped / 0 failed**（68.4s）。**R19 测试文件**：新建 `tests/unit/test_rev19_expert_isolation_unit.py` + `tests/integration/test_rev19_project_expert_isolation_int.py` + `tests/e2e/test_rev19_project_expert_journeys.py`（**前端冒烟未新增用例**——IFC-IB-387 项目域闭环为**零代码**，用例数不变，**本轮亦未实跑 `npm`**）。**2 skip 的如实登记**：均为 `tests/unit/test_rev18_system_mgmt_unit.py`（L445 / L476）的 **POSIX 权限位语义**断言 ——「Windows 的 `chmod` 表达不了 0660」与「`_harden_file_permissions` 在 Windows 直接返回」，属**平台性跳过**（**非失败、非 xfail、非 REV-19 引入**），于 CI（ubuntu-24.04）应**实跑**（届时为 382 passed）。**依据**：`docs/test_report.md` **1.15.0 / §24**（REV-19，INV-GROUP_D-INTELBASE-020：改动后 **379 passed / 1 failed / 2 skipped**，唯一 FAIL = **TC-INT-R19-006**（DEFECT-R19-D-01），自报判定 PARTIAL_SUCCESS）+ `docs/phase_status.md` **GR-D-016 / GR-D-017**（REV-19 GROUP_D 门控）+ **GR-C-015**（DEFECT-R19-D-01 **已闭合**：专家域 fail-closed 补 `log_event(expert_domain, …)` + `LOG_FIELDS` 加 `reason` 键，PHASE_06 v2.15.0）；**本轮独立复跑（缺陷闭合后，2026-10-11）**：`pytest tests -q` → **380 passed / 2 skipped / 0 failed**（382 collected，68.4s）+ `selfcheck.py` → **52/52**。**据此基线取「缺陷闭合后」值 = 382 collected / 380 passed / 2 skipped / 0 failed**，与 test_report §24 的 379/1fail/2skip 之差恰为**已闭合的 DEFECT-R19-D-01**（1 条由 FAIL 转 PASS）。R19 对 CI 为**标签层同步**（无迁移门增量、无版本门增量）——命令计数无关，**不新增 / 不删除 step**。
+
+> **R21 基线同步说明（本轮，关键）**：R21（编排图专家节点实显：显示投影层展开 + 前端渲染契约）相对 **REV-19 / R21 改动前实测**新增 **unit +19 / integration +4 / e2e +2 = Python 全量 +25**，前端冒烟 **+5**（35 → **40**，用例 36~40），selfcheck **±0**（52/52，命令不变）。**分层实测（`pytest -q --collect-only` 逐层，本轮复跑）**：`tests/unit` = **190**、`tests/integration` = **190**、`tests/e2e` = **29**、`tests/agents` = **21** ⇒ 190 + 190 + 29 + 21 = **430** ✓；`pytest tests -q` 实测 **428 passed / 2 skipped / 0 failed**。**R21 测试文件**：新建 `tests/unit/test_orchestration_expert_nodes_r21.py`（+19，含冲突负例 `pytest.raises(ConfigError)`）、`tests/integration/test_definition_config_rev21_int.py`（+4）、`tests/e2e/test_rev21_expert_graph_journeys.py`（+2）；`tests/integration/test_definition_config_r7.py` **仅追加断言**；`src/frontend/tests/frontend.smoke.test.js` 追加**用例 36~40**（既有 35 例未改）。**2 skip 的如实登记**：均为 `tests/unit/test_rev18_system_mgmt_unit.py` 的 **POSIX 权限位语义**断言 —— **平台性跳过**（**非失败、非 xfail、非本轮引入**），于 CI（ubuntu-24.04）应**实跑**（届时为 430 passed / 0 skipped）。**依据**：`docs/test_report.md` REV-21 / §25 + `docs/phase_status.md` **GR-D-019 = PASS**（finding_6 记「全量 428 passed / 2 skipped / 0 failed EXIT 0，基线 403 + 2；selfcheck 52/52；前端 `npm test` 40/40、`typecheck` / `build` EXIT 0」）。R21 对 CI 为**标签层同步**（无迁移门增量、无版本门增量）——命令计数无关，**不新增 / 不删除 step**。
 
 > **阶段9 说明（R10 增量）**：阶段9 在 `npm run build` **之后**追加 `npm test`——前端冒烟测试（`src/frontend/tests/frontend.smoke.test.js`，Node 20 内置 `node:test`，**零新增依赖**）。其**必须在 build 之后**运行：用例 6 断言 `dist/` 构建产物内容，属「先建后测」的前置条件顺序。该测试含「`package-lock.json` 与 `package.json` 同步」回归闸——正是 R10 中 `npm ci` 因锁失同步而 `EUSAGE` 失败的根因守卫；接入流水线后该回归守卫方具备**强制力**（此前仅本地可跑）。
 
@@ -82,7 +87,7 @@
 | 无 `pytest`+`unittest` 混杂误用 | 测试命令统一 pytest | 与实际套件一致 | tech_stack「测试框架」行 |
 | `langchain-core` 区间 | `python -c "import importlib.metadata as m; print(m.version('langchain-core'))"` | **`>=0.3,<2.0`** | 冻结决策 ⑤ / `requirements.txt` |
 | **`bcrypt` 区间**（R13） | `python -c "import importlib.metadata as m; print(m.version('bcrypt'))"` | **`>=4,<5`** | DR-11 / IFC-IB-311 / `requirements.txt`（对齐 `phase_status` MINOR-R13-03） |
-| **前端零运行时 CDN**（R13） | 前端冒烟用例（**R18 后共 35 例**，**R19 计数未变**；R14 为 21）：源码与 `dist/` 无外网引用 | 零外网引用 | DR-13 / AC-IB-17-06；`tech_stack` §4.5 |
+| **前端零运行时 CDN**（R13） | 前端冒烟用例（**R21 后共 40 例**；R19 为 35，R18 为 35，R14 为 21）：源码与 `dist/` 无外网引用 | 零外网引用 | DR-13 / AC-IB-17-06；`tech_stack` §4.5 |
 | **凭据零命中**（R13） | `git grep -nE 'IB_DEFAULT_ADMIN_PASSWORD=' -- . \| grep -v REPLACE_ME`（期望空）+ `scripts/selfcheck.py` 的 `deploy_templates_have_no_secrets` | **零命中** | C-IB-09 / REQ-NFR-IB-15 / checklists B19 |
 
 > 版本门是**部署路径与本地一致性**的守卫——`ibweb/composition.py` 在**装配期**也会对 `langchain-openai` 做 fail-fast 断言（test_report DEV-02 已实测该断言触发），CI 版本门是其**上游更早的一道**。
@@ -181,7 +186,7 @@ python -c "import sys; sys.path.insert(0,'src'); from ib.ledger.schema import ac
 | **用例** | `tests/e2e/test_user_journeys.py::test_TC_E2E_001_import_then_rag_answer`（US-IB-01 导入 + **US-IB-08 带来源的检索增强回答**，关键路径） |
 | **覆盖链路** | 上传文档 → worker 处理至 `indexed` → **检索命中该文档**（`degraded=False`，`hits` 含 `doc_id`）→ **SSE 问答**（`/api/chat/stream?q=…`）产出 `event: content` + `event: done` |
 | **运行位置** | 阶段 5（`python -m pytest tests/e2e -q`）—— **其余 20 条 E2E 一并跑**；阶段 6 全量再覆盖一次 |
-| **判据** | 全通过（**R19 后：采集 382 / 380 passed / 2 skipped / 0 failed**，2 skip 为 Windows 平台性 POSIX 权限位断言；R18 为 `351/351`）；**离线跑**（`IB_OFFLINE_MODE=1`，LLM / 向量库 / Embedding 用替身） |
+| **判据** | 全通过（**R21 后：采集 430 / 428 passed / 2 skipped / 0 failed**，2 skip 为 Windows 平台性 POSIX 权限位断言；R19 为 `382`，R18 为 `351/351`）；**离线跑**（`IB_OFFLINE_MODE=1`，LLM / 向量库 / Embedding 用替身） |
 | **R13 附加** | R13 E2E（`tests/e2e/test_accounts_journeys_r13.py`：TC-E2E-020 管理员→运维台全账户旅程 / TC-E2E-021 零粘贴令牌旁路）**同为关键路径**，阶段 5 一并覆盖 |
 | **R14 附加** | **R14 回归修复的 CI 层守卫**在**集成层**（阶段 4）：`tests/integration/test_project_context_int_r14.py`（TC-INT-123~128：`GET /api/projects` 授权口径 / admin 选项目后 `/api/config/definition` 503→200 / ops 跨项目 403 / 未知头 fail-closed / 写方法 405）+ **前端层**（阶段 9；TC-FE-018~021：注入 fail-closed / 单项目预选 / ops 不可切换 / provider 优先）。**提示**：真实浏览器端到端（admin 于 UI 选项目）由 `deployment_plan.md` §14.5 **V14-9** 在**部署后**覆盖，**不在 CI 内**（CI 不触网、不装浏览器） |
 | **R18 附加** | **R18 的 e2e 层断言增强既有 TC-E2E-001**（`tests/e2e/test_user_journeys.py`）：断言 HTTP 上传落库 **`kb_id ≡ project_id` 推导**（IFC-IB-375 / ADR-41），**计数中性**。R18 **新端点契约**的 CI 守卫在**集成层**（阶段 4）：`tests/integration/test_rev18_system_management_int.py`（TC-INT-148~153）+ `tests/integration/test_rev18_system_management_extra_int.py`（TC-INT-154~162：1:N 多账号 / **422 先于 400·409 的错误码判定顺序** / 项目软删不级联账号·保留账本 / 未配置态 `masked == ""` / **审计只记 outcome 不含密钥** / **任何响应体（含错误体）不含明文** / D-R18-01 边界清晰）；**前端层**（阶段 9，第 35 例）核对三子域 IA + 「资料管理」(files) **保持独立顶级**。**提示**：真实 **LLM Key 提交与重启生效**由 `deployment_plan.md` §15.3 **DEPLOY-031** / §15.8 在**部署后**覆盖，**不在 CI 内**（CI 不触网、不含真实凭据） |
@@ -189,6 +194,8 @@ python -c "import sys; sys.path.insert(0,'src'); from ib.ledger.schema import ac
 | **R19 附加** | **R19 的 e2e 层**新增 `tests/e2e/test_rev19_project_expert_journeys.py`（**每项目专家集隔离 + 定义文档目录化 + 新项目种子**的端到端旅程；阶段 5 一并跑）。**R19 的集成层**新增 `tests/integration/test_rev19_project_expert_isolation_int.py`（**每项目专家集隔离契约**；阶段 4）。**提示**：真实三项由 `deployment_plan.md` **§16** 在**部署后**覆盖，**不在 CI 内**——① **C-IB-46 定义文档目录化迁移**（§16.3 DEPLOY-037，用户手工执行，CI 无生产文件系统）；② **C-IB-47 三专家历史迁移**（§16.4，**当前无持久化迁移对象、为前向条款**）；③ **前端构建首次实跑**（`npm run typecheck && npm test && npm run build`，§16.3 DEPLOY-034） |
 
 > **纪律**：本 smoke 为**离线替身**冒烟（验证编排与端到端链路**接线正确**），**不是**真实 DeepSeek 调用。真实云端调用属**部署后**冒烟（`deployment_plan.md` §9 / checklists B7），**不在 CI 内**（CI 不触网、不外发数据）。
+
+| **R21 附加** | **R21 的编排图专家节点实显**在 **unit 层**新增 `tests/unit/test_orchestration_expert_nodes_r21.py`（**展开规则 + 冲突负例 `pytest.raises(ConfigError)`**；阶段 3）；**集成层**新增 `tests/integration/test_definition_config_rev21_int.py`（**`GET /api/config/definition` 信封：`derived.nodes` 逐专家展开 / 不含字面量 `expert` / `derived.experts` 3 键 / 顶层键未增**；阶段 4）；**e2e 层**新增 `tests/e2e/test_rev21_expert_graph_journeys.py`（端到端旅程；阶段 5）；**前端层**新增冒烟**用例 36~40**（`cn_label` / `graph-expert` / **仍只读** / `DerivedExpertEntry` 类型契约；阶段 9）。**提示**：真实浏览器**渲染与拖拽**（`AC-IB-54-01` / `AC-IB-52-03`）为 **[NOT_TESTABLE]**（离线无浏览器），「保存并经服务重启后生效」（`AC-IB-52-01` / `52-02`）为 **[DEPLOY_REQUIRED]** —— 均在**部署后**由 `deployment_plan.md` **§17.5 V21-7 / §17.7 AC-R21-C/D** 覆盖，**不在 CI 内** |
 
 ## 8. 工作流落地（GitHub Actions，**增量更新**）
 
@@ -204,6 +211,7 @@ python -c "import sys; sys.path.insert(0,'src'); from ib.ledger.schema import ac
 | **R14 增量更新** | **标签/注释层同步（不新增、不删除 step、不改任何 `run` 命令）**：① **基线标签修正**（integration 123 → **129**、full 239 → **245**、前端 13 → **21**；unit 95 / e2e 21 不变）；② 阶段 7 `selfcheck.py` 现覆盖 **47/47**（含 R14 两条：`r14_project_context` 端点授权口径 + `r14_frontend_project_discipline` 单点注入 / SSE 覆盖；**计数无关**，命令不变）；③ R14 **无迁移 / 无新依赖** → **阶段2 的迁移门脚本不变**（`003_accounts.sql` 仍为唯一迁移快照）；④ R14 **无 `package.json` / `package-lock.json` 改动** → 阶段9 `npm ci` 的锁同步回归闸**不受影响**（R10 `EUSAGE` 守卫继续有效）；⑤ **硬门集合不变** |
 | **R18 增量更新**（本轮） | **标签/注释层同步 + 一迁移门如实登记（不新增、不删除 step、不改任何 `run` 命令）**：① **基线标签修正**（unit 95 → **157**、integration 129 → **170**、e2e 21 → **24**、full 245 → **351**、前端 21 → **35**）；② 阶段 7 `selfcheck.py` 现为 **51/51**（**计数无关**，命令不变；R17 起即 51，R18 未新增自检项）；③ **⚠ R18 的 `005_projects.sql` / `006_llm_key.sql` 未纳入阶段 2 迁移门**（该门**只覆盖 `003_accounts.sql`）—— **本轮已知 CI 覆盖缺口**；**本代理未改 `.github/workflows/ci.yml`**（超本轮授权面），建议随下轮授权扩展（详见 §3.2 / §9.3）；④ R18 **无 `package.json` / `package-lock.json` 改动** → 阶段9 `npm ci` 的锁同步回归闸**不受影响**（R10 `EUSAGE` 守卫继续有效）；⑤ **硬门集合不变**（含 **`bcrypt>=4,<5` 门**保留，见 §3 / §9.4） |
 | **R19 增量更新**（本轮） | **标签/注释层同步（不新增、不删除 step、不改任何 `run` 命令）**：① **基线标签修正**（unit 157 → **174**、integration 170 → **181**、e2e 24 → **27**、full 351 → **采集 382 / 380 passed / 2 skipped**、前端 **35 不变**）；② 阶段 7 `selfcheck.py` 现为 **52/52**（含 R19 新增 `r19_project_expert_isolation`；**计数无关**，命令不变）；③ R19 **无新 SQL 迁移** → **阶段2 的迁移门脚本不变**（`003_accounts.sql` 仍为唯一迁移快照；**承前结转 R18 缺口** `005`/`006`，见 §3.2 / §10.3）；④ R19 **无 `package.json` / `package-lock.json` 改动** → 阶段9 `npm ci` 的锁同步回归闸**不受影响**（R10 `EUSAGE` 守卫继续有效）；⑤ **硬门集合不变**（含 **`bcrypt>=4,<5` 门**保留，见 §3 / §10.4）；⑥ 能力映射自动纳入 R19 用例（阶段 3 `tests/unit/test_rev19_expert_isolation_unit.py`；阶段 4 `tests/integration/test_rev19_project_expert_isolation_int.py`；阶段 5 `tests/e2e/test_rev19_project_expert_journeys.py`），**无需改 `ci.yml`** |
+| **R21 增量更新**（本轮） | **标签/注释层同步（不新增、不删除 step、不改任何 `run` 命令）**：① **基线标签修正**（unit 174 → **190**、integration 181 → **190**、e2e 27 → **29**、full 382 → **采集 430 / 428 passed / 2 skipped**、前端 **35 → 40**）；② 阶段 7 `selfcheck.py` 仍为 **52/52**（**计数无关**，命令不变）；③ R21 **无新 SQL 迁移** → **阶段2 的迁移门脚本不变**（`003_accounts.sql` 仍为唯一迁移快照；**承前结转** R18 缺口 `005` / `006`，见 §3.2 / §11.3）；④ R21 **无 `package.json` / `package-lock.json` 改动** → 阶段9 `npm ci` 的锁同步回归闸**不受影响**（R10 `EUSAGE` 守卫继续有效）；⑤ **硬门集合不变**（含 **`bcrypt>=4,<5` 门**保留）；⑥ 能力映射自动纳入 R21 用例（阶段 3 `tests/unit/test_orchestration_expert_nodes_r21.py`；阶段 4 `tests/integration/test_definition_config_rev21_int.py`；阶段 5 `tests/e2e/test_rev21_expert_graph_journeys.py`；阶段 9 前端用例 36~40），**无需改 `ci.yml`** |
 | 纪律 | 任一 step 失败即 **abort**（原生 fail-fast，后续 step 自动跳过）；**不** `continue-on-error` |
 
 > **注**：CI 的「禁 Docker」判据**只**校验「仓库不含 `Dockerfile` / `docker-compose*`」（GitHub 托管 runner 自带 docker CLI，`command -v docker` 会恒假阳性）；目标机的 `command -v docker` 空判据属**部署机硬门**，不在 CI。
@@ -353,6 +361,72 @@ python -c "import sys; sys.path.insert(0,'src'); from ib.ledger.schema import ac
 
 ---
 
+## 11. REV-21 增量节（可视化配置「编排图」实显项目已配置的专家 —— 显示投影层展开 + 前端渲染契约）
+
+> 本节为 **REV-21 增量**（INV-GROUP_E-INTELBASE-010，拟）。**仅定义，未执行**；**未连接、未触碰目标机**。配套部署面见 `deployment_plan.md` **§17**；本节与 §2 / §3 / §3.2 / §7 / §8 的 R21 增量补注**同源一致**。
+
+### 11.1 R21 对 CI 的净影响（结论：**零 step 改动**）
+
+| 维度 | R21 值 | 对 CI 的影响 |
+|------|--------|--------------|
+| **阶段结构** | 10 阶段**不变** | **不新增 / 不删除 step** |
+| **硬门集合** | **不变**（含 **`bcrypt>=4,<5` 门保留**） | 版本门命令逐字不变 |
+| **测试基线** | Python **采集 430 = 428 passed / 2 skipped / 0 failed**（unit **190** / integration **190** / e2e **29** / `tests/agents` **21**）；前端 **40**；selfcheck **52** | **标签/注释层同步**（命令**计数无关**） |
+| **迁移** | **零新增**（无新 `.sql`） | 迁移门**不变**；**承前结转** R18 缺口（`005` / `006`） |
+| **第三方依赖** | **零新增**（`tech_stack.md` NO_CHANGE，维持 1.4.1/REV-18） | 阶段 2 / 9 安装步骤**不变** |
+| **锁文件** | `package.json` / `package-lock.json` **零改动** | 阶段 9 `npm ci` 锁同步回归闸**不受影响** |
+| **env 键** | **零新增** | 对 CI **无影响** |
+| **模块 / 端口 / 依赖边** | 模块**仍 26**；端口**仍 19**；**零新增依赖边** | 对 CI **无影响** |
+| **运行期拓扑** | **未改**（C-IB-54；展开仅在显示投影层） | 对 CI **无影响** |
+
+> **禁 Docker 复核**：REV-21 **未引入任何容器化**，本文件**无任何 Docker step**（DR-03 冻结决策②/⑦不变）。
+
+### 11.2 基线（R21 口径）
+
+```
+[Source] → [Config+Schema] → [Unit 190] → [Integration 190] → [E2E 29] → [Full 430] → [Selfcheck 52] → [Version-Gate] → [Frontend 40] → [Artifact]
+```
+
+| 层 | R21 基线 | 依据 |
+|----|----------|------|
+| Python 全量 | **采集 430**；**428 passed / 2 skipped / 0 failed**（unit **190** / integration **190** / e2e **29** / `tests/agents` **21**） | `docs/test_report.md` REV-21 / §25 + `phase_status` **GR-D-019**（finding_6：428 passed / 2 skipped / 0 failed，基线 403 + 2）；**本轮独立复跑**（`pytest tests -q`；`--collect-only` 逐层） |
+| 前端冒烟（独立层） | **40/40** | `frontend.smoke.test.js`（**用例 36~40 为 R21 新增**；R19 为 35）；test_report §25 |
+| 离线自检 | **52/52** | `docs/test_report.md` §25 / `phase_status`（`selfcheck 52/52`；命令不变） |
+
+> **2 skip 口径**：均为 `tests/unit/test_rev18_system_mgmt_unit.py` 的 **POSIX 权限位语义**断言，Windows 平台性跳过（**非失败 / 非 xfail / 非本轮引入**）；CI（ubuntu-24.04）应实跑（届时 430 passed / 0 skipped）。
+
+### 11.3 迁移门：R21 **零新增缺口**，**承前结转** R18 缺口（**如实登记**）
+
+- REV-21 **不新增 SQL 迁移** —— 显示投影层展开与前端渲染均为**纯代码**（ADR-52 未引入任何表 / 列）；因此**阶段 2 迁移门命令逐字不变**（`003_accounts.sql` 仍为唯一迁移快照）。
+- **承前结转**：R18 的 `005_projects.sql` / `006_llm_key.sql` **仍未纳入**迁移门 —— R21 **未消、也未改**该缺口（本代理未改 `ci.yml`，超授权面）。**建议仍同上轮**：判据 = `schema.py::ensure_schema()` 于 `:memory:` 连跑两次 exit 0 + `kb_default` 归零 + `llm_key` 单行表存在，并同步 `ci.yml` 阶段 2。
+- **同源登记**：`deployment_plan.md` §17.2 / §17.8。
+
+### 11.4 版本门集合（R21 复核：**不变**）
+
+§3 的硬断言**逐条保留**：`langchain-openai < 0.3`、**禁 PyMuPDF / fitz**、**禁 Docker**、Python `>=3.11,<3.14`、`langchain-core >=0.3,<2.0`、**`bcrypt >=4,<5`**、**前端零运行时 CDN**（R21 后共 **40** 例）、**凭据零命中**。R21 **未新增、未删除**任何版本门。
+
+### 11.5 R21 相关测试文件（CI 覆盖映射）
+
+| 文件 | 层 | 阶段 | 覆盖 |
+|------|-----|------|------|
+| `tests/unit/test_orchestration_expert_nodes_r21.py` | unit | 阶段 3 | `_expand_expert_nodes` 展开规则（结构节点保留 / 占位节点逐专家原位展开 / 条件边仍 1 条 / 普通边逐专家镜像 / 节点唯一）+ **冲突负例**（专家名 ∈ {route, general, gate, aggregate} ∪ {START, END} ⇒ `ConfigError`） |
+| `tests/integration/test_definition_config_rev21_int.py` | integration | 阶段 4 | `GET /api/config/definition` 信封（`derived.nodes` 逐专家展开 / **不含字面量 `expert`** / `derived.experts` 3 键 / **顶层键未增**） |
+| `tests/e2e/test_rev21_expert_graph_journeys.py` | e2e | 阶段 5 | 编排图专家节点实显的端到端旅程 |
+| `tests/integration/test_definition_config_r7.py`（**仅追加断言**） | integration | 阶段 4 | R7 既有契约 + R21 **追加**断言（**原断言未动**） |
+| `src/frontend/tests/frontend.smoke.test.js`（用例 **36~40**） | 前端 | 阶段 9 | `cn_label` 标签 / `graph-expert` 视觉可区分 / **仍只读** / `DerivedExpertEntry` 类型契约 / 前端**不自展开**占位节点 |
+
+### 11.6 未在 CI 内、须**部署后**覆盖的 R21 项
+
+| 项 | 归属 |
+|----|------|
+| **真实浏览器渲染 / 拖拽连线视觉观感**（`AC-IB-54-01` / `AC-IB-52-03`，`[NOT_TESTABLE]`） | `deployment_plan.md` §17.5 **V21-7** / §17.7 **AC-R21-C** |
+| **「保存并经服务重启后生效」**（`AC-IB-52-01` / `52-02`，`[DEPLOY_REQUIRED]`） | `deployment_plan.md` §17.7 **AC-R21-D** |
+| **后端重启 + 编排图专家节点实显**（`GET /api/config/definition` 的 `derived.*` 实测） | `deployment_plan.md` §17.3 **DEPLOY-042** / §17.5 **V21-1 / V21-2 / V21-3** |
+| **前端重建 + `dist/` 发布**（目标机首跑；改前端不重启） | `deployment_plan.md` §17.3 **DEPLOY-043** / §17.5 **V21-4** |
+| **目标机首跑风险**（Node 版本差：CI Node 20 vs 生产 node v22；锁漂移） | `deployment_plan.md` §17.6 **R-21-2** |
+
+---
+
 ## 附：自检声明
 
 - 本流水线**未执行**，为**定义**；CI 平台具体实现 = **GitHub Actions**（`.github/workflows/ci.yml` 已存在并本轮增量更新，见 §8）。
@@ -363,6 +437,7 @@ python -c "import sys; sys.path.insert(0,'src'); from ib.ledger.schema import ac
 - **REV-14 增量边界（前轮，INV-GROUP_E-INTELBASE-005）**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何部署 / SSH / 连接 / 写操作 / 安装 / 服务启停；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源四文档 / `docs/phase_status.md` / `docs/test_*.md`；**未触发 PHASE_11**，且该轮 `special_instructions` **不含 `PRODUCTION_DEPLOY_CONFIRM`**。该轮仅更新本文件（1.2.0 → **1.3.0/REV-14**）、`docs/deployment_plan.md` 与 `.github/workflows/ci.yml` 的**注释基线标签**（纯注释，不改 step 逻辑）。
 - **REV-18 增量边界（本轮，INV-GROUP_E-INTELBASE-006）**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何部署 / SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传 / 迁移；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码（R18 交付物全程只读引用）/ `tests/**` / 设计真源文档 / `docs/{implementation_plan,test_report,phase_status}.md` / `.github/workflows/ci.yml`；**未触发 PHASE_11**，且**本轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**。本轮仅更新**两个文档**（本文件 1.3.0 → **1.4.0/REV-18** 与 `docs/deployment_plan.md` 1.3.0 → **1.4.0/REV-18**），**未改 `ci.yml`**（R18 无 CI 逻辑改动，仅**如实登记** §3.2/§9.3 迁移门未覆盖 `005`/`006`）。
 - **REV-19 增量边界（本轮，INV-GROUP_E-INTELBASE-007）**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何部署 / SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传 / 迁移；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码（R19 交付物全程只读引用）/ `tests/**` / 设计真源文档 / `docs/{implementation_plan,test_report,phase_status}.md` / `.github/workflows/ci.yml`；**未触发 PHASE_11**，且**本轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（PHASE_11 保持冻结）。本轮**仅更新两个文档**（本文件 1.4.0 → **1.5.0/REV-19** 与 `docs/deployment_plan.md` 1.4.0 → **1.5.0/REV-19**），**未改 `ci.yml`**（R19 无 CI 逻辑改动，仅**如实登记** §3.2 / §10.3 承前结转 R18 缺口 + C-IB-46 文件级迁移 CI 不可测）。**本文件为本轮 CI 视角下唯一运行过的动作 = 只读引用 + 独立复跑 `pytest` / `selfcheck` 以核实基线数字**（R19**未触发**、也未新增任何 CI step）。
+- **REV-21 增量边界（本轮，INV-GROUP_E-INTELBASE-010，拟）**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何部署 / SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传 / 迁移；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码（R21 交付物全程只读引用）/ `tests/**` / 设计真源文档 / `docs/{implementation_plan,test_report,phase_status}.md` / `.github/workflows/ci.yml`；**未跑 Docker**（忠实 DR-03）。**未触发 PHASE_11**，且**本轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（本代理**未**、也**不得**自赋）。本轮**仅更新两个文档**（本文件 1.5.1 → **1.6.0/REV-21** 与 `docs/deployment_plan.md` 1.5.1 → **1.6.0/REV-21**），另**新增** `src/deploy/checklists.txt` 条目（**仅新增、不改既有条目**）。**本文件为本轮 CI 视角下唯一运行过的动作 = 只读引用 + 独立复跑 `pytest` / `selfcheck` 以核实基线数字**（R21 **未触发**、也未新增任何 CI step）。
 
 ---
 
@@ -378,9 +453,11 @@ python -c "import sys; sys.path.insert(0,'src'); from ib.ledger.schema import ac
 | **1.4.0** | **GROUP_E / REV-18** | **2026-10-07** | **INV-GROUP_E-INTELBASE-006** | **REV-18 增量（标签层同步 + 一迁移门如实登记，不新增 / 不删除 step）**：① header 补 revision=REV-18 / 版本 1.3.0→**1.4.0**；新增「REV-18 增量声明 + R18 变更面对 CI 的影响」；② **§2 阶段表基线同步**（unit 95 → **157**、integration 129 → **170**、e2e 21 → **24**、full 245 → **351**、前端 21 → **35**）+ 新增「R18 基线同步说明」（分层实测 157+170+24=351；R18 测试文件清单；e2e 计数中性说明）；③ §3 版本门「前端零运行时 CDN」行注更新为 R18 后 35 例（版本门集合**不变**，**`bcrypt` 门保留**）；④ **§3.2 迁移门新增「R18 增量登记」**（`005`/`006` **未纳入**，如实登记缺口）；⑤ §5 矩阵补 R18 两行（项目注册表 / LLM Key 载体）；⑥ §7 端到端 smoke 判据改 `351/351` + 新增「R18 附加」；⑦ §8 工作流落地「能力映射」补 R18 用例 + 新增「R18 增量更新」行；⑧ **新增 §9 REV-18 增量节**（9.1 净影响 / 9.2 基线 / **9.3 已知缺口：迁移门未覆盖 `005`/`006`** / 9.4 版本门集合不变 / 9.5 测试文件映射 / 9.6 须部署后覆盖项）；⑨ 附自检补 R18 边界；status → REVISED_PENDING_REVIEW（待 GR-E-006） | `docs/test_report.md` 1.14.0/REV-18 §23（Python **351** = unit 157 + integration 170 + e2e 24，0 skip/xfail，`groupd_r18_pytest_final.log`；前端 **35**；selfcheck **51/51**，`groupd_r18_selfcheck_final.log`）；`docs/phase_status.md` GR-D-015（用户 2026-10-07 接受）；`docs/deployment_plan.md` 1.4.0/REV-18 §15；`tests/unit/test_rev18_system_mgmt_unit.py`（TC-UNIT-R18-001~008）；`tests/integration/test_rev18_system_management_int.py`（TC-INT-148~153）+ `test_rev18_system_management_extra_int.py`（TC-INT-154~162）；`src/frontend/tests/frontend.smoke.test.js`（35 例）；`src/deploy/migrations/{005_projects,006_llm_key}.sql`；`.github/workflows/ci.yml`（**未改**，仅登记 §3.2 迁移门未覆盖 `005`/`006`） |
 | **1.5.0** | **GROUP_E / REV-19** | **2026-10-11** | **INV-GROUP_E-INTELBASE-007** | **REV-19 增量（标签层同步，不新增 / 不删除 step）**：① header 补 revision=REV-19 / 版本 1.4.0→**1.5.0**；新增「REV-19 增量声明 + R19 变更面对 CI 的影响」；② **§2 阶段表基线同步**（unit 157 → **174**、integration 170 → **181**、e2e 24 → **27**、full 351 → **采集 382 / 380 passed / 2 skipped**、前端 **35 不变**）+ 新增「R19 基线同步说明」（分层实测 174+181+27=382；R19 测试文件清单；**2 skip 为 Windows 平台性 POSIX 权限位断言，如实登记**；前端未新增用例且本轮未实跑）；③ §3 版本门「前端零运行时 CDN」行注更新为 R19 后仍 35 例（版本门集合**不变**，**`bcrypt` 门保留**）；④ **§3.2 迁移门新增「R19 增量登记」**（**零新增缺口** + **承前结转 R18 缺口** + **C-IB-46 文件级迁移 CI 不可测**）；⑤ §5 矩阵补 R19 两行（定义文档载体 / 每项目专家集）；⑥ §7 端到端 smoke 判据改 `382`（380 passed / 2 skipped）+ 新增「R19 附加」；⑦ §8 工作流落地新增「R19 增量更新」行；⑧ **新增 §10 REV-19 增量节**（10.1 净影响 / 10.2 基线 / 10.3 迁移门：零新增缺口 + 结转 / 10.4 版本门集合不变 / 10.5 测试文件映射 / 10.6 须部署后覆盖项）；⑨ 附自检补 R19 边界；status → REVISED_PENDING_REVIEW（待 GR-E-007） | `docs/deployment_plan.md` 1.5.0/REV-19 §16；`src/ib/config/definition.py`（`FileDefinitionDocumentStore._path_for` / `migrate_legacy_definition_file`）；`src/ib/experts/__init__.py`（`ExpertRegistryView` / `resolve_expert_registry` / `builtin_default_registry`）；`src/ib/streaming/__init__.py`（`migrate_expert_history`）；`src/deploy/checklists.txt`（**B24 / B25**）；`tests/{unit,integration,e2e}/test_rev19_*`；`docs/rev19_groupb_apply_package*.md`（ADR-43~47 / IFC-IB-378~388）；`docs/test_report.md` **1.15.0 / §24**（REV-19：379 passed / 1 failed / 2 skipped，TC-INT-R19-006 = DEFECT-R19-D-01）+ `docs/phase_status.md` **GR-B-011 / GR-C-014 / GR-C-015 / GR-D-016 / GR-D-017**（REV-19 四组门控；DEFECT-R19-D-01 已闭合）；**本轮独立复跑** `pytest tests -q`（380 passed / 2 skipped / 0 failed，382 collected）+ `src/scripts/selfcheck.py`（52/52） |
 | **1.5.1** | **2026-10-11 用户裁决回填轮** | **2026-10-11** | **（非代理调用；PM 文书回填）** | **文书回填 + 交付物订正（对 CI 净影响 = 零）**：版本 1.5.0 → **1.5.1**；新增 §10.7 记录本轮；**未改** `.github/workflows/ci.yml`（无 step / 基线 / 门集合变更）；本文件用 HTML 注释头部 + Markdown 元数据表（**非 XML `file_header`**，ET 解析不适用）。 | 用户 2026-10-11 裁决（GR-E-007 open_item 回填 + `checklists.txt` B24/B25 订正 + `deployment_plan.md` §1.1 / §16.3 / §16.4 回填）；`docs/phase_status.md`（GR-E-007 追加） |
+| **1.6.0** | **GROUP_E / REV-21** | **2026-10-17** | **INV-GROUP_E-INTELBASE-010（拟）** | **REV-21 增量（标签层同步，不新增 / 不删除 step）**：① header 补 revision=REV-21 / 版本 1.5.1→**1.6.0**；新增「REV-21 增量声明 + R21 变更面对 CI 的影响」；② **§2 阶段表基线同步**（unit 174 → **190**、integration 181 → **190**、e2e 27 → **29**、full 382 → **采集 430 / 428 passed / 2 skipped**、前端 35 → **40**）+ 新增「R21 基线同步说明」（分层实测 190+190+29+21=430；R21 测试文件清单；**2 skip 为 Windows 平台性 POSIX 权限位断言，如实登记**）；③ §3 版本门「前端零运行时 CDN」行注更新为 R21 后 40 例（版本门集合**不变**，**`bcrypt` 门保留**）；④ §7 端到端 smoke 判据改 `430`（428 passed / 2 skipped）+ 新增「R21 附加」；⑤ §8 工作流落地新增「R21 增量更新」行（含 CI 阶段 9 已含 `npm ci && npm run build && npm test`、仅**同步计数**）；⑥ **新增 §11 REV-21 增量节**（11.1 净影响 / 11.2 基线 / 11.3 迁移门：零新增缺口 + 承前结转 R18 缺口 / 11.4 版本门集合不变 / 11.5 测试文件映射 / 11.6 须部署后覆盖项）；⑦ 附自检补 R21 边界；status → REVISED_PENDING_REVIEW（待 PM 门控） | `docs/deployment_plan.md` 1.6.0/REV-21 §17；`architecture_design.md` 1.13.0/REV-21（ADR-52）；`module_design.md` 1.13.0/REV-21（IFC-IB-393 / 394）；`tech_stack.md` 1.4.1/REV-18（NO_CHANGE）；`src/ibweb/serializers.py`（`_expand_expert_nodes` / `definition_derived_summary`）；`src/frontend/src/views/ConfigPage.vue`、`src/frontend/src/api/client.ts`；`tests/{unit,integration,e2e}/test_*r21*` + `tests/integration/test_definition_config_r7.py`（仅追加断言）+ `src/frontend/tests/frontend.smoke.test.js`（用例 36~40）；`docs/test_report.md` REV-21 / §25 + `docs/phase_status.md` **GR-D-019 = PASS**；**本轮独立复跑** `pytest tests -q`（428 passed / 2 skipped / 0 failed，430 collected）+ `--collect-only` 逐层（190/190/29/21） |
 
 > 本文件为**定义**，**未执行**；不含任何真实凭据。**1.2.0（REV-13）未连接、未触碰目标机，未 commit / push，未触发 PHASE_11**。
 > **1.3.0（REV-14）边界（INV-GROUP_E-INTELBASE-005）**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何部署 / SSH / 连接 / 写操作 / 安装 / 服务启停；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` / `tests/**` / 设计真源四文档 / `docs/phase_status.md` / `docs/test_*.md`；**未触发 PHASE_11**（`special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`）。
 > **1.4.0（REV-18）本轮边界（INV-GROUP_E-INTELBASE-006）**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何部署 / SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传 / 迁移；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码（R18 交付物全程只读引用）/ `tests/**` / 设计真源文档 / `docs/{implementation_plan,test_report,phase_status}.md` / `.github/workflows/ci.yml`；**未触发 PHASE_11**（`special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`，PHASE_11 保持冻结）。本轮**仅改两个文档**：本文件（1.3.0 → **1.4.0/REV-18**）与 `docs/deployment_plan.md`（1.3.0 → **1.4.0/REV-18**）。
 > **1.5.0（REV-19）本轮边界（INV-GROUP_E-INTELBASE-007）**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何部署 / SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传 / 迁移；**未执行 `scp` / `pscp` / `rsync`**；**未 commit / push / `git add`**；**未改** `src/**` 实现代码（R19 交付物全程只读引用）/ `tests/**` / 设计真源文档 / `docs/{implementation_plan,test_report,phase_status}.md` / `.github/workflows/ci.yml`；**未触发 PHASE_11**，**本轮 `special_instructions` 不含 `PRODUCTION_DEPLOY_CONFIRM`**（PHASE_11 保持冻结）。本轮**仅改两个文档**（本文件 / `docs/deployment_plan.md`，均 1.4.0 → **1.5.0/REV-19**），**未改 `.github/workflows/ci.yml`**（R19 无 CI 逻辑改动，仅如实登记 §3.2 / §10.3）。**唯一实际运行动作 = 只读复跑 `pytest` / `selfcheck` 以核实基线数字**（不构成 CI step 增删）。
 > **1.5.1（2026-10-11 用户裁决回填轮）边界（PM 文书回填，非代理调用）**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何部署 / SSH / 写操作 / 迁移 / `scp` / `pscp` / `rsync`；**未 commit / push / `git add`**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源文档 / `.github/workflows/ci.yml`；**未触发 PHASE_11**、**未自赋 `PRODUCTION_DEPLOY_CONFIRM`**。本轮（回填轮）**本文件仅做文书回填**（1.5.0 → **1.5.1**：header 版本 + §10.7 + 版本历史行），**对 CI 净影响 = 零**。
+> **1.6.0（REV-21）本轮边界（INV-GROUP_E-INTELBASE-010，拟）**：**未连接、未触碰**目标机 `192.168.31.133`；**未执行**任何部署 / SSH / 连接 / 写操作 / 安装 / 服务启停 / `nginx` 写 / 文件上传 / 迁移 / `scp` / `pscp` / `rsync`；**未 commit / push / `git add`**；**未改** `src/**` 实现代码 / `tests/**` / 设计真源文档 / `.github/workflows/ci.yml`；**未跑 Docker**；**未触发 PHASE_11**、**未自赋 `PRODUCTION_DEPLOY_CONFIRM`**。本轮**仅更新两个文档**（本文件 / `docs/deployment_plan.md`，均 1.5.1 → **1.6.0/REV-21**），另**新增** `src/deploy/checklists.txt` 条目（**仅新增**）。**本文件为本轮 CI 视角下唯一运行过的动作 = 只读引用 + 独立复跑 `pytest` / `selfcheck` 以核实基线数字**（R21 **未触发**、也未新增任何 CI step）。

@@ -3,12 +3,12 @@
   <artifact>module_design</artifact>
   <path>docs/module_design.md</path>
   <doc_id>MOD-INTELBASE-001</doc_id>
-  <version>1.12.0</version>
-  <revision>REV-20</revision>
+  <version>1.13.0</version>
+  <revision>REV-21</revision>
   <status>DRAFT_FOR_GATE_REVIEW</status>
   <phase>GROUP_B / PHASE_04 模块详细设计</phase>
   <author>system-architect</author>
-  <invocation_id>INV-GROUP_B-INTELBASE-015</invocation_id>
+  <invocation_id>INV-GROUP_B-INTELBASE-016</invocation_id>
   <created_at>2026-09-25</created_at>
   <revision_history>
     <rev no="R1" date="2026-09-25" by="system-architect" basis="REV-01（框架切换 FastAPI→Django）">
@@ -56,11 +56,14 @@
     <rev no="REV-20" date="2026-10-17" by="system-architect" invocation_id="INV-GROUP_B-INTELBASE-015" basis="GROUP_A REV-20 裁决收尾（OQ-IB-41=B / 42=B / 43=C / 44=C / 45=C / 46=B / 47=C / 48=C；结论见 requirements_spec.md §2.13.4 / C-IB-52）；上游 architecture_design.md 1.12.0（REV-20），对应 ADR-48 ~ 51 / §2.0.11">
       **不新增模块、不新增端口、不新增依赖边**（模块数仍 **26**，**端口数仍 19（未新增）**，**§4.1 依赖边清单逐行未改（零新增边）**，DAG 无环，§4.2.10 再声明）：**提示词域两层化** —— `merge_prompt_layers` / `load_prompt_bundle` / `validate_prompt_directory` / `derive_prompt_layers`（IFC-IB-343 / 345 / 347）删 keyword-only `builtin_fallback(s)`、「缺兜底」判据改「两层皆缺 → `prompt_missing`」；`FileDefinitionDocumentStore`（IFC-IB-288 / 289）删 `builtin_fallbacks` 注入、legacy `fallback_prompt` 键一律 fail-closed；`ExpertPromptStore` 端口（IFC-IB-339）方法集不变、`InMemoryExpertPromptStore` 改由**种子内容预填**；**新增 IFC-IB-389 `kb_agent_seed_prompt()`**（读仓库 markdown 种子资产）—— 均并入 **MOD-IB-02**。**三专家机制退役** —— **IFC-IB-365 整体退役**；IFC-IB-379 / 380 / 381 口径修订（`builtin_expert_registry()` 与内置默认单例同值；`DEMO_EXPERT_NAMES` 退役；`EXPERT_SPECS` 初始值 = 单 kb-agent）并入 **MOD-IB-16**。**创建期播种扩展与回填迁移** —— **IFC-IB-390**（提示词落盘子步）/ **IFC-IB-391**（一次性回填迁移）/ **IFC-IB-392**（来源可观测）并入 **MOD-IB-23**（回填迁移亦涉 **MOD-IB-25** 的部署检查清单 **B26**）；**IFC-IB-385 口径修订**（删 demo 分支）。新增 IFC 编号 **389 ~ 392**（4 条，全部类型化、纯 stdlib、零第三方依赖；**IFC-IB-285 仍预留未分配**；既有重号 IFC-IB-131 **登记不修**）。**既有 `IFC-IB-001 ~ 388` 的号 / 名 / 签名一字不动**（仅上述 keyword-only 参数集与判据口径修订 + IFC-IB-365 退役，逐条登记于 **§2.2.11**）。**计数同步**：REQ-FUNC **53/53 → 58/58**、NFR **21 → 22**。**红线（强制）**：提示词域**不再有非项目域载体**（代码内置兜底层退役）；「生效提示词恒非空」由**可达 fail-closed 判据**（`prompt_missing`）保证；**C-IB-45 两条不变式仍为类型层事实**。**生效口径未变**：保存 + 服务重启重装配（ADR-32 / C-IB-40 / OOS-16），不引运行期热重载、**不重编译编排图**。**凭据纪律**：全文**只登记键名 / 表名 / 文件名 / 字段名 / 头名**；回填迁移**不含任何凭据**；**登记：创建期落盘与回填迁移须用户手工执行 + 先备份 + 失败回滚**（C-IB-38 / C-IB-52）。增补位置：§2.2.11 REV-20 IFC 索引、§3 的 MOD-IB-02 / 16 / 23 增补、§4.2.10 无环性再声明。需求侧文档只读；未修改 FreeArk 任何文件；未写入任何口令 / Key / token / 证书字面量。
     </rev>
+    <rev no="REV-21" date="2026-10-17" by="system-architect" invocation_id="INV-GROUP_B-INTELBASE-016" basis="GROUP_A REV-21 裁决收尾（OQ-IB-49 ~ OQ-IB-56 全部采纳推荐默认 A；结论见 requirements_spec.md §2.14.4 / C-IB-56 / DR-26；GR-A-013 条件已闭合）；上游 architecture_design.md 1.13.0（REV-21），对应 ADR-52 / §2.0.12">
+      **不新增模块、不新增端口、不新增依赖边**（模块数仍 **26**，**端口数仍 19（未新增）**，**§4.1 依赖边清单逐行未改（零新增边）**，DAG 无环，§4.2.11 再声明）：**编排图专家节点实显的派生落点 = 显示投影层展开**（ADR-52）。① **IFC-IB-393（新增）** —— `definition_derived_summary(view)` 的**专家节点展开**：保留既有 5 键（`capability_digest` / `expert_names` / `nodes` / `conditional_edges` / `edges`，**键名不变**），`nodes` / `conditional_edges` / `edges` 的**取值**按 ADR-52 决定 1 ~ 6 逐专家展开（**单条件边保留**、`branch_map` 由 `("expert","expert")` 改为逐专家 `(name, name)` + `("general","general")`；普通边 `expert→gate` 展开为逐专家 `name→gate`；`START→route` / `gate→aggregate` / `general→aggregate` / `aggregate→END` 保留），**新增** `experts: [{name, cn_label, is_default}]`；**纯函数、只读**（输入 = 既有派生结果 `DerivedView.experts` / `DerivedView.graph_config`；**不改任何真源、不新增写入口、不新增端点**），落点 **MOD-IB-23**。② **IFC-IB-394（新增）** —— 前端 `ConfigPage.vue` 的**专家节点渲染契约**：节点 `id` = 专家 `name`；标签 = `cn_label`（次级显示 `name`）；默认专家显示标记、**不显示**工具授权摘要；专家节点与结构节点 / 合成端点（`route` / `general` / `gate` / `aggregate` / `START` / `END`）在**视觉 / 图例**上可区分；**仍只读**（`nodes-draggable=false` / `nodes-connectable=false`，无运行期改图入口）；沿用既有分层布局，落点 **MOD-IB-24**（对 IFC-IB-296 的**加成式扩展**，其文本不改）。新增 IFC 编号 **393 ~ 394**（2 条，全部类型化、零第三方依赖；**IFC-IB-285 仍预留未分配**；既有重号 IFC-IB-131 **登记不修**）。**既有 `IFC-IB-001 ~ 392` 的号 / 名 / 签名一字不动**（本轮**无任何文字口径修订**、**无退役**）。**计数同步**：REQ-FUNC **58/58 → 63/63**（新增 IB-59 ~ IB-63；并**补登** REV-20 的 IB-54 ~ IB-58 矩阵行，见 §9.1）、NFR **22 → 23**（新增 NFR-23；并**补登** REV-20 的 NFR-22 矩阵行，见 §9.2）。**红线（强制）**：**运行期 LangGraph 编排拓扑零改动**（`src/ib/orchestration/__init__.py` **不在本轮范围**；C-IB-54）；**定义文档 `orchestration` schema 零改动**（`doc.orchestration.nodes` 仍含单一结构节点 `expert`；C-IB-56②）；**专家节点来源 = 定义文档专家集合（不得引入第二真源）**（C-IB-55）；**零数据迁移**（OQ-IB-55=A）；**编排图仍只读**（C-IB-54 / OOS-24；**不为运行期执行轨迹 / 运行期编辑节点设计任何能力**）。**生效口径未变**：**保存 + 服务重启重装配**（ADR-32 / C-IB-40 / OOS-16），**不引运行期热重载**、**不重编译编排图**。**凭据纪律**：全文**只登记键名 / 表名 / 文件名 / 字段名 / 头名 / 端点路径**；**未写入任何口令 / Key / token / 证书字面量**。**补登（一致性，非本轮新增结论）**：§2.2.11 自 REV-20 起引用的「§4.2.10 无环性再声明」与 §9.1 / §9.2 的 REV-20 矩阵行（IB-54 ~ IB-58 / NFR-22）本轮一并补齐（见 §4.2.10 / §9.1 / §9.2），**不改变 REV-20 的任何结论**。增补位置：§2.2.12 REV-21 IFC 索引、§3 的 MOD-IB-23 / MOD-IB-24 增补、§4.2.10（REV-20 补登）与 §4.2.11（REV-21）无环性再声明、§9.1 / §9.2 覆盖行与计数同步、§11 REV-21 自检。需求侧文档只读；未修改 FreeArk 任何文件。
+    </rev>
   </revision_history>
   <inputs>
-    <input path="docs/requirements_spec.md" version="1.12.0" revision="REV-20" status="APPROVED"/>
-    <input path="docs/user_stories.md" version="1.12.0" revision="REV-20" status="APPROVED"/>
-    <input path="docs/architecture_design.md" version="1.12.0" revision="REV-20" status="DRAFT_FOR_GATE_REVIEW"/>
+    <input path="docs/requirements_spec.md" version="1.13.0" revision="REV-21" status="APPROVED"/>
+    <input path="docs/user_stories.md" version="1.13.0" revision="REV-21" status="APPROVED"/>
+    <input path="docs/architecture_design.md" version="1.13.0" revision="REV-21" status="DRAFT_FOR_GATE_REVIEW"/>
     <readonly_reference path="FreeArk 仓库" note="只读参考；未修改任何文件"/>
     <input path="docs/ib_embed_service_contract.md" version="1.0.0" revision="R2" status="DRAFT_FOR_GATE_REVIEW" note="MOD-IB-26 契约唯一落点；本文件 §3 MOD-IB-26 为摘要视图，冲突时以其为准"/>
   </inputs>
@@ -69,7 +72,7 @@
 
 # 模块详细设计 — intelligentbase
 
-**版本**: 1.12.0 (REV-20) | **状态**: DRAFT_FOR_GATE_REVIEW | **日期**: 2026-10-17
+**版本**: 1.13.0 (REV-21) | **状态**: DRAFT_FOR_GATE_REVIEW | **日期**: 2026-10-17
 **R7 性质**: 本修订为**追加式增量**（GROUP_A REV-06 裁决：诉求③「UI 可视化配置」纳入 v1，新增 REQ-FUNC-IB-25 / IB-26 / IB-27），**只追加、不改写**：**不新增模块、不新增依赖边**。定义文档的**数据层**（装载 `IFC-IB-288` / 完备性校验 `IFC-IB-290` / 原子写回 `IFC-IB-289` / 装配期派生 `IFC-IB-291` / 白名单 `IFC-IB-292` / 新增键名 `IFC-IB-297`）并入 **MOD-IB-02**；契约（端口 + 数据结构）并入 **MOD-IB-01**；可视化端点与**装配期准入闸门**（`IFC-IB-293~295`）并入 **MOD-IB-23**；可视化视图约束（`IFC-IB-296`）并入 **MOD-IB-24**。新增 `IFC-IB-287 ~ 297`（**IFC-IB-285 仍预留未分配**）。既有 MOD-IB-01~26、`IFC-IB-001~286`、13 个既有端口名、§4.1 依赖边清单与 DAG 拓扑**一字不动**（零新增边的再声明见 §4.2.2）。**REV-07-6 施工前置判定 = (a) 可登记的前置条件 / 风险，本轮继续**（见 §9.5；另见 `architecture_design.md` [ARCH-ASSUMPTION-A7]）。
 
 **R8 性质**: 本修订为**追加式增量**（GROUP_A REV-11-1：REQ-FUNC-IB-20「流式输出契约与会话生命周期」补入 US-IB-19 / US-IB-20 与 11 组 AC 后的**设计覆盖闭环**），**只追加、不改写**：**不新增模块、不新增端口、不新增依赖边**。会话状态（`SessionState` / `SessionTurn`）、持久化策略枚举、完成产物（`CompletionPayload` / `CitationItem`）与确认中间态（`ConfirmationPrompt` / `ConfirmationDecision` / `ConfirmationGateState`）的类型化契约并入 **MOD-IB-01**（`IFC-IB-298~301`，其中 **IFC-IB-298 补齐 `IFC-IB-221/222` 的既有悬置引用，不改其签名文本**）；键名登记与值域显式化并入 **MOD-IB-02**（`IFC-IB-304`）；流式终态单发与可见性判据并入 **MOD-IB-21**（`IFC-IB-302/303`）；恢复判定与确认门装配语义并入 **MOD-IB-22**（`IFC-IB-305/306`，其中 **IFC-IB-305 类型化 `IFC-IB-233` 的 `payload: dict`，不改其签名文本**）；会话恢复端点与 fail-closed 准入并入 **MOD-IB-23**（`IFC-IB-307`）；确认中间态的呈递与决策回传渲染约束并入 **MOD-IB-24**（`IFC-IB-308`）。新增 `IFC-IB-298 ~ 308`（**IFC-IB-285 仍预留未分配**）。既有 MOD-IB-01~26、`IFC-IB-001~297`、14 个端口名、§4.1 依赖边清单与 DAG 拓扑**一字不动**（零新增边的再声明见 §4.2.3）。**OQ-IB-07 / OQ-IB-08 保持开放**（架构默认取值见 `architecture_design.md` §10.1 R8 行与 ADR-17）。
@@ -465,6 +468,18 @@
 | IFC-IB-379 / 380 / 381 | `ExpertRegistryView` / `resolve_expert_registry` / `builtin_default_registry`（+ `builtin_expert_registry`）：`builtin_expert_registry()` 语义澄清为**与内置默认单例同值**（唯一 kb-agent）；`DEMO_EXPERT_NAMES` **退役**；**号 / 名 / 签名一字不变** | MOD-IB-16 | **口径修订** |
 | IFC-IB-385 | `seed_project`：**删除 demo 分支**（种子一律 = 唯一 kb-agent）；提示词落盘子步见 IFC-IB-390 | MOD-IB-23 | **口径修订**（号 / 名不变） |
 | IFC-IB-339 | `ExpertPromptStore` 端口：**方法集 / 签名不变**；`InMemoryExpertPromptStore` 由**种子内容预填**（离线 / 内存态） | MOD-IB-02 | **口径补注** |
+
+### 2.2.12 REV-21 新增 IFC 索引（IFC-IB-393 ~ 394）与文字修订 / 退役索引
+
+> 触发：REQ-FUNC-IB-59 ~ IB-63 / REQ-NFR-IB-23；用户裁决 OQ-IB-49 ~ OQ-IB-56 **全部采纳推荐默认 A**（`requirements_spec.md` §2.14.4）；约束 C-IB-54 / C-IB-55 / C-IB-56 / OOS-24。承接：**ADR-52**（编排图专家节点实显的派生落点 = 显示投影层展开）。
+> **不新增模块、不新增端口、不新增依赖边**：模块数 **26**、端口数 **19**、`§4.1 依赖边清单` **逐行不变**（见 §4.2.11）。
+
+| IFC | 名称 / 内容 | 落点 | 变更类型 |
+|-----|-------------|------|----------|
+| **IFC-IB-393** | `definition_derived_summary(view: DerivedView) -> dict` 的**显示投影扩展** —— 保留既有 5 键（`capability_digest` / `expert_names` / `nodes` / `conditional_edges` / `edges`，**键名不变**），其 `nodes` / `conditional_edges` / `edges` 的**取值**按 ADR-52 决定 1 ~ 6 **逐专家展开**（① `nodes` = 结构节点 + 逐专家 `name`；② 条件边**仍为单条**，`branch_map` 由 `("expert","expert")` 改为逐专家 `(name, name)` + `("general","general")`；③ 普通边 `expert → gate` 展开为逐专家 `name → gate`，`START→route` / `gate→aggregate` / `general→aggregate` / `aggregate→END` 保留；④ 专家节点 `id` = 专家 `name`，与结构节点名 / 合成端点名冲突即**装配期错误**），并**新增** `experts: [{name: str, cn_label: str, is_default: bool}]`（默认专家标记来源 = 定义文档专家集合的 `is_default`；**不含**工具授权摘要）。**纯函数、只读**：输入 = **既有派生结果**（`DerivedView.experts` + `DerivedView.graph_config`），**不改任何真源、不新增写入口、不新增端点**（C-IB-55） | MOD-IB-23 | **新增**（对 `definition_derived_summary` 的**口径扩展**；函数名 / 位置不变；`GET /api/config/definition`（IFC-IB-294）号 / 名 / 签名 / 状态码 / fail-closed 语义一字不动） |
+| **IFC-IB-394** | 前端 `ConfigPage.vue` 的**专家节点渲染契约** —— 节点 `id` = 专家 `name`；标签 = `cn_label`（**次级显示** `name` 以便核对，AC-IB-51-04）；**默认专家**显示标记、**不显示**工具授权摘要；专家节点与结构节点 / 合成端点（`route` / `general` / `gate` / `aggregate` / `START` / `END`）在**视觉 / 图例**上**可区分**（AC-IB-53-02）；**仍只读**（`:nodes-draggable="false"` / `:nodes-connectable="false"`，**无**运行期增删节点 / 拖拽连线入口，AC-IB-52-03）；**沿用既有分层布局**（专家层按专家数横排 n 个节点；换行 / 阈值属**前端实现边界**，REQ-NFR-IB-23 / [TBD-T31]） | MOD-IB-24 | **新增**（对 IFC-IB-296 的**加成式扩展**；**其文本不改**） |
+| 文字修订 | **无** —— 本轮**无任何既有 IFC 的文字 / 取值口径修订**（`IFC-IB-001 ~ 392` 号 / 名 / 签名一字不动） | — | — |
+| 退役 | **无** | — | — |
 
 ## 3. 模块详情
 
@@ -913,7 +928,7 @@
 ### MOD-IB-23 HTTP API 与组合根 (L5)
 
 - **职责**: **唯一装配点**；REST + SSE 端点；鉴权注入与 `project_id` 解析（不信请求体）；健康检查。
-- **覆盖需求**: REQ-FUNC-IB-05、IB-06、IB-09、IB-17、IB-21、IB-23、**IB-25 / IB-27（R7 新增：定义文档的读写端点与装配期准入闸门）**、**IB-20（R8 新增：会话恢复端点与 fail-closed 准入；US-IB-20 / AC-IB-20-04 ~ 20-06）**；**REQ-FUNC-IB-28 ~ IB-33（R13 新增：登录/登出/主体查询/改密/续期、账户 CRUD、内置会话令牌解析与可注入策略模块、fail-closed 装配；见 IFC-IB-316~326）**；REQ-NFR-IB-15、IB-16；**REQ-NFR-IB-19（REV-16-4，辅：审计查询端点、内存态端点与保存路径审计挂钩，见 IFC-IB-359 / 360 / 362）**；**REQ-FUNC-IB-51 / IB-52（REV-19，主：知识问答项目闭环 + 新项目默认种子，见 IFC-IB-385）**
+- **覆盖需求**: REQ-FUNC-IB-05、IB-06、IB-09、IB-17、IB-21、IB-23、**IB-25 / IB-27（R7 新增：定义文档的读写端点与装配期准入闸门）**、**IB-20（R8 新增：会话恢复端点与 fail-closed 准入；US-IB-20 / AC-IB-20-04 ~ 20-06）**；**REQ-FUNC-IB-28 ~ IB-33（R13 新增：登录/登出/主体查询/改密/续期、账户 CRUD、内置会话令牌解析与可注入策略模块、fail-closed 装配；见 IFC-IB-316~326）**；REQ-NFR-IB-15、IB-16；**REQ-NFR-IB-19（REV-16-4，辅：审计查询端点、内存态端点与保存路径审计挂钩，见 IFC-IB-359 / 360 / 362）**；**REQ-FUNC-IB-51 / IB-52（REV-19，主：知识问答项目闭环 + 新项目默认种子，见 IFC-IB-385）**；**REQ-FUNC-IB-59 / IB-61 / IB-62（REV-21，辅：显示投影层的专家节点展开与单条件边分支目标，见 IFC-IB-393）**
 - **公开接口契约（HTTP 契约）**:
   - IFC-IB-241: `build_application(deps: CompositionRoot) -> WSGIApplication`（**组合根**：装配全部适配器与替身，见 §5；**R1**：返回类型由 v1.0.0 的 `ASGIApp` 改为 `WSGIApplication`，装配语义不变）
   - IFC-IB-242: `POST /api/files`（multipart）→ `201 DocumentRecord`；`400` 校验失败；`403` 归属断言失败；`5xx` **fail-closed**（台账/Blob 不可用）
@@ -992,10 +1007,16 @@
 - `admit_two_domains` / `build_prompt_stores`：**删 `builtin_fallbacks` 传递链**（`builtin_fallbacks_of` 退役）；`build_prompt_stores` 的**离线 / 内存态分支**改为**用种子内容预填**构造 `InMemoryExpertPromptStore`。
 - **不变**：组合根**单一装配点**（`build_deps`）、每项目编排器缓存、`reload_projects` 的工件收敛（prompt_stores / definitions / derived_views）、ADR-16 / ADR-32 / ADR-33 的准入与生效口径。
 
+**REV-21 增量**（IFC-IB-393 新增；ADR-52）：
+
+- `definition_derived_summary(view)`（MOD-IB-23 的**显示投影层**，`src/ibweb/serializers.py`）的**专家节点展开**：保留既有 5 键（`capability_digest` / `expert_names` / `nodes` / `conditional_edges` / `edges`，**键名不变**），其 `nodes` / `conditional_edges` / `edges` 的**取值**逐专家展开（ADR-52 决定 1 ~ 6），并**新增** `experts: [{name, cn_label, is_default}]`。
+- **纯函数、只读**：输入 = **既有派生结果**（`DerivedView.experts` + `DerivedView.graph_config`，即 `derive(doc)` 的产出），**不改真源、不新增写入口、不新增端点**（C-IB-55）。`GET /api/config/definition`（IFC-IB-294）的**号 / 名 / 签名 / 状态码 / fail-closed 语义一字不动**（仅其 `derived` 载荷**取值**按上展开）。
+- **不变（强制）**：组合根**单一装配点**（`build_deps`）、每项目编排器缓存、R7 / R8 / R13 / R14 / REV-16-2 / REV-16-4 / REV-18 / REV-19 / REV-20 的**装配序列与准入顺序**；**运行期编排拓扑零改动**（`src/ib/orchestration/__init__.py` **不在本轮范围**；C-IB-54）；**定义文档 `orchestration` schema 零改动**（C-IB-56②）。
+
 ### MOD-IB-24 Web 前端 (L5)
 
 - **职责**: 上传/列表/删除/重试/重建页 + 问答页 + **可视化配置页（R7）**；仅通过类型化 HTTP/SSE 契约与后端交互。
-- **覆盖需求**: REQ-FUNC-IB-09、IB-17、**IB-25（主）、IB-26（并列主，与 MOD-IB-22）、IB-27（辅）**；**IB-20（R8 新增：问答页对确认中间态与恢复的呈递、流式交付渲染；US-IB-20 / AC-IB-20-04、US-IB-19 / AC-IB-19-01、AC-IB-19-03）**；**REQ-FUNC-IB-34、IB-35（R13 新增：商用化界面重构、登录页与首登改密、运维控制台、暗/亮主题、中文优先）**、**REQ-FUNC-IB-28（R13 主：登录页取代粘贴令牌入口）**；REQ-NFR-IB-17；**REQ-NFR-IB-19（REV-16-4，辅：配置页内存态非静默提示，见 IFC-IB-363）**；**REQ-FUNC-IB-50 / IB-51（REV-19，主：配置页项目域切换 / 加载 + 知识问答项目闭环，见 IFC-IB-387）**
+- **覆盖需求**: REQ-FUNC-IB-09、IB-17、**IB-25（主）、IB-26（并列主，与 MOD-IB-22）、IB-27（辅）**；**IB-20（R8 新增：问答页对确认中间态与恢复的呈递、流式交付渲染；US-IB-20 / AC-IB-20-04、US-IB-19 / AC-IB-19-01、AC-IB-19-03）**；**REQ-FUNC-IB-34、IB-35（R13 新增：商用化界面重构、登录页与首登改密、运维控制台、暗/亮主题、中文优先）**、**REQ-FUNC-IB-28（R13 主：登录页取代粘贴令牌入口）**；REQ-NFR-IB-17；**REQ-NFR-IB-19（REV-16-4，辅：配置页内存态非静默提示，见 IFC-IB-363）**；**REQ-FUNC-IB-50 / IB-51（REV-19，主：配置页项目域切换 / 加载 + 知识问答项目闭环，见 IFC-IB-387）**；**REQ-FUNC-IB-59 ~ IB-63（REV-21，主：编排图专家节点的只读渲染、标识与可区分性，见 IFC-IB-394）**、**REQ-NFR-IB-23（REV-21）**
 - **公开接口契约（TS 类型与后端契约一一对应）**:
   - IFC-IB-256: `UploadPage`（消费 242/243/244/245）
   - IFC-IB-257: `ChatPage`（消费 247；渲染 `content`/`degraded`；`degraded` 时展示「当前未接入知识资料库」）
@@ -1056,6 +1077,13 @@
   - **路由**：`vue-router`（hash）**新增父级节点**「系统管理」，既有账户管理 hash **迁移**（**不引入 nginx `try_files` 回退**，ADR-23 精神）。
   - **凭据不回显 / 视图侧零持久化**：沿用 IFC-IB-296 / IFC-IB-354 / IFC-IB-363 口径 —— 只显示**键名 / 状态**，不显示任何值 / 掩码 / 前缀；**不得**以 `localStorage` / `IndexedDB` / 独立后端表充当真源。
   - **IFC-IB-387（REV-19 新增；REQ-FUNC-IB-50 / IB-51）**: **前端项目域切换 / 加载 + 知识问答项目闭环**：配置页与知识问答页**复用**既有 `projectContext` store（IFC-IB-335）与 `client.ts` 单一注入点（IFC-IB-334）的项目域切换；切换后配置页 `GET /api/config/definition`（IFC-IB-295 系列）**按当前项目域加载**、编辑**只写当前项目**；知识问答页提问**绑定当前项目域**（`X-IB-Project`），答案引用 / 检索范围限于该项目（**非 demo 项目不出现三专家的知识 / 历史**）。**授权与失败语义为服务端裁决**：未选项目 → 前端**不发送** `X-IB-Project` → 服务端 **fail-closed**（同 ADR-28）；项目闭环**不是**前端过滤，而是服务端 `Scope(project_id=…)` + `orchestrator_for` **fail-closed** 的既有事实。**不引入**任何“即时跨项目生效”暗示（生效口径 = 保存 + 服务重启重装配）。
+
+**REV-21 增量**（IFC-IB-394 新增；ADR-52）：
+
+- **编排图（只读）的专家节点渲染契约（IFC-IB-394）**：节点 `id` = 专家 `name`（取值来自信封 `derived.experts` / `derived.nodes`）；**标签 = `cn_label`**（**次级显示 `name`**，例如悬浮 / 图例，供核对，AC-IB-51-04）；**默认专家**（`is_default`）显示标记；**不显示**工具授权摘要（OQ-IB-53=A）。
+- **专家节点与结构节点可区分**：`route` / `general` / `gate` / `aggregate`（及合成端点 `START` / `END`）保留，与专家节点在**视觉 / 图例**上可区分（AC-IB-53-02）；**沿用既有分层布局**（`layeredPositions`，专家层按专家数横排 n 个节点）；n 较大时的换行 / 滚动 / 折叠阈值属**前端实现边界**（REQ-NFR-IB-23；[TBD-T31]，与 [TBD-T20] 同源）。
+- **仍只读（强制）**：`:nodes-draggable="false"` / `:nodes-connectable="false"`；**无**运行期增删节点 / 拖拽连线 / 改图入口（AC-IB-52-03；C-IB-54 / OOS-24 / ADR-14 强制约束③）。**不**为「运行期执行轨迹可视化」（节点活动态 / 实时高亮）设计任何能力（OOS-24）。
+- **沿用 IFC-IB-296 的全部口径（其文本不改）**：视图侧零持久化 / 白名单制 / 以文档为准刷新 / 凭据不回显 / 无 CDN 与外发请求；**服务端（显示投影层 IFC-IB-393）为专家节点集合的唯一裁决者**，前端**不做**专家集合的最终判定。
 
 ### MOD-IB-25 部署运维 (L5)
 
@@ -1274,6 +1302,27 @@ L0  MOD-IB-01  02  03  04
 - **单一入口纪律未被绕开**：专家集仍**只**经装配期 `resolve_expert_registry` 派生并**构造注入**（上层 MOD-IB-17 / 19 / 22 **不得**各自解析）；定义文档仍**只**经 `DefinitionDocumentStore` 端口读写；前端仍**只**经 HTTP/SSE 契约取数（**不新增任何绕过路径**）。
 - 因此「编号即拓扑序」继续适用于 GROUP_C；REV-19 的**边界纪律同 §4.2.2 末句**：新增工件若被低编号模块（尤其组合根）依赖，**不得新开编号更高的模块**。
 
+### 4.2.10 REV-20 无环性再声明（零新增依赖边；**本轮补登**）
+
+> **补登说明**：本小节为 **REV-20** 的无环性再声明。自 REV-20 起 `§2.2.11` 与 `architecture_design.md` §2.0.11 即引用「见 §4.2.10」，但该节点此前**未落盘**（`§4.2.9` 之后直接进入 §5）。REV-21 仅**补齐该引用**，**不改变 REV-20 的任何结论**（REV-20 的 §4.1 依赖边本已逐行未改）。
+
+**结论：DAG 拓扑在 REV-20 下不变，无环证明（§4.2）继续成立。**
+
+- **零新增依赖边**：REV-20 的全部新增落在 **MOD-IB-02**（提示词两层化 / `kb_agent_seed_prompt`）/ **MOD-IB-16**（三专家机制退役）/ **MOD-IB-23**（创建期落盘与回填迁移）/ **MOD-IB-25**（部署检查清单 B26）**内部**；**§4.1 依赖边清单逐行未改** ⇒ `w(MOD-IB-n) = n` 严格递减的构造性证明**不受影响**。
+- **不新增模块 / 端口**：提示词装载与创建期播种**必然被组合根（MOD-IB-23）调用**，故并入既有模块（§4.2.2 边界纪律继续适用）。
+- 因此「编号即拓扑序」继续适用于 GROUP_C。
+
+### 4.2.11 REV-21 无环性再声明（零新增依赖边）
+
+**结论：DAG 拓扑在 REV-21 下不变，无环证明（§4.2）继续成立。**
+
+- **零新增依赖边**：REV-21 的全部新增落在 **MOD-IB-23**（显示投影层 `definition_derived_summary` 的专家节点展开，IFC-IB-393）与 **MOD-IB-24**（`ConfigPage.vue` 专家节点渲染契约，IFC-IB-394）**内部**；**§4.1 依赖边清单逐行未改** ⇒ `w(MOD-IB-n) = n` 严格递减的构造性证明**不受影响**。
+- **不新增模块**：显示投影**必然由 MOD-IB-23（组合根 / HTTP 层）承载并被前端消费**；若新开模块只能取 **≥27** 的编号，会产生 `23 → 27` 的边，**违反 `w(A) > w(B)`**；故并入既有模块（§4.2.2 边界纪律继续适用）。
+- **既有边被复用而非新增**：`definition_derived_summary` 在 **MOD-IB-23**（复用既有边 `23 → 01 / 02`）；`ConfigPage.vue` 在 **MOD-IB-24**（复用既有边 `24 → 23`，前端仍**只**经 HTTP 契约取数）。**均零新增边**。
+- **不新增端口 / 真源**：显示投影**只消费**既有派生结果（`DerivedView.experts` / `DerivedView.graph_config`），**不新增端口、不新增写入口、不新增真源**（C-IB-55）。
+- **运行期编排拓扑与文档 schema 零改动**：`src/ib/orchestration/__init__.py` **不在本轮范围**（C-IB-54）；`doc.orchestration` 结构未变（C-IB-56②）⇒ 图编译输入与「拓扑不可编辑」口径（REQ-FUNC-IB-26 ②）不变；「文档边 ↔ 运行期边一致」守卫（`tests/unit/test_orchestration_edges_consistency.py`）**因文档边未变而不受影响**。
+- 因此「编号即拓扑序」继续适用于 GROUP_C；REV-21 的**边界纪律同 §4.2.2 末句**。
+
 ---
 
 ## 5. 组合根装配表（MOD-IB-23）
@@ -1473,7 +1522,7 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 
 ## 9. REQ → MOD 覆盖率矩阵
 
-### 9.1 功能需求（REQ-FUNC-IB-01 ~ IB-53，**53/53 全覆盖**；REV-19 同步计数）
+### 9.1 功能需求（REQ-FUNC-IB-01 ~ IB-63，**63/63 全覆盖**；REV-21 同步计数）
 
 | REQ | 需求要点（摘要） | 覆盖模块（主 / 辅） |
 |-----|------------------|---------------------|
@@ -1530,12 +1579,22 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 | IB-51 | **知识问答项目闭环**（提问 / 引用 / 检索范围限于当前项目域） | **MOD-IB-23** / 19, 16, 21, 24（ADR-43 / ADR-47） |
 | IB-52 | **新项目默认种子**（1 个 KB 问答 agent + 1 个默认编排流） | **MOD-IB-23** / 02, 16, 01（ADR-45；IFC-IB-385） |
 | IB-53 | **三专家属 `demo`**（非 demo 隐藏；由种子差异保证） | **MOD-IB-16** / 23, 02, 24（ADR-45；IFC-IB-379 / 381） |
+| IB-54 | **内置默认 kb-agent 的提示词按项目目录落盘**（创建期） | **MOD-IB-23** / 02, 25（ADR-51 / ADR-49；IFC-IB-389 / 390）【**REV-20 补登**】 |
+| IB-55 | **新建项目 kb-agent 生效提示词来源可核验**（不静默回退） | **MOD-IB-02, MOD-IB-23** / 16（ADR-48；IFC-IB-392）【**REV-20 补登**】 |
+| IB-56 | **内置 kb-agent 提示词内容要求**（按 agent-builder 评审意见优化） | **MOD-IB-02** / 24（ADR-49；IFC-IB-389）【**REV-20 补登**】 |
+| IB-57 | **取消「默认三专家」机制**（任何新建项目默认集 = 唯一通用 kb-agent） | **MOD-IB-16** / 23, 02（ADR-50；IFC-IB-381）【**REV-20 补登**】 |
+| IB-58 | **默认 kb-agent 的通用性**（无 FreeArk 专有语义） | **MOD-IB-16, MOD-IB-02** / 24（ADR-50 / ADR-49）【**REV-20 补登**】 |
+| IB-59 | **编排图逐专家成节点**（按项目专家集合，不以单一 `expert` 占位代替） | **MOD-IB-23, MOD-IB-24** / 01, 02（ADR-52；IFC-IB-393 / 394；**REV-21 新增**） |
+| IB-60 | **专家节点标识取自定义文档专家集合**（`cn_label` 为主 + `name` 次级；默认标记显示、工具摘要不显示） | **MOD-IB-24** / 23, 01（ADR-52；IFC-IB-394） |
+| IB-61 | **专家节点来源 = 定义文档（单一真源）且随集合变更而变化** | **MOD-IB-16, MOD-IB-23** / 02, 24（ADR-52 / ADR-43 / ADR-32；IFC-IB-393） |
+| IB-62 | **「路由 → 各专家」边语义与运行期并行分派一致**（保持单条件边、分支目标改为各专家 + `general`） | **MOD-IB-22, MOD-IB-23** / 19, 17（ADR-52；IFC-IB-393） |
+| IB-63 | **非专家支路与基础设施节点保留且与专家节点可区分** | **MOD-IB-24** / 23, 22（ADR-52；IFC-IB-394） |
 
-**无缺口**：**53 条 REQ-FUNC**（REV-19 同步计数；沿革：R1 / R2 基线 24、R7 27、R13 36、REV-16-2 42、REV-18 48）每条至少一个「主」模块，且每条均可被至少一个 AC 验证（REV-18 新增 IB-43 ~ IB-48 六行见上；AC 落点以 GROUP_A 包 §2 为权威，本矩阵的 AC 配对标 [INFERRED]）。
+**无缺口**：**63 条 REQ-FUNC**（REV-21 同步计数；沿革：R1 / R2 基线 24、R7 27、R13 36、REV-16-2 42、REV-18 48、REV-19 53、**REV-20 58**）每条至少一个「主」模块，且每条均可被至少一个 AC 验证（**REV-21 新增 IB-59 ~ IB-63 五行** + **REV-20 补登 IB-54 ~ IB-58 五行**；AC 落点以 GROUP_A 包 §2 为权威，本矩阵的 AC 配对标 [INFERRED]）。
 
 **（R8）REQ-FUNC-IB-20 的设计覆盖闭环**：需求侧补入 **US-IB-19**（流式交付最终答复；AC-IB-19-01 ~ 05）与 **US-IB-20**（会话生命周期；AC-IB-20-01 ~ 06）后，本需求的设计覆盖由「仅登记 REQ 与模块归属」升级为「**US / AC → ADR / IFC 逐条可追溯**」（见 §9.6 的逐 AC 映射表）：`ADR-17`（承载方式与状态丢失语义）+ `IFC-IB-298 ~ 308`（11 条类型化契约）+ §7.3 / §7.4 / §8 的相应补充。**本轮不重写既有设计**（`IFC-IB-221 ~ 225` / `IFC-IB-231 ~ 233` / `IFC-IB-247` 一字不动）。
 
-### 9.2 非功能需求（REQ-NFR-IB-01 ~ IB-21）
+### 9.2 非功能需求（REQ-NFR-IB-01 ~ IB-23）
 
 | REQ | 需求要点 | 覆盖模块（主 / 辅） |
 |-----|----------|---------------------|
@@ -1560,6 +1619,8 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
 | NFR-19 | 可视化配置的一致性 / 可观测 / **fail-safe**（提示词与工具授权） | **MOD-IB-02, MOD-IB-23** / 01, 16, 24 |
 | NFR-20 | **LLM Key 存储与呈现纪律**（载体 = DB；库文件 **0660** 且属主对齐服务账号；`.env` 仅非 LLM Key 密钥；**不回显明文 / 掩码不含明文前后缀**） | **MOD-IB-11, MOD-IB-23** / 01, 02, 25（ADR-38；C-IB-42） |
 | NFR-21 | **专家域 fail-closed 与可观测**（未登记项目 / 默认专家缺失或非唯一 → fail-closed + 结构化日志） | **MOD-IB-16** / 23, 04（ADR-47；IFC-IB-380） |
+| NFR-22 | **提示词取值链可观测且不静默**（生效来源层可判定；回落可见） | **MOD-IB-02, MOD-IB-23** / 16, 04（ADR-48；IFC-IB-392）【**REV-20 补登**】 |
+| NFR-23 | **编排图在 n 专家规模下的渲染完整性与可读性**（不漏不重叠、不因 n 增长退化；专家节点数恒与集合一致） | **MOD-IB-24** / 23, 22（ADR-52；IFC-IB-394；**REV-21 新增**） |
 
 **R7 说明（NFR 覆盖不变）**：R7 **不新增 NFR 条目**，14 条 NFR 的主 / 辅归属**一行未改**。新增结构对 NFR 的作用为**既有条目的加固**：`DefinitionDocumentStore`（IFC-IB-287）服务 **NFR-11（可维护性 / 模块边界）**；`validate` / `derive`（IFC-IB-290 / 291）为纯函数 + 替身齐备，服务 **NFR-14（可测试性）**；装配期闸门服务 **NFR-02（可配置性）**；「数据不出本地 + 前端禁止 CDN」服务 **NFR-08**。
 
@@ -1808,3 +1869,16 @@ plan_rebuild → [建新 collection ib_<pid>_v<new>] → step_rebuild（循环�
       - **编号纪律未破**：`IFC-IB-001 ~ 377` 的号 / 名 / 签名**一字不动**（**仅 5 组文字与取值口径修订**，登记于 §2.2.10）；新增 378 ~ 388 为**纯追加**；**`IFC-IB-285` 仍预留未分配**；既有重号 `IFC-IB-131` **登记不修**（残余项 R-9）。
       - **类型化未降级**：新增 `IFC-IB-378 ~ 388`（11 条）全部为 `name: type` + 可空性的**类型化契约**，均为 **frozen dataclass / Protocol / 纯 stdlib、零第三方依赖**；`backup_path` 仅登记路径字符串，**不含任何凭据**。
       - **边界合规**：REV-19 增量**不含实现代码**（无函数体、无伪代码）；**未修改 FreeArk 任何文件**（全程只读）；需求侧文档（`requirements_spec.md` v1.11.0 / `user_stories.md` v1.11.0）**只读未改**；`implementation_plan.md`（GROUP_C）**未改**；`tech_stack.md` **NO_CHANGE**（无新第三方依赖）；**未写入任何口令 / 令牌 / Key / 证书字面量**（只登记键名 / 表名 / 文件名 / 字段名 / 头名）；本阶段**止于 GROUP_B**。
+    - **REV-21 自检（编排图专家节点实显：显示层派生增量）**：
+      - **覆盖同步**：§9.1 由 58/58 同步为 **63/63 REQ-FUNC**（新增 IB-59 ~ IB-63，各有主模块；并**补登** REV-20 的 IB-54 ~ IB-58 五行），§9.2 NFR 由 22 同步为 **23**（NFR-23；并**补登** NFR-22 一行）。
+      - **零新增模块 / 端口 / 依赖边**：模块数仍 **26**、端口数仍 **19**（**未新增**）；**§4.1 依赖边清单逐行未改**；新增工件并入 **MOD-IB-23**（显示投影层，IFC-IB-393）与 **MOD-IB-24**（专家节点渲染契约，IFC-IB-394）（§4.2.11 给出无环性再声明与「为何不新增模块」的编号论证；§4.2.10 为 REV-20 的同名节点**补登**）。
+      - **要求侧口径逐条落点**：OQ-IB-49=A 仅显示层派生（ADR-52 = Option A）→ 运行期拓扑与文档 schema 零改动；OQ-IB-50=A 逐专家成节点 → IFC-IB-393 决定 1；OQ-IB-51=A **保持单条件边**、分支目标改为各专家 + `general` → IFC-IB-393 决定 3；OQ-IB-52=A 不改 schema → 显示投影**不碰** `doc.orchestration`；OQ-IB-53=A `cn_label` 为主 + `name` 次级、显示默认标记、不显示工具摘要 → IFC-IB-393 / 394；OQ-IB-54=A 沿用分层布局（阈值属前端实现边界）→ IFC-IB-394 / [TBD-T31]；OQ-IB-55=A **零迁移** → 无迁移交付物；OQ-IB-56=A **图仍只读** → IFC-IB-394 只读约束。
+      - **单一真源未被破坏（C-IB-55）**：显示投影**只消费**既有派生结果（`DerivedView.experts` / `DerivedView.graph_config`，二者同源于**当前项目域的定义文档**）；**不新增写入口、不新增端点、不新增端口**；**不**读代码内置默认集、**不**另立专家清单。
+      - **运行期编排拓扑零改动（C-IB-54）**：`src/ib/orchestration/__init__.py`（`add_node("expert", _expert)` / `add_conditional_edges("route", _fan_out, ["expert","general"])` / `_fan_out` 的 `Send("expert", …)`）**不在本轮范围**；**定义文档 `orchestration` schema 零改动**（C-IB-56②）⇒ 「文档边 ↔ 运行期边一致」守卫（`tests/unit/test_orchestration_edges_consistency.py`）**不受影响**。
+      - **编号纪律未破**：`IFC-IB-001 ~ 392` 的号 / 名 / 签名 / 字段集**一字不动**（本轮**无文字口径修订、无退役**）；新增 **393 / 394** 为**纯追加**；**`IFC-IB-285` 仍预留未分配**；既有重号 `IFC-IB-131` **登记不修**（残余项 R-9）。
+      - **类型化未降级**：新增 `IFC-IB-393 / 394` 为 `name: type` + 可空性的**类型化契约**，**纯 stdlib、零第三方依赖**；`definition_derived_summary` 保持**纯函数、只读**语义（无实现体）。
+      - **OOS-24 未越权（强制）**：**未**为「运行期执行轨迹可视化」（节点活动态 / 实时高亮）或「运行期编辑图上节点」设计**任何能力**；图仍只读（不可拖拽 / 不可连线 / 无运行期改图入口）。
+      - **生效口径未变**：**保存 + 服务重启重装配**（ADR-32 / C-IB-40 / OOS-16）；**不引运行期热重载**、**不重编译编排图**。
+      - **凭据纪律**：全文**只登记键名 / 表名 / 文件名 / 字段名 / 头名 / 端点路径**；**未写入任何口令 / 令牌 / Key / 证书字面量**；令牌仅经 `Authorization` 头，`?token=` 纪律不变。
+      - **边界合规**：REV-21 增量**不含实现代码**（无函数体、无伪代码）；**未修改 `src/` 与 `tests/` 任何文件**；**未修改 FreeArk 任何文件**（全程只读）；需求侧文档（`requirements_spec.md` v1.13.0 / `user_stories.md` v1.13.0）**只读未改**；`implementation_plan.md`（GROUP_C）**未改**；`tech_stack.md` **NO_CHANGE**（无新第三方依赖）；本阶段**止于 GROUP_B**。
+    - **补登一致性声明**：本轮的 §4.2.10（REV-20 无环性再声明）、§9.1 的 IB-54 ~ IB-58 行与 §9.2 的 NFR-22 行，均为**补齐 REV-20 已声明但未落盘的引用 / 归属**（`§2.2.11` 与 `architecture_design.md` §2.0.11 自 REV-20 起即以「见 §4.2.10」引用之），**不改变 REV-20 的任何结论、不新增任何 IFC / REQ**。

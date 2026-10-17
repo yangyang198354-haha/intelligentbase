@@ -539,10 +539,33 @@
     [ ] 装配期 `prompt_source` 结构化日志可见（`resolved_from ∈ {main_file, fallback_file}`，
         **不含正文**）—— 回落 `fallback_file` 属语义降级，须在日志里**看得见**（IFC-IB-392 / REQ-NFR-IB-22）
 
+[B27] 编排图「专家节点实显」部署后核对（REV-21 / IFC-IB-393 / 394；ADR-52；**无迁移、无不可逆步**）
+    —— 键名 / 步骤名登记（承 B12 / B15~B26 先例；细则见 `deployment_plan.md` §17.5 / §17.7）
+    步骤名：① 后端重启严格断言；② `GET /api/config/definition` 显示投影核对；③ 前端重建 + `dist/` 原子发布（**改前端不重启**）。
+    (1) 后端重启严格断言（**不得**只用 `systemctl is-active` 判定）
+        $ systemctl show -p ActiveState,SubState,NRestarts ib-web
+        $ journalctl -u ib-web --since "<重启时刻>" -g "startup succeeded|ConfigError" --no-pager
+        $ curl -sS -o /dev/null -w '%{http_code}\n' https://<host>/healthz/deps
+        [ ] ActiveState=active **且** SubState=running **且** NRestarts==0
+        [ ] journal 出现 `startup succeeded`；`ConfigError` **零命中**
+        [ ] `/healthz/deps` == 200 **且** `/healthz` == 200
+    (2) 显示投影核对（**本轮核心**；admin 令牌经环境变量注入，**不回显 / 不入日志 / 不入库文件**）
+        $ curl -sS -H "Authorization: Bearer ${IB_ADMIN_TOKEN}" -H "X-IB-Project: <项目>" \
+            https://<host>/api/config/definition
+        [ ] `derived.nodes` **含各专家的 `name`**；**不含**字面量 `expert`（占位节点已逐专家展开）
+        [ ] `derived.experts` **存在**且每项**恰 3 键**（`name` / `cn_label` / `is_default`）
+        [ ] 信封**顶层键未增**（仍 `document` / `derived` / `editable_fields` / `config_key_names`）；`derived` 既有 5 键**键名不变**
+    (3) 前端重建 + `dist/` 原子发布（**改前端不重启服务**）
+        $ cd /opt/intelligentbase/src/frontend && npm ci && npm run build
+        [ ] `npm ci` / `vue-tsc --noEmit` / `vite build` 全 EXIT 0（前端冒烟 `npm test` **40/40**）
+        [ ] 发布 `dist/` 前后 `systemctl show -p ActiveEnterTimestamp ib-web` **不变**（发布未触发重启）
+    说明：R21 **无新 SQL 迁移**（`005` / `006` 仍**未纳入**阶段 2 迁移门，承前结转 —— 见 `deployment_plan.md` §17.2 / `cicd_pipeline.md` §11.3）；**本轮无不可逆步**（代码 / 前端产物均可回退）。
+    !! 真实浏览器**渲染 / 拖拽连线**为 **[NOT_TESTABLE]**（离线无浏览器），须由用户在 UI 复核（`deployment_plan.md` §17.7 AC-R21-C）；「保存并经服务重启后生效」为 **[DEPLOY_REQUIRED]**（AC-R21-D），未实测前**不得给结论**。
+
 ##############################################################################
 # C. 验收签署
 ##############################################################################
 [ ] A1–A8 全部勾选，证据归档（命令原文 + 时间戳）
-[ ] B1–B26 全部勾选，证据归档
+[ ] B1–B27 全部勾选，证据归档
 [ ] 本文件不含任何真实凭据（自检：grep -nE 'sk-|ghp_|BEGIN .*PRIVATE KEY' 本文件应无命中）
 执行人：____________  复核人：____________  日期：____________

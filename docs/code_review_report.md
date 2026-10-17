@@ -2932,3 +2932,67 @@ EXIT=2
 ## 23.8 守约复核
 
 未新增模块（仍 **26**）/ **未新增端口（仍 19）** / 未新增第三方依赖（纯 stdlib）/ 未改模块边界 / **未新增 §4.1 依赖边**（`ib.streaming` 重复三专家字面量以守边界，自检断言兜底）/ 未改既有配置键名与默认值 / `IFC-IB-001~377` 一字不动（仅新增 378~388）/ 未 bump `schema_version` / **不引运行期热重载**（ADR-32）/ **未运行任何生产迁移**（C-IB-46 / C-IB-47 仅脚本 + 清单，用户手工执行）/ **无任何口令 / Key / token / 证书字面量** / 未 `git add` / `commit` / `push` / 部署 / FreeArk 参考仓**只读**。
+
+---
+
+# §24 REV-21 增量自评（编排图「专家节点实显」：IFC-IB-393 / IFC-IB-394；ADR-52 显示投影层展开）
+
+**范围**：本增量**只重评被触及的部分**（MOD-IB-23 的 `ibweb/serializers.py::definition_derived_summary` + `ibweb/views.py::_get_definition_config` 的 1 行位置调整；MOD-IB-24 的 `ConfigPage.vue` 节点标签 / class / 图例 + `api/client.ts` 类型）。§1~§23 为历史记录，未改写。
+**invocation** = **INV-GROUP_C-INTELBASE-024**（按既有编号序列推定；PM 委派未附显式 ID，**待 PM 核对**）。
+**输入**：`architecture_design.md` 1.13.0 / REV-21（ADR-52，L1486 起，Option A 选定）、`module_design.md` 1.13.0 / REV-21（IFC-IB-393 / 394）、`requirements_spec.md` / `user_stories.md` 1.13.0 / REV-21（OQ-IB-49 ~ OQ-IB-56 全采纳默认 A；C-IB-54 / C-IB-55 / C-IB-56；US-IB-51 ~ US-IB-54）。
+
+## 24.1 评审摘要
+
+| 指标 | 值 |
+|------|-----|
+| 本轮改动文件 | **5**（后端 2 / 前端 2 / 测试契约同步 1） |
+| 后端改动行数（净） | 约 **+70**（`serializers.py` 展开函数 + 口径扩展；`views.py` 1 行移入 `try` + 2 行注释） |
+| 前端改动行数（净） | 约 **+50**（`ConfigPage.vue` 元数据派生 / 节点 class / 图例 / 样式；`client.ts` 类型） |
+
+| 维度 | 评分 | 说明 |
+|------|------|------|
+| Correctness（正确性） | **9/10** | 展开规则逐条对齐 ADR-52 决定 1 ~ 6（含冲突**显式报错**、条件边**仍单条**、普通边逐专家镜像、结构节点保留）；7 项直跑证据（§24.3）逐条可复核。扣 1 分：`derived` 与 `doc.orchestration` 的**有意的解释差**只由「1 处契约订正断言 + 本报告」固定，**尚未**有 GROUP_D 正式用例覆盖展开规则本身（属测试工程师职责，登记为 §24.4 遗留）。 |
+| Security（安全性） | **9/10** | 无新增端点 / 无写回路径 / 无第二真源（C-IB-55）；展开不依赖运行期图或 LLM；错误消息只含**专家名 / 节点名**，不含任何配置取值或凭据（回执仍走既有固定文案的 503）。 |
+| Performance（性能） | **9/10** | 纯函数、O(nodes + edges + experts) 单遍；无 I/O、无缓存；每次 GET 一次。 |
+| Maintainability（可维护性） | **9/10** | 规则**收敛在一处**（ADR-52 Option A 的核心收益），常量与规则同文件内；`RESERVED_GRAPH_ENDPOINTS` 复用 `ib.core` 唯一真源而非复制字面量；每条规则在 docstring 内标注 ADR 决定号。 |
+| Test Coverage（可测试性） | **8/10** | 纯函数离线可直接调（本轮以 7 项直跑取证）；**无**新增自动化用例（GROUP_D 职责）。 |
+
+**Finding 统计**：**CRITICAL 0 / MAJOR 0 / MINOR 2**（均为「设计使然 / 待测试侧覆盖」，非阻塞）。
+
+## 24.2 逐条 finding
+
+| Finding ID | 严重级别 | 文件:行号 | 描述 | 状态 |
+|-----------|---------|-----------|------|------|
+| FND-R21-001 | MINOR | `src/ibweb/views.py:866-889` | 「专家名与结构节点 / 合成端点同名」是**装配期错误**（ADR-52 决定 1），但在 `_get_definition_config` 中原先发生在 `try` 之外 ⇒ 会以未捕获异常（500）而非既有 fail-closed 通道暴露。**处置**：把 `definition_derived_summary(view)` 调用移入既有 `try` ⇒ 经 `except ConfigError` 回既有 `503`（文案不变）。属**计划外但必要**的最小改动，已在 `implementation_plan.md` §28.1 登记 | FIXED |
+| FND-R21-002 | MINOR | `tests/integration/test_definition_config_r7.py:431-447` | 既有断言 `after["derived"]["edges"] == seed_edges` 要求 `derived` **原样镜像**文档编排，与 ADR-52 决定 4 不可兼得（契约翻转的必然结果，非实现缺陷）。**处置**：按 ADR-52 口径**就地订正**该单一断言（意图保留、对专家集合更敏感），详见 `implementation_plan.md` §28.3 | FIXED |
+
+**未解决的 CRITICAL 问题**：**无**（CRITICAL = 0）。
+
+## 24.3 自验证据（真实执行，命令可被第三方重跑）
+
+| # | 命令 | 实际结果 | EXIT |
+|---|------|----------|------|
+| 1 | `python -m pytest tests -q -p no:cacheprovider`（cwd = 仓库根） | **403 passed, 2 skipped** | **0** |
+| 2 | `python src/scripts/selfcheck.py` | **52/52 通过** | **0** |
+| 3 | `npm run typecheck`（cwd = `src/frontend`） | `vue-tsc --noEmit` 无输出 | **0** |
+| 4 | `npm test`（cwd = `src/frontend`） | **pass 35 / fail 0** | **0** |
+| 5 | `python -c` 直调 `definition_derived_summary`（双专家） | `nodes` / `branch_map` / `edges` / `experts` 与 ADR-52 决定 1 ~ 6 逐条一致 | **0** |
+| 6 | `python -c` 冲突用例（专家名 = `route` / `gate` / `START` / `END`） | 四例全部 `ConfigError`，**无静默改名** | **0** |
+| 7 | `python -c` 零迁移用例（文档已逐专家声明节点） | 展开为**无操作**，仅新增 `experts` | **0** |
+
+**「无证据不下结论」自查**：以上 7 项均为**本机实跑**的原始结果；**未**引用任何子代理自报数字；`npm run build` 本轮**未执行**（无构建产物需求；TS 契约由 `vue-tsc --noEmit` 覆盖）—— 故**不宣称**构建绿灯。
+
+## 24.4 未决 / 需 GROUP_D 复核的点
+
+1. **展开规则的正式用例覆盖**：ADR-52 决定 1 ~ 6（尤其「冲突 ⇒ 显式错误」与「条件边仍为单条」）目前**只有**本报告的直跑证据 + 1 处契约订正断言，**无**专门验收用例（US-IB-51 ~ US-IB-54 的 12 组 AC 未被自动化覆盖）。属测试工程师职责，**提请 GROUP_D 在下一轮补 US-IB-51 ~ IB-54 的 AC 用例**。
+2. **前端渲染无自动化断言**：`graph-expert` class / 标签取 `cn_label` / 图例项 / 专家清单行**无**冒烟断言（`src/frontend/tests/frontend.smoke.test.js` 本轮未改）。提请 GROUP_D 补（可仿现有第 4 例的源码级断言风格）。
+3. **一处契约订正待复核**：`tests/integration/test_definition_config_r7.py`（1 处，见 §24.2 FND-R21-002）—— 已按 ADR-52 口径订正且**非放宽**，提请 GROUP_D 复核该订正是否充分（是否需要**新增**一条「占位节点 `expert` 不残留于 `derived.nodes`」的断言）。
+4. **invocation ID** 为推定值（INV-GROUP_C-INTELBASE-024），待 PM 核对。
+
+## 24.5 [ARCH-ASSUMPTION-A16] 实测结论
+
+`derived` **新增键** `experts`（既有 5 键键名 / 位置不变）。实跑复核：① 全量 `pytest`（403 passed）中**无**对 `derived` 键集的强断言（既有断言均为取值断言）；② 前端 `client.ts` 为结构类型（非 exact），`vue-tsc` EXIT 0；③ HTTP 层 `set(payload) == {"document","derived","editable_fields","config_key_names"}` 断的是**顶层**键，不受影响。⇒ **A16 实测无破坏面**。
+
+## 24.6 守约复核（REV-21）
+
+未新增模块（仍 **26**）/ **未新增端口（仍 19）** / 未新增第三方依赖 / **未新增 §4.1 依赖边**（唯一新增 import = `ib.core` 常量与异常，属既有 MOD-IB-23 → MOD-IB-01 边内）/ 未改既有配置键名与默认值 / `IFC-IB-001~392` 号 / 名 / 签名一字不动（仅新增 393 / 394）/ 未 bump `schema_version` / **未改运行期编排拓扑**（`ib/orchestration/__init__.py` 一字未动，C-IB-54）/ **未改定义文档 schema**（C-IB-56②）/ **未改 `derive()` 与 `DerivedView.graph_config` 语义** / **未改信封顶层键与 `config_key_names`** / 图**仍只读**（`:nodes-draggable="false"` / `:nodes-connectable="false"` 未改；**无**任何 `addNode` / `removeNode` / `addEdge` 类运行期改图标识）/ **无任何口令 / Key / token 字面量** / 未 `git add` / `commit` / `push` / 部署 / FreeArk 参考仓**只读**。
