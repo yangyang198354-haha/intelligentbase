@@ -385,6 +385,6 @@ sudo systemctl restart ib-web ib-worker
 
 ## §R21.4 最终状态（REV-21）
 
-**DEPLOYED / 待用户 UI 验收** —— 代码已推送、生产已部署并通过全部严格断言；**唯一未闭合项 = 用户在可视化配置页肉眼确认编排图「逐专家成节点、不再只有一个 `expert` 方块」**（AC-IB-51-01 ~ 51-03，属 `[NOT_TESTABLE]` 的视觉观感）。经用户确认后 GR-E-010 可升为 **PASS**，PHASE_11 置 APPROVED。
+**DELIVERED** —— 用户 **2026-10-17 UI 复核「确认无误」**：可视化配置页的编排图**逐专家成节点**、**不再只有一个 `expert` 方块**（AC-IB-51-01 ~ 51-03 视觉观感已由用户确认）。代码已推送（`7bfdf3f` / `c815aa6`）、生产已部署并通过全部严格断言；**GR-E-010 唯一条件闭合 ⇒ 升为 PASS**，**PHASE_11 = APPROVED**（已执行 + 已验收）。REV-21 全流程（GROUP_A → GROUP_E）收口。
 
-> **残留开放项（非阻塞，承前）**：① `demo` 仍为三专家 + legacy `fallback_prompt`（disabled，启用前须先迁移）；② `ib-worker.env` 未设 `IB_DEFINITION_DOC_PATH`（既有常态）；③ `deployment_plan.md` 未补登 REV-20 部署步骤（本轮自 DEPLOY-041 续编号）。
+> **残留开放项（非阻塞，承前）**：① `demo` 仍为三专家 + legacy `fallback_prompt`（disabled，启用前须先迁移）；② `ib-worker.env` 未设 `IB_DEFINITION_DOC_PATH`（既有常态）；③ `deployment_plan.md` 未补登 REV-20 部署步骤（本轮自 DEPLOY-041 续编号）；④ 前端旧 dist 未备份（回滚依赖 git 重建）。
