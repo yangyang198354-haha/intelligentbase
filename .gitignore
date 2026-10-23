@@ -35,8 +35,17 @@ htmlcov/
 # Claude Code: version sub-agent definitions; ignore machine-local KB state
 .claude/*
 !.claude/agents/
-.claude/agents/knowledge_base/
+.claude/agents/knowledge_base/*
+!.claude/agents/knowledge_base/generic/
+!.claude/agents/knowledge_base/README.md
 !.claude/skills/
+!.claude/hooks/
+!.claude/settings.json
+!.claude/agent-memory/
 
 # Evidence run logs (keep *.py probes tracked)
 docs/evidence/*.log
+
+# SDLC agent suite: hook runtime state and raw knowledge inbox
+project_workspace/.hook_state/
+project_workspace/_kb_inbox.jsonl
