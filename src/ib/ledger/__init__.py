@@ -46,6 +46,7 @@ from ib.core import (
     ScopeViolationError,
     StartupError,
 )
+from ib.core.library import FolderRecord, LibraryConflictError, NameClash, name_key_of
 
 __all__ = [
     "InMemoryLedgerRepository",
@@ -73,6 +74,13 @@ __all__ = [
     "SqliteLlmKeyStore",
     "MemoryLlmKeyStore",
     "build_llm_key_store",
+    # 资料库目录（MOD-002 / MOD-003）：惰性导出
+    "SqliteEntryTree",
+    "MemoryEntryTree",
+    "build_entry_tree",
+    "SqliteUploadBatchStore",
+    "MemoryUploadBatchStore",
+    "build_upload_batch_store",
 ]
 
 
@@ -228,6 +236,9 @@ class InMemoryLedgerRepository:
         #: 页面图关联行（R2 / M-02）：按 `doc_id` 分桶，先删后写（幂等，与 chunks 同构）。
         self._chunk_images: dict[str, list[ChunkImageRecord]] = {}
         self._jobs: dict[str, RebuildJobRow] = {}
+        #: 资料库目录（MOD-002 的内存替身 `MemoryEntryTree` 与上传批次替身共用本锁与存储）。
+        self._folders: dict[str, FolderRecord] = {}
+        self._purge: dict[str, dict[str, Any]] = {}
 
     # --- 播种（组合根 / 自测用；非端口方法） --- #
 
@@ -288,6 +299,23 @@ class InMemoryLedgerRepository:
             kb_id = scope.kb_ids[0] if scope.kb_ids else ""
             self._assert_kb(scope.project_id, kb_id)
             now = utc_now_iso()
+            key = name_key_of(doc_name)
+            # 旧入口 = 根目录单文件创建：同名（跨文件/文件夹，不区分大小写）→ 409。
+            for other in self._documents.values():
+                if (
+                    other.project_id == scope.project_id
+                    and other.folder_id == ""
+                    and other.revision_of is None
+                    and other.name_key == key
+                ):
+                    raise LibraryConflictError(
+                        "同目录下已存在同名条目", clashes=(NameClash("file", other.doc_id, other.doc_name),)
+                    )
+            for folder in self._folders.values():
+                if folder.project_id == scope.project_id and folder.parent_id == "" and folder.name_key == key:
+                    raise LibraryConflictError(
+                        "同目录下已存在同名条目", clashes=(NameClash("folder", folder.folder_id, folder.name),)
+                    )
             record = DocumentRecord(
                 doc_id=uuid.uuid4().hex,
                 project_id=scope.project_id,
@@ -306,6 +334,9 @@ class InMemoryLedgerRepository:
                 lease_expires_at=None,
                 created_at=now,
                 updated_at=now,
+                folder_id="",
+                name_key=key,
+                uploaded_at=now,
             )
             self._documents[record.doc_id] = record
             return record
@@ -318,13 +349,21 @@ class InMemoryLedgerRepository:
             return record
 
     def list_documents(
-        self, scope: Scope, *, page: int, page_size: int, status: DocStatus | None
+        self,
+        scope: Scope,
+        *,
+        page: int,
+        page_size: int,
+        status: DocStatus | None,
+        include_revisions: bool = True,
     ) -> tuple[list[DocumentRecord], int]:
         with self._lock:
             items = [
                 record
                 for record in self._documents.values()
-                if self._in_scope(record, scope) and (status is None or record.status == status)
+                if self._in_scope(record, scope)
+                and (status is None or record.status == status)
+                and (include_revisions or record.revision_of is None)
             ]
             items.sort(key=lambda item: (item.created_at, item.doc_id), reverse=True)
             total = len(items)
@@ -365,6 +404,7 @@ class InMemoryLedgerRepository:
                 lease_owner=None,
                 lease_expires_at=None,
                 updated_at=utc_now_iso(),
+                indexed_at=utc_now_iso(),
             )
             assert_no_half_state(updated)
             self._documents[doc_id] = updated
@@ -743,4 +783,12 @@ def __getattr__(name: str) -> Any:
         from ib.ledger import llm_key as _llm_key
 
         return getattr(_llm_key, name)
+    if name in {"SqliteEntryTree", "MemoryEntryTree", "build_entry_tree"}:
+        from ib.ledger import tree as _tree
+
+        return getattr(_tree, name)
+    if name in {"SqliteUploadBatchStore", "MemoryUploadBatchStore", "build_upload_batch_store"}:
+        from ib.ledger import upload_batches as _upload_batches
+
+        return getattr(_upload_batches, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -181,6 +181,16 @@ IB_RUNTIME_ENV_KEYS: tuple[str, ...] = (
     # 同一条纪律：后端选择由组合根在装配期读取（`ib/ledger/projects.py` / `llm_key.py`）。
     "IB_PROJECT_REGISTRY_BACKEND",
     "IB_LLM_KEY_BACKEND",
+    # 资料库目录与批量上传限额（MOD-009 / IFC-023）：只登记键名，值不入仓库。
+    #   IB_UPLOAD_BATCH_MAX_FILES —— 单次上传文件数上限（默认 1000；1..10000）。
+    #   IB_UPLOAD_BATCH_MAX_TOTAL_MB —— 单次上传总大小上限（MB，默认 1024；1..102400；A-01 待部署阶段确认，
+    #                                  默认值保持可配置、不在代码中另行硬编码）。
+    #   IB_LIBRARY_MAX_DEPTH —— 目录最大层数（默认 10；1..64）。
+    #   IB_UPLOAD_BATCH_TTL_HOURS —— 上传批次记录保留小时数（默认 24；1..720）。
+    "IB_UPLOAD_BATCH_MAX_FILES",
+    "IB_UPLOAD_BATCH_MAX_TOTAL_MB",
+    "IB_LIBRARY_MAX_DEPTH",
+    "IB_UPLOAD_BATCH_TTL_HOURS",
 )
 
 #: v1 支持的 4 种格式（**OQ-IB-02 默认值**：其余格式按扩展点预留，不实现）。
@@ -216,6 +226,30 @@ def _as_int(raw: Any, *, default: int, key: str) -> int:
         return int(raw)
     except (TypeError, ValueError) as exc:
         raise ConfigError(f"配置键 {key} 不是合法整数", key=key) from exc
+
+
+def _as_bounded_int(raw: Any, *, default: int, key: str, low: int, high: int) -> int:
+    """整数 + 闭区间校验；越界 / 非整数 → `ConfigError`（只报键名，不回显值；启动期 fail-fast）。"""
+    value = _as_int(raw, default=default, key=key)
+    if value < low or value > high:
+        raise ConfigError(f"配置键 {key} 超出允许范围 [{low}, {high}]", key=key)
+    return value
+
+
+#: nginx `client_max_body_size` 为 64m（ADR-003）：单文件上限超过它的配置在传输层必被拒。
+_PROXY_BODY_LIMIT_MB = 60
+
+
+def _warn_if_over_proxy_limit(max_upload_mb: int) -> int:
+    """`max_upload_mb` 超过反代限制时记 WARNING（不改变取值与基线行为）。"""
+    if max_upload_mb > _PROXY_BODY_LIMIT_MB:
+        try:
+            from ib.observability import log_event
+
+            log_event("startup", "warned", error_code="max_upload_mb_exceeds_proxy_limit", count=max_upload_mb)
+        except Exception:  # noqa: BLE001 - 告警失败不影响配置加载
+            pass
+    return max_upload_mb
 
 
 def _as_float(raw: Any, *, default: float, key: str) -> float:
@@ -366,6 +400,11 @@ class GlobalConfig:
     project_registry_backend: str = "sqlite"  # IB_PROJECT_REGISTRY_BACKEND
     llm_key_backend: str = "sqlite"  # IB_LLM_KEY_BACKEND
     max_upload_mb: int = 50  # IB_MAX_UPLOAD_MB
+    #: 资料库目录与批量上传限额（MOD-009）。总大小默认值 1024MB 为 [ESTIMATE]（A-01，部署阶段再确认）。
+    upload_batch_max_files: int = 1000  # IB_UPLOAD_BATCH_MAX_FILES
+    upload_batch_max_total_mb: int = 1024  # IB_UPLOAD_BATCH_MAX_TOTAL_MB
+    library_max_depth: int = 10  # IB_LIBRARY_MAX_DEPTH
+    upload_batch_ttl_hours: int = 24  # IB_UPLOAD_BATCH_TTL_HOURS
     allowed_exts: tuple[str, ...] = SUPPORTED_EXTS
     ocr_enabled: bool = True  # IB_OCR_ENABLED
     render_enabled: bool = True  # IB_RENDER_ENABLED
@@ -707,7 +746,37 @@ def resolve_global_config(raw: RawConfig) -> GlobalConfig:
             values.get("project_registry_backend", GlobalConfig.project_registry_backend)
         ),
         llm_key_backend=str(values.get("llm_key_backend", GlobalConfig.llm_key_backend)),
-        max_upload_mb=_as_int(values.get("max_upload_mb"), default=GlobalConfig.max_upload_mb, key="IB_MAX_UPLOAD_MB"),
+        max_upload_mb=_warn_if_over_proxy_limit(
+            _as_int(values.get("max_upload_mb"), default=GlobalConfig.max_upload_mb, key="IB_MAX_UPLOAD_MB")
+        ),
+        upload_batch_max_files=_as_bounded_int(
+            values.get("upload_batch_max_files"),
+            default=GlobalConfig.upload_batch_max_files,
+            key="IB_UPLOAD_BATCH_MAX_FILES",
+            low=1,
+            high=10000,
+        ),
+        upload_batch_max_total_mb=_as_bounded_int(
+            values.get("upload_batch_max_total_mb"),
+            default=GlobalConfig.upload_batch_max_total_mb,
+            key="IB_UPLOAD_BATCH_MAX_TOTAL_MB",
+            low=1,
+            high=102400,
+        ),
+        library_max_depth=_as_bounded_int(
+            values.get("library_max_depth"),
+            default=GlobalConfig.library_max_depth,
+            key="IB_LIBRARY_MAX_DEPTH",
+            low=1,
+            high=64,
+        ),
+        upload_batch_ttl_hours=_as_bounded_int(
+            values.get("upload_batch_ttl_hours"),
+            default=GlobalConfig.upload_batch_ttl_hours,
+            key="IB_UPLOAD_BATCH_TTL_HOURS",
+            low=1,
+            high=720,
+        ),
         allowed_exts=allowed_exts,
         ocr_enabled=_as_bool(values.get("ocr_enabled"), default=True, key="IB_OCR_ENABLED"),
         render_enabled=_as_bool(values.get("render_enabled"), default=True, key="IB_RENDER_ENABLED"),

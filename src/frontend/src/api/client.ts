@@ -129,11 +129,150 @@ export type RelatedImageItem = {
   doc_name: string;
   page_or_section: string;
   url_path: string;
+  /** 台账当前目录路径（含文件名；MOD-005）。旧后端未带时缺省。 */
+  doc_path?: string;
 };
 
 export type RelatedImagesPayload = { images: RelatedImageItem[] };
 
 export type FileListEnvelope = { items: DocumentRecord[]; total: number };
+
+// ---------------------------------------------------------------------- //
+// 资料库（云盘式目录；MOD-013 / IFC-001~013、IFC-025）：与后端 `ibweb/library_views.py` 逐字段对齐
+// ---------------------------------------------------------------------- //
+
+export type LibraryDocStatus = 'pending' | 'parsing' | 'indexed' | 'failed';
+
+export interface FolderItem {
+  kind: 'folder';
+  folder_id: string;
+  name: string;
+  depth: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FileItem {
+  kind: 'file';
+  doc_id: string;
+  name: string;
+  ext: string;
+  size_bytes: number;
+  status: LibraryDocStatus;
+  error_code: string | null;
+  chunk_count: number;
+  uploaded_at: string; // ISO UTC，浏览器本地化显示
+  content_updated_at: string | null; // null = 从未更新
+  indexed_at: string | null; // 仅 status === 'indexed' 时非 null
+  searchable: boolean; // 重建在途期间新增/更新的文件为 false
+  update_state: 'updating' | 'update_failed' | null;
+  update_error_code: string | null;
+}
+
+export type LibraryItem = FolderItem | FileItem;
+export interface Crumb {
+  folder_id: string;
+  name: string;
+}
+export type ConflictActionTs = 'overwrite' | 'skip' | 'rename';
+export interface ConflictInfo {
+  rel_path?: string; // 上传场景
+  entry?: { kind: 'file' | 'folder'; id: string; name: string }; // 移动/更新场景：发起方
+  existing: { kind: 'file' | 'folder'; id: string; name: string };
+}
+
+export interface LibraryPage {
+  folder: FolderItem | null;
+  breadcrumb: Crumb[];
+  items: LibraryItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  permissions: { can_manage: boolean };
+}
+
+export interface FolderDetail {
+  folder: FolderItem;
+  subtree_folders: number;
+  subtree_files: number;
+}
+
+export interface FolderDeleteStep {
+  done: boolean;
+  deleted_files: number;
+  deleted_folders: number;
+  failed: { doc_id: string; name: string; path: string; error_code: string }[];
+  remaining_files: number;
+}
+
+export interface MoveRequest {
+  entries: { kind: 'file' | 'folder'; id: string }[];
+  target_folder_id: string;
+  resolutions?: Record<string, ConflictActionTs>;
+}
+
+export interface MoveResult {
+  moved: { kind: string; id: string }[];
+  skipped: { kind: string; id: string }[];
+  renamed: { id: string; kind: string; new_name: string }[];
+  overwritten: { id: string }[];
+}
+
+export type UpdateResult =
+  | { changed: true; item: FileItem; final_name: string }
+  | { changed: false; reason: 'CONTENT_UNCHANGED' };
+
+export interface UploadPlanRequest {
+  target_folder_id: string; // '' = 根
+  dry_run: boolean; // true: 只计划不落批次
+  entries: { client_idx: number; rel_path: string; size: number }[];
+  resolutions?: Record<string, ConflictActionTs>; // 键 = 冲突的 rel_path（文件）或目录前缀（文件夹）
+}
+
+export interface PlannedItemTs {
+  client_idx: number;
+  rel_path: string;
+  final_rel_path: string | null;
+  action: 'create' | 'update' | 'skip';
+  reason_code: string | null;
+  target_doc_id: string | null;
+}
+
+export interface UploadPlanResponse {
+  batch_id: string | null;
+  total: number;
+  limits: { max_files: number; max_total_bytes: number; max_depth: number; max_file_bytes: number };
+  items: PlannedItemTs[];
+  conflicts: { rel_path: string; kind: 'file' | 'folder'; existing_id: string; existing_name: string }[];
+  accepted_count: number;
+  skipped_count: number;
+}
+
+export interface UploadItemResultTs {
+  client_idx: number;
+  state: 'accepted' | 'skipped';
+  reason_code: string | null;
+  doc_id: string | null;
+  final_rel_path: string | null;
+}
+
+export interface UploadBatchSummaryTs {
+  batch_id: string;
+  target_folder_id: string;
+  total: number;
+  accepted: number;
+  skipped: number;
+  failed: number;
+  pending: number;
+  items: {
+    client_idx: number;
+    rel_path: string;
+    final_rel_path: string | null;
+    state: 'planned' | 'accepted' | 'skipped' | 'failed';
+    reason_code: string | null;
+    doc_id: string | null;
+  }[];
+}
 
 /**
  * R7 定义文档类型（IFC-IB-294 / 295；与后端 `ibweb/serializers.py` **逐字段对齐**）。
@@ -467,13 +606,20 @@ export class ApiClientError extends Error {
    * 供界面给出可读回执（IFC-IB-295）；不含任何凭据值（后端保证）。
    */
   readonly details: Record<string, unknown>;
+  /** 409 同名冲突时的冲突条目（响应体同级键 `conflicts`；资料库 MOD-013）。 */
+  readonly conflicts: ConflictInfo[];
 
-  constructor({ status, code, message }: ApiError, details: Record<string, unknown> = {}) {
+  constructor(
+    { status, code, message }: ApiError,
+    details: Record<string, unknown> = {},
+    conflicts: ConflictInfo[] = [],
+  ) {
     super(message);
     this.name = 'ApiClientError';
     this.status = status;
     this.code = code;
     this.details = details;
+    this.conflicts = conflicts;
   }
 }
 
@@ -574,6 +720,7 @@ export class ApiClient {
       let code = 'http_error';
       let message = `请求失败（HTTP ${response.status}）`;
       let details: Record<string, unknown> = {};
+      let conflicts: ConflictInfo[] = [];
       try {
         const parsed = JSON.parse(text);
         if (parsed?.error?.code) code = String(parsed.error.code);
@@ -581,6 +728,7 @@ export class ApiClient {
         if (parsed?.error && typeof parsed.error === 'object') {
           details = parsed.error as Record<string, unknown>;
         }
+        if (Array.isArray(parsed?.conflicts)) conflicts = parsed.conflicts as ConflictInfo[];
       } catch {
         /* 保持通用文案 */
       }
@@ -595,7 +743,7 @@ export class ApiClient {
           /* 回调失败不得掩盖原始错误 */
         }
       }
-      throw new ApiClientError({ status: response.status, code, message }, details);
+      throw new ApiClientError({ status: response.status, code, message }, details, conflicts);
     }
     return (text ? JSON.parse(text) : null) as T;
   }
@@ -638,6 +786,92 @@ export class ApiClient {
     return this.request<DocumentRecord>(`/api/files/${encodeURIComponent(docId)}/retry`, {
       method: 'POST',
     });
+  }
+
+  // ------------------------------------------------------------------ //
+  // 资料库（云盘式目录；IFC-025）：HTTP 的唯一出口，请求头与错误处理沿用 `request`
+  // ------------------------------------------------------------------ //
+
+  private jsonInit(method: string, body?: unknown): RequestInit {
+    return {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    };
+  }
+
+  browse(params: { folder_id?: string; page?: number; page_size?: number } = {}): Promise<LibraryPage> {
+    const query = new URLSearchParams();
+    if (params.folder_id) query.set('folder_id', params.folder_id);
+    if (params.page) query.set('page', String(params.page));
+    if (params.page_size) query.set('page_size', String(params.page_size));
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    return this.request<LibraryPage>(`/api/library${suffix}`);
+  }
+
+  getFolder(folderId: string): Promise<FolderDetail> {
+    return this.request<FolderDetail>(`/api/library/folders/${encodeURIComponent(folderId)}`);
+  }
+
+  createFolder(parentId: string, name: string): Promise<FolderItem> {
+    return this.request<FolderItem>('/api/library/folders', this.jsonInit('POST', { parent_id: parentId, name }));
+  }
+
+  renameFolder(folderId: string, name: string): Promise<FolderItem> {
+    return this.request<FolderItem>(
+      `/api/library/folders/${encodeURIComponent(folderId)}`,
+      this.jsonInit('PATCH', { name }),
+    );
+  }
+
+  /** 分步删除：`done=false` 时调用方应重复调用，直至 `done=true`。 */
+  deleteFolderStep(folderId: string, opts: { max_files?: number } = {}): Promise<FolderDeleteStep> {
+    return this.request<FolderDeleteStep>(
+      `/api/library/folders/${encodeURIComponent(folderId)}`,
+      this.jsonInit('DELETE', { confirm: true, ...(opts.max_files ? { max_files: opts.max_files } : {}) }),
+    );
+  }
+
+  /** 409 抛 `ApiClientError`，其 `conflicts` 携带冲突条目。 */
+  moveEntries(req: MoveRequest): Promise<MoveResult> {
+    return this.request<MoveResult>('/api/library/move', this.jsonInit('POST', req));
+  }
+
+  renameFile(docId: string, name: string): Promise<FileItem> {
+    return this.request<FileItem>(`/api/files/${encodeURIComponent(docId)}`, this.jsonInit('PATCH', { name }));
+  }
+
+  updateFile(docId: string, file: File, onConflict?: 'fail' | 'rename'): Promise<UpdateResult> {
+    const body = new FormData();
+    body.append('file', file);
+    if (onConflict) body.append('on_conflict', onConflict);
+    return this.request<UpdateResult>(`/api/files/${encodeURIComponent(docId)}/revision`, {
+      method: 'POST',
+      body,
+    });
+  }
+
+  discardRevision(docId: string): Promise<{ discarded: boolean }> {
+    return this.request<{ discarded: boolean }>(`/api/files/${encodeURIComponent(docId)}/revision`, {
+      method: 'DELETE',
+    });
+  }
+
+  planUpload(req: UploadPlanRequest): Promise<UploadPlanResponse> {
+    return this.request<UploadPlanResponse>('/api/uploads', this.jsonInit('POST', req));
+  }
+
+  uploadBatchItem(batchId: string, clientIdx: number, file: File): Promise<UploadItemResultTs> {
+    const body = new FormData();
+    body.append('file', file);
+    return this.request<UploadItemResultTs>(
+      `/api/uploads/${encodeURIComponent(batchId)}/items/${clientIdx}`,
+      { method: 'PUT', body },
+    );
+  }
+
+  getUploadBatch(batchId: string): Promise<UploadBatchSummaryTs> {
+    return this.request<UploadBatchSummaryTs>(`/api/uploads/${encodeURIComponent(batchId)}`);
   }
 
   // ------------------------------------------------------------------ //

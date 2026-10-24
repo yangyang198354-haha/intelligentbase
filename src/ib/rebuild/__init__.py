@@ -88,6 +88,12 @@ FINGERPRINT_LEN = 8
 #: `planned` 是 `RebuildState` 的初态（枚举里**没有** `pending` —— 那是文档状态，见 D-4a）。
 IN_FLIGHT_REBUILD_STATES = ("planned", "running")
 
+#: 写路径需要重定向到目标版本的任务状态 = 在飞 + `succeeded`（已重建完成、尚未激活）。
+#: DEF-R25-001：`succeeded` 窗口内的写入（新上传 / 更新）若仍落旧 active 版本，激活后会随旧集合“消失”，
+#: 且修订行会因 collection_version == active_version 被立即晋升（ADR-007：晋升推迟到修订的索引版本 = 激活后的 active）。
+#: `step_rebuild` 的 done 判据与 worker 的推进仍只认 `IN_FLIGHT_REBUILD_STATES`，不受影响。
+REDIRECT_REBUILD_STATES = IN_FLIGHT_REBUILD_STATES + ("succeeded",)
+
 #: 重建任务的事件间隔：任务级租约 600s > 单批最长处理时间，避免同批被两个 worker 抢。
 REBUILD_LEASE_SECONDS = 600
 
@@ -156,7 +162,7 @@ class RebuildAwareProjectProvider:
     def target_version(self, project_id: str) -> str | None:
         """当前正在进行的重建目标版本；无则 `None`。"""
         for job in self._ledger.list_rebuild_jobs(project_id):
-            if str(job.state) in IN_FLIGHT_REBUILD_STATES:
+            if str(job.state) in REDIRECT_REBUILD_STATES:
                 return str(job.to_version)
         return None
 
@@ -179,7 +185,10 @@ class RebuildService:
         project_provider: Callable[[str], Any],
         current_factors: Callable[[], dict[str, Any]],
         batch_limit: int = 50,
+        revision_promoter: Callable[[str], int] | None = None,
     ) -> None:
+        #: MOD-008：激活后补晋升钩子（`project_id → 晋升数`；装配为 `lifecycle.promote_ready_revisions`）。
+        self._revision_promoter = revision_promoter
         self._ledger = ledger
         self._vectors = vectors
         self._lifecycle = lifecycle
@@ -231,7 +240,7 @@ class RebuildService:
 
     def _target_of(self, project_id: str) -> str | None:
         for job in self._ledger.list_rebuild_jobs(project_id):
-            if str(job.state) in IN_FLIGHT_REBUILD_STATES:
+            if str(job.state) in REDIRECT_REBUILD_STATES:
                 return str(job.to_version)
         return None
 
@@ -342,10 +351,15 @@ class RebuildService:
             self._ledger.set_rebuild_state(job.job_id, "succeeded")
         return RebuildProgress(indexed=indexed, failed=failed, pending=pending, done=done)
 
-    def _count(self, project_id: str, *, status: str | None) -> int:
-        """统计该项目下处于 `status` 的**未删除**文档数（`status=None` 为全部）。"""
+    def _count(self, project_id: str, *, status: str | None, include_revisions: bool = True) -> int:
+        """统计该项目下处于 `status` 的**未删除**文档数（`status=None` 为全部）。
+
+        `include_revisions=False` 时排除修订行（MOD-008：失败的“更新”不应挡住版本切换）；
+        默认 True 保持 `step_rebuild` 的计数口径。
+        """
+        extra = {} if include_revisions else {"include_revisions": False}
         _, total = self._ledger.list_documents(
-            Scope(project_id=project_id), page=1, page_size=1, status=status
+            Scope(project_id=project_id), page=1, page_size=1, status=status, **extra
         )
         return total
 
@@ -372,7 +386,7 @@ class RebuildService:
                 f"目标 collection {collection} 不存在，拒绝切换（切换即完整）",
                 dependency="vectorstore",
             )
-        failed = self._count(project_id, status="failed")
+        failed = self._count(project_id, status="failed", include_revisions=False)
         if failed:
             raise ConflictError(f"存在 {failed} 篇失败文档，拒绝切换版本（AC-IB-16-04）")
         unfinished = self._count(project_id, status="pending") + self._count(
@@ -385,6 +399,14 @@ class RebuildService:
         job = self._ledger.find_rebuild_job(project_id, version)
         if job is not None:
             self._ledger.set_rebuild_state(job.job_id, "activated")
+        # 重建在途期间已索引但推迟晋升的修订行：激活后补晋升（best-effort；worker 每轮仍会补，MOD-011）。
+        if self._revision_promoter is not None:
+            try:
+                self._revision_promoter(project_id)
+            except Exception as exc:  # noqa: BLE001 - 补晋升失败不影响已完成的切换
+                from ib.observability import log_event
+
+                log_event("rebuild", "promote_failed", project_id=project_id, error_code=type(exc).__name__)
 
     # ================================================================== #
     # IFC-IB-155 回滚

@@ -355,6 +355,7 @@ def _list_files(request: Any) -> Any:
             page=int(data.get("page", 1)),
             page_size=min(int(data.get("page_size", 20)), MAX_PAGE_SIZE),
             status=raw_status or None,
+            include_revisions=False,  # 修订行是内部隐藏行，不出现在扁平列表（IFC-013）
         )
     except IbError as exc:
         return error_response(exc)
@@ -373,6 +374,11 @@ def _list_files(request: Any) -> Any:
 def file_detail_endpoint(request: Any, doc_id: str) -> Any:
     """`DELETE /api/files/{doc_id}` → `200 DeleteReport`；`POST .../retry` → `200 DocumentRecord`。"""
     deps = composition.get_deps()
+    if request.method == "PATCH":
+        # 资料库（MOD-012 / IFC-007）：文件重命名，委托 library_views（局部导入避免模块级循环）
+        from ibweb.library_views import rename_file_endpoint
+
+        return rename_file_endpoint(request, doc_id)
     try:
         ctx = _require_manage(request)
         scope = composition.resolve_scope(ctx)
@@ -380,6 +386,18 @@ def file_detail_endpoint(request: Any, doc_id: str) -> Any:
             report = deps.lifecycle.delete_document(scope, doc_id)
             return _json(DeleteReportSerializer(report).data, status.HTTP_200_OK)
         if request.method == "POST":
+            live = deps.ledger.get_document(scope, doc_id)
+            if (
+                live is not None
+                and live.revision_of is None
+                and live.status in ("indexed", "failed")
+                and deps.tree is not None
+                and (revision := deps.tree.get_revision_of(scope, doc_id)) is not None
+                and revision.status == "failed"
+            ):
+                # IFC-013：存活行 indexed|failed 且其修订行 failed -> 重试修订行（存活行保持可检索）
+                deps.lifecycle.retry_revision(scope, doc_id)
+                return _json(DocumentRecordSerializer(live).data, status.HTTP_200_OK)
             record = deps.lifecycle.retry_document(scope, doc_id)
             return _json(DocumentRecordSerializer(record).data, status.HTTP_200_OK)
     except IbError as exc:

@@ -120,6 +120,7 @@ def related_images_json(payload: RelatedImagesPayload) -> str:
                     "doc_name": item.doc_name,
                     "page_or_section": item.page_or_section,
                     "url_path": item.url_path,
+                    "doc_path": item.doc_path,
                 }
                 for item in payload.images
             ]
@@ -486,6 +487,7 @@ def completion_payload_json(payload: CompletionPayload) -> str:
                     "page_or_section": item.page_or_section,
                     "locator": item.locator,
                     "score": item.score,
+                    "doc_path": item.doc_path,
                 }
                 for item in payload.citations
             ],

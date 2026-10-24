@@ -528,20 +528,58 @@ def retrieval_happy_path() -> None:
     （provider → resolver → embedder → vectorstore → 映射）。
     """
     deps = _deps()
-    from ib.core import Scope
+    from ib.core import DocumentRecord, Scope
+    from ib.core.library import name_key_of
 
-    scope = Scope(project_id="p_alpha")  # isolation 用例已在此项目写入 1 个向量点
-    result = deps.retrieval.search("任意问题", scope=scope)
-    assert result.degraded is False, (
-        f"读路径处于降级状态（degrade_reason={result.degrade_reason}）—— "
-        "依赖齐备时降级即为缺陷，且会被 fail-open 语义掩盖"
+    scope = Scope(project_id="p_alpha")  # isolation 用例已在此项目写入 1 个向量点（doc_id=d1）
+    # 台账是存活与展示名的权威（MOD-005）：向量点 d1 必须有对应的存活台账行才可被检索到。
+    live_row = DocumentRecord(
+        doc_id="d1", project_id="p_alpha", kb_id="kb_a", doc_name="a.txt", ext="txt", size_bytes=1,
+        content_sha256="", blob_ref=None, status="indexed", error_code=None, chunk_count=1,
+        indexed_collection_version="1", target_collection_version=None, lease_owner=None,
+        lease_expires_at=None, created_at="2020-01-01T00:00:00Z", updated_at="2020-01-01T00:00:00Z",
+        folder_id="", name_key=name_key_of("a.txt"), uploaded_at="2020-01-01T00:00:00Z",
     )
-    assert result.hits, "读路径未召回任何内容（向量已写入却查不到）"
-    assert result.hits[0].doc_id == "d1"
-    # 工具形态：文本必须包含可读定位信息（LLM 需要能说出「来自哪个文件」）
-    tool_result = deps.retrieval.search_as_tool("任意问题", scope=scope)
-    assert tool_result.ok is True and tool_result.degraded is False
-    assert "a.txt" in tool_result.content, tool_result.content[:200]
+    with deps.ledger._lock:
+        deps.ledger._documents["d1"] = live_row
+    try:
+        result = deps.retrieval.search("任意问题", scope=scope)
+        assert result.degraded is False, (
+            f"读路径处于降级状态（degrade_reason={result.degrade_reason}）—— "
+            "依赖齐备时降级即为缺陷，且会被 fail-open 语义掩盖"
+        )
+        assert result.hits, "读路径未召回任何内容（向量已写入却查不到）"
+        assert result.hits[0].doc_id == "d1"
+        assert result.hits[0].doc_name == "a.txt" and result.hits[0].doc_path == "a.txt", "名称/路径应取台账当前值"
+        # 工具形态：文本必须包含可读定位信息（LLM 需要能说出「来自哪个文件」）
+        tool_result = deps.retrieval.search_as_tool("任意问题", scope=scope)
+        assert tool_result.ok is True and tool_result.degraded is False
+        assert "a.txt" in tool_result.content, tool_result.content[:200]
+
+        # 成对判据 1：命中全部不存活（台账行已不在）→ degraded=False 且 hits==[]（≠ 依赖故障）
+        with deps.ledger._lock:
+            deps.ledger._documents.pop("d1", None)
+        gone = deps.retrieval.search("任意问题", scope=scope)
+        assert gone.degraded is False and gone.hits == [], "不存活命中应被过滤且不标降级"
+
+        # 成对判据 2：存活解析端口故障 → fail-closed 降级 LEDGER_UNAVAILABLE（hits==[]）
+        from ib.core import DegradeReason
+
+        class _BrokenResolver:
+            def resolve_live(self, project_id: str, doc_ids: Any) -> Any:
+                raise RuntimeError("selfcheck: 故意故障")
+
+        original = deps.retrieval._entry_resolver
+        deps.retrieval._entry_resolver = _BrokenResolver()
+        try:
+            broken = deps.retrieval.search("任意问题", scope=scope)
+        finally:
+            deps.retrieval._entry_resolver = original
+        assert broken.degraded is True and broken.hits == [], "存活解析故障必须 fail-closed"
+        assert broken.degrade_reason == DegradeReason.LEDGER_UNAVAILABLE, broken.degrade_reason
+    finally:
+        with deps.ledger._lock:
+            deps.ledger._documents.pop("d1", None)  # 还原：后续用例共用同一装配，不留额外台账行
 
 
 @_case("sse_frame_and_done_terminator：SSE 帧格式与 done 终止条件")
@@ -1498,6 +1536,7 @@ def related_images_events() -> None:
         "doc_name",
         "page_or_section",
         "url_path",
+        "doc_path",  # MOD-005：键追加（既有键不变），台账当前目录路径
     }, decoded["images"][0]
     assert "base64" not in related_images_json(payload).lower()
     assert related_image_url("d1", "img-a") == "/api/files/d1/images/img-a"
@@ -4189,6 +4228,144 @@ def r19_project_expert_isolation() -> None:
     #  判据覆盖，此处不重复 —— 原始文本里 X-IB-Project 仅出现在文档注释中。）
 
 
+@_case("folder_tree_migration_007：007 与 schema 生成器单源 / 幂等 / 老库补列与回填（MOD-001 / REQ-FUNC-017）")
+def folder_tree_migration_007() -> None:
+    import pathlib
+    import sqlite3
+
+    from ib.core.library import name_key_of
+    from ib.ledger import schema as S
+
+    deploy = pathlib.Path(_SRC) / "deploy" / "migrations"
+    sql = (deploy / "007_folder_tree.sql").read_text(encoding="utf-8")
+    norm = lambda s: "".join(s.split())  # noqa: E731 - 与 CI 的 003 单源比对同口径（去空白后包含）
+    assert norm(S.folder_tree_ddl_script()) in norm(sql), "007_folder_tree.sql 与 folder_tree_ddl_script() 不一致（单源）"
+    for old in ("001_ledger_init.sql", "002_chunk_image.sql", "003_accounts.sql", "004_config_audit.sql",
+                "005_projects.sql", "006_llm_key.sql"):
+        assert (deploy / old).is_file(), f"既有迁移 {old} 缺失（001~006 不得删改）"
+    # 回滚说明在头注释；可执行语句里不得出现 DROP（DROP 类只在注释里并标 MANUAL_ROLLBACK_REQUIRED）
+    assert "MANUAL_ROLLBACK_REQUIRED" in sql and "name_key" in sql.split("CREATE TABLE")[0], "007 头注释缺回滚/回填说明"
+    for line in sql.splitlines():
+        assert "DROP" not in line.split("--")[0].upper(), "007 含可执行的 DROP 语句"
+
+    # 老库（001 形态 + 历史数据：含仅大小写不同的重名行）→ ensure_schema 两遍
+    con = sqlite3.connect(":memory:", isolation_level=None)
+    for statement in S.DDL_STATEMENTS:
+        con.execute(statement)
+    con.execute("INSERT INTO projects VALUES ('p','p','1','m',3,'2020')")
+    con.execute("INSERT INTO kbs VALUES ('p','p','p','2020')")
+    for i, name in enumerate(["A.pdf", "a.PDF", "b.pdf"]):
+        con.execute(
+            "INSERT INTO documents VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (f"d{i}", "p", "p", name, "pdf", 1, "s", None, "indexed", None, 1, "1", None, None, None,
+             f"2020-01-0{i + 1}", "2020-02-01"),
+        )
+    S.ensure_schema(con)
+    S.ensure_schema(con)  # 幂等
+    rows = {r[0]: r for r in con.execute(
+        "SELECT doc_id, doc_name, name_key, folder_id, uploaded_at, indexed_at, revision_of FROM documents")}
+    assert rows["d0"][2] == name_key_of("A.pdf") and rows["d2"][2] == "b.pdf"
+    assert rows["d1"][2].startswith("a.pdf\x1f") and rows["d1"][1] == "a.PDF", "历史重名行应仅 name_key 去重、显示名不变"
+    assert all(r[3] == "" and r[4] and r[5] and r[6] is None for r in rows.values()), "归根/uploaded_at/indexed_at 回填失败"
+    assert not S.missing_columns(con) and not S.missing_folder_tree_columns(con), "ensure_schema 后结构不完整"
+    con.executescript(sql)
+    con.executescript(sql)  # 007 快照在已 ensure_schema 的库上可重放
+    # 唯一约束生效：同目录大小写同名的存活行应被拒绝
+    try:
+        con.execute(
+            "INSERT INTO documents (doc_id,project_id,kb_id,doc_name,ext,size_bytes,content_sha256,status,chunk_count,"
+            "created_at,updated_at,folder_id,name_key,uploaded_at) VALUES "
+            "('x','p','p','B.PDF','pdf',1,'s','pending',0,'t','t','','b.pdf','t')"
+        )
+        raise AssertionError("uq_documents_name 未生效")
+    except sqlite3.IntegrityError:
+        pass
+
+
+def _folder_tree_issues(con: Any) -> list[str]:
+    """目录完整性对账（REQ-FUNC-017）：空列表 = 一致。"""
+    issues: list[str] = []
+    folders = {
+        r[0]: (r[1], r[2], int(r[3]))
+        for r in con.execute("SELECT folder_id, project_id, parent_id, depth FROM folders")
+    }
+    for fid, (pid, parent, depth) in folders.items():
+        if parent == "":
+            if depth != 1:
+                issues.append("根下一级目录 depth 应为 1")
+            continue
+        up = folders.get(parent)
+        if up is None:
+            issues.append("目录父链悬空")
+        elif up[0] != pid:
+            issues.append("目录父子跨项目")
+        elif depth != up[2] + 1:
+            issues.append("depth 与父链不一致")
+        seen, cur = {fid}, parent
+        while cur:
+            if cur in seen:
+                issues.append("目录父链成环")
+                break
+            seen.add(cur)
+            cur = folders.get(cur, ("", "", 0))[1]
+    docs = con.execute("SELECT doc_id, project_id, folder_id, revision_of FROM documents").fetchall()
+    live = {d[0]: d for d in docs if d[3] is None}
+    for doc_id, pid, folder_id, revision_of in docs:
+        if folder_id and (folder_id not in folders or folders[folder_id][0] != pid):
+            issues.append("文档所属目录不存在或跨项目")
+        if revision_of is not None and (revision_of not in live or live[revision_of][1] != pid):
+            issues.append("修订行指向的存活行悬空")
+    return issues
+
+
+@_case("folder_tree_integrity：目录树增删改移 + 修订晋升后对账一致，且对账能抓出人为损坏（正反例）")
+def folder_tree_integrity() -> None:
+    import os
+    import tempfile
+
+    from ib.core import KbRecord, ProjectRecord, Scope
+    from ib.core.library import EntryRef
+    from ib.ledger.sqlite_repo import SqliteLedgerRepository
+    from ib.ledger.tree import build_entry_tree
+
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        ledger = SqliteLedgerRepository(os.path.join(tmp, "ledger.sqlite3"))
+        try:
+            ledger.upsert_project(ProjectRecord("p", "p", "1", "m", 3, "2020"))
+            ledger.upsert_kb(KbRecord("p", "p", "p", "2020"))
+            tree = build_entry_tree(ledger)
+            scope = Scope("p", ("p",))
+            a = tree.create_folder(scope, "", "A", max_depth=5)
+            made = tree.create_document_in(
+                scope, folder_id=a.folder_id, rel_dirs=["B", "C"], name="x.md", ext="md", size_bytes=1,
+                content_sha256="h", on_conflict="fail", max_depth=5,
+            )
+            ledger.claim_pending("w", 60, 5)
+            ledger.mark_indexed(scope, made.record.doc_id, "1", 1)
+            rev, _ = tree.create_revision(
+                scope, made.record.doc_id, new_name="x.md", ext="md", size_bytes=2, content_sha256="h2",
+                on_conflict="fail",
+            )
+            conn = ledger._conn()
+            assert _folder_tree_issues(conn) == [], f"建树/修订后对账应一致：{_folder_tree_issues(conn)}"
+            ledger.claim_pending("w", 60, 5)
+            tree.promote_revision(scope, rev.doc_id, collection_version="1", chunk_count=1, active_version="1")
+            top = tree.create_folder(scope, "", "Top", max_depth=5)
+            tree.move_entries(scope, [EntryRef("folder", a.folder_id)], top.folder_id, {}, max_depth=5)
+            assert _folder_tree_issues(conn) == [], f"移动/晋升后对账应一致：{_folder_tree_issues(conn)}"
+            assert tree.resolve_live("p", [rev.doc_id])[rev.doc_id].path == "Top/A/B/C/x.md"
+            # 反例：人为损坏必须被抓出（对账不是空转）
+            conn.execute("UPDATE documents SET folder_id = 'nope' WHERE doc_id = ?", (rev.doc_id,))
+            conn.execute("UPDATE folders SET depth = 9 WHERE folder_id = ?", (a.folder_id,))
+            conn.execute("UPDATE folders SET parent_id = ? WHERE folder_id = ?", (a.folder_id, top.folder_id))
+            found = _folder_tree_issues(conn)
+            assert any("所属目录不存在" in i for i in found), found
+            assert any("depth" in i for i in found), found
+            assert any("成环" in i for i in found), found
+        finally:
+            ledger.close()
+
+
 def main() -> int:
     print("=" * 72)
     print("intelligentbase 离线自检（GROUP_C 自我验证；正式测试套件属 GROUP_D）")
@@ -4255,6 +4432,9 @@ def main() -> int:
         r17_build_expert_system_slot,
         # ---- REV-19 增量（每项目专家集隔离 / 种子 / 目录化 / 历史迁移；IFC-IB-378~388） ----
         r19_project_expert_isolation,
+        # ---- 资料库目录增量（007 迁移单源 + 目录完整性对账；MOD-001 / MOD-015） ----
+        folder_tree_migration_007,
+        folder_tree_integrity,
     ]
     for case in cases:
         case()

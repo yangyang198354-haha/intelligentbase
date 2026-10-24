@@ -275,6 +275,7 @@ class RetrievedChunk:
     page_or_section: str
     source_kind: str
     locator: str
+    doc_path: str = ""  # MOD-005：台账当前目录路径（含文件名）；空 = 未回填
 
 
 @dataclass(frozen=True, slots=True)
@@ -354,6 +355,7 @@ class RelatedImageItem:
     doc_name: str
     page_or_section: str
     url_path: str
+    doc_path: str = ""  # MOD-005：台账当前目录路径
 
 
 @dataclass(frozen=True, slots=True)
@@ -426,6 +428,13 @@ class DocumentRecord:
     lease_expires_at: str | None
     created_at: str
     updated_at: str
+    # ---- 资料库目录扩展（MOD-001）：全部尾部、带默认值，保持按位置构造的既有代码兼容 ----
+    folder_id: str = ""  # '' = 根
+    name_key: str = ""  # '' = 修订行（隐藏）或尚未回填
+    uploaded_at: str = ""  # 首次上传登记时间（UTC 定长）
+    content_updated_at: str | None = None  # None = 从未更新
+    indexed_at: str | None = None  # 最近一次索引成功时间
+    revision_of: str | None = None  # 非空 = 修订行，值为旧（存活）doc_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -763,6 +772,7 @@ class CitationItem:
     page_or_section: str
     locator: str
     score: float
+    doc_path: str = ""  # MOD-005：台账当前目录路径
 
 
 @dataclass(frozen=True, slots=True)

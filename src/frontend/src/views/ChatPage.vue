@@ -64,6 +64,8 @@ type TurnImage = {
   imageId: string;
   docId: string;
   docName: string;
+  /** 台账当前目录路径（含文件名，如 `规范/第一章/a.pdf`）；空串 = 载荷未带（旧后端）。 */
+  docPath: string;
   pageOrSection: string;
   objectUrl: string;
   failed: boolean;
@@ -215,6 +217,7 @@ function collectImages(turn: Turn, data: string): void {
       imageId: item.image_id,
       docId: item.doc_id,
       docName: item.doc_name ?? '',
+      docPath: item.doc_path ?? '',
       pageOrSection: item.page_or_section ?? '',
       objectUrl: '',
       failed: false,
@@ -379,11 +382,11 @@ onBeforeUnmount(() => {
           :key="image.imageId"
           type="button"
           class="thumb"
-          :title="`${image.docName || '文档'} · ${image.pageOrSection}`"
-          :aria-label="`查看原图：${image.docName || '文档'} ${image.pageOrSection}`"
+          :title="`${image.docPath || image.docName || '文档'} · ${image.pageOrSection}`"
+          :aria-label="`查看原图：${image.docPath || image.docName || '文档'} ${image.pageOrSection}`"
           @click="openOriginal(image)"
         >
-          <img :src="image.objectUrl" :alt="`${image.docName} ${image.pageOrSection}`" loading="lazy" />
+          <img :src="image.objectUrl" :alt="`${image.docPath || image.docName} ${image.pageOrSection}`" loading="lazy" />
         </button>
       </div>
 

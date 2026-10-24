@@ -427,6 +427,141 @@ LLM_KEY_EXPECTED_COLUMNS: dict[str, tuple[str, ...]] = {
 }
 
 
+# --------------------------------------------------------------------------- #
+# 资料库目录（007_folder_tree；MOD-001 / ADR-001~002、ADR-009）
+# --------------------------------------------------------------------------- #
+#
+# 与 REV-18 同一纪律：`documents` 既有表**不改 001 的 DDL_STATEMENTS**，新列由
+# `_ensure_document_tree_columns` 以 `PRAGMA table_info` 探测后逐列 `ALTER TABLE` 补齐；
+# 新表 / 非唯一索引 / 标量回填 / 唯一索引的 SQL 为单源（`folder_tree_ddl_script()`），
+# `007_folder_tree.sql` 是它的可审阅快照。Python 的 `name_key` 回填只在 `ensure_schema`
+# 中执行（见 `backfill_name_keys`），不在 007 快照里。
+
+#: `documents` 表新增的 6 列（列名, 定义）。`''` = 根目录 / 修订行 / 待回填。
+FOLDER_TREE_ADDED_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("folder_id", "TEXT NOT NULL DEFAULT ''"),
+    ("name_key", "TEXT NOT NULL DEFAULT ''"),
+    ("uploaded_at", "TEXT NOT NULL DEFAULT ''"),
+    ("content_updated_at", "TEXT"),
+    ("indexed_at", "TEXT"),
+    ("revision_of", "TEXT"),
+)
+
+#: 新表 + 不依赖回填顺序的非唯一索引（幂等）。
+FOLDER_TREE_DDL_STATEMENTS: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS folders (
+        folder_id   TEXT PRIMARY KEY,
+        project_id  TEXT NOT NULL,
+        parent_id   TEXT NOT NULL DEFAULT '',
+        name        TEXT NOT NULL,
+        name_key    TEXT NOT NULL,
+        depth       INTEGER NOT NULL,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        CHECK (depth >= 1)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS upload_batches (
+        batch_id         TEXT PRIMARY KEY,
+        project_id       TEXT NOT NULL,
+        target_folder_id TEXT NOT NULL DEFAULT '',
+        planned_files    INTEGER NOT NULL,
+        planned_bytes    INTEGER NOT NULL,
+        created_at       TEXT NOT NULL,
+        expires_at       TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS upload_batch_items (
+        batch_id        TEXT NOT NULL REFERENCES upload_batches(batch_id) ON DELETE CASCADE,
+        client_idx      INTEGER NOT NULL,
+        rel_path        TEXT NOT NULL,
+        final_rel_path  TEXT,
+        action          TEXT NOT NULL,
+        declared_size   INTEGER NOT NULL,
+        target_doc_id   TEXT,
+        state           TEXT NOT NULL,
+        reason_code     TEXT,
+        doc_id          TEXT,
+        updated_at      TEXT NOT NULL,
+        PRIMARY KEY (batch_id, client_idx),
+        CHECK (action IN ('create', 'update', 'skip')),
+        CHECK (state IN ('planned', 'accepted', 'skipped', 'failed'))
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS doc_purge_queue (
+        doc_id      TEXT PRIMARY KEY,
+        project_id  TEXT NOT NULL,
+        kb_id       TEXT NOT NULL,
+        reason      TEXT NOT NULL,
+        attempts    INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_folders_parent ON folders(project_id, parent_id)",
+    "CREATE INDEX IF NOT EXISTS idx_documents_folder ON documents(project_id, folder_id)",
+    "CREATE INDEX IF NOT EXISTS idx_batch_items_state ON upload_batch_items(batch_id, state)",
+    "CREATE INDEX IF NOT EXISTS idx_upload_batches_expiry ON upload_batches(expires_at)",
+)
+
+#: 标量回填（幂等：只处理尚未回填的行）。`name_key` 的回填需要 Python（Unicode 规范化），
+#: 见 `backfill_name_keys`，不在此处。
+FOLDER_TREE_BACKFILL_STATEMENTS: tuple[str, ...] = (
+    "UPDATE documents SET uploaded_at = created_at WHERE uploaded_at = ''",
+    "UPDATE documents SET indexed_at = updated_at WHERE status = 'indexed' AND indexed_at IS NULL",
+)
+
+#: 唯一索引。**必须在 `backfill_name_keys` 之后创建**，否则历史重名行会使建索引失败。
+FOLDER_TREE_UNIQUE_INDEX_STATEMENTS: tuple[str, ...] = (
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_folders_name ON folders(project_id, parent_id, name_key)",
+    """
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_documents_name
+        ON documents(project_id, folder_id, name_key) WHERE name_key <> '' AND revision_of IS NULL
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_documents_revision ON documents(revision_of) WHERE revision_of IS NOT NULL",
+)
+
+#: 资料库新表期望列（与 `missing_folder_tree_columns` 配套）。`documents` 的新列在 `EXPECTED_COLUMNS`。
+FOLDER_TREE_EXPECTED_COLUMNS: dict[str, tuple[str, ...]] = {
+    "folders": (
+        "folder_id",
+        "project_id",
+        "parent_id",
+        "name",
+        "name_key",
+        "depth",
+        "created_at",
+        "updated_at",
+    ),
+    "upload_batches": (
+        "batch_id",
+        "project_id",
+        "target_folder_id",
+        "planned_files",
+        "planned_bytes",
+        "created_at",
+        "expires_at",
+    ),
+    "upload_batch_items": (
+        "batch_id",
+        "client_idx",
+        "rel_path",
+        "final_rel_path",
+        "action",
+        "declared_size",
+        "target_doc_id",
+        "state",
+        "reason_code",
+        "doc_id",
+        "updated_at",
+    ),
+    "doc_purge_queue": ("doc_id", "project_id", "kb_id", "reason", "attempts", "created_at"),
+}
+
+
 #: 期望存在的列（用于启动期/自测期的一致性校验，防止「老库缺列」导致的运行期 TypeError）。
 EXPECTED_COLUMNS: dict[str, tuple[str, ...]] = {
     "projects": (
@@ -458,6 +593,13 @@ EXPECTED_COLUMNS: dict[str, tuple[str, ...]] = {
         "lease_expires_at",
         "created_at",
         "updated_at",
+        # 资料库目录（007_folder_tree）：6 个新列，缺列在启动期被 `missing_columns` 拦截。
+        "folder_id",
+        "name_key",
+        "uploaded_at",
+        "content_updated_at",
+        "indexed_at",
+        "revision_of",
     ),
     "chunks": (
         "chunk_id",
@@ -528,6 +670,111 @@ def llm_key_ddl_script() -> str:
     return ";\n".join(statement.strip() for statement in LLM_KEY_DDL_STATEMENTS) + ";\n"
 
 
+def folder_tree_ddl_script() -> str:
+    """资料库目录 DDL（新表 + 索引）+ 标量回填 + 唯一索引，拼为单条脚本（供 `007_folder_tree.sql`）。
+
+    不含 `documents` 的 `ALTER TABLE … ADD COLUMN`（SQLite 无 IF NOT EXISTS，由 `ensure_schema`
+    探测后补列）与 Python 的 `name_key` 回填；对已有老库手工执行本脚本前须先完成这两步，
+    即先让 `ensure_schema` 跑过一次。
+    """
+    statements = (
+        FOLDER_TREE_DDL_STATEMENTS
+        + FOLDER_TREE_BACKFILL_STATEMENTS
+        + FOLDER_TREE_UNIQUE_INDEX_STATEMENTS
+    )
+    return ";\n".join(statement.strip() for statement in statements) + ";\n"
+
+
+class _WriteTxn:
+    """若连接尚未处于事务中则 `BEGIN IMMEDIATE`，退出时提交（异常回滚）；已在事务中则透传。"""
+
+    def __init__(self, connection) -> None:
+        self._connection = connection
+        self._owned = False
+
+    def __enter__(self):
+        if not self._connection.in_transaction:
+            self._connection.execute("BEGIN IMMEDIATE")
+            self._owned = True
+        return self._connection
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        if self._owned:
+            if exc_type is None:
+                self._connection.commit()
+            else:
+                self._connection.rollback()
+        return False
+
+
+def _ensure_document_tree_columns(connection) -> None:
+    """**幂等**为既有 `documents` 表补资料库的 6 个新列（`FOLDER_TREE_ADDED_COLUMNS`）。
+
+    `ib-web` 的 ExecStartPre 与 `ib-worker` 启动都会调 `ensure_schema`，故包在 `BEGIN IMMEDIATE`
+    内，并容忍并发方抢先补列造成的 `duplicate column name`。
+    """
+    import sqlite3
+
+    with _WriteTxn(connection):
+        cursor = connection.cursor()
+        try:
+            cursor.execute("PRAGMA table_info(documents)")
+            actual = {row[1] for row in cursor.fetchall()}
+            if not actual:
+                return
+            for column, column_ddl in FOLDER_TREE_ADDED_COLUMNS:
+                if column in actual:
+                    continue
+                try:
+                    cursor.execute(f"ALTER TABLE documents ADD COLUMN {column} {column_ddl}")
+                except sqlite3.OperationalError as exc:
+                    if "duplicate column name" not in str(exc).lower():
+                        raise
+        finally:
+            cursor.close()
+
+
+def backfill_name_keys(connection) -> int:
+    """**幂等**回填 `documents.name_key`（只处理 `name_key = '' AND revision_of IS NULL` 的行）。
+
+    按 `(project_id, folder_id)` 分组、`created_at, doc_id` 升序计算 `name_key_of(doc_name)`；
+    组内与已占用键重复者追加 `\\x1f<doc_id>`，使历史重名行**显示名不变**（AC-017-01）。
+    返回本次回填的行数。
+    """
+    from ib.core.library import name_key_of
+
+    filled = 0
+    with _WriteTxn(connection):
+        cursor = connection.cursor()
+        try:
+            cursor.execute(
+                "SELECT doc_id, project_id, folder_id, doc_name FROM documents"
+                " WHERE name_key = '' AND revision_of IS NULL ORDER BY project_id, folder_id, created_at, doc_id"
+            )
+            pending = cursor.fetchall()
+            if not pending:
+                return 0
+            taken: dict[tuple[str, str], set[str]] = {}
+            for doc_id, project_id, folder_id, doc_name in pending:
+                group = (project_id, folder_id)
+                if group not in taken:
+                    cursor.execute(
+                        "SELECT name_key FROM documents WHERE project_id = ? AND folder_id = ?"
+                        " AND name_key <> '' AND revision_of IS NULL",
+                        group,
+                    )
+                    taken[group] = {row[0] for row in cursor.fetchall()}
+                key = name_key_of(doc_name) or doc_id
+                if key in taken[group]:
+                    key = f"{key}\x1f{doc_id}"
+                taken[group].add(key)
+                cursor.execute("UPDATE documents SET name_key = ? WHERE doc_id = ?", (key, doc_id))
+                filled += 1
+        finally:
+            cursor.close()
+    return filled
+
+
 def _ensure_project_registry_columns(connection) -> None:
     """**幂等**为既有 `projects` 表补 REV-18 两列（`status` / `updated_at`）。
 
@@ -587,6 +834,16 @@ def ensure_schema(connection) -> None:
         for statement in CONFIG_AUDIT_DDL_STATEMENTS:
             cursor.execute(statement)
         connection.commit()
+        # 资料库目录（007）：顺序固定——补列 → 新表/索引 → 标量回填 → name_key 回填 → 唯一索引。
+        _ensure_document_tree_columns(connection)
+        for statement in FOLDER_TREE_DDL_STATEMENTS:
+            cursor.execute(statement)
+        for statement in FOLDER_TREE_BACKFILL_STATEMENTS:
+            cursor.execute(statement)
+        backfill_name_keys(connection)
+        for statement in FOLDER_TREE_UNIQUE_INDEX_STATEMENTS:
+            cursor.execute(statement)
+        connection.commit()
     finally:
         cursor.close()
 
@@ -614,6 +871,11 @@ def missing_project_registry_columns(connection) -> dict[str, list[str]]:
 def missing_llm_key_columns(connection) -> dict[str, list[str]]:
     """LLM Key 表期望列的缺失检查（REV-18，IFC-IB-371）。空字典表示结构完整。"""
     return _missing(connection, LLM_KEY_EXPECTED_COLUMNS)
+
+
+def missing_folder_tree_columns(connection) -> dict[str, list[str]]:
+    """资料库目录新表的缺失列检查（007，MOD-001）。空字典表示结构完整。"""
+    return _missing(connection, FOLDER_TREE_EXPECTED_COLUMNS)
 
 
 def _missing(connection, expected_tables: dict[str, tuple[str, ...]]) -> dict[str, list[str]]:

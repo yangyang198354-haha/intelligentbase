@@ -23,3 +23,7 @@
 ## 用户偏好与禁止项
 
 ## 待验证
+- [P-SD-001] 检索接入“台账存活过滤”后，凡是直接 upsert 向量点而不建台账行的夹具（selfcheck `isolation_scope_required` 的 d1）会被判不存活而召回 0；夹具需补一条存活台账行，并成对断言“全不存活=不降级且空 / 解析故障=LEDGER_UNAVAILABLE” — 自记 2026-10-24 · 证据 selfcheck retrieval_happy_path 改动前失败
+- [P-SD-002] 给端口 Protocol 已有方法加可选关键字参数时，同步改 `ib/core/ports.py` 的签名，否则 selfcheck `port_conformance`（按参数名集合比对）会失败；新增响应键（如 doc_path）要同步 selfcheck/测试里按“精确键集”的断言 — 自记 2026-10-24 · 证据 list_documents(include_revisions)、related_images 键集
+- [P-SD-004] 想验证“修复前行为”时，不要对工作区文件 `git stash`（会连同未提交的其他增量一并收走）；改用测试内 `monkeypatch` 把新增的模块级常量置回旧值重放 — 自记 2026-10-24 · 证据 DEF-R25-001 修复轮（REDIRECT_REBUILD_STATES）
+- [P-SD-003] 无 django/pytest 的机器上，可在 scratchpad 放 stub 的 rest_framework/django.http + 假 request 对象驱动视图函数做冒烟（不入库、不算测试），能抓出序列化/错误映射类缺陷；PUT multipart 解析等 Django 特有路径仍须标未验证 — 自记 2026-10-24 · 证据 library_views 冒烟

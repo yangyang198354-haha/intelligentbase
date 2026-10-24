@@ -191,6 +191,12 @@ class Deps:
     # REV-18 LLM Key 存储（第 19 个端口的装配实例；IFC-IB-368/371）。**唯一写入口**
     # = `PUT /api/llm-key`；装配期解析为唯一读点。HTTP 层只暴露 `LlmKeyStatus`（不含明文）。
     llm_key_store: Any = None
+    # 资料库目录（MOD-010 / IFC-024）：目录树存储、上传批次存储与两个业务服务。
+    # 均**不读 `cfg.projects`**（运行期新建项目不在其中）：项目维度只来自 Scope 与台账。
+    tree: Any = None
+    upload_batches: Any = None
+    library: Any = None
+    uploads: Any = None
 
     def __post_init__(self) -> None:
         self._lock = threading.Lock()
@@ -463,10 +469,16 @@ def _make_related_images_provider(ledger: Any, scope: Scope) -> Any:
     def _provider(hits: Sequence[Any], provider_scope: Scope) -> RelatedImagesPayload | None:
         keys: list[tuple[str, str]] = []
         seen_keys: set[tuple[str, str]] = set()
+        # 命中已由检索层按台账回填当前名称/目录路径（MOD-005）：优先用它，不再读 chunk_image.doc_name
+        names: dict[str, tuple[str, str]] = {}
         for hit in hits or ():
             doc_id = str(getattr(hit, "doc_id", "") or "")
             if not doc_id:
                 continue
+            names.setdefault(
+                doc_id,
+                (str(getattr(hit, "doc_name", "") or ""), str(getattr(hit, "doc_path", "") or "")),
+            )
             key = (doc_id, str(getattr(hit, "page_or_section", "") or ""))
             if key in seen_keys:
                 continue
@@ -487,9 +499,10 @@ def _make_related_images_provider(ledger: Any, scope: Scope) -> Any:
                     RelatedImageItem(
                         image_id=record.image_id,
                         doc_id=record.doc_id,
-                        doc_name=record.doc_name,
+                        doc_name=names.get(record.doc_id, ("", ""))[0] or record.doc_name,
                         page_or_section=record.page_or_section,
                         url_path=related_image_url(record.doc_id, record.image_id),
+                        doc_path=names.get(record.doc_id, ("", ""))[1],
                     )
                 )
         return RelatedImagesPayload(images=tuple(items)) if items else None
@@ -632,7 +645,9 @@ def _assemble() -> Deps:
     from ib.blob import build_blob_store
     from ib.chunking import SlidingWindowChunker
     from ib.embedding import build_embedder, collection_spec_for
-    from ib.ledger import build_ledger, load_project_record
+    from ib.ledger import build_entry_tree, build_ledger, build_upload_batch_store, load_project_record
+    from ib.library import LibraryService
+    from ib.library.uploads import UploadBatchService, UploadLimits
     from ib.llm import build_llm_provider
     from ib.lifecycle import DocumentLifecycle
     from ib.observability import configure_logging, log_event
@@ -697,6 +712,10 @@ def _assemble() -> Deps:
     # 3c) 逐项目补齐台账项目行 + 知识库行（IFC-IB-130 归属断言的判定依据；幂等）
     _ensure_project_ledger_rows(ledger, projects)
 
+    # 3d) 资料库目录树 / 上传批次存储（与台账同一实现族：sqlite 或内存替身）
+    tree = build_entry_tree(ledger)
+    upload_batches = build_upload_batch_store(ledger)
+
     read_provider = _make_read_provider(ledger, cfg)
     write_provider = RebuildAwareProjectProvider(ledger, read_provider)
 
@@ -718,6 +737,9 @@ def _assemble() -> Deps:
         cold_max_retries=cfg.embedding.cold_max_retries,
         cold_batch_size=cfg.embedding.cold_batch_size,
         lease_seconds=cfg.worker.lease_seconds,
+        tree=tree,
+        active_version_provider=ledger.active_collection_version,
+        library_max_depth=cfg.library_max_depth,
     )
     retrieval = RetrievalService(
         embedder=embedder,
@@ -728,6 +750,7 @@ def _assemble() -> Deps:
         score_threshold=cfg.retrieval.score_threshold,
         candidate_multiplier=cfg.retrieval.candidate_multiplier,
         hot_timeout_s=cfg.embedding.hot_timeout_s,
+        entry_resolver=tree,  # 台账存活过滤 + 当前名称/路径回填（MOD-005）
     )
     rebuild = RebuildService(
         ledger=ledger,
@@ -737,6 +760,20 @@ def _assemble() -> Deps:
         project_provider=write_provider,
         current_factors=lambda: _fingerprint_factors(cfg),
         batch_limit=cfg.worker.batch_limit,
+        revision_promoter=lifecycle.promote_ready_revisions,
+    )
+    library = LibraryService(tree=tree, lifecycle=lifecycle, ledger=ledger, max_depth=cfg.library_max_depth)
+    uploads = UploadBatchService(
+        tree=tree,
+        batches=upload_batches,
+        lifecycle=lifecycle,
+        limits=UploadLimits(
+            max_files=cfg.upload_batch_max_files,
+            max_total_bytes=cfg.upload_batch_max_total_mb * 1024 * 1024,
+            max_depth=cfg.library_max_depth,
+            max_file_bytes=cfg.max_upload_mb * 1024 * 1024,
+        ),
+        batch_ttl_hours=cfg.upload_batch_ttl_hours,
     )
 
     # 4d) R13 账户 / 会话（IFC-IB-325）：构造 AccountStore → 幂等种子 → 注入策略模块。
@@ -840,6 +877,10 @@ def _assemble() -> Deps:
         llm_key_store=llm_key_store,
         storage_state=storage_state,
         login_throttle=login_throttle,
+        tree=tree,
+        upload_batches=upload_batches,
+        library=library,
+        uploads=uploads,
     )
     log_event(
         "startup",

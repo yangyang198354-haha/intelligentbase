@@ -36,7 +36,9 @@ from __future__ import annotations
 
 import hashlib
 import io
-from typing import Any, BinaryIO, Callable, Sequence
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, BinaryIO, Callable, Literal, Sequence
 
 from ib.blob import kb_segment
 from ib.context import utc_now_iso
@@ -63,11 +65,16 @@ from ib.core import (
     ValidatedUpload,
     VectorPoint,
 )
+from ib.core.library import LibraryConflictError
 from ib.observability import Timer, get_logger, log_event
 from ib.vectorstore import point_id_for
 
 __all__ = [
     "DocumentLifecycle",
+    "UploadRejection",
+    "RejectedUpload",
+    "DocumentPlacement",
+    "RevisionResult",
     "ERROR_CODES",
     "MAX_UPLOAD_BYTES",
     "MAGIC_HEAD_BYTES",
@@ -219,6 +226,35 @@ def _page_image_ref_of(chunk: ParsedChunk, *, doc_id: str) -> PageImageRef | Non
     )
 
 
+class UploadRejection(str, Enum):
+    UNSUPPORTED_TYPE = "UNSUPPORTED_TYPE"
+    EMPTY_FILE = "EMPTY_FILE"
+    TOO_LARGE = "TOO_LARGE"
+    MAGIC_MISMATCH = "MAGIC_MISMATCH"
+
+
+@dataclass(frozen=True, slots=True)
+class RejectedUpload:
+    reason: UploadRejection
+    message: str  # 与 validate_upload 现有中文提示一致
+
+
+@dataclass(frozen=True, slots=True)
+class DocumentPlacement:
+    folder_id: str  # '' = 根
+    rel_dirs: tuple[str, ...]  # 需在 folder_id 之下确保存在的目录（展示名，已校验）
+    name: str  # 文件展示名（含扩展名）
+    on_conflict: Literal["fail", "rename"] = "fail"
+
+
+@dataclass(frozen=True, slots=True)
+class RevisionResult:
+    changed: bool  # False = 内容与现有完全相同（不建修订行）
+    live: DocumentRecord  # 存活行（changed=False 时即现有行）
+    revision: DocumentRecord | None  # 新修订行
+    final_name: str
+
+
 class DocumentLifecycle:
     """入库管线编排（IFC-IB-141~145）。
 
@@ -244,7 +280,14 @@ class DocumentLifecycle:
         cold_max_retries: int = COLD_MAX_RETRIES,
         cold_batch_size: int = COLD_BATCH_SIZE,
         lease_seconds: int = LEASE_SECONDS,
+        tree: Any = None,
+        active_version_provider: Callable[[str], str] | None = None,
+        library_max_depth: int = 10,
     ) -> None:
+        # MOD-004：tree / active_version_provider 缺省时，目录与修订相关方法抛 DependencyUnavailableError。
+        self._tree = tree
+        self._active_version_provider = active_version_provider
+        self._library_max_depth = library_max_depth
         self._ledger = ledger
         self._blobs = blobs
         self._parsers = parsers
@@ -274,26 +317,37 @@ class DocumentLifecycle:
         顺序刻意从「便宜且确定」到「需要读内容」：扩展名（字符串）→ 大小（整数）→ 魔数（字节）。
         任何一步失败都抛 `ValidationError`（→ HTTP 400），**不返回半校验对象**。
         """
+        result = self.classify_upload(filename, size_bytes, head)
+        if isinstance(result, RejectedUpload):
+            raise ValidationError(result.message)
+        return result
+
+    def classify_upload(
+        self, filename: str, size_bytes: int, head: bytes
+    ) -> ValidatedUpload | RejectedUpload:
+        """非抛出式分类（IFC-017）：顺序与 `validate_upload` 完全一致，失败返回 `RejectedUpload`。"""
         from ib.parsing import SUPPORTED_EXTS, ext_of, sniff_magic
 
         ext = ext_of(filename or "")
         if not ext:
-            raise ValidationError("文件名缺少扩展名，无法判定格式")
+            return RejectedUpload(UploadRejection.UNSUPPORTED_TYPE, "文件名缺少扩展名，无法判定格式")
         if ext not in SUPPORTED_EXTS:
             # 只回显扩展名与支持列表（均为键名级信息，不含用户内容）
-            raise ValidationError(
-                f"不支持的文件格式 .{ext}（支持：{', '.join('.' + e for e in SUPPORTED_EXTS)}）"
+            return RejectedUpload(
+                UploadRejection.UNSUPPORTED_TYPE,
+                f"不支持的文件格式 .{ext}（支持：{', '.join('.' + e for e in SUPPORTED_EXTS)}）",
             )
         if size_bytes is None or int(size_bytes) <= 0:
-            raise ValidationError("文件为空")
+            return RejectedUpload(UploadRejection.EMPTY_FILE, "文件为空")
         if int(size_bytes) > self._max_upload_bytes:
-            raise ValidationError(
-                f"文件超出大小上限（{self._max_upload_bytes // (1024 * 1024)}MB）"
+            return RejectedUpload(
+                UploadRejection.TOO_LARGE,
+                f"文件超出大小上限（{self._max_upload_bytes // (1024 * 1024)}MB）",
             )
         detected = sniff_magic(head or b"", ext)
         if detected is None:
             # 关键防线：扩展名与真实内容不符（改名攻击 / 伪装上传）
-            raise ValidationError("文件内容与扩展名不符（魔数签名校验失败）")
+            return RejectedUpload(UploadRejection.MAGIC_MISMATCH, "文件内容与扩展名不符（魔数签名校验失败）")
         return ValidatedUpload(
             filename=filename,
             ext=ext,
@@ -368,6 +422,178 @@ class DocumentLifecycle:
             kb_id=kb_id,
         )
         return record
+
+    # ================================================================== #
+    # MOD-004（IFC-017）：目录内落库 / 修订 / 清理队列
+    # ================================================================== #
+
+    def _require_tree(self) -> Any:
+        if self._tree is None:
+            raise DependencyUnavailableError("目录存储未装配", dependency="ledger")
+        return self._tree
+
+    def _read_payload(self, data: BinaryIO) -> tuple[bytes, str]:
+        payload = data.read()
+        if isinstance(payload, str):  # pragma: no cover - 防御
+            payload = payload.encode("utf-8")
+        if len(payload) > self._max_upload_bytes:
+            raise ValidationError(f"文件超出大小上限（{self._max_upload_bytes // (1024 * 1024)}MB）")
+        return payload, hashlib.sha256(payload).hexdigest()
+
+    def submit_library_document(
+        self,
+        ctx: RequestContext,
+        validated: ValidatedUpload,
+        kb_id: str,
+        *,
+        placement: DocumentPlacement,
+        data: BinaryIO,
+    ) -> DocumentRecord:
+        """目录内落库：单事务建目录链 + pending 行 → 落盘；落盘失败补偿删行并清掉本次新建的空目录。"""
+        tree = self._require_tree()
+        scope = _scope_of(ctx, kb_id)
+        self._ledger.assert_kb_in_project(scope.project_id, kb_id)
+        payload, sha = self._read_payload(data)
+        created = tree.create_document_in(
+            scope,
+            folder_id=placement.folder_id,
+            rel_dirs=placement.rel_dirs,
+            name=placement.name,
+            ext=validated.ext,
+            size_bytes=len(payload),
+            content_sha256=sha,
+            on_conflict=placement.on_conflict,
+            max_depth=self._library_max_depth,
+        )
+        record = created.record
+        try:
+            ref = self._blobs.put(scope, record.doc_id, io.BytesIO(payload), validated.ext)
+            if ref.sha256 != sha:  # pragma: no cover - 不一致说明存储被篡改
+                raise DependencyUnavailableError("原文件摘要与台账记录不一致", dependency="blob")
+        except Exception:
+            self._compensate_upload(scope, record.doc_id)
+            self._cleanup_folders(scope, created.created_folders)
+            raise
+        log_event("indexing", "accepted", project_id=scope.project_id, doc_id=record.doc_id, kb_id=kb_id)
+        return record
+
+    def _cleanup_folders(self, scope: Scope, folders: Sequence[Any]) -> None:
+        if not folders:
+            return
+        try:
+            self._tree.delete_empty_folders(scope, [f.folder_id for f in folders])
+        except Exception as exc:  # noqa: BLE001 - 补偿失败不改写原始异常
+            get_logger("indexing").warn("failed", error_code=f"compensate_folders_failed:{type(exc).__name__}")
+
+    def submit_revision(
+        self,
+        ctx: RequestContext,
+        doc_id: str,
+        validated: ValidatedUpload,
+        *,
+        data: BinaryIO,
+        new_name: str,
+        on_conflict: Literal["fail", "rename"] = "fail",
+    ) -> RevisionResult:
+        """更新：内容完全相同且存活行已索引 → changed=False；否则建修订行 + 落盘（旧版继续可检索）。"""
+        tree = self._require_tree()
+        scope = Scope(project_id=ctx.authz.project_id, kb_ids=None)
+        live = self._ledger.get_document(scope, doc_id)
+        if live is None or live.revision_of is not None:
+            raise NotFoundError("文档不存在或不在当前作用域内")
+        payload, sha = self._read_payload(data)
+        if sha == live.content_sha256 and live.status == "indexed":
+            return RevisionResult(changed=False, live=live, revision=None, final_name=live.doc_name)
+        revision, replaced = tree.create_revision(
+            scope,
+            doc_id,
+            new_name=new_name,
+            ext=validated.ext,
+            size_bytes=len(payload),
+            content_sha256=sha,
+            on_conflict=on_conflict,
+        )
+        blob_scope = Scope(project_id=live.project_id, kb_ids=(live.kb_id,) if live.kb_id else None)
+        try:
+            ref = self._blobs.put(blob_scope, revision.doc_id, io.BytesIO(payload), validated.ext)
+            if ref.sha256 != sha:  # pragma: no cover
+                raise DependencyUnavailableError("原文件摘要与台账记录不一致", dependency="blob")
+        except Exception:
+            self._compensate_upload(scope, revision.doc_id)
+            raise
+        for old in replaced:  # 被替换的旧修订行已移出台账：物理清理走清理队列（可重试）
+            tree.enqueue_purge(old.project_id, old.kb_id, old.doc_id, "replaced_revision")
+        if replaced:
+            self.drain_purge_queue(limit=10)
+        log_event("indexing", "accepted", project_id=scope.project_id, doc_id=revision.doc_id, kb_id=live.kb_id)
+        return RevisionResult(changed=True, live=live, revision=revision, final_name=revision.doc_name)
+
+    def discard_revision(self, scope: Scope, live_doc_id: str) -> bool:
+        """丢弃 pending/failed 的修订行；parsing → `update_in_progress`。"""
+        tree = self._require_tree()
+        revision = tree.get_revision_of(scope, live_doc_id)
+        if revision is None:
+            return False
+        if revision.status == "parsing":
+            raise LibraryConflictError("该文件正在更新中", code="update_in_progress")
+        self.delete_document(scope, revision.doc_id)
+        return True
+
+    def retry_revision(self, scope: Scope, live_doc_id: str) -> DocumentRecord:
+        """修订行 failed → pending；无失败修订 → ConflictError。"""
+        tree = self._require_tree()
+        revision = tree.get_revision_of(scope, live_doc_id)
+        if revision is None or revision.status != "failed":
+            raise ConflictError("没有可重试的失败更新")
+        self._ledger.set_status(scope, revision.doc_id, DocStatus.PENDING, error_code=None)
+        updated = self._ledger.get_document(scope, revision.doc_id)
+        if updated is None:  # pragma: no cover
+            raise DependencyUnavailableError("重试后读取台账失败", dependency="ledger")
+        return updated
+
+    def promote_ready_revisions(self, project_id: str, limit: int = 50) -> int:
+        """补晋升：重建激活后，把“已索引且集合版本已是 active”的修订行晋升为存活行。"""
+        tree = self._require_tree()
+        if self._active_version_provider is None:
+            raise DependencyUnavailableError("active 版本提供者未装配", dependency="ledger")
+        version = self._active_version_provider(project_id)
+        promoted = 0
+        for revision in tree.list_ready_revisions(project_id, active_version=version, limit=limit):
+            scope = Scope(project_id=project_id, kb_ids=(revision.kb_id,) if revision.kb_id else None)
+            try:
+                outcome = tree.promote_ready(scope, revision.doc_id, active_version=version)
+            except Exception as exc:  # noqa: BLE001 - 单个修订失败不阻塞其余（下一轮重试）
+                get_logger("indexing").warn("failed", error_code=f"promote_failed:{type(exc).__name__}")
+                continue
+            if outcome is not None:
+                promoted += 1
+        self.drain_purge_queue()
+        return promoted
+
+    def drain_purge_queue(self, limit: int = 50) -> int:
+        """逐项清理：向量（跨全部版本）→ 原文件 → 出队。任一步异常保留队列项并 attempts+1，不外抛。"""
+        if self._tree is None:
+            return 0
+        drained = 0
+        try:
+            items = self._tree.list_purge(limit)
+        except Exception as exc:  # noqa: BLE001
+            get_logger("indexing").warn("failed", error_code=f"purge_list_failed:{type(exc).__name__}")
+            return 0
+        for item in items:
+            scope = Scope(project_id=item.project_id, kb_ids=(item.kb_id,) if item.kb_id else None)
+            try:
+                self._vectors.delete_doc_everywhere(item.project_id, scope, item.doc_id)
+                self._blobs.delete(scope, item.doc_id)
+                self._tree.ack_purge(item.doc_id)
+                drained += 1
+            except Exception as exc:  # noqa: BLE001 - 后台动作：保留队列项，下轮重试
+                get_logger("indexing").warn("failed", error_code=f"purge_failed:{type(exc).__name__}")
+                try:
+                    self._tree.bump_purge(item.doc_id)
+                except Exception:  # noqa: BLE001
+                    pass
+        return drained
 
     def _compensate_upload(self, scope: Scope, doc_id: str) -> None:
         """补偿：删除刚落盘的台账行（best-effort，失败只记日志）。"""
@@ -612,9 +838,13 @@ class DocumentLifecycle:
             )
 
             # 9) 置位（**最后**一步：先向量后台账，ADR-07）
-            self._ledger.mark_indexed(
-                scope, record.doc_id, project.active_collection_version, len(chunks)
-            )
+            if record.revision_of:
+                # 修订行（MOD-004）：单事务晋升代替 mark_indexed；重建在途时仅置 ready，不晋升。
+                self._finish_revision(scope, record, project.active_collection_version, len(chunks))
+            else:
+                self._ledger.mark_indexed(
+                    scope, record.doc_id, project.active_collection_version, len(chunks)
+                )
         log_event(
             "indexing",
             "succeeded",
@@ -624,6 +854,37 @@ class DocumentLifecycle:
             page_images=len(bindings),
         )
         return True
+
+    def _finish_revision(
+        self, scope: Scope, record: DocumentRecord, collection_version: str, chunk_count: int
+    ) -> None:
+        """修订行索引完成：`tree.promote_revision`（旧行已不存在 → 丢弃已写向量与修订行，安全跳过）。"""
+        tree = self._require_tree()
+        if self._active_version_provider is None:
+            raise DependencyUnavailableError("active 版本提供者未装配", dependency="ledger")
+        try:
+            outcome = tree.promote_revision(
+                scope,
+                record.doc_id,
+                collection_version=collection_version,
+                chunk_count=chunk_count,
+                active_version=self._active_version_provider(record.project_id),
+            )
+        except NotFoundError:
+            if self._ledger.get_document(scope, record.doc_id) is None:
+                raise  # 修订行自身已被删：交给 process_pending 的并发删除分支
+            # 被更新的旧行已不存在：修订行没有归宿，丢弃（向量→原文件→台账行）
+            self._discard_written_vectors(scope, record.doc_id)
+            try:
+                self._blobs.delete(_blob_scope_of(record), record.doc_id)
+                self._ledger.mark_deleted(scope, record.doc_id)
+            except Exception as exc:  # noqa: BLE001 - 尽力而为
+                get_logger("indexing").warn(
+                    "warned", error_code=f"orphan_revision_cleanup_failed:{type(exc).__name__}", doc_id=record.doc_id
+                )
+            raise _DeletedConcurrently() from None
+        if outcome.kind == "promoted":
+            self.drain_purge_queue()  # 旧 doc_id 的向量/原文件（best-effort，失败留给 worker 下轮）
 
     def _renew(self, doc_id: str, lease_owner: str) -> None:
         """续租。失败不抛 —— 续租失败只意味着可能被回收，重跑是幂等的。"""
@@ -696,6 +957,12 @@ class DocumentLifecycle:
         record = self._ledger.get_document(scope, doc_id)
         if record is None:
             raise NotFoundError("文档不存在或不在当前作用域内")
+
+        # MOD-004：存活行带修订行时，先递归删除修订行（顺序“向量→blob→台账”不变），再删存活行。
+        if self._tree is not None and record.revision_of is None:
+            revision = self._tree.get_revision_of(scope, doc_id)
+            if revision is not None:
+                self.delete_document(scope, revision.doc_id)
 
         # 1) 派生物之一：向量（删除该文档在**全部版本集合**中的点；D-5 跨版本孤儿清扫）
         vectors_deleted = int(self._vectors.delete_doc_everywhere(record.project_id, scope, doc_id))

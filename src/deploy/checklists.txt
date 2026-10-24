@@ -562,10 +562,62 @@
     说明：R21 **无新 SQL 迁移**（`005` / `006` 仍**未纳入**阶段 2 迁移门，承前结转 —— 见 `deployment_plan.md` §17.2 / `cicd_pipeline.md` §11.3）；**本轮无不可逆步**（代码 / 前端产物均可回退）。
     !! 真实浏览器**渲染 / 拖拽连线**为 **[NOT_TESTABLE]**（离线无浏览器），须由用户在 UI 复核（`deployment_plan.md` §17.7 AC-R21-C）；「保存并经服务重启后生效」为 **[DEPLOY_REQUIRED]**（AC-R21-D），未实测前**不得给结论**。
 
+[B28] 资料库文件夹树迁移 007 部署后核对（R25 / ADR-009；迁移随 ib-web 重启自动应用；
+      **台账读取一律以服务账号 ib-web 的身份、只读打开**；详见 docs/sdlc/intelligentbase/deployment_plan.md）
+    步骤名：① 迁移前备份；② ib-web 重启严格断言；③ 只读结构核对；④ 在途修订 / 清理队列核对（回滚前置）；⑤ 前端发布。
+    (1) 迁移前备份（**用户执行**；只拷贝、不回显内容；以 ib-web 身份而非 root，避免 -wal/-shm 被建为 root 属主，见 [B22]）
+        $ sudo -u ib-web /opt/intelligentbase/venv/bin/python - <<'PY'
+          import os, sqlite3
+          os.umask(0o007)
+          src = sqlite3.connect("file:/var/lib/intelligentbase/ledger/ledger.sqlite3?mode=ro", uri=True)
+          dst = sqlite3.connect("/var/lib/intelligentbase/ledger/ledger.sqlite3.pre-r25.bak")
+          src.backup(dst); dst.close(); src.close(); print("backup done")
+          PY
+        $ sudo ls -l /var/lib/intelligentbase/ledger/ledger.sqlite3.pre-r25.bak
+        [ ] 备份文件存在、非空，mode 660、属主 ib-web:ib
+        [ ] 备份库 `PRAGMA integrity_check` 返回 ok，documents 行数与主库一致（只输出计数）
+    (2) ib-web 重启严格断言（**不得**只用 `systemctl is-active` 判定；<重启时刻> 取重启前远端 `date`）
+        $ systemctl show -p ActiveState,SubState,NRestarts ib-web
+        $ journalctl -u ib-web --since "<重启时刻>" -g "startup succeeded|ConfigError|OperationalError|Traceback" --no-pager
+        [ ] ActiveState=active 且 SubState=running 且 NRestarts==0
+        [ ] journal 出现 `startup succeeded`；ConfigError / OperationalError / Traceback 零命中（ExecStartPre --ensure-schema 无错）
+        [ ] ib-worker 同样 active/running/NRestarts==0，且 `journalctl -u ib-worker --since "<重启时刻>" -g "unable to open database file"` 零命中
+    (3) 只读结构核对（**用户执行**；`mode=ro`、ib-web 身份；只输出名称与计数）
+        $ sudo -u ib-web /opt/intelligentbase/venv/bin/python - <<'PY'
+          import sqlite3
+          c = sqlite3.connect("file:/var/lib/intelligentbase/ledger/ledger.sqlite3?mode=ro", uri=True)
+          cols = {r[1] for r in c.execute("PRAGMA table_info(documents)")}
+          tabs = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+          idx = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='index'")}
+          print("missing_cols=", sorted({"folder_id","name_key","uploaded_at","content_updated_at","indexed_at","revision_of"} - cols))
+          print("missing_tables=", sorted({"folders","upload_batches","upload_batch_items","doc_purge_queue"} - tabs))
+          print("missing_indexes=", sorted({"uq_folders_name","uq_documents_name","uq_documents_revision"} - idx))
+          print("unfilled_name_key=", c.execute("SELECT COUNT(*) FROM documents WHERE name_key='' AND revision_of IS NULL").fetchone()[0])
+          print("documents_total=", c.execute("SELECT COUNT(*) FROM documents").fetchone()[0], "by_project=", c.execute("SELECT project_id, COUNT(*) FROM documents GROUP BY project_id ORDER BY project_id").fetchall())
+          print("revision_rows=", c.execute("SELECT COUNT(*) FROM documents WHERE revision_of IS NOT NULL").fetchone()[0])
+          print("purge_queue=", c.execute("SELECT COUNT(*) FROM doc_purge_queue").fetchone()[0])
+          print("integrity=", c.execute("PRAGMA integrity_check").fetchone()[0], "journal_mode=", c.execute("PRAGMA journal_mode").fetchone()[0])
+          PY
+        [ ] 三个 missing_* 均为 []；unfilled_name_key == 0
+        [ ] integrity == ok 且 journal_mode == wal；documents 总行数与迁移前一致（既有文档不丢、不增）
+        [ ] 除 `*.pre-*.bak*` 冷备外，凡存在的 ledger.sqlite3* 仍为 660 ib-web:ib（承 [B22]）
+    (4) 回滚前置核对（仅回滚时；亦可在部署后随时查看）
+        [ ] revision_rows == 0（在途修订行已清理）且 purge_queue == 0（旧向量/旧 blob 已物理清理），否则**不得**回退代码
+    (5) 前端发布（**改前端不重启服务**）
+        [ ] `cd /opt/intelligentbase/src/frontend && npm run build` 退出码 0；发布前后 `systemctl show -p ActiveEnterTimestamp ib-web` 不变
+        [ ] 目标机 dist/index.html 引用的 assets/index-*.js 文件名与 `curl -sk https://<host>/` 返回页一致
+    (6) 代码版本判据（**不得用 .pyc**，承 SKILL §7.1）
+        [ ] 目标机 HEAD == 待部署提交；该提交涉及的 src/ib、src/ibweb 源文件 mtime 均早于 ib-web / ib-worker 的 ActiveEnterTimestamp
+    说明：007 为**纯追加**迁移（新表 / 新列 / 回填标量），回滚 = 代码回退；表与列的 DROP 属 MANUAL_ROLLBACK_REQUIRED，
+    仅在确需撤销新结构时由用户在**备份之后**执行，需 SQLite >= 3.35（DROP COLUMN）。
+    !! 手工 `sqlite3 < 007_folder_tree.sql` 不含补列与 name_key 回填 !! 部署路径只能是 ib-web 重启（ExecStartPre）。
+    !! 真实浏览器交互（文件夹上传 / 新建 / 重命名 / 删除 / 更新 / 时间显示）为 [NOT_TESTABLE] !! 须由用户在 UI 复核。
+
 ##############################################################################
 # C. 验收签署
 ##############################################################################
 [ ] A1–A8 全部勾选，证据归档（命令原文 + 时间戳）
 [ ] B1–B27 全部勾选，证据归档
+[ ] B28（R25 文件夹树迁移 007）全部勾选，证据归档
 [ ] 本文件不含任何真实凭据（自检：grep -nE 'sk-|ghp_|BEGIN .*PRIVATE KEY' 本文件应无命中）
 执行人：____________  复核人：____________  日期：____________

@@ -297,7 +297,11 @@ def test_TC_UNIT_019_related_images_event_empty_suppressed():
     assert event is not None and str(event.kind) == "related_images"
     body = related_images_json(payload)
     decoded = json.loads(body)
-    assert set(decoded["images"][0]) == {"image_id", "doc_id", "doc_name", "page_or_section", "url_path"}
+    # R25（REQ-FUNC-014 / MOD-005）：精确键集 = 旧 5 键 + 新增 doc_path
+    assert set(decoded["images"][0]) == {
+        "image_id", "doc_id", "doc_name", "page_or_section", "url_path", "doc_path",
+    }
+    assert decoded["images"][0]["doc_path"] == "", "未提供目录路径时 doc_path 应为空串（根目录）"
     assert "base64" not in body.lower()
 
 

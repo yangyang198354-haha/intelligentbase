@@ -14,3 +14,7 @@
 ## 用户偏好与禁止项
 
 ## 待验证
+- [P-TE-001] 台账 sqlite 参数化用例：配置里 `offline_mode=True` 会把台账强制切回内存替身（composition._offline_view），必须同时 `offline_mode=False` 并注入测试占位账户环境（IB_ACCOUNT_BACKEND=memory、IB_AUTHZ_POLICY_MODULE=ibweb.accounts.policy、占位初始口令），再断言 `isinstance(deps.ledger, SqliteLedgerRepository)`，否则 sqlite 参数化实为内存 — 自记 2026-10-24 · 证据 tests/folder_r25_support.py::sqlite_deps（探测输出 InMemoryLedgerRepository）
+- [P-TE-002] 重建共存类用例：`RebuildService.step_rebuild` 把任务置 succeeded 后写路径不再重定向到目标版本（IN_FLIGHT_REBUILD_STATES 仅 planned/running）；测"重建在途"要在 start_rebuild + process_pending 之后、不调 step_rebuild；succeeded 未激活窗口是已登记缺陷窗口 — 自记 2026-10-24 · 证据 DEF-R25-001 / TC-INT-R25-055
+- [P-TE-003] 可控时钟只能替换各模块已导入的 `utc_now_iso`；`iso_plus_seconds`（批次 expires_at）用真实墙钟，TTL 类用例应把时钟起点设为真实当前时间或给 purge_expired 传显式 now_iso — 自记 2026-10-24 · 证据 TC-UNIT-R25-106/110
+- [P-TE-004] 测 start_rebuild 的“不同目标版本冲突”：plan_rebuild 恒取 active+1，succeeded 窗口内只会得到同版本（幂等）；要构造不同版本须 dataclasses.replace(plan, to_version=..., target_collection=...)，HTTP 端点无法构造 — 自记 2026-10-24 · 证据 TC-INT-R25-057

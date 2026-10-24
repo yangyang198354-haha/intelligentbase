@@ -38,6 +38,8 @@ from ib.core import RESERVED_GRAPH_ENDPOINTS, ConfigError
 
 __all__ = [
     "DocumentRecordSerializer",
+    "LibraryFolderSerializer",
+    "LibraryFileSerializer",
     "DeleteReportSerializer",
     "RebuildJobSerializer",
     "RebuildProgressSerializer",
@@ -99,6 +101,48 @@ class DocumentRecordSerializer(_DataclassSerializer):
         "created_at": None,
         "updated_at": None,
     }
+
+
+class LibraryFolderSerializer(_DataclassSerializer):
+    """资料库 `FolderItem`（MOD-012 / IFC-001）：只输出前端契约字段，不含 project_id / name_key。"""
+
+    _fields = {
+        "folder_id": None,
+        "name": None,
+        "depth": None,
+        "created_at": None,
+        "updated_at": None,
+    }
+
+    def to_representation(self, instance: Any) -> dict[str, Any]:
+        return {"kind": "folder", **super().to_representation(instance)}
+
+
+class LibraryFileSerializer(serializers.Serializer):
+    """资料库 `FileItem`（MOD-012）：输入为 `ib.library.FileEntryView`。
+
+    `indexed_at` 仅 `status == 'indexed'` 时非空（REQ-NFUNC-003）；不输出 content_sha256 / blob_ref /
+    lease / name_key 等内部字段。
+    """
+
+    def to_representation(self, instance: Any) -> dict[str, Any]:
+        record = instance.record
+        return {
+            "kind": "file",
+            "doc_id": record.doc_id,
+            "name": record.doc_name,
+            "ext": record.ext,
+            "size_bytes": record.size_bytes,
+            "status": record.status,
+            "error_code": record.error_code,
+            "chunk_count": record.chunk_count,
+            "uploaded_at": record.uploaded_at or record.created_at,
+            "content_updated_at": record.content_updated_at,
+            "indexed_at": record.indexed_at if record.status == "indexed" else None,
+            "searchable": bool(instance.searchable),
+            "update_state": instance.update_state,
+            "update_error_code": instance.update_error_code,
+        }
 
 
 class DeleteReportSerializer(_DataclassSerializer):

@@ -120,7 +120,19 @@ def test_TC_INT_044_provider_maps_hits_to_payload_paths_only(deps):
 
     body = related_images_json(payload)
     assert "base64" not in body.lower()
-    assert set(json.loads(body)["images"][0]) == {"image_id", "doc_id", "doc_name", "page_or_section", "url_path"}
+    # R25（REQ-FUNC-014 / MOD-005）：精确键集 = 旧 5 键 + 新增 doc_path（旧契约已被已批准设计取代）
+    assert set(json.loads(body)["images"][0]) == {
+        "image_id", "doc_id", "doc_name", "page_or_section", "url_path", "doc_path",
+    }
+    # 无台账回填的命中 → doc_path 为空串（根目录 / 无路径信息）；有回填的命中 → 原样携带目录路径
+    assert json.loads(body)["images"][0]["doc_path"] == ""
+    hit_with_path = _Hit(record.doc_id, "p3")
+    hit_with_path.doc_name = "atlas.txt"
+    hit_with_path.doc_path = "技术文档/设计/atlas.txt"
+    with_path = provider([hit_with_path], scope)
+    assert with_path is not None and with_path.images[0].doc_path == "技术文档/设计/atlas.txt"
+    assert with_path.images[0].doc_name == "atlas.txt"
+    assert json.loads(related_images_json(with_path))["images"][0]["doc_path"] == "技术文档/设计/atlas.txt"
     event = related_images_event(payload)
     assert event is not None and str(event.kind) == "related_images"
 

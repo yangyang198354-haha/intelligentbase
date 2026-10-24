@@ -75,7 +75,11 @@ class RetrievalService:
         score_threshold: float = 0.35,
         candidate_multiplier: int = 4,
         hot_timeout_s: float = 5.0,
+        entry_resolver: Any = None,
     ) -> None:
+        #: MOD-005：存活解析端口（`resolve_live(project_id, doc_ids) -> Mapping[doc_id, EntryLocation]`）；
+        #: None = 不过滤、不回填（基线行为）。
+        self._entry_resolver = entry_resolver
         self._embedder = embedder
         self._vectors = vectors
         self._resolver = resolver
@@ -173,19 +177,49 @@ class RetrievalService:
                 reason = _reason_of(exc, default=DegradeReason.VECTORSTORE_UNAVAILABLE)
                 return self._degrade(scope, reason, timer, exc, stage="retrieval")
 
+            # --- 3b) 台账存活过滤 + 当前名称/路径回填（MOD-005 / ADR-005；fail-closed） ---
+            #  台账是“存活与展示名/路径”的权威：被删除 / 被替换 / 修订行的向量对检索不可见；
+            #  `entry_resolver` 为 None 时与基线完全一致。解析故障 → 降级（不返回未经核验的命中）。
+            locations: Any = None
+            if self._entry_resolver is not None:
+                try:
+                    doc_ids = list(dict.fromkeys(point.payload.doc_id for point in candidates))
+                    locations = self._entry_resolver.resolve_live(scope.project_id, doc_ids) if doc_ids else {}
+                except Exception as exc:  # noqa: BLE001 - 端口契约要求无异常出口
+                    log_event(
+                        "retrieval",
+                        "step3b_failed",
+                        project_id=scope.project_id,
+                        error_code=type(exc).__name__,
+                    )
+                    return self._degrade(
+                        scope, DegradeReason.LEDGER_UNAVAILABLE, timer, exc, stage="retrieval"
+                    )
+
             # --- 4) 映射为对外的命中结构（**只取需要的字段**，不泄露 payload 全量） ---
-            hits = [
-                RetrievedChunk(
-                    doc_id=point.payload.doc_id,
-                    doc_name=point.payload.doc_name,
-                    content=point.payload.content,
-                    score=float(point.score),
-                    page_or_section=point.payload.page_or_section,
-                    source_kind=str(point.payload.source_kind),
-                    locator=point.payload.locator,
+            hits = []
+            for point in candidates:
+                if len(hits) >= eff_top_k:
+                    break
+                doc_name = point.payload.doc_name
+                doc_path = ""
+                if locations is not None:
+                    location = locations.get(point.payload.doc_id)
+                    if location is None:
+                        continue  # 不存活（已删除 / 被替换 / 修订行）
+                    doc_name, doc_path = location.name, location.path
+                hits.append(
+                    RetrievedChunk(
+                        doc_id=point.payload.doc_id,
+                        doc_name=doc_name,
+                        content=point.payload.content,
+                        score=float(point.score),
+                        page_or_section=point.payload.page_or_section,
+                        source_kind=str(point.payload.source_kind),
+                        locator=point.payload.locator,
+                        doc_path=doc_path,
+                    )
                 )
-                for point in candidates[:eff_top_k]
-            ]
 
         log_event(
             "retrieval",
@@ -243,7 +277,7 @@ class RetrievalService:
         lines: list[str] = []
         for index, hit in enumerate(result.hits, start=1):
             where = hit.page_or_section or hit.locator or "位置未知"
-            lines.append(f"[{index}] {hit.doc_name} ({where})\n{hit.content}")
+            lines.append(f"[{index}] {hit.doc_path or hit.doc_name} ({where})\n{hit.content}")
         return ToolResult(ok=True, content="\n\n".join(lines))
 
     # ------------------------------------------------------------------ #

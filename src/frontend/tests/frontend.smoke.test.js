@@ -658,12 +658,29 @@ describe('REV-18 前端冒烟：系统管理三分 IA + 项目域上传 + LLM Ke
   it('32. 项目域上传：请求体不再携带 kb 字段（kb_id 由服务端按主体推导）', () => {
     const upload = stripComments(readText(rev18.upload));
     assert.doesNotMatch(upload, /kbId|kb_id\s*[:=]/, '上传视图仍出现 kb 输入 / 变量（应已移除）');
-    assert.match(upload, /uploadFile\(picked\.value\)/, '上传调用未改为单参（仅文件）');
+    // R25：单文件上传器（uploadFile(picked.value)）已退役，改为目录式上传入口（REQ-FUNC-001/007，MOD-014）。
+    // 强度不低于原断言：页面挂载云盘式浏览器；上传调用只走批次接口且不带 kb 字段；文件夹入口真实存在。
+    assert.doesNotMatch(upload, /uploadFile\(picked\.value\)/, '已退役的单文件上传器不应残留');
+    assert.match(upload, /<LibraryBrowser\b/, 'UploadPage 应挂载云盘式 LibraryBrowser（目录式上传入口）');
+    const libDir = join(root, 'src', 'views', 'library');
+    const libText = ['LibraryBrowser.vue', 'UploadBatchPanel.vue', 'ConflictDialog.vue', 'FolderDeleteDialog.vue']
+      .map((f) => stripComments(readText(join(libDir, f))))
+      .join('\n');
+    const batchStore = stripComments(readText(join(root, 'src', 'stores', 'uploadBatch.ts')));
+    assert.doesNotMatch(libText + batchStore, /kbId|kb_id\s*[:=]/, '目录式上传视图 / 批次 store 出现 kb 输入（应由服务端推导）');
+    assert.match(libText, /<input[^>]*\bwebkitdirectory\b/, '缺少文件夹上传入口（webkitdirectory）');
+    assert.match(batchStore, /\.planUpload\(/, '批次 store 应经 planUpload 提交上传清单');
+    assert.match(batchStore, /\.uploadBatchItem\(\s*state\.batchId\s*,\s*idx\s*,\s*files\[idx\]\s*\)/, '批次 store 应经 uploadBatchItem 逐文件上传（仅文件）');
     assert.ok(upload.includes('项目域'), '视图文案未改为「项目域」');
 
     const clientTs = stripComments(readText(rev18.client));
     assert.match(clientTs, /uploadFile\(file:\s*File\)/, '客户端 uploadFile 签名应为单参（file）');
     assert.match(clientTs, /body\.append\('file',\s*file\)/, 'FormData 只应 append file 字段');
+    assert.match(
+      clientTs,
+      /uploadBatchItem\(batchId:\s*string,\s*clientIdx:\s*number,\s*file:\s*File\)[^}]*body\.append\('file',\s*file\)/s,
+      '批次逐文件上传方法应只 append file 字段',
+    );
     assert.doesNotMatch(
       clientTs,
       /body\.append\(\s*'kb/,
@@ -812,5 +829,105 @@ describe('REV-21 前端冒烟：编排图专家节点实显（cn_label / graph-e
     // **不得**在前端硬编码占位节点 `expert` 或复刻展开规则
     assert.doesNotMatch(text, /EXPERT_PLACEHOLDER/, '前端不得持有占位节点常量（展开属服务端显示投影）');
     assert.doesNotMatch(text, /'expert'/, "前端不得硬编码字面量 'expert' 节点名");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R25（GROUP_D）：资料库目录式界面 —— 源码结构契约（组件无挂载框架，沿用既有“读源码 + 正则”口径）
+// 溯源：US-001/002/006/009/011/015；REQ-NFUNC-005/006（前端并发 2、写操作按权限隐藏）。
+// ---------------------------------------------------------------------------
+const r25 = {
+  lib: join(root, 'src', 'views', 'library'),
+  store: join(root, 'src', 'stores', 'uploadBatch.ts'),
+  client: join(root, 'src', 'api', 'client.ts'),
+};
+const r25lib = (name) => stripComments(readText(join(r25.lib, name)));
+
+describe('R25 前端冒烟：资料库目录式界面', () => {
+  it('41. 冲突弹窗：覆盖 / 跳过 / 两者都保留并自动改名 三选项；关闭 = 取消整次操作（不替用户选默认值）；文件夹合并有警示', () => {
+    const text = r25lib('ConflictDialog.vue');
+    for (const label of ['覆盖', '跳过', '两者都保留并自动改名']) {
+      assert.ok(text.includes(label), `冲突弹窗缺少选项「${label}」`);
+    }
+    assert.match(text, /value="overwrite"/, '缺少 overwrite 选项取值');
+    assert.match(text, /value="skip"/, '缺少 skip 选项取值');
+    assert.match(text, /value="rename"/, '缺少 rename 选项取值');
+    // 遮罩点击 / 右上角关闭 / 取消按钮 三个出口都只发 cancel（AC-011-04）
+    assert.ok((text.match(/emit\('cancel'\)/g) || []).length >= 3, '关闭弹窗的三个出口都应只发出 cancel');
+    assert.match(text, /@click\.self="emit\('cancel'\)"/, '点击遮罩应取消');
+    assert.ok(text.includes('同名文件将被覆盖'), '文件夹合并覆盖应有“同名文件将被覆盖”警示（A-03）');
+  });
+
+  it('42. 批次上传 store：并发固定为 2；进度“已处理 N / 总数”；跳过原因文案覆盖 5 类；限额提示携带上限与实际值', () => {
+    const store = stripComments(readText(r25.store));
+    assert.match(store, /export const UPLOAD_CONCURRENCY\s*=\s*2\s*;/, '前端上传并发必须固定为 2（与 SSE 共享 Waitress 线程，ADR-003）');
+    assert.match(store, /Array\.from\(\{\s*length:\s*UPLOAD_CONCURRENCY\s*\}/, '并发 worker 数应由 UPLOAD_CONCURRENCY 决定');
+    for (const [code, label] of [
+      ['UNSUPPORTED_TYPE', '不支持的文件类型'],
+      ['EMPTY_FILE', '文件为空'],
+      ['TOO_LARGE', '超出单文件大小上限'],
+      ['MAGIC_MISMATCH', '文件内容与扩展名不符'],
+      ['CONTENT_UNCHANGED', '内容未变化'],
+    ]) {
+      assert.match(store, new RegExp(`${code}:\\s*'${label}'`), `缺少跳过原因文案 ${code}`);
+    }
+    for (const code of ['limit_files', 'limit_total_bytes', 'depth_exceeded']) {
+      assert.ok(store.includes(`'${code}'`), `限额提示未处理 ${code}`);
+    }
+    assert.match(store, /raw\.actual/, '限额提示应带实际值');
+    assert.match(store, /raw\.limit/, '限额提示应带上限值');
+    const panel = r25lib('UploadBatchPanel.vue');
+    assert.match(panel, /已处理\s*\{\{\s*state\.processed\s*\}\}\s*\/\s*\{\{\s*state\.total\s*\}\}/, '缺少“已处理 N / 总数”进度');
+    assert.match(panel, /role="progressbar"/, '缺少进度条');
+    assert.match(panel, /if \(!picked\.length\) return;/, '未选任何文件时不得发起上传（AC-007-02：无空提交）');
+  });
+
+  it('46. DEF-R25-002：三条限额提示文案与 AC-015-01/02/04 字面一致（含实际值与上限）', () => {
+    const store = stripComments(readText(r25.store));
+    // AC-015-01：“单次最多上传 1000 个文件（当前 1001）”
+    assert.ok(store.includes('`单次最多上传 ${raw.limit} 个文件（当前 ${raw.actual ?? \'?\'}）`'), 'limit_files 文案应为“单次最多上传 {limit} 个文件（当前 {actual}）”');
+    // AC-015-04：“单次上传总大小超过上限（当前 {实际大小}，上限 {L}）”
+    assert.ok(store.includes('`单次上传总大小超过上限（当前 ${mb(raw.actual ?? 0)}，上限 ${mb(raw.limit)}）`'), 'limit_total_bytes 文案应为“单次上传总大小超过上限（当前 {实际}，上限 {L}）”');
+    // AC-015-02：“目录层级最多 10 层”
+    assert.ok(store.includes('`目录层级最多 ${raw.limit} 层`'), 'depth_exceeded 文案应为“目录层级最多 {limit} 层”');
+    assert.doesNotMatch(store, /超过\s*\$\{raw\.limit\}|最多\s*\$\{raw\.limit\}\s*个文件，/, '不得保留旧文案');
+  });
+
+  it('43. 资料浏览器：三个时间一律本地时区到秒、无值显示 —；写操作按 can_manage 隐藏；更新中 / 更新失败 / 重建后暂不可检索有明确提示', () => {
+    const text = r25lib('LibraryBrowser.vue');
+    assert.match(text, /if \(!iso\) return '—';/, '无值应显示 —');
+    assert.match(text, /getFullYear\(\)[\s\S]*getHours\(\)[\s\S]*getSeconds\(\)/, '时间应按本地时区格式化到秒');
+    for (const field of ['file.uploaded_at', 'file.content_updated_at', 'file.indexed_at']) {
+      assert.ok(text.includes(`fmtDate(${field})`), `缺少 ${field} 的展示`);
+    }
+    assert.match(text, /permissions\.can_manage\s*===\s*true/, '写操作可见性应取自 permissions.can_manage');
+    assert.match(text, /<UploadBatchPanel v-if="canManage"/, '无管理权限时不得展示上传入口');
+    assert.ok(text.includes('更新中（旧版本仍可检索）'), '缺少“更新中（旧版本仍可检索）”提示');
+    assert.ok(text.includes('更新失败（旧版本仍有效）'), '缺少“更新失败”提示');
+    assert.ok(text.includes('已索引，重建切换后可检索'), '缺少重建在途期间的提示');
+  });
+
+  it('44. 删除文件夹：确认框展示子文件夹 / 文件数；循环 deleteFolderStep 至 done；部分失败展示 remaining 与失败清单', () => {
+    const text = r25lib('FolderDeleteDialog.vue');
+    assert.match(text, /detail\.subtree_folders/, '确认框应展示子文件夹数');
+    assert.match(text, /detail\.subtree_files/, '确认框应展示文件数');
+    assert.match(text, /client\.deleteFolderStep\(/, '应经 client.deleteFolderStep 分步删除');
+    assert.match(text, /if \(step\.done\) break;/, '应循环至 done');
+    assert.match(text, /remaining_files/, '部分失败应展示剩余文件数');
+    assert.match(text, /\.failed/, '应展示失败清单');
+  });
+
+  it('45. 客户端：目录 / 批次 / 更新 / 移动 方法齐备且 HTTP 只经 request；409 冲突体被解析进 ApiClientError.conflicts', () => {
+    const clientTs = stripComments(readText(r25.client));
+    for (const method of [
+      'browse', 'getFolder', 'createFolder', 'renameFolder', 'deleteFolderStep', 'moveEntries',
+      'renameFile', 'updateFile', 'discardRevision', 'planUpload', 'uploadBatchItem', 'getUploadBatch',
+    ]) {
+      assert.match(clientTs, new RegExp(`\\n\\s+${method}\\(`), `ApiClient 缺少方法 ${method}`);
+    }
+    assert.match(clientTs, /conflicts\??:\s*ConflictInfo\[\]/, 'ApiClientError 应携带 conflicts');
+    assert.doesNotMatch(clientTs, /axios/, '禁用 axios');
+    const store = stripComments(readText(r25.store));
+    assert.doesNotMatch(store, /\bfetch\(/, 'store 不得绕过 client.ts 直接 fetch');
   });
 });

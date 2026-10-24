@@ -397,8 +397,12 @@ class LedgerRepository(Protocol):
         page: int,
         page_size: int,
         status: DocStatus | None,
+        include_revisions: bool = True,
     ) -> tuple[list[DocumentRecord], int]:
-        """分页列表。返回 `(items, total)`。[MOD-IB-11: IFC-IB-122]"""
+        """分页列表。返回 `(items, total)`。[MOD-IB-11: IFC-IB-122]
+
+        `include_revisions`（MOD-002 增量，默认 True = 基线行为）：为 False 时排除“更新中”的隐藏修订行。
+        """
         ...
 
     def set_status(

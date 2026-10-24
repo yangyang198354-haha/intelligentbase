@@ -46,9 +46,10 @@ from ib.ledger import (
     _assert_transition,
     assert_no_half_state,
 )
-from ib.ledger.schema import ensure_schema, missing_columns
+from ib.core.library import LibraryConflictError, NameClash, name_key_of
+from ib.ledger.schema import ensure_schema, missing_columns, missing_folder_tree_columns
 
-__all__ = ["SqliteLedgerRepository"]
+__all__ = ["SqliteLedgerRepository", "find_name_clashes_sql"]
 
 #: `documents` 表列顺序（与 `_row_to_document` 的索引一一对应；集中定义避免漂移）。
 _DOC_COLUMNS = (
@@ -69,6 +70,13 @@ _DOC_COLUMNS = (
     "lease_expires_at",
     "created_at",
     "updated_at",
+    # 资料库目录扩展（007 / MOD-001）：全部在尾部，既有按位置的列索引不变。
+    "folder_id",
+    "name_key",
+    "uploaded_at",
+    "content_updated_at",
+    "indexed_at",
+    "revision_of",
 )
 
 _CHUNK_COLUMNS = (
@@ -113,6 +121,41 @@ _IMAGE_COLUMNS = (
     "doc_name",
     "created_at",
 )
+
+
+def find_name_clashes_sql(
+    connection: sqlite3.Connection,
+    project_id: str,
+    folder_id: str,
+    keys: Sequence[str],
+    *,
+    exclude_doc_id: str | None = None,
+    exclude_folder_id: str | None = None,
+) -> dict[str, NameClash]:
+    """同目录内已占用 `name_key` 的条目（文件 + 文件夹，跨类；修订行与未回填行不参与）。
+
+    调用方须在写事务（`BEGIN IMMEDIATE`）内使用，才满足“先检查后写入”的原子性（ADR-002）。
+    """
+    found: dict[str, NameClash] = {}
+    wanted = [key for key in dict.fromkeys(keys) if key]
+    for start in range(0, len(wanted), 400):
+        batch = wanted[start : start + 400]
+        marks = ",".join("?" for _ in batch)
+        for row in connection.execute(
+            f"SELECT folder_id, name, name_key FROM folders WHERE project_id = ? AND parent_id = ?"
+            f" AND name_key IN ({marks})",
+            [project_id, folder_id, *batch],
+        ).fetchall():
+            if row[0] != exclude_folder_id:
+                found[row[2]] = NameClash("folder", row[0], row[1])
+        for row in connection.execute(
+            f"SELECT doc_id, doc_name, name_key FROM documents WHERE project_id = ? AND folder_id = ?"
+            f" AND revision_of IS NULL AND name_key IN ({marks})",
+            [project_id, folder_id, *batch],
+        ).fetchall():
+            if row[0] != exclude_doc_id:
+                found.setdefault(row[2], NameClash("file", row[0], row[1]))
+    return found
 
 
 def image_row_id(
@@ -229,7 +272,7 @@ class SqliteLedgerRepository:
             raise DependencyUnavailableError(
                 f"台账初始化失败（sqlite：{type(exc).__name__}）", dependency="ledger"
             ) from exc
-        missing = missing_columns(connection)
+        missing = {**missing_columns(connection), **missing_folder_tree_columns(connection)}
         if missing:
             # **不回显表结构细节之外的任何数据**；键名级信息足够定位迁移缺失。
             raise StartupError(
@@ -365,7 +408,12 @@ class SqliteLedgerRepository:
         self.assert_kb_in_project(scope.project_id, kb_id)
         doc_id = uuid.uuid4().hex
         now = utc_now_iso()
+        key = name_key_of(doc_name)
         with self._write() as connection:
+            # 旧入口 = 根目录单文件创建：同一写事务内做同名检查（跨文件/文件夹，不区分大小写）。
+            clashes = find_name_clashes_sql(connection, scope.project_id, "", [key])
+            if key in clashes:
+                raise LibraryConflictError("同目录下已存在同名条目", clashes=(clashes[key],))
             connection.execute(
                 f"INSERT INTO documents ({','.join(_DOC_COLUMNS)}) VALUES ({','.join('?' for _ in _DOC_COLUMNS)})",
                 (
@@ -386,6 +434,12 @@ class SqliteLedgerRepository:
                     None,
                     now,
                     now,
+                    "",
+                    key,
+                    now,
+                    None,
+                    None,
+                    None,
                 ),
             )
         record = self.get_document(scope, doc_id)
@@ -402,7 +456,13 @@ class SqliteLedgerRepository:
         return _row_to_document(row) if row is not None else None
 
     def list_documents(
-        self, scope: Scope, *, page: int, page_size: int, status: DocStatus | None
+        self,
+        scope: Scope,
+        *,
+        page: int,
+        page_size: int,
+        status: DocStatus | None,
+        include_revisions: bool = True,
     ) -> tuple[list[DocumentRecord], int]:
         clause, params = self._scope_clause(scope)
         where = [clause.strip()[4:]]  # 去掉前导 "AND "
@@ -410,6 +470,8 @@ class SqliteLedgerRepository:
         if status is not None:
             where.append("status = ?")
             values.append(str(status))
+        if not include_revisions:
+            where.append("revision_of IS NULL")
         where_sql = " WHERE " + " AND ".join(where)
         connection = self._conn()
         total = int(
@@ -460,9 +522,9 @@ class SqliteLedgerRepository:
             connection.execute(
                 "UPDATE documents SET status = 'indexed', error_code = NULL, chunk_count = ?,"
                 " indexed_collection_version = ?, target_collection_version = NULL,"
-                " lease_owner = NULL, lease_expires_at = NULL, updated_at = ?"
+                " lease_owner = NULL, lease_expires_at = NULL, updated_at = ?, indexed_at = ?"
                 f" WHERE doc_id = ?{clause}",
-                [int(chunk_count), collection_version, utc_now_iso(), doc_id, *params],
+                [int(chunk_count), collection_version, utc_now_iso(), utc_now_iso(), doc_id, *params],
             )
         record = self.get_document(scope, doc_id)
         if record is not None:
@@ -845,6 +907,12 @@ def _row_to_document(row: Sequence[Any]) -> DocumentRecord:
         lease_expires_at=row[14],
         created_at=row[15],
         updated_at=row[16],
+        folder_id=row[17] or "",
+        name_key=row[18] or "",
+        uploaded_at=row[19] or "",
+        content_updated_at=row[20],
+        indexed_at=row[21],
+        revision_of=row[22],
     )
 
 

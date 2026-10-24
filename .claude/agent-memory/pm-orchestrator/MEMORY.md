@@ -21,3 +21,4 @@
 - [M-PM-101] 需求定稿 8 项决策（Qdrant、bge-m3、禁 Docker 全裸装、保留云端 DeepSeek、单实例多项目、支持索引重建、v1 含 OCR、PyMuPDF 不得以"内部使用"豁免）与 REV-06"UI 可视化配置纳入 v1"均已由用户拍板，不要重复询问；"禁 Docker"推翻了分析师的折中推荐 — 来源：用户裁决 2026-09-25 / 2026-09-27（docs/requirements_spec.md 决策记录）
 
 ## 待验证
+- [P-PM-001] 缺陷修复改了被多处复用的判定函数（如 rebuild `_target_of`）时，门控须 grep 全部调用方评估副作用：扩大重定向状态集同时让 start_rebuild 在 succeeded 未激活时拒绝新重建 — 自记 2026-10-24 · 证据 GR-C-002-F01

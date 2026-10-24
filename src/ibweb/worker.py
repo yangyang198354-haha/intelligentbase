@@ -99,8 +99,42 @@ def run_once(*, lease_owner: str, limit: int, reap: bool = True) -> dict[str, An
                 done=progress.done,
             )
 
+    # 资料库周期动作（MOD-011）：补晋升 → 清理队列排空 → 过期批次清理。
+    # 全部 try/except + log_event，异常不外抛（与 reap 同口径）；项目集合以台账/注册表为准、
+    # config 仅回退（运行期新建项目不在 cfg.projects，M-SA-018）。
+    summary.update({"promoted": 0, "purged": 0, "batches_expired": 0})
+    for project_id in _known_project_ids(deps):
+        try:
+            summary["promoted"] += int(deps.lifecycle.promote_ready_revisions(project_id))
+        except Exception as exc:  # noqa: BLE001
+            log_event("worker", "promote_failed", error_code=type(exc).__name__)
+    try:
+        summary["purged"] = int(deps.lifecycle.drain_purge_queue())
+    except Exception as exc:  # noqa: BLE001
+        log_event("worker", "purge_failed", error_code=type(exc).__name__)
+    try:
+        if deps.upload_batches is not None:
+            summary["batches_expired"] = int(deps.upload_batches.purge_expired(utc_now_iso()))
+    except Exception as exc:  # noqa: BLE001
+        log_event("worker", "batch_purge_failed", error_code=type(exc).__name__)
+
     log_event("worker", "cycle", **summary)
     return summary
+
+
+def _known_project_ids(deps: Any) -> list[str]:
+    """已知项目集合 = 注册表活动项目 ∪ `deps.projects`（后者仅回退）。注册表读失败时只用回退。"""
+    ids: dict[str, None] = {}
+    registry = getattr(deps, "project_registry", None)
+    if registry is not None:
+        try:
+            for entry in registry.list_active():
+                ids[str(entry.project_id)] = None
+        except Exception:  # noqa: BLE001 - 注册表不可用：退回 deps.projects
+            pass
+    for project_id in getattr(deps, "projects", {}) or {}:
+        ids[str(project_id)] = None
+    return list(ids)
 
 
 def main(argv: list[str] | None = None) -> int:

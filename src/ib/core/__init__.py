@@ -16,7 +16,23 @@
 
 from __future__ import annotations
 
-from . import accounts, enums, errors, ports, types
+from . import accounts, enums, errors, library, ports, types
+from .library import (
+    NAME_MAX_LEN,
+    ROOT_FOLDER_ID,
+    ConflictAction,
+    EntryKind,
+    EntryLocation,
+    EntryNameError,
+    EntryRef,
+    FolderRecord,
+    LibraryConflictError,
+    LibraryValidationError,
+    NameClash,
+    name_key_of,
+    next_free_name,
+    validate_entry_name,
+)
 from .accounts import (
     new_session_token,
     token_digest,
@@ -334,4 +350,20 @@ __all__ = [
     # REV-18 第 18 / 19 个端口（IFC-IB-367 / 368）
     "ProjectRegistryStore",
     "LlmKeyStore",
+    # 资料库目录（MOD-001 / IFC-014）
+    "library",
+    "ROOT_FOLDER_ID",
+    "NAME_MAX_LEN",
+    "EntryKind",
+    "ConflictAction",
+    "EntryNameError",
+    "validate_entry_name",
+    "name_key_of",
+    "next_free_name",
+    "EntryRef",
+    "FolderRecord",
+    "NameClash",
+    "EntryLocation",
+    "LibraryConflictError",
+    "LibraryValidationError",
 ]

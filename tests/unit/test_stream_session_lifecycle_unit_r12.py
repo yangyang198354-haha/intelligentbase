@@ -89,7 +89,21 @@ def test_TC_UNIT_070_completion_event_structured_payload_boundaries():
         "page_or_section": "第 3 页",
         "locator": "§3.2",
         "score": 0.91,
+        "doc_path": "",  # R25（REQ-FUNC-014 / MOD-005）：新增键；未提供路径时为空串
     }
+    # 成对：携带目录路径时原样输出
+    pathed = completion_event(
+        CompletionPayload(
+            citations=(
+                CitationItem(
+                    doc_id="doc-2", doc_name="方案.pdf", page_or_section="第 1 页", locator="§1",
+                    score=0.5, doc_path="技术文档/设计/方案.pdf",
+                ),
+            ),
+            had_content=True,
+        )
+    )
+    assert json.loads(pathed.data)["citations"][0]["doc_path"] == "技术文档/设计/方案.pdf"
     lowered = hit_done.data.lower()
     assert "base64" not in lowered and "data:image" not in lowered, "引用不得内联字节"
     # 引用条目只登记**定位**，不含命中正文全文

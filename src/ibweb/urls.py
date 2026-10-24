@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from django.urls import path
 
-from ibweb import views
+from ibweb import library_views, views
 
 __all__ = ["urlpatterns"]
 
@@ -41,6 +41,21 @@ urlpatterns = [
     path("api/files", views.files_endpoint, name="ib-files"),
     path("api/files/<str:doc_id>", views.file_detail_endpoint, name="ib-file-detail"),
     path("api/files/<str:doc_id>/retry", views.file_detail_endpoint, name="ib-file-retry"),
+    # 资料库（MOD-012 / IFC-008~009）：更新文件内容 / 丢弃未完成或失败的更新。
+    path("api/files/<str:doc_id>/revision", library_views.file_revision_endpoint, name="ib-file-revision"),
+    # 资料库目录（MOD-012 / IFC-001~006）。字面量路由先于参数路由。
+    path("api/library", library_views.library_endpoint, name="ib-library"),
+    path("api/library/folders", library_views.library_folders_endpoint, name="ib-library-folders"),
+    path("api/library/folders/<str:folder_id>", library_views.library_folder_endpoint, name="ib-library-folder"),
+    path("api/library/move", library_views.library_move_endpoint, name="ib-library-move"),
+    # 批量上传（MOD-012 / IFC-010~012）：清单计划 + 逐文件 PUT 的批次会话。
+    path("api/uploads", library_views.uploads_endpoint, name="ib-uploads"),
+    path("api/uploads/<str:batch_id>", library_views.upload_batch_endpoint, name="ib-upload-batch"),
+    path(
+        "api/uploads/<str:batch_id>/items/<int:client_idx>",
+        library_views.upload_item_endpoint,
+        name="ib-upload-item",
+    ),
     # R2（IFC-IB-283）：页面图字节。**字面量必须与 `ib.streaming.IMAGE_ENDPOINT_TEMPLATE`
     # 一致** —— 前端拿到的 `url_path` 就是按那个模板拼的，二者漂移会表现为「前端 404
     # 但服务端日志一片正常」。自检 `related_images_event_contract` 会断言二者相等。
