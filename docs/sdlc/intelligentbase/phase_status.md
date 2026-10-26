@@ -1,4 +1,4 @@
-<phase_status project="intelligentbase" mode="INCREMENTAL" created="2026-10-24T17:11:32+08:00" updated="2026-10-25T00:12:43+08:00">
+<phase_status project="intelligentbase" mode="INCREMENTAL" created="2026-10-24T17:11:32+08:00" updated="2026-10-26T22:18:00+08:00">
   <request><![CDATA[资料管理页面目前只能通过选择文件上传一个文件，我希望能够上传一个文件夹，整个文件夹都能上传上去。而且这些文件能够有文件目录一样管理。用户在资料管理上可以创建文件夹，给文件夹重命名，删除文件夹等等，就像云盘一样。当然，这些文件都要可以索引到向量库。而且文件可以更新，更新后会重新索引。每个文件也可以看到上传时间或者索引成功的时间。先整理我的需求，分成一个一个的用户故事。确认后再开始sdlc 开发。]]></request>
   <scope>本轮只执行 GROUP_A（PHASE_01、PHASE_02）；GROUP_A 门控后停止，用户确认用户故事后再进入 GROUP_B。</scope>
   <profile version="1.0.0 (APPROVED, mtime 2026-10-24T16:57:39+08:00)"/>
@@ -18,7 +18,9 @@
     <group id="GROUP_E1" agent="devops-engineer" status="APPROVED" gate_decision="PASS_WITH_CONDITIONS" retries="0">
       <phase id="PHASE_10" status="APPROVED"/><phase id="PHASE_11a" status="APPROVED"/>
     </group>
-    <group id="GROUP_E2" agent="devops-engineer" status="NOT_AUTHORIZED" environment=""/>
+    <group id="GROUP_E2" agent="devops-engineer" status="APPROVED" gate_decision="PASS" retries="0" environment="production">
+      <phase id="PHASE_11b" status="APPROVED"/>
+    </group>
   </groups>
   <artifacts>
     <artifact path="docs/sdlc/intelligentbase/requirements_spec.md" version="1.0.0" status="SUPERSEDED" group="GROUP_A"/>
@@ -46,9 +48,13 @@
     <artifact path="docs/sdlc/intelligentbase/e2e_test_report.md" version="1.0.0" status="APPROVED" group="GROUP_D"/>
     <artifact path="docs/sdlc/intelligentbase/cicd_pipeline.md" version="1.0.0" status="APPROVED" group="GROUP_E1"/>
     <artifact path="docs/sdlc/intelligentbase/deployment_plan.md" version="1.0.0" status="APPROVED" group="GROUP_E1"/>
+    <artifact path="docs/sdlc/intelligentbase/deployment_report.md" version="1.0.0" status="APPROVED" group="GROUP_E2"/>
+    <artifact path="docs/sdlc/intelligentbase/delivery_report.md" version="1.0.0" status="APPROVED" group="GROUP_Z"/>
   </artifacts>
   <legacy_baseline status="CONFIRMED" confirmed_at="2026-10-24T17:22:12+08:00" confirmed_by="用户（Q3：A）">已登记为基线（只读，视为 APPROVED）：docs/requirements_spec.md（v1.13.0 REV-21，含 REQ-FUNC-IB-48 项目域资料上传）、docs/user_stories.md（US-IB-01 ~ US-IB-54）；现有代码 src/frontend/src/views/UploadPage.vue、src/ibweb/urls.py、src/ibweb/views.py、src/ib/lifecycle/__init__.py、src/ib/ledger/schema.py。</legacy_baseline>
   <invocations>
+    <invocation id="intelligentbase-GROUP_E2-002" agent="devops-engineer" start="2026-10-25T01:40:40+08:00" end="2026-10-26T22:18:00+08:00" result="SUCCESS"/>
+    <invocation id="intelligentbase-GROUP_E2-001" agent="devops-engineer" start="2026-10-25T01:23:32+08:00" end="2026-10-25T01:27:40+08:00" result="CLARIFICATION_NEEDED"/>
     <invocation id="intelligentbase-GROUP_E1-001" agent="devops-engineer" start="2026-10-24T23:33:45+08:00" end="2026-10-24T23:50:00+08:00" result="SUCCESS"/>
     <invocation id="intelligentbase-GROUP_D-002" agent="test-engineer" start="2026-10-24T23:16:28+08:00" end="2026-10-24T23:26:30+08:00" result="SUCCESS"/>
     <invocation id="intelligentbase-GROUP_C-003" agent="software-developer" start="2026-10-24T23:02:09+08:00" end="2026-10-24T23:10:00+08:00" result="SUCCESS"/>
@@ -214,6 +220,26 @@ grep -c GUARD:DEF-R25-001 tests/integration/test_folder_rebuild_coexist_int_r25.
   PASS: 007_folder_tree.sql syntax-ok / replay x2 idempotent / single-source / old-db upgrade
   exit=0]]></verification>
     </gate_review>
+    <gate_review id="GR-E2-001" invocation_id="intelligentbase-GROUP_E2-002" decision="PASS" time="2026-10-26T22:18:00+08:00">
+      <reviewed_files><file path="docs/sdlc/intelligentbase/deployment_report.md" version="1.0.0"/></reviewed_files>
+      <criterion id="J-E2 最终状态" result="SATISFIED">deployment_report.md「摘要」= DEPLOYED_SUCCESSFULLY；DEPLOY 4/4 完成、0 失败、0 跳过；V-01~13 均有实际结果并全部通过。</criterion>
+      <criterion id="J-E2 验证有实际结果" result="SATISFIED">V-01/04/06/09/10/13 由 PM 亲自运行（5 单元 active；healthz=200/deps=200；HEAD_MATCH+MTIME_OK；外部 index-DE-71Zgt.js 一致；ib-embed 时间戳未变；磁盘 71504650240B）。V-05/07/11 与 PRE-06/07/08 由用户以 sudo 执行并回传真实输出（missing_*=[]、unfilled_name_key=0、documents_total=2、revision_rows=0、purge_queue=0、integrity=ok/wal、rebuild_open=[]）。V-08 由用户持令牌执行（201/200/200/200，零残留）。V-12 由用户浏览器复核确认无误。</criterion>
+      <criterion id="J-E2 授权" result="SATISFIED">invocation special_instructions 含 PRODUCTION_DEPLOY_CONFIRM=true、DEPLOY_ENVIRONMENT=production、DEPLOY_COMMIT=80f2962...；与计划/画像环境一致；计划 v1.0.0=APPROVED。</criterion>
+      <criterion id="J-E2 回滚可用" result="SATISFIED">DEPLOY 前后保留 ROLLBACK 路径；本次未触发。DEPLOY-001 首轮失败时 HEAD 未前进、服务未重启，就地恢复工作树后重试，未使用 reset/clean/stash。</criterion>
+      <finding id="GR-E2-001-F01" severity="MAJOR">DEPLOY-001 首轮失败：生产 `.trae/`、`tests/agents/`、`src/ib/core/__init__.py` 为 root 所有，git 无法覆盖；已由用户定向 chown 后重试成功。deployment_plan PRE-02 缺「部署面路径属主/可写性」核对，应在下次计划中补齐。</finding>
+      <finding id="GR-E2-001-F02" severity="MINOR">V-02 计划期望字面 `startup succeeded`，实际日志为结构化 `stage=startup outcome=succeeded`；按语义判 PASS，计划口径需更新。</finding>
+      <finding id="GR-E2-001-F03" severity="MINOR">ib-worker 启动出现 `ledger_chmod_failed:PermissionError` WARN×3（db/wal/shm）；不影响运行，建议后续评估日志级别或权限统一。</finding>
+      <finding id="GR-E2-001-F04" severity="MINOR">PRE-06 备份初建 640（计划期望 660），已在 V-05 阶段补为 660；V-08 首次因空/过期令牌 401，重取令牌后通过。</finding>
+      <verification><![CDATA[生产实测（PM 亲自 ssh）
+git rev-parse HEAD -> 80f2962cafe5d17d40aebcb8e9aa31d4e38f54a1；git status --porcelain -> 空
+systemctl is-active ib-web ib-worker ib-embed qdrant nginx -> 5×active
+curl /healthz -> 200；/healthz/deps -> 200
+V-06 -> HEAD_MATCH / MTIME_OK
+外部 curl https://192.168.31.133/ -> assets/index-DE-71Zgt.js（与目标机一致）；/healthz -> 200
+ib-embed ActiveEnterTimestamp -> 2026-10-24 16:19:08 CST（未变）
+sudo -n true -> NOPASSWD_OK；/etc/sudoers.d/90-ib-deploy-full 0440 root:root
+用户执行输出：PRE-06 integrity=ok/documents=2；PRE-07 rebuild_open=[]/indexed=2/New=1,demo=1；V-07 missing_*=[]/unfilled=0/integrity=ok/wal；V-08 201/200/200(done)/200，root_total=1、root_folders=0、root_files=1、indexed/searchable=true；V-12 用户确认无误]]></verification>
+    </gate_review>
   </gate_reviews>
   <clarifications>
     <clarification id="CL-001" status="ANSWERED" answered_by="用户" time="2026-10-24T17:22:12+08:00">是否把 docs/requirements_spec.md 与 docs/user_stories.md 登记为 legacy_baseline。答复：A 是。</clarification>
@@ -261,5 +287,16 @@ grep -c GUARD:DEF-R25-001 tests/integration/test_folder_rebuild_coexist_int_r25.
     <event time="2026-10-24T23:33:45+08:00" type="INVOCATION" actor="pm-orchestrator">调用 devops-engineer（intelligentbase-GROUP_E1-001，PHASE_10,PHASE_11a）。</event>
     <event time="2026-10-24T23:47:05+08:00" type="GATE" actor="pm-orchestrator">GR-E1-001 PASS_WITH_CONDITIONS；cicd_pipeline.md / deployment_plan.md 0.1.0→1.0.0 APPROVED；收件箱补记 3 条；已移除 PM 基线 worktree。等待用户确认提交与 E2 授权。</event>
     <event time="2026-10-24T23:50:20+08:00" type="EXCEPTION" actor="pm-orchestrator">git commit 失败：Author identity unknown。改动已 git add（暂存，未提交、未推送）；未修改任何 git 全局配置，等待用户指定作者。</event>
+    <event time="2026-10-25T01:23:32+08:00" type="DEPLOY_AUTH" actor="pm-orchestrator">用户本轮消息明确授权："Use Skill: sdlc-orchestrator 将最新的代码部署到生产环境"。授权仅对本次 E2 有效；环境 production；DEPLOY_COMMIT=80f2962cafe5d17d40aebcb8e9aa31d4e38f54a1；ANCHOR（目标机 HEAD 实测）=f49a39582b741e86eaf6bbbf5cb1cd5d71bbd9e4。PRODUCTION_DEPLOY_CONFIRM=true。</event>
+    <event time="2026-10-25T01:23:32+08:00" type="INVOCATION" actor="pm-orchestrator">GR-E1-001 条件 F01 已闭合：6875398（REV-25 产品改动）与 80f2962（套件移植）均已 push origin/main，CI run 40112554749 success。调用 devops-engineer 执行 E2（intelligentbase-GROUP_E2-001，PHASE_11b），deployment_plan.md v1.0.0 APPROVED。</event>
+    <event time="2026-10-25T01:27:40+08:00" type="EXCEPTION" actor="devops-engineer">E2 首轮预检 PRE-01~05 全部通过（锚点 f49a395 已 fetch 到 80f2962、祖先关系成立、工作树干净、变更文件 171、部署面零改动、src/deploy 仅 2 文件、5 单元 active、SQLite 3.46.1、磁盘可用 71508713472 字节）。PRE-06/07/08 需 sudo 口令，代理无法执行，停在 DEPLOY-001 之前（目标环境零变更），返回 CLARIFICATION_NEEDED。</event>
+    <event time="2026-10-25T01:40:40+08:00" type="INVOCATION" actor="pm-orchestrator">用户回传 PRE-06/07/08 输出，重调 devops-engineer 执行 DEPLOY-001~004（intelligentbase-GROUP_E2-002）。PRE-06 backup_integrity=ok、documents=2、备份 640 ib-web:ib（计划期望 660，只读冷备可接受，记 MINOR）；PRE-07 rebuild_open=[]、documents 全部 indexed、按项目 New=1/demo=1；PRE-08 新键计数=0；du 台账 1172883B、qdrant 806071640B。A-01：F=71508713472、B=151552、R=max(10GiB,15%总量)=17465742336 ⇒ F−B−R=54042799584 ≥ 3·1GiB ⇒ C*=1024，保持默认，不改 env，跳过 PRE-09。</event>
+    <event time="2026-10-25T01:44:00+08:00" type="EXCEPTION" actor="devops-engineer">DEPLOY-001 失败：git pull 在检出阶段因 .trae/ 为 root 所有报 unable to unlink / Permission denied；HEAD 未前进（仍 f49a395），但 .claude/agents/*、.github/workflows/ci.yml、.gitignore 被部分改写并出现 4 个 untracked。已按证据就地恢复：git checkout -- .claude/ .github/ .gitignore 并删除部分检出的 untracked，工作树已回到锚点且 git status 为空。未执行源头 revert（源头未前进，计划矩阵的 001a 不适用；已记计划缺口）。同时发现 src/ib/core/__init__.py、tests/agents/ 亦为 root 所有，属同一历史遗留。等待用户执行定向 chown 后重试 DEPLOY-001。</event>
+    <event time="2026-10-25T01:52:00+08:00" type="DEPLOY" actor="devops-engineer">chown 修复后重试 DEPLOY-001 成功：f49a395→80f2962 fast-forward（171 文件，+22365/−16090），工作树干净。DEPLOY-002 ib-web 重启成功（RESTART_TS=2026-10-25 01:47:53；healthz=200、deps=200、active/running/NRestarts=0；日志 schema 就绪 + stage=startup outcome=succeeded + prompt_source main_file；错误关键字 0）。DEPLOY-003 ib-worker 重启成功（01:48:44；active/running/NRestarts=0；errors_in_log=0；worker_procs=1；有 ledger_chmod_failed WARN×3，属权限告警，待 V-05 核对）。DEPLOY-004 前端构建发布成功（旧 web root 已备份 ~/ib-webroot-pre-r25；新 assets/index-DE-71Zgt.js；ib-web ActiveEnterTimestamp 未变=01:47:54）。V-01/04/06/09/10/13 通过：5 单元 active；HEAD_MATCH+MTIME_OK；外部首页与目标机 hash 一致；ib-embed 未重启；磁盘 71504650240B。计划缺口：V-02 期望字面 "startup succeeded"，实际结构化日志为 stage=startup outcome=succeeded，按语义判 PASS 并记 MINOR。</event>
+    <event time="2026-10-25T01:56:00+08:00" type="VERIFY" actor="devops-engineer">V-05/07/11 由用户执行并通过：ledger.sqlite3 660 ib-web:ib；pre-r25.bak 已补为 660；missing_cols/tables/indexes 均 []；unfilled_name_key=0；documents_total=2 与 PRE-07 一致（New=1/demo=1）；revision_rows=0；purge_queue=0；integrity=ok、journal_mode=wal；rebuild_open=[]。待完成 V-08（API 冒烟，需用户令牌）与 V-12（浏览器 UI 复核）。</event>
+    <event time="2026-10-26T13:05:00+08:00" type="VERIFY" actor="devops-engineer">V-08 API 冒烟通过（用户持令牌执行，项目 New）：POST /api/library/folders=201；PATCH=200（改名成功）；DELETE=200（done=true、deleted_folders=1、remaining_files=0、failed=[]）；GET /api/library=200（root_total=1、root_folders=0、root_files=1，既有文件 indexed/searchable=True）。首次 401 为令牌为空/过期，重取令牌后通过。零残留。仅剩 V-12 浏览器 UI 复核。</event>
+    <event time="2026-10-26T13:20:00+08:00" type="SECURITY" actor="pm-orchestrator">用户明确要求并选择「全量 NOPASSWD ALL」（原话："为什么只有安装helper 能解决问题，你直接拿到所有sudo 权限不就可以了吗" → 选项确认）。已告知该授权使部署账号等价 root、密钥泄漏或代理误操作可直接破坏主机；用户仍选择此方案。作为安全例外登记；一次性安装脚本 ~/ib_sudo_full.sh（先 visudo -cf 校验后 install，0440 root:root），安装后部署的 sudo 步骤零人工。UI 目检（V-12）仍为唯一人工项。</event>
+    <event time="2026-10-26T22:18:00+08:00" type="GATE" actor="pm-orchestrator">GR-E2-001 PASS；deployment_report.md 0.1.0→1.0.0 APPROVED；GROUP_E2/PHASE_11b=APPROVED；最终状态 DEPLOYED_SUCCESSFULLY；V-12 用户确认无误；全量 NOPASSWD 安全例外已登记。遗留：属主缺口（MAJOR，已消除，计划需补 PRE-02 项）、V-02 日志口径、worker chmod WARN、备份初建 640、V-08 首次 401（均 MINOR）。</event>
+    <event time="2026-10-26T22:20:00+08:00" type="GATE" actor="pm-orchestrator">delivery_report.md 1.0.0 已写盘并登记；项目最终状态 DELIVERED。PHASE_12 知识蒸馏未在本次执行（可在用户需要时单独调用 kb-curator）。</event>
   </audit_log>
 </phase_status>
