@@ -1,4 +1,4 @@
-<phase_status project="intelligentbase" mode="INCREMENTAL" created="2026-10-26T23:55:36+08:00" updated="2026-10-27T22:23:14+08:00">
+<phase_status project="intelligentbase" mode="INCREMENTAL" created="2026-10-26T23:55:36+08:00" updated="2026-10-27T22:38:25+08:00">
   <request><![CDATA[核对确认需求可视化配置，能够对当前项目agent的编排以diagram的方式查看，图是动态的，鼠标放上去可以看到他的配置，agent 可以看到提示词，能够通过agent builder 创建新的agent，并且可以对agent 的路由，工具，权限、参数等等进行配置。保存后生效。 梳理并对比行业里面可视化编排agent， 工具的架构给出优化提示和建议。 整理用户故事。确认后开始开发。]]></request>
   <revision>REV-26</revision>
   <scope>本轮先只执行 GROUP_A（PHASE_01、PHASE_02，含行业可视化编排调研）；GROUP_A 门控后停止，用户确认用户故事后再进入 GROUP_B。</scope>
@@ -19,7 +19,9 @@
     <group id="GROUP_E1" agent="devops-engineer" status="APPROVED" gate_decision="PASS_WITH_CONDITIONS" retries="0">
       <phase id="PHASE_10" status="APPROVED"/><phase id="PHASE_11a" status="APPROVED"/>
     </group>
-    <group id="GROUP_E2" agent="devops-engineer" status="NOT_AUTHORIZED" environment=""/>
+    <group id="GROUP_E2" agent="devops-engineer" status="BLOCKED" gate_decision="PENDING" retries="0" environment="production">
+      <phase id="PHASE_11b" status="BLOCKED"/>
+    </group>
   </groups>
   <artifacts>
     <artifact path="docs/sdlc/intelligentbase/requirements_spec.md" version="1.0.0" status="SUPERSEDED" group="GROUP_A"/>
@@ -44,7 +46,8 @@
   </artifacts>
   <legacy_baseline status="CONFIRMED" confirmed_at="2026-10-26T23:55:36+08:00" confirmed_by="沿用用户 2026-10-24 确认（REV-25 Q3:A）的同类基线">只读、视为 APPROVED：docs/requirements_spec.md（v1.13.0 REV-21）、docs/user_stories.md（US-IB-01 ~ US-IB-54）、docs/agent_platform_research.md；现有代码 src/frontend/src/views/ConfigPage.vue、src/ibweb/views.py（definition/prompt config 端点）、src/ibweb/urls.py。REV-25 产物已归档 docs/sdlc/intelligentbase/archive/rev25/（只读参考）。</legacy_baseline>
   <invocations>
-    <invocation id="intelligentbase-R26-GROUP_C-005" agent="software-developer" start="2026-10-27T22:23:14+08:00" end="" result="PENDING"/>
+    <invocation id="intelligentbase-R26-GROUP_E2-001" agent="devops-engineer" start="2026-10-27T22:30:44+08:00" end="2026-10-27T22:33:26+08:00" result="BLOCKED"/>
+    <invocation id="intelligentbase-R26-GROUP_C-005" agent="software-developer" start="2026-10-27T22:23:14+08:00" end="2026-10-27T22:30:44+08:00" result="SUCCESS"/>
     <invocation id="intelligentbase-R26-GROUP_E1-001" agent="devops-engineer" start="2026-10-27T16:27:50+08:00" end="2026-10-27T16:38:20+08:00" result="SUCCESS"/>
     <invocation id="intelligentbase-R26-GROUP_D-002" agent="test-engineer" start="2026-10-27T15:59:13+08:00" end="2026-10-27T16:21:51+08:00" result="SUCCESS"/>
     <invocation id="intelligentbase-R26-GROUP_C-004" agent="software-developer" start="2026-10-27T14:37:56+08:00" end="2026-10-27T15:59:13+08:00" result="SUCCESS"/>
@@ -189,5 +192,10 @@
     <event time="2026-10-27T16:27:50+08:00" type="INVOKE" actor="pm-orchestrator">调用 devops-engineer（intelligentbase-R26-GROUP_E1-001，PHASE_10/11a）；E2 未授权。</event>
     <event time="2026-10-27T16:38:20+08:00" type="GATE" actor="pm-orchestrator">GR-E1-001 PASS_WITH_CONDITIONS；cicd_pipeline / deployment_plan 0.1.0→1.0.0 APPROVED；收件箱补记 R26-GROUP_E1-001-1..3。A~E1 全部批准，E2 NOT_AUTHORIZED（用户：现在暂时不部署）；等待用户授权提交与将来的部署。</event>
     <event time="2026-10-27T22:23:14+08:00" type="INVOKE" actor="pm-orchestrator">CL-009 用户授权提交与部署。先调用 software-developer（intelligentbase-R26-GROUP_C-005）处理 GR-E1-001-F02 两处跟进。</event>
+    <event time="2026-10-27T22:30:44+08:00" type="VERIFY" actor="pm-orchestrator">GROUP_C-005（GR-E1-001-F02）：selfcheck.py 清单断言扩到 B28/B29（含签署行正则），checklists.txt 不改；ib-worker.env.example 追加 REV-26 四个可选键注释（子代理首报"已有无需改"系误读，PM grep 核出后返工）。PM 复核：两文件四键各 4 处一致；selfcheck 57/58（core_framework_free 环境既有）；pytest tests/unit + test_accounts_deploy_int_r13 512 passed。</event>
+    <event time="2026-10-27T22:30:44+08:00" type="INVOCATION" actor="pm-orchestrator">主会话按 CL-009 提交（作者 Yang Yang，git -c 指定，未改配置）：7ea6b4c docs(sdlc) 归档 REV-25；971e14d feat(config) REV-26；5eedbd6 chore(agents) 记忆。push 前发现 origin/main 多 444520b（REV-25 部署报告），merge 9243ab4：REV-26 phase_status 保留本地，444520b 的 REV-25 phase_status 内容与 deployment_report / delivery_report 并入 archive/rev25/（追加更正事件）。git push origin main：444520b..9243ab4 成功。</event>
+    <event time="2026-10-27T22:30:44+08:00" type="DEPLOY_AUTH" actor="pm-orchestrator">用户本轮消息「提交，跟进两处小问题。然后部署」明确授权生产部署。PRODUCTION_DEPLOY_CONFIRM=true；环境 production；DEPLOY_COMMIT=9243ab4f05aac9249489ed7515c54fbb4290ffe3；计划 deployment_plan.md 1.0.0 APPROVED。生产当前 HEAD 80f2962（据 archive/rev25 GR-E2-001）。调用 devops-engineer（intelligentbase-R26-GROUP_E2-001）。</event>
+    <event time="2026-10-27T22:33:26+08:00" type="EXCEPTION" actor="pm-orchestrator">GROUP_E2-001 BLOCKED，生产未变更、无需回滚。PRE-00 通过（HEAD = origin/main = 9243ab4，关键文件 12/12 在提交中）。阻塞经 PM 亲自核实：① 本机无 ~/.ssh/ib_prod_ed25519（仅 id_ed25519，子代理未用其试登，正确）；② 本机为云主机（eth0 168.144.100.158 / 10.x），192.168.31.133:22 不可达；③ PRE-06~10 需用户执行。另：本机无 gh，9243ab4 的 CI 结果未核对。部署授权（CL-009）仅对该次调用有效，换环境重做 E2 须用户重新授权。deployment_report.md 0.1.0 DRAFT 记录阻塞（未提交）。收件箱补记 R26-GROUP_E2-001-1。</event>
+    <event time="2026-10-27T22:38:25+08:00" type="INVOCATION" actor="pm-orchestrator">用户「先git commit push」：主会话提交 phase_status.md 与 deployment_report.md（0.1.0 DRAFT，记录 E2-001 BLOCKED）并 push，便于在局域网机器上 pull 后续做 E2。</event>
   </audit_log>
 </phase_status>
