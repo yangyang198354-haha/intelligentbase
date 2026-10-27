@@ -1,8 +1,8 @@
 <file_header>
   <author_agent>devops-engineer</author_agent>
-  <timestamp>2026-10-27T16:30:27+08:00</timestamp>
+  <timestamp>2026-10-27T23:53:38+08:00</timestamp>
   <project_name>intelligentbase</project_name>
-  <version>1.0.0</version>
+  <version>2.0.0</version>
   <input_files>
     <file>architecture_design.md</file>
     <file>module_design.md</file>
@@ -10,6 +10,7 @@
     <file>implementation_plan.md</file>
     <file>e2e_test_report.md</file>
     <file>phase_status.md</file>
+    <file>.github/workflows/ci.yml</file>
   </input_files>
   <phase>PHASE_10</phase>
   <status>APPROVED</status>
@@ -28,7 +29,7 @@
 | 项 | 内容 |
 |---|---|
 | 文件 | `.github/workflows/ci.yml`，触发：push / PR 到 `main`、`workflow_dispatch` |
-| 运行环境 | `ubuntu-24.04`，Python 3.12，Node 20，`timeout-minutes: 30` |
+| 运行环境 | `ubuntu-24.04`，Python 3.12，Node 22（R26 由 20 升版，见文末「R26 变更记录」），`timeout-minutes: 30` |
 | 阶段 | 10 阶段：Source → Config(compileall) + Schema/迁移门 → Unit → Integration → E2E → Full+coverage → selfcheck → Version gate → Frontend build+test → Package(dist + HEAD artifact，保留 30 天) |
 | 纪律 | 任一 step 失败即 abort（无 `continue-on-error`） |
 | 部署 | **CI 不含 CD**：生产部署由 E2 按 `.claude/skills/ib-prod-deploy/SKILL.md` 授权执行（画像 P7） |
@@ -113,5 +114,30 @@ CD（不在 CI 内，沿用画像 P7）：部署由 E2 经 ssh 到 production �
 ## 制品管理
 
 - **CI 制品**：frontend `dist/` + `HEAD` 作为 Actions artifact，命名 `ib-${{ github.sha }}-${{ github.run_id }}`（含提交号），保留 30 天；仅供追溯。
-- **生产不使用该制品**：目标机 `git pull` 后**本地构建**前端（`npm run build`）并拷贝到 web root。风险：目标机与 CI 的构建环境（node 22 / npm 9 vs Node 20）不同，构建结果可能与 CI 的 dist 不逐字一致；缓解：构建失败时 `&&` 链在替换 web root 之前中断（旧前端仍可用），并保留部署前 web root 副本供紧急止血（见 deployment_plan DEPLOY-004）。
+- **生产不使用该制品**：目标机 `git pull` 后**本地构建**前端（`npm run build`）并拷贝到 web root。风险：目标机与 CI 的构建环境（node 22 / npm 9 vs CI Node 22）不同，构建结果可能与 CI 的 dist 不逐字一致；缓解：构建失败时 `&&` 链在替换 web root 之前中断（旧前端仍可用），并保留部署前 web root 副本供紧急止血（见 deployment_plan DEPLOY-004）。R26 起 CI Node 已与生产 node 22 对齐，这一差异收窄为 npm 版本差。
 - **晋升条件**：待部署提交（`DEPLOY_COMMIT`）已在 `origin/main`，其 CI 运行全部成功；无 staging，无环境间晋升。
+
+## R26 变更记录（v1.1.0，CI Node 20 → 22）
+
+**触发证据（PM 亲自取证，2026-10-27）**：部署提交 `bb3ac4b97bcdd51afc8725197693fd458d0eb798` 的 CI 运行 [run 40523055080](https://github.com/yangyang198354-haha/intelligentbase/actions/runs/40523055080) `conclusion=failure`（17m1s）；同一失败的还有前一个提交 `9243ab4`（run 40521743636）。失败步骤 = 阶段 9 `Frontend build`：
+
+- `npm test`：`# tests 77 / # pass 74 / # fail 3`，失败用例 46、47、48 及父套件 11；
+- 错误：`Unknown file extension ".ts" for .../src/frontend/src/components/config/graphModel.ts`。
+
+**根因**：REV-26 新增的前端冒烟用例以 `node --test` **直接 `import` `.ts` 源文件**；原生 TypeScript 类型剥离自 Node 22.6 起提供，CI 钉版 `node-version: "20"` 不支持。开发机 Node 24、生产机 node 22 均通过，`npm run build`（`vue-tsc --noEmit && vite build`）通过 → **产品运行时代码与该失败无关**，仅测试运行环境受限。
+
+**用户裁决**：CL-010（2026-10-27）选择「CI Node 20 → 22（推荐）」，与生产 node 22 对齐。
+
+**改动（最小范围）**：
+
+| 文件 | 改动 |
+|---|---|
+| `.github/workflows/ci.yml` | `node-version: "20"` → `"22"`（全文件仅此一处 node-version，ci.yml:240）；阶段 9 注释补 R26 说明（ci.yml:234-236） |
+| `docs/sdlc/intelligentbase/cicd_pipeline.md` | 本文：运行环境行、制品管理段的 Node 版本表述，新增本节 |
+
+**未改动的面**：测试代码、产品代码、`package.json` / `package-lock.json`、`src/requirements*.txt`、systemd / nginx、`timeout-minutes`、其余 9 个阶段与 job 级 `env`。
+
+**风险与回归**：
+- 缓解：CI 与生产 node 主版本一致（22），前述"目标机与 CI 构建环境不同"的风险由 node 差收窄为 npm 版本差。
+- 保留风险：若将来把 CI 降回 Node 20，该 3 例会再次失败（无 `describe.skip` 之类兜底，属预期硬失败）。
+- 验证方式：本次提交 push 后以真实 CI 运行为准（`gh run list --commit <sha>`），绿方可作为 `DEPLOY_COMMIT`（deployment_plan PRE-00）。

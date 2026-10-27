@@ -1,4 +1,4 @@
-<phase_status project="intelligentbase" mode="INCREMENTAL" created="2026-10-26T23:55:36+08:00" updated="2026-10-27T22:38:25+08:00">
+<phase_status project="intelligentbase" mode="INCREMENTAL" created="2026-10-26T23:55:36+08:00" updated="2026-10-27T23:55:08+08:00">
   <request><![CDATA[核对确认需求可视化配置，能够对当前项目agent的编排以diagram的方式查看，图是动态的，鼠标放上去可以看到他的配置，agent 可以看到提示词，能够通过agent builder 创建新的agent，并且可以对agent 的路由，工具，权限、参数等等进行配置。保存后生效。 梳理并对比行业里面可视化编排agent， 工具的架构给出优化提示和建议。 整理用户故事。确认后开始开发。]]></request>
   <revision>REV-26</revision>
   <scope>本轮先只执行 GROUP_A（PHASE_01、PHASE_02，含行业可视化编排调研）；GROUP_A 门控后停止，用户确认用户故事后再进入 GROUP_B。</scope>
@@ -16,11 +16,11 @@
     <group id="GROUP_D" agent="test-engineer" status="APPROVED" gate_decision="OVERRIDDEN" retries="0" defect_loops="1">
       <phase id="PHASE_07" status="APPROVED"/><phase id="PHASE_08" status="APPROVED"/><phase id="PHASE_09" status="APPROVED"/>
     </group>
-    <group id="GROUP_E1" agent="devops-engineer" status="APPROVED" gate_decision="PASS_WITH_CONDITIONS" retries="0">
+    <group id="GROUP_E1" agent="devops-engineer" status="APPROVED" gate_decision="PASS" retries="0">
       <phase id="PHASE_10" status="APPROVED"/><phase id="PHASE_11a" status="APPROVED"/>
     </group>
-    <group id="GROUP_E2" agent="devops-engineer" status="BLOCKED" gate_decision="PENDING" retries="0" environment="production">
-      <phase id="PHASE_11b" status="BLOCKED"/>
+    <group id="GROUP_E2" agent="devops-engineer" status="PENDING" gate_decision="PENDING" retries="0" environment="production" deploy_auth="GRANTED">
+      <phase id="PHASE_11b" status="PENDING"/>
     </group>
   </groups>
   <artifacts>
@@ -41,11 +41,13 @@
     <artifact path="docs/sdlc/intelligentbase/unit_test_report.md" version="1.0.0" status="APPROVED" group="GROUP_D"/>
     <artifact path="docs/sdlc/intelligentbase/integration_test_report.md" version="1.0.0" status="APPROVED" group="GROUP_D"/>
     <artifact path="docs/sdlc/intelligentbase/e2e_test_report.md" version="1.0.0" status="APPROVED" group="GROUP_D"/>
-    <artifact path="docs/sdlc/intelligentbase/cicd_pipeline.md" version="1.0.0" status="APPROVED" group="GROUP_E1"/>
+    <artifact path="docs/sdlc/intelligentbase/cicd_pipeline.md" version="1.0.0" status="SUPERSEDED" group="GROUP_E1"/>
+    <artifact path="docs/sdlc/intelligentbase/cicd_pipeline.md" version="2.0.0" status="APPROVED" group="GROUP_E1"/>
     <artifact path="docs/sdlc/intelligentbase/deployment_plan.md" version="1.0.0" status="APPROVED" group="GROUP_E1"/>
   </artifacts>
   <legacy_baseline status="CONFIRMED" confirmed_at="2026-10-26T23:55:36+08:00" confirmed_by="沿用用户 2026-10-24 确认（REV-25 Q3:A）的同类基线">只读、视为 APPROVED：docs/requirements_spec.md（v1.13.0 REV-21）、docs/user_stories.md（US-IB-01 ~ US-IB-54）、docs/agent_platform_research.md；现有代码 src/frontend/src/views/ConfigPage.vue、src/ibweb/views.py（definition/prompt config 端点）、src/ibweb/urls.py。REV-25 产物已归档 docs/sdlc/intelligentbase/archive/rev25/（只读参考）。</legacy_baseline>
   <invocations>
+    <invocation id="intelligentbase-R26-GROUP_E1-002" agent="devops-engineer" start="2026-10-27T23:50:55+08:00" end="2026-10-27T23:55:08+08:00" result="SUCCESS"/>
     <invocation id="intelligentbase-R26-GROUP_E2-001" agent="devops-engineer" start="2026-10-27T22:30:44+08:00" end="2026-10-27T22:33:26+08:00" result="BLOCKED"/>
     <invocation id="intelligentbase-R26-GROUP_C-005" agent="software-developer" start="2026-10-27T22:23:14+08:00" end="2026-10-27T22:30:44+08:00" result="SUCCESS"/>
     <invocation id="intelligentbase-R26-GROUP_E1-001" agent="devops-engineer" start="2026-10-27T16:27:50+08:00" end="2026-10-27T16:38:20+08:00" result="SUCCESS"/>
@@ -138,6 +140,16 @@
       <condition>E1：ci.yml 迁移检查加 008；上线需 ib-web / ib-worker 各重启一次；本次不部署（E2 NOT_AUTHORIZED）。</condition>
       <condition>下次 GROUP_A 触达：AC-030-02 措辞改为"每次外发 1 条（生成与自评各 1）"；GR-A-002-F01 来源标注改正。</condition>
     </gate_review>
+    <gate_review id="GR-E1-002" invocation_id="intelligentbase-R26-GROUP_E1-002" decision="PASS" time="2026-10-27T23:55:08+08:00">
+      <reviewed_files><file path=".github/workflows/ci.yml" version="+5/-2"/><file path="docs/sdlc/intelligentbase/cicd_pipeline.md" version="1.1.0"/></reviewed_files>
+      <criterion id="J-E1 改动最小" result="SATISFIED">`git diff --stat` → ci.yml +5/-2、cicd_pipeline.md +36/-5，无其他文件；node-version 全文件唯一一处（ci.yml:240）由 "20" 改 "22"；阶段 9 注释补 R26 说明（ci.yml:234-236）；未改 timeout、未新增依赖、未改其他 9 个阶段</criterion>
+      <criterion id="J-E1 配置有效" result="SATISFIED">PM 亲自运行 `python -c yaml.safe_load(.github/workflows/ci.yml)` → YAML_OK jobs=['ci']（单 job 结构未变）</criterion>
+      <criterion id="J-E1 测试未动" result="SATISFIED">`git status --porcelain` 无 src/frontend/tests 与 src/** 改动；PM 亲自在 src/frontend 运行 npm test → tests 77 / pass 77 / fail 0 / skipped 0（Node v24.18.0）</criterion>
+      <criterion id="J-E1 未越权" result="SATISFIED">子代理报告未 ssh / 未部署 / 未 commit / 未 push；仅改 REWORK_AUTHORIZED 的两个文件</criterion>
+      <criterion id="J-E1 文档同步" result="SATISFIED">cicd_pipeline.md 运行环境行（:32）、制品管理段（:117）改为 Node 22，文末新增「R26 变更记录」（:120-143）含 run id / 失败用例号 / 错误文本 / 改动面 / 未改动面 / 风险</criterion>
+      <finding id="GR-E1-002-F01" severity="MINOR">项目画像 P3（前端测试「Node 20 内置 node:test」）与 P4 的事实已过时（CI 现为 Node 22）。画像为 APPROVED 文档，本次不改；在下次画像修订时同步，或由用户确认后由 PM 升版。不影响本轮部署。</finding>
+      <verification>YAML_OK / git diff --stat / git status --porcelain / npm test 77 pass 0 fail；证据见上各 criterion。</verification>
+    </gate_review>
     <gate_review id="GR-E1-001" invocation_id="intelligentbase-R26-GROUP_E1-001" decision="PASS_WITH_CONDITIONS" time="2026-10-27T16:38:20+08:00">
       <reviewed_files><file path="docs/sdlc/intelligentbase/cicd_pipeline.md" version="0.1.0"/><file path="docs/sdlc/intelligentbase/deployment_plan.md" version="0.1.0"/><file path=".github/workflows/ci.yml" version="git diff +36/-2"/></reviewed_files>
       <criterion id="J-E1 ci.yml 最小改动" result="SATISFIED">git diff 仅 "Schema / migration check" step（注释、name、追加 008 断言）；PM 用 yaml.safe_load 抽出 run 脚本以 /root/.venvs/intelligentbase/bin/python 执行：PASS 003 / 007 / 008（syntax-ok / replay x2 idempotent / single-source / old-db upgrade），rc=0</criterion>
@@ -160,6 +172,7 @@
     <clarification id="CL-007" answered_by="用户" time="2026-10-27T07:19:48+08:00">「全部按照推荐，进入下一步」：OQ-R26-A01~A07 全部采纳推荐——A01 现有运维账号上线后为 manage 档；A02 方案 B，下游 agent 以只读"上游材料"看到上游输出，v1 旧项目行为不变；A03 条件分支仅支持关键词与 upstream_degraded 谓词，不支持表达式/代码；A04（CRITICAL）保留 6 分 LLM 判定项，缓存期内同分，接受缓存失效后的残余差异；A05 单 agent 最大步数=工具调用轮数，默认 4，范围 1~8，与全图步数上限并存；A06 人工确认挂起态仅进程内，重启后 fail-closed；A07 v1 旧项目首次保存先存升级前基线 v1 再存用户 v2。GR-B-001 第 1 条条件满足，无需架构修订。提交（commit）仍未授权。</clarification>
     <clarification id="CL-008" answered_by="用户" time="2026-10-27T16:27:50+08:00">「接受。等部署的时候验证。现在暂时不部署」：接受 critical path 0.96（US-003 浏览器交互不可离线验证），浏览器交互按 e2e_test_report「上线后人工浏览器验收清单」在部署时验证；本次不部署（E2 不授权）。提交（commit）仍未授权。</clarification>
     <clarification id="CL-009" answered_by="用户" time="2026-10-27T22:23:14+08:00">「提交，跟进两处小问题。然后部署」：授权① GR-E1-001-F02 两处跟进；② 主会话 commit 并 push（部署方式为目标机 git pull，push 为部署前置 PRE-00）；③ 本轮 E2 生产部署授权（production），按 deployment_plan 1.0.0 执行。</clarification>
+    <clarification id="CL-010" answered_by="用户" time="2026-10-27T23:40:00+08:00">CI 红灯处置：用户选择「CI Node 20 → 22（推荐）」——改 `.github/workflows/ci.yml` 的 `node-version` 与生产 Node 22 对齐，同步更新 cicd_pipeline.md，重跑 CI 绿后立即按 deployment_plan 1.0.0 执行 E2。用户本轮消息「Use Skill: sdlc-orchestrator 部署到生产环境」为本次生产部署授权（PRODUCTION_DEPLOY_CONFIRM=true，环境 production）。</clarification>
   </clarifications>
   <escalations></escalations>
   <audit_log>
@@ -197,5 +210,10 @@
     <event time="2026-10-27T22:30:44+08:00" type="DEPLOY_AUTH" actor="pm-orchestrator">用户本轮消息「提交，跟进两处小问题。然后部署」明确授权生产部署。PRODUCTION_DEPLOY_CONFIRM=true；环境 production；DEPLOY_COMMIT=9243ab4f05aac9249489ed7515c54fbb4290ffe3；计划 deployment_plan.md 1.0.0 APPROVED。生产当前 HEAD 80f2962（据 archive/rev25 GR-E2-001）。调用 devops-engineer（intelligentbase-R26-GROUP_E2-001）。</event>
     <event time="2026-10-27T22:33:26+08:00" type="EXCEPTION" actor="pm-orchestrator">GROUP_E2-001 BLOCKED，生产未变更、无需回滚。PRE-00 通过（HEAD = origin/main = 9243ab4，关键文件 12/12 在提交中）。阻塞经 PM 亲自核实：① 本机无 ~/.ssh/ib_prod_ed25519（仅 id_ed25519，子代理未用其试登，正确）；② 本机为云主机（eth0 168.144.100.158 / 10.x），192.168.31.133:22 不可达；③ PRE-06~10 需用户执行。另：本机无 gh，9243ab4 的 CI 结果未核对。部署授权（CL-009）仅对该次调用有效，换环境重做 E2 须用户重新授权。deployment_report.md 0.1.0 DRAFT 记录阻塞（未提交）。收件箱补记 R26-GROUP_E2-001-1。</event>
     <event time="2026-10-27T22:38:25+08:00" type="INVOCATION" actor="pm-orchestrator">用户「先git commit push」：主会话提交 phase_status.md 与 deployment_report.md（0.1.0 DRAFT，记录 E2-001 BLOCKED）并 push，便于在局域网机器上 pull 后续做 E2。</event>
+    <event time="2026-10-27T23:12:25+08:00" type="DEPLOY_AUTH" actor="pm-orchestrator">用户本轮消息「Use Skill: sdlc-orchestrator 部署到生产环境」明确授权生产部署。PRODUCTION_DEPLOY_CONFIRM=true；环境 production；DEPLOY_COMMIT=bb3ac4b97bcdd51afc8725197693fd458d0eb798（本地 HEAD = origin/main，工作区干净）；计划 deployment_plan.md 1.0.0 APPROVED。本机（局域网）已核实：`~/.ssh/ib_prod_ed25519` 存在、192.168.31.133:22 可达、生产 HEAD=80f2962（=ANCHOR）、工作区干净、5 个单元 active、`sudo -n true` 通过。上次 E2-001 的三项阻塞全部解除。</event>
+    <event time="2026-10-27T23:15:00+08:00" type="VERIFY" actor="pm-orchestrator">PRE-00 CI 核查发现红灯：`gh run list --commit bb3ac4b` → run 40523055080 conclusion=failure（17m1s）；9243ab4 的 run 40521743636 同为 failure。根因经 `gh run view --log-failed` 定位：阶段9 `npm test` 77 例中 74 pass / 3 fail（46、47、48 与父套件 11），错误 `Unknown file extension ".ts"` for `src/frontend/src/components/config/graphModel.ts` —— CI `node-version: "20"` 不支持直接 import .ts（本机 Node 24 / 生产 Node 22 通过；`npm run build` 通过，产品运行时不受影响）。按 PRE-00「红灯不得部署」暂停，向用户请示。</event>
+    <event time="2026-10-27T23:40:00+08:00" type="CLARIFY" actor="pm-orchestrator">CL-010 用户选择 CI Node 20→22。停用 E2，先做 GROUP_E1 定向整改（`.github/workflows/ci.yml` node-version "20"→"22"，ci.yml:237 单处；同步 `docs/sdlc/intelligentbase/cicd_pipeline.md`），GROUP_E1 置 IN_PROGRESS，记 INVOCATION intelligentbase-R26-GROUP_E1-002；GROUP_E2 保持 PENDING（deploy_auth=GRANTED，待 CI 绿后调用）。</event>
+    <event time="2026-10-27T23:55:08+08:00" type="GATE" actor="pm-orchestrator">GR-E1-002 PASS（GROUP_E1 回到 APPROVED / gate_decision=PASS，PHASE_10 APPROVED）；cicd_pipeline.md 1.1.0→2.0.0 APPROVED，1.0.0 SUPERSEDED。PM 亲自核验：yaml.safe_load OK、git diff 仅两文件、npm test 77/77；finding F01（画像 P3/P4 的 Node 20 事实过时）记 MINOR，不阻塞。收件箱记录 R26-GROUP_E1-002 两条 proposal。</event>
+    <event time="2026-10-27T23:55:08+08:00" type="INVOCATION" actor="pm-orchestrator">主会话按 CL-010 提交 CI Node 升版（ci.yml + cicd_pipeline + phase_status），push 到 origin/main，等待真实 CI 结果作为 PRE-00 依据；绿后再调用 devops-engineer 执行 E2（intelligentbase-R26-GROUP_E2-002）。</event>
   </audit_log>
 </phase_status>
