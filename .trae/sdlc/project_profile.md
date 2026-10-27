@@ -8,9 +8,9 @@
 
 <file_header>
   <author_agent>pm-orchestrator(draft)</author_agent>
-  <timestamp>2026-10-24T16:24:15+08:00</timestamp>
+  <timestamp>2026-10-26T22:18:00+08:00</timestamp>
   <project_name>intelligentbase</project_name>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
   <status>APPROVED</status>
 </file_header>
 
@@ -136,7 +136,8 @@
 ## P9. 版本控制与远程操作权限
 - 分支策略：单主干 `main`（CI 只对 main 触发；远端另有 origin/master，用途未知）。
 - 谁执行 commit / push：**主会话在用户确认后执行；子代理不 commit、不 push**（用户确认 2026-10-24）。旧流程中曾由子代理提交（docs/phase_status.md:23），已不再适用。TRAE 无 hook 拦截：远程操作（`git push`/`ssh`/`scp`）一律需用户当轮确认，规则登记在 `.trae/sdlc/suite_config.md` §1。
-- 子代理是否可 ssh / 部署：否（缺省）；E2 获得用户本轮授权后，devops-engineer 可执行 SKILL.md §4.4/§5 中的 git pull 与三条免密 restart；daemon-reload、unit 安装、env 修改、nginx reload 一律由用户执行。
+- 子代理是否可 ssh / 部署：否（缺省）；E2 获得用户本轮授权后，devops-engineer 可执行 SKILL.md §4.4/§5 中的 git pull、三条 restart、台账备份/只读核验、env 键计数与权限核对。
+- **生产 sudo（2026-10-26 起，画像 v1.1.0）**：`/etc/sudoers.d/90-ib-deploy-full` = `yangyang198354 ALL=(ALL) NOPASSWD: ALL`（用户明确选择，已登记为安全例外）。部署账号自此等价 root，代理可在 E2 授权范围内无口令完成全部 A/U 步骤。**权限扩大不解除任何既有禁令**：仍不得回显 `/etc/intelligentbase/*.env` 值、不得把凭据写入任何文件/日志、不得执行画像 P8 禁用项；SSH 私钥须按 root 级密钥保管。
 - 提交前必须通过的检查：与 CI 一致：compileall、迁移检查、unit/integration/e2e/全量、selfcheck、版本门、前端 build+test。
 
 ## P10. 额外必读（PM 填入 required_reading）
@@ -153,3 +154,4 @@
 - 2026-10-24 用户确认：文档工作区 `docs/sdlc/intelligentbase/`（flat）；测试以 CI 的 pytest 命令为准；无 staging；回滚 = git revert 后重新部署；commit/push 由主会话在用户确认后执行；P8 禁用项成立；`.trae/` 保留不动、子代理不修改。画像状态改为 APPROVED。
 - 仍为未知（不阻塞流程）：origin/master 分支用途；开发机测试环境（缺 pytest）由谁准备——遇到时测试标 BLOCKED 并告知用户。
 - 2026-10-25 用户授权「生成本项目正式画像 + 提交并推送移植成果」：从 Claude 版派生为 TRAE 版画像，运行时路径改为 `.trae/sdlc/`，状态 APPROVED。`.claude/agents/project_profile.md` 保持只读、未修改。
+- 2026-10-26 用户选择「全量 NOPASSWD ALL」以消除部署中的人工 sudo 步骤（原话「现在部署还要我手工上133那台机操作太不方便了。能不能你全自动完成」）；已告知等价 root 的风险。画像 P9 同步为 v1.1.0，登记为安全例外。
