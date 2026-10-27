@@ -287,7 +287,8 @@ def test_TC_UNIT_090_resolver_maps_token_to_authz_context_fail_closed():
     ops_token = new_session_token()
     store.issue_session(ops.user_id, token_digest(ops_token), expires_at=iso_plus_seconds(600))
     ctx2 = resolver.resolve(ops_token)
-    assert ctx2 is not None and ctx2.project_id == "p_alpha" and ctx2.roles == ("manager",)
+    # REV-26（REQ-FUNC-010 / IFC-R26-133）：ops 账号追加配置档位令牌；存量账号默认 manage 档（OQ-R26-A01）。
+    assert ctx2 is not None and ctx2.project_id == "p_alpha" and ctx2.roles == ("manager", "cfg:manage")
 
     # 解析器无授权方法（AC-IB-27-03：不存在与 AuthzPolicy 并列的第二套授权真源）
     assert not hasattr(resolver, "can_manage") and not hasattr(resolver, "can_query")
@@ -305,7 +306,7 @@ def test_TC_UNIT_090_resolver_maps_token_to_authz_context_fail_closed():
     assert resolver.resolve(admin_token) is None  # 已停用
 
     assert effective_roles(admin) == ("admin",)
-    assert effective_roles(ops) == ("manager",)
+    assert effective_roles(ops) == ("manager", "cfg:manage")  # REV-26 IFC-R26-133（同上）
 
 
 # --------------------------------------------------------------------------- #

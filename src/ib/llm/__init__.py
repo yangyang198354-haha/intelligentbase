@@ -45,7 +45,8 @@ FreeArk 已有过一次生产漂移（见 CLAUDE.md 开发约定 7）。本模�
 from __future__ import annotations
 
 import threading
-from typing import Any
+from collections import OrderedDict
+from typing import Any, Callable
 
 from ib.core import (
     EgressDescriptor,
@@ -140,6 +141,7 @@ class OpenAiCompatibleProvider:
         expert_temperature: float = 0.6,
         aggregator_temperature: float = 0.2,
         request_timeout_s: float = 60.0,
+        client_cache_max: int = 128,
     ) -> None:
         if not base_url or not model:
             from ib.core import StartupError
@@ -159,7 +161,9 @@ class OpenAiCompatibleProvider:
         self._aggregator_temperature = float(aggregator_temperature)
         self._timeout = float(request_timeout_s)
         self._lock = threading.Lock()
-        self._clients: dict[tuple[float, str | None], Any] = {}
+        # REV-26（IFC-R26-071）：热生效后提示词会随版本变化，旧版本的客户端不再被引用 → 有界 LRU，防无界增长。
+        self._clients: OrderedDict[tuple[float, str | None], Any] = OrderedDict()
+        self._client_cache_max = max(1, int(client_cache_max))
 
     # --- 端口方法 --- #
 
@@ -259,6 +263,8 @@ class OpenAiCompatibleProvider:
         with self._lock:
             cached = self._clients.get(key)
             if cached is not None:
+                if hasattr(self._clients, "move_to_end"):
+                    self._clients.move_to_end(key)
                 return cached
             client = _make_langchain_client(
                 base_url=self._base_url,
@@ -269,7 +275,27 @@ class OpenAiCompatibleProvider:
                 system_prompt=system_prompt,
             )
             self._clients[key] = client
+            cap = getattr(self, "_client_cache_max", 128)  # 兼容绕过 __init__ 构造的测试替身
+            while len(self._clients) > cap:
+                del self._clients[next(iter(self._clients))]  # 淘汰最久未用（dict / OrderedDict 均为插入序）
             return client
+
+    def complete(
+        self, system: str, user: str, *, temperature: float = 0.0, timeout_s: float | None = None
+    ) -> str:
+        """REV-26（IFC-R26-071）：一次性补全（Agent Builder 唯一调用点）。**实现侧扩展**，`LlmProvider` 端口方法集不变。
+
+        不进客户端缓存：`system` 是请求期内容（ADR-36 禁止其作缓存键）。异常原样上抛，由 `EgressGuard` 归类。
+        """
+        client = _make_langchain_client(
+            base_url=self._base_url,
+            model=self._model,
+            api_key=self._api_key,
+            temperature=float(temperature),
+            timeout=float(timeout_s) if timeout_s is not None else self._timeout,
+            system_prompt=None,
+        )
+        return _extract_text(client.invoke([("system", system), ("human", user)]))
 
 
 class UnconfiguredLlmProvider:
@@ -305,6 +331,13 @@ class UnconfiguredLlmProvider:
     def build_aggregator(self) -> LlmRole:
         self._fail()
 
+    def complete(
+        self, system: str, user: str, *, temperature: float = 0.0, timeout_s: float | None = None
+    ) -> str:
+        """REV-26：未配置态 fail-closed（可读、不含 Key 信息）。"""
+        self._fail()
+        return ""
+
     def health(self) -> HealthStatus:
         """**永不抛异常**；如实声明「未配置」。"""
         return HealthStatus(ok=False, detail="LLM 未配置（Key 未设置）", latency_ms=None)
@@ -339,6 +372,19 @@ class FakeLlmProvider:
         self.aggregator_output = aggregator_output
         self._unavailable = unavailable
         self._timeout = timeout
+        #: REV-26：`complete()` 的可编程返回（None → 回显固定串）与调用记录（供测试断言外发内容）。
+        self.complete_output: str | Callable[[str, str], str] | None = None
+        self.complete_calls: list[tuple[str, str]] = []
+
+    def complete(
+        self, system: str, user: str, *, temperature: float = 0.0, timeout_s: float | None = None
+    ) -> str:
+        self._guard()
+        self.complete_calls.append((system, user))
+        out = self.complete_output
+        if callable(out):
+            return out(system, user)
+        return "{}" if out is None else out
 
     def _guard(self) -> None:
         from ib.core import DependencyUnavailableError
@@ -418,6 +464,12 @@ def build_llm_provider(cfg: Any, *, api_key: str | None = None) -> Any:
         # **未配置态**（非致命）：服务正常启动，LLM 依赖路径调用期 fail-closed（ADR-39）。
         return UnconfiguredLlmProvider(base_url=cfg.llm.base_url)
     assert_langchain_openai_version()
+    import os
+
+    try:  # REV-26：客户端有界 LRU 容量（只登记键名；缺省 128；非法值回落缺省）
+        cache_max = int(os.environ.get("IB_LLM_CLIENT_CACHE_MAX", "").strip() or 128)
+    except ValueError:
+        cache_max = 128
     return OpenAiCompatibleProvider(
         base_url=cfg.llm.base_url,
         model=cfg.llm.model,
@@ -426,6 +478,7 @@ def build_llm_provider(cfg: Any, *, api_key: str | None = None) -> Any:
         expert_temperature=cfg.llm.expert_temperature,
         aggregator_temperature=cfg.llm.aggregator_temperature,
         request_timeout_s=cfg.llm.request_timeout_s,
+        client_cache_max=cache_max,
     )
 
 
@@ -474,7 +527,14 @@ class _PromptedClient:
             [("system", self._system_prompt), ("human", prompt)], **kwargs
         )
 
-    def run_tool_loop(self, prompt: str, tools: list[Any], *, max_iterations: int = 4) -> str:
+    def run_tool_loop(
+        self,
+        prompt: str,
+        tools: list[Any],
+        *,
+        max_iterations: int = 4,
+        on_unauthorized: Callable[[str], None] | None = None,
+    ) -> str:
         """专家作答的**工具调用循环**（function-calling），返回最终正文。
 
         把 `BoundTool`（框架无关：`name` / `description` / `parameters` / `callable`）
@@ -509,8 +569,14 @@ class _PromptedClient:
                 name, args, call_id = _tool_call_parts(call)
                 tool = by_name.get(name)
                 if tool is None:
+                    # REV-26（ADR-61）：模型给出未绑定（未授权）的工具名 → 回调记录（只传工具名）并回给模型“未授权”。
+                    if on_unauthorized is not None:
+                        try:
+                            on_unauthorized(str(name))
+                        except Exception:  # noqa: BLE001 - 记录失败不得影响问答
+                            pass
                     followups.append(
-                        ToolMessage(content="未知工具，忽略该调用。", tool_call_id=call_id or "unknown")
+                        ToolMessage(content="未授权的工具，忽略该调用。", tool_call_id=call_id or "unknown")
                     )
                     continue
                 followups.append(

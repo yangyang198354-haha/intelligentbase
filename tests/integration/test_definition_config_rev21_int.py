@@ -98,8 +98,10 @@ def test_TC_INT_R21_001_default_doc_envelope_and_derived_keys(http_app):
     deps, Client = http_app
     payload = json.loads(Client().get(PATH, **AUTH).content)
 
-    # 顶层键**未增**：仍为既有四键
-    assert set(payload) == {"document", "derived", "editable_fields", "config_key_names"}, set(payload)
+    # 顶层键：既有四键 + REV-26 追加的 version / level / graph（IFC-R26-141；除此之外未增）
+    assert set(payload) == {
+        "document", "derived", "editable_fields", "config_key_names", "version", "level", "graph",
+    }, set(payload)
     # derived 既有 5 键键名不变；本轮仅**新增** experts（加成式契约）
     existing_five = {"capability_digest", "expert_names", "nodes", "conditional_edges", "edges"}
     assert existing_five <= set(payload["derived"]), set(payload["derived"])

@@ -287,23 +287,34 @@ class IntentRouter:
         history: Sequence[Message] = (),
         scope: Scope,
         allow_ood: bool = False,
+        restrict_to: Sequence[str] | None = None,
     ) -> RouteDecision:
         """[IFC-IB-201] 返回 `RouteDecision`。**永不抛异常**。
 
         `allow_ood=True` 时允许返回 `experts=[]`（交给通用应答节点）；
         默认 `False` 表示「空结果按默认专家处理」（保守：宁可多用一个专家，也不要无人应答）。
+
+        **REV-26（IFC-R26-081）**：`restrict_to` 非空 → L0 关键词 / L1 语义 / L2 LLM 的候选与“默认专家回落”
+        都限制在该集合内（集合外的专家被忽略）；`None` → 既有行为逐位不变。
         """
         try:
             text = current_query(query)
             valid = set(self._expert_names())
+            restrict = frozenset(restrict_to) if restrict_to else None
+            if restrict is not None:
+                valid &= restrict
 
             # --- L0/L1：关键词唯一命中 → 语义高置信（都是「不必问 LLM」的快速路径） ---
             keyword_hits = self._keyword_hits(text)
+            if restrict is not None:
+                keyword_hits = [k for k in keyword_hits if k in restrict]
             if len(keyword_hits) == 1:
                 return RouteDecision(
                     experts=keyword_hits, tier=RouteTier.KEYWORD_UNIQUE, confidence=1.0
                 )
             scores = self._semantic_scores(text, scope)
+            if restrict is not None:
+                scores = {k: v for k, v in scores.items() if k in restrict}
             if self._semantic is not None:
                 picked = None
                 try:
@@ -324,6 +335,8 @@ class IntentRouter:
                 raw = self._invoke_router(text)
                 if raw:
                     llm_names, saw_array = parse_route_output_ex(raw)
+                    if restrict is not None:
+                        llm_names = [n for n in llm_names if n in restrict]
                     llm_said_ood = saw_array and not llm_names
             if llm_names:
                 decision = RouteDecision(
@@ -353,6 +366,10 @@ class IntentRouter:
 
             # --- 默认专家（确定性兜底，绝不留「无人应答」） ---
             fallback = self._default_name()
+            if restrict is not None and fallback not in restrict:
+                # 默认专家不在候选集内：回落到候选集中按注册表顺序的第一个（确定性）。
+                ordered = [n for n in self._expert_names() if n in restrict]
+                fallback = ordered[0] if ordered else sorted(restrict)[0]
             return RouteDecision(experts=[fallback], tier=RouteTier.DEFAULT, confidence=0.0)
         except Exception:  # noqa: BLE001 - IFC-IB-201 要求无异常出口
             try:

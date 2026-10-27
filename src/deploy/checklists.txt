@@ -613,11 +613,25 @@
     !! 手工 `sqlite3 < 007_folder_tree.sql` 不含补列与 name_key 回填 !! 部署路径只能是 ib-web 重启（ExecStartPre）。
     !! 真实浏览器交互（文件夹上传 / 新建 / 重命名 / 删除 / 更新 / 时间显示）为 [NOT_TESTABLE] !! 须由用户在 UI 复核。
 
+[B29] 配置版本迁移 008 与热生效上线核对（REV-26 / ADR-55；迁移随 ib-web 重启自动应用；台账读取一律以 ib-web 身份只读打开）
+    (1) 迁移前备份：同 [B28](1)（只拷贝、不回显内容；以 ib-web 身份，避免 -wal/-shm 变 root 属主，见 [B22]）
+    (2) ib-web / ib-worker 各重启一次后：
+        [ ] 只读核对新表存在：config_versions / config_head / config_drafts / builder_eval_cache；
+            users.config_level 与 config_audit.version_before / version_after / object_summary 三列存在
+        [ ] 存量 ops 账号 config_level 均为 manage（与上线前“能写配置”等价）；`SELECT 1 FROM config_head WHERE pending_version IS NOT NULL` 无结果
+        [ ] `journalctl -u ib-web --since <启动时刻>` 无 runtime_compile_failed / config_drift
+    (3) 回滚前置核对（仅回滚时）：确认无 pending 版本；v2 定义文档在旧代码下不可读 ——
+        回滚到旧代码前须从版本快照 1（升级前基线）还原定义文档与提示词文件为 v1 [MANUAL_ROLLBACK_REQUIRED]；
+        撤销新结构的 DROP 语句见 008_config_versions.sql 头注释（需 SQLite >= 3.35，目标机版本部署前核对，**备份之后由用户执行**）
+    说明：本轮新增可选键名 IB_CONFIG_HEAD_CHECK_INTERVAL_S / IB_GRAPH_RUNTIME / IB_LLM_CLIENT_CACHE_MAX / IB_DOC_SCOPE_MAX_IDS
+    （缺省值即可运行；/etc/intelligentbase/*.env 由用户按需自行添加）。
+
 ##############################################################################
 # C. 验收签署
 ##############################################################################
 [ ] A1–A8 全部勾选，证据归档（命令原文 + 时间戳）
 [ ] B1–B27 全部勾选，证据归档
 [ ] B28（R25 文件夹树迁移 007）全部勾选，证据归档
+[ ] B29（R26 配置版本迁移 008 与热生效上线）全部勾选，证据归档
 [ ] 本文件不含任何真实凭据（自检：grep -nE 'sk-|ghp_|BEGIN .*PRIVATE KEY' 本文件应无命中）
 执行人：____________  复核人：____________  日期：____________

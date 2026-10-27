@@ -67,6 +67,17 @@ __all__ = [
     "SqliteConfigAuditStore",
     "MemoryConfigAuditStore",
     "build_config_audit_store",
+    # REV-26（IFC-R26-050/051/055）：配置版本 / 草稿 / 评审缓存 / 目录文档解析
+    "SqliteConfigVersionStore",
+    "MemoryConfigVersionStore",
+    "SqliteConfigDraftStore",
+    "MemoryConfigDraftStore",
+    "SqliteBuilderEvalCache",
+    "MemoryBuilderEvalCache",
+    "build_config_version_store",
+    "build_config_draft_store",
+    "build_builder_eval_cache",
+    "TreeDocScopeResolver",
     # REV-18（IFC-IB-370/371）：项目注册表 / LLM Key 存储
     "SqliteProjectRegistryStore",
     "MemoryProjectRegistryStore",
@@ -783,10 +794,24 @@ def __getattr__(name: str) -> Any:
         from ib.ledger import llm_key as _llm_key
 
         return getattr(_llm_key, name)
-    if name in {"SqliteEntryTree", "MemoryEntryTree", "build_entry_tree"}:
+    if name in {"SqliteEntryTree", "MemoryEntryTree", "build_entry_tree", "TreeDocScopeResolver"}:
         from ib.ledger import tree as _tree
 
         return getattr(_tree, name)
+    if name in {
+        "SqliteConfigVersionStore",
+        "MemoryConfigVersionStore",
+        "SqliteConfigDraftStore",
+        "MemoryConfigDraftStore",
+        "SqliteBuilderEvalCache",
+        "MemoryBuilderEvalCache",
+        "build_config_version_store",
+        "build_config_draft_store",
+        "build_builder_eval_cache",
+    }:
+        from ib.ledger import config_versions as _config_versions
+
+        return getattr(_config_versions, name)
     if name in {"SqliteUploadBatchStore", "MemoryUploadBatchStore", "build_upload_batch_store"}:
         from ib.ledger import upload_batches as _upload_batches
 

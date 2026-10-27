@@ -155,7 +155,7 @@ def test_TC_INT_143_audit_records_successful_save(http_app):
     saved = [e for e in items if e["result"] == "saved"]
     assert saved, "成功保存应记 result=saved"
     last = saved[-1]
-    # 字段白名单：恰七键，且含「谁 / 何时 / 改了哪些字段」
+    # 字段白名单：原七键 + REV-26 追加的版本前后号与对象摘要（IFC-R26-054 / 153，REQ-NFUNC-006），且含「谁 / 何时 / 改了哪些字段」
     assert set(last) == {
         "timestamp",
         "project",
@@ -164,6 +164,9 @@ def test_TC_INT_143_audit_records_successful_save(http_app):
         "changed_field_names",
         "result",
         "detail_code",
+        "version_before",
+        "version_after",
+        "object_summary",
     }
     assert last["project"] == "p_alpha"
     assert last["actor"]  # 「谁」

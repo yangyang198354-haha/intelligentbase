@@ -364,7 +364,9 @@ def validate_prompt_directory(
             )
 
     # 缺提示词：某专家**两层文件皆缺**（REV-20：不再有代码内置兜底可回落）。
-    for name in sorted(known):
+    # REV-26：已停用（status="disabled"）的专家不参与运行，不要求提示词（历史文件可保留）。
+    inactive = {e.name for e in doc.experts if getattr(e, "status", "active") != "active"}
+    for name in sorted(known - inactive):
         has_main_file = any(
             r.expert_name == name and r.layer == "main" and r.exists for r in refs
         )

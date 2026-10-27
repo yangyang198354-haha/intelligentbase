@@ -156,10 +156,14 @@ def validate_password_strength(password: str, policy: PasswordPolicy | None = No
 def effective_roles(user: UserRecord) -> tuple[str, ...]:
     """账户角色 → `AuthzContext.roles` 的映射（ADR-21）。
 
-    `admin` → `("admin",)`（全局）；`ops` → `("manager",)`（等价既有 manager 语义，
-    项目边界由 `project_id` 承载）。**仅做身份映射，不做授权判定**。
+    `admin` → `("admin",)`（全局）；`ops` → `("manager", "cfg:<level>")`（等价既有 manager 语义，
+    项目边界由 `project_id` 承载；REV-26 追加配置三档令牌，IFC-R26-133）。**仅做身份映射，不做授权判定**。
     """
-    return ("admin",) if user.role == "admin" else ("manager",)
+    if user.role == "admin":
+        return ("admin",)
+    from ib.config.access import level_token
+
+    return ("manager", level_token(getattr(user, "config_level", "manage")))
 
 
 class SessionTokenResolver:

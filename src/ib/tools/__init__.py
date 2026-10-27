@@ -60,6 +60,8 @@ __all__ = [
     "build_authorized_tools",
     "validate_grants",
     "derive_tool_param_specs",
+    # REV-26（IFC-R26-060）
+    "build_agent_tools",
 ]
 
 #: 摘要中每个工具的简述长度上限（防止超长 description 挤占提示预算）。
@@ -409,6 +411,43 @@ def build_authorized_tools(
             assert registered is not None  # 由 `known` 保证
             bound.append(_wrap_with_params(registered, params))
     return bound
+
+
+def build_agent_tools(
+    grant: ToolGrantSpec | None,
+    *,
+    registry: ToolRegistry,
+    specs: tuple[ToolParamSpec, ...],
+    scope: Scope,
+    retrieval: Any,
+    knowledge: Any,
+) -> list[BoundTool]:
+    """[IFC-R26-060 / ADR-61] 只用**该 agent 自己的**授权构造已绑 scope 的工具列表。
+
+    `grant is None` → 空列表（该 agent 无任何授权）。检索类工具（实现体接受 `knowledge` 关键字）另以
+    `functools.partial` 闭包注入 `knowledge`：它不出现在工具 JSON Schema 的 `parameters` 里，
+    LLM 不可见、不可改。未知工具 / 参数越界 → `ToolParamValidationError`（编译期 fail-fast）。
+    """
+    if grant is None or not grant.tool_names:
+        return []
+    import inspect
+
+    injected = build_authorized_tools((grant,), registry=registry, specs=specs)
+    scoped_in: list[BoundTool] = []
+    for tool in injected:
+        try:
+            takes_knowledge = "knowledge" in inspect.signature(tool.callable).parameters
+        except (TypeError, ValueError):  # pragma: no cover - 极端包装
+            takes_knowledge = False
+        if takes_knowledge:
+            tool = BoundTool(
+                name=tool.name,
+                description=tool.description,
+                callable=functools.partial(tool.callable, knowledge=knowledge),
+                parameters=tool.parameters,
+            )
+        scoped_in.append(tool)
+    return bind_scope(scoped_in, scope, retrieval)
 
 
 def _param_belongs(param_name: str, tool_spec: ToolSpec) -> bool:

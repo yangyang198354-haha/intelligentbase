@@ -48,12 +48,13 @@ from ib.core import (
     DependencyUnavailableError,
     StartupError,
 )
-from ib.ledger.schema import ensure_schema, missing_config_audit_columns
+from ib.ledger.schema import ensure_schema, missing_config_audit_columns, missing_config_version_columns
 
 __all__ = [
     "SqliteConfigAuditStore",
     "MemoryConfigAuditStore",
     "build_config_audit_store",
+    "insert_audit_row",
 ]
 
 #: 查询列（与 `_row_to_entry` 一一对应；集中一处避免 `SELECT *` 漂移）。
@@ -65,7 +66,37 @@ _A_COLUMNS = (
     "changed_field_names",
     "result",
     "detail_code",
+    # REV-26（IFC-R26-054）：版本前后号与对象摘要（既有行为 NULL）。
+    "version_before",
+    "version_after",
+    "object_summary",
 )
+
+
+def insert_audit_row(connection: sqlite3.Connection, entry: ConfigAuditEntry) -> None:
+    """在**调用方给定的连接 / 事务**内追加一条审计行（REV-26 CR-009：审计与发布 / 权限变更同事务）。
+
+    只 INSERT；`SqliteConfigAuditStore.record` 也经由它写入（单一 SQL 出处）。
+    """
+    column_list = ", ".join(_A_COLUMNS)
+    placeholders = ", ".join("?" for _ in _A_COLUMNS)
+    connection.execute(
+        f"INSERT INTO config_audit ({column_list}) VALUES ({placeholders})",
+        (
+            entry.timestamp,
+            entry.project,
+            entry.actor,
+            entry.action,
+            # 只存**字段名**的 JSON 数组；永不存字段值（SC-3）。
+            json.dumps(list(entry.changed_field_names), ensure_ascii=False),
+            entry.result,
+            entry.detail_code,
+            entry.version_before,
+            entry.version_after,
+            # 只存对象 id / 类别清单（<=50 项）；永不存正文 / 凭据。
+            json.dumps(list(entry.object_summary[:50]), ensure_ascii=False),
+        ),
+    )
 
 
 class SqliteConfigAuditStore:
@@ -135,6 +166,10 @@ class SqliteConfigAuditStore:
                 f"配置审计存储初始化失败（sqlite：{type(exc).__name__}）", dependency="ledger"
             ) from exc
         missing = missing_config_audit_columns(connection)
+        # REV-26：新列同样必须齐全（ensure_schema 已补；否则 INSERT 会运行期失败）。
+        for table, cols in missing_config_version_columns(connection).items():
+            if table == "config_audit":
+                missing.setdefault(table, []).extend(cols)
         if missing:
             tables = "；".join(f"{t}:{','.join(cols)}" for t, cols in missing.items())
             raise StartupError(
@@ -157,25 +192,7 @@ class SqliteConfigAuditStore:
 
     def record(self, entry: ConfigAuditEntry) -> None:
         """追加一条审计记录（IFC-IB-360）。**只 INSERT**，不提供更新 / 删除。"""
-        column_list = ", ".join(_A_COLUMNS)
-        placeholders = ", ".join("?" for _ in _A_COLUMNS)
-        cursor = self._conn().cursor()
-        try:
-            cursor.execute(
-                f"INSERT INTO config_audit ({column_list}) VALUES ({placeholders})",
-                (
-                    entry.timestamp,
-                    entry.project,
-                    entry.actor,
-                    entry.action,
-                    # 只存**字段名**的 JSON 数组；永不存字段值（SC-3）。
-                    json.dumps(list(entry.changed_field_names), ensure_ascii=False),
-                    entry.result,
-                    entry.detail_code,
-                ),
-            )
-        finally:
-            cursor.close()
+        insert_audit_row(self._conn(), entry)
 
     def list_by_project(
         self,
@@ -183,21 +200,41 @@ class SqliteConfigAuditStore:
         *,
         limit: int = 50,
         offset: int = 0,
+        action: str | None = None,
     ) -> tuple[ConfigAuditEntry, ...]:
-        """按项目回放审计记录（IFC-IB-359），稳定升序（`entry_id` 追加序）。"""
+        """按项目回放审计记录（IFC-IB-359），稳定升序（`entry_id` 追加序）。`action` 为可选过滤（REV-26）。"""
         safe_limit = max(0, int(limit))
         safe_offset = max(0, int(offset))
         cursor = self._conn().cursor()
         try:
-            cursor.execute(
-                f"SELECT {', '.join(_A_COLUMNS)} FROM config_audit "
-                "WHERE project = ? ORDER BY entry_id ASC LIMIT ? OFFSET ?",
-                (project_id, safe_limit, safe_offset),
-            )
+            if action is None:
+                cursor.execute(
+                    f"SELECT {', '.join(_A_COLUMNS)} FROM config_audit "
+                    "WHERE project = ? ORDER BY entry_id ASC LIMIT ? OFFSET ?",
+                    (project_id, safe_limit, safe_offset),
+                )
+            else:
+                cursor.execute(
+                    f"SELECT {', '.join(_A_COLUMNS)} FROM config_audit "
+                    "WHERE project = ? AND action = ? ORDER BY entry_id ASC LIMIT ? OFFSET ?",
+                    (project_id, action, safe_limit, safe_offset),
+                )
             rows = cursor.fetchall()
         finally:
             cursor.close()
         return tuple(_row_to_entry(row) for row in rows)
+
+    def purge_before(self, cutoff_iso: str) -> int:
+        """`ConfigAuditRetention`（IFC-R26-054）：删除早于 `cutoff_iso` 的审计行（1 年保留）。
+
+        **仅注入 ib-worker**；Web 层不持有该端口（审计表对 Web 仍是 append-only）。
+        """
+        cursor = self._conn().cursor()
+        try:
+            cursor.execute("DELETE FROM config_audit WHERE timestamp < ?", (cutoff_iso,))
+            return int(cursor.rowcount or 0)
+        finally:
+            cursor.close()
 
 
 class MemoryConfigAuditStore:
@@ -222,12 +259,23 @@ class MemoryConfigAuditStore:
         *,
         limit: int = 50,
         offset: int = 0,
+        action: str | None = None,
     ) -> tuple[ConfigAuditEntry, ...]:
         with self._lock:
-            matched = [e for e in self._entries if e.project == project_id]
+            matched = [
+                e for e in self._entries if e.project == project_id and (action is None or e.action == action)
+            ]
         safe_limit = max(0, int(limit))
         safe_offset = max(0, int(offset))
         return tuple(matched[safe_offset : safe_offset + safe_limit])
+
+    def purge_before(self, cutoff_iso: str) -> int:
+        """`ConfigAuditRetention` 的内存实现（仅 worker 维护步骤使用）。"""
+        with self._lock:
+            kept = [e for e in self._entries if e.timestamp >= cutoff_iso]
+            removed = len(self._entries) - len(kept)
+            self._entries = kept
+        return removed
 
 
 def _row_to_entry(row: Any) -> ConfigAuditEntry:
@@ -240,7 +288,14 @@ def _row_to_entry(row: Any) -> ConfigAuditEntry:
         changed_field_names_json,
         result,
         detail_code,
+        version_before,
+        version_after,
+        object_summary_json,
     ) = row
+    try:
+        summary = tuple(str(x) for x in json.loads(object_summary_json or "[]"))
+    except (json.JSONDecodeError, TypeError):
+        summary = ()
     try:
         changed = tuple(json.loads(changed_field_names_json or "[]"))
     except (json.JSONDecodeError, TypeError):
@@ -254,6 +309,9 @@ def _row_to_entry(row: Any) -> ConfigAuditEntry:
         changed_field_names=tuple(str(name) for name in changed),
         result=_coerce_result(result),
         detail_code=str(detail_code) if detail_code is not None else None,
+        version_before=None if version_before is None else int(version_before),
+        version_after=None if version_after is None else int(version_after),
+        object_summary=summary,
     )
 
 

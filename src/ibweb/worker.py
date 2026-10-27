@@ -38,9 +38,10 @@ import os
 import signal
 import sys
 import time
+from dataclasses import dataclass
 from typing import Any
 
-__all__ = ["run_once", "main"]
+__all__ = ["run_once", "run_maintenance", "MaintenanceSummary", "main"]
 
 
 def _setup_django() -> None:
@@ -118,8 +119,84 @@ def run_once(*, lease_owner: str, limit: int, reap: bool = True) -> dict[str, An
     except Exception as exc:  # noqa: BLE001
         log_event("worker", "batch_purge_failed", error_code=type(exc).__name__)
 
+    # REV-26（MOD-R26-17）：配置版本 / 草稿 / 审计保留 / 评审缓存维护（每小时至多一次，进程内时间戳守卫；不新增线程 / 单元）。
+    summary.update({"cfg_versions_pruned": 0, "cfg_drafts_purged": 0, "cfg_audit_purged": 0, "cfg_eval_purged": 0})
+    global _LAST_MAINTENANCE
+    now_mono = time.monotonic()
+    if now_mono - _LAST_MAINTENANCE >= _MAINTENANCE_INTERVAL_S:
+        _LAST_MAINTENANCE = now_mono
+        try:
+            m = run_maintenance(deps=deps, now=utc_now_iso())
+            summary.update(
+                {"cfg_versions_pruned": m.versions_pruned, "cfg_drafts_purged": m.drafts_purged,
+                 "cfg_audit_purged": m.audit_purged, "cfg_eval_purged": m.eval_cache_purged}
+            )
+        except Exception as exc:  # noqa: BLE001 - 维护失败不阻断入库主循环
+            log_event("worker", "config_maintenance_failed", error_code=type(exc).__name__)
+
     log_event("worker", "cycle", **summary)
     return summary
+
+
+#: 配置维护的进程内节流（秒）；`-inf` 使 worker 启动后的第一轮即执行一次。
+_MAINTENANCE_INTERVAL_S = 3600.0
+_LAST_MAINTENANCE = float("-inf")
+
+
+@dataclass(frozen=True)
+class MaintenanceSummary:
+    versions_pruned: int
+    drafts_purged: int
+    audit_purged: int
+    eval_cache_purged: int
+
+
+def _iso_minus_days(now: str, days: int) -> str:
+    from datetime import datetime, timedelta, timezone
+
+    base = datetime.strptime(now, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    return (base - timedelta(days=int(days))).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def run_maintenance(
+    *,
+    deps: Any,
+    now: str,
+    audit_retention_days: int = 365,
+    draft_ttl_days: int = 30,
+    eval_cache_keep: int = 2000,
+    eval_cache_ttl_days: int = 90,
+    keep_versions: int = 50,
+) -> MaintenanceSummary:
+    """[IFC-R26-170] 删除类维护：修剪版本（保留 head + 最近 `keep_versions` 个）/ 过期草稿 / 评审缓存 / 审计 1 年保留。
+
+    审计的删除**只**经 `purge_before`（仅 worker 调用；Web 层没有任何删除审计的入口）。
+    陈旧 pending 的回收由 ib-web 在发布 / 启动路径处理，worker 不碰。每一类各自 try：一类失败不影响其他类。
+    """
+    from ib.observability import log_event
+
+    counts = {"v": 0, "d": 0, "a": 0, "e": 0}
+
+    def _step(key: str, name: str, fn: Any) -> None:
+        try:
+            counts[key] = int(fn() or 0)
+        except Exception as exc:  # noqa: BLE001
+            log_event("worker", "config_maintenance_step_failed", error_code=f"{name}:{type(exc).__name__}")
+
+    vs = getattr(deps, "version_store", None)
+    if vs is not None:
+        _step("v", "versions", lambda: vs.prune_all(keep=keep_versions))
+    ds = getattr(deps, "draft_store", None)
+    if ds is not None:
+        _step("d", "drafts", lambda: ds.purge_older_than(_iso_minus_days(now, draft_ttl_days)))
+    audit = getattr(deps, "config_audit_store", None)
+    if audit is not None and hasattr(audit, "purge_before"):
+        _step("a", "audit", lambda: audit.purge_before(_iso_minus_days(now, audit_retention_days)))
+    ec = getattr(deps, "eval_cache", None)
+    if ec is not None:
+        _step("e", "eval_cache",
+              lambda: ec.purge(keep=eval_cache_keep, older_than_iso=_iso_minus_days(now, eval_cache_ttl_days)))
+    return MaintenanceSummary(counts["v"], counts["d"], counts["a"], counts["e"])
 
 
 def _known_project_ids(deps: Any) -> list[str]:

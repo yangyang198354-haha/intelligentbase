@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from django.urls import path
 
-from ibweb import library_views, views
+from ibweb import builder_views, config_views, library_views, views
 
 __all__ = ["urlpatterns"]
 
@@ -88,6 +88,33 @@ urlpatterns = [
     # `audit` / `storage-state` 均为独立字面量，不会被 `prompts/<str:expert>` 捕获。
     # 仅 `Authorization` 头鉴权；`?token=` 由中间件先于路由拒绝（4xx）。
     path("api/config/audit", views.config_audit_endpoint, name="ib-config-audit"),
+    # REV-26（MOD-R26-15 / IFC-R26-140~152）：热生效配置端点族。字面量路由先于带参路由。
+    path("api/config/status", config_views.status_endpoint, name="ib-config-status"),
+    path("api/config/catalog", config_views.catalog_endpoint, name="ib-config-catalog"),
+    path("api/config/validate", config_views.validate_endpoint, name="ib-config-validate"),
+    path("api/config/publish/preview", config_views.preview_endpoint, name="ib-config-publish-preview"),
+    path("api/config/publish", config_views.publish_endpoint, name="ib-config-publish"),
+    path("api/config/versions", config_views.versions_endpoint, name="ib-config-versions"),
+    path(
+        "api/config/versions/<int:n>/diff", config_views.version_diff_endpoint, name="ib-config-version-diff"
+    ),
+    path("api/config/versions/<int:n>", config_views.version_detail_endpoint, name="ib-config-version"),
+    path("api/config/rollback", config_views.rollback_endpoint, name="ib-config-rollback"),
+    path("api/config/adopt-drift", config_views.adopt_drift_endpoint, name="ib-config-adopt-drift"),
+    path("api/config/drafts", config_views.drafts_endpoint, name="ib-config-drafts"),
+    path("api/config/drafts/<str:draft_id>", config_views.draft_detail_endpoint, name="ib-config-draft"),
+    path("api/config/access", config_views.access_endpoint, name="ib-config-access"),
+    path("api/config/access/<str:user_id>", config_views.access_detail_endpoint, name="ib-config-access-user"),
+    path("api/config/trial", config_views.trial_endpoint, name="ib-config-trial"),
+    # REV-26（MOD-R26-16 / IFC-R26-160~163）：Agent Builder（草案 / 自评 / 优化 / 评审已有 agent；不写配置）。
+    path("api/builder/draft", builder_views.builder_draft_endpoint, name="ib-builder-draft"),
+    path("api/builder/evaluate", builder_views.builder_evaluate_endpoint, name="ib-builder-evaluate"),
+    path("api/builder/optimize", builder_views.builder_optimize_endpoint, name="ib-builder-optimize"),
+    path(
+        "api/builder/review-existing",
+        builder_views.builder_review_existing_endpoint,
+        name="ib-builder-review-existing",
+    ),
     path(
         "api/config/storage-state",
         views.storage_state_endpoint,

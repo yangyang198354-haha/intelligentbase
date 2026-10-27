@@ -75,8 +75,10 @@ jobs:
       # R13（阶段2）：Schema/迁移门 —— 003_accounts.sql 语法合法 + 幂等可重放 +
       # 与代码生成器（ib/ledger/schema.py::account_ddl_script()）单源一致。
       # R25：同一步骤追加 007_folder_tree.sql（语法 / 两次重放 / 与 folder_tree_ddl_script() 单源 / 老库升级形态）。
-      # 对齐 checklists B20 / B28；只用标准库（runner 无需 sqlite3 CLI）。
-      - name: Schema / migration check (阶段2 R13 + R25)
+      # R26：同一步骤再追加 008_config_versions.sql（语法 / 两次重放 / 与 config_versions_ddl_script() 单源 /
+      #      无可执行 DROP / 老库升级补列与存量 ops 账号为 manage 档），口径同 selfcheck config_versions_schema_single_source。
+      # 对齐 checklists B20 / B28 / B29；只用标准库（runner 无需 sqlite3 CLI）。
+      - name: Schema / migration check (阶段2 R13 + R25 + R26)
         run: |
           python - <<'PY'
           import sqlite3, pathlib, sys
@@ -127,6 +129,38 @@ jobs:
           c0.executescript(sql7)
           assert shape(c0) == shape(c7), "old-db upgrade shape != fresh shape"
           print("PASS: 007_folder_tree.sql syntax-ok / replay x2 idempotent / single-source / old-db upgrade")
+
+          # R26（阶段2）：追加 008_config_versions.sql —— 与 001~007 同口径：
+          # 单源（config_versions_ddl_script() 去空白包含）/ 新库 ensure_schema 后重放两遍幂等 /
+          # 头注释含回滚说明且无可执行 DROP / 老库（001+003+004 形态）ensure_schema 两遍后补齐新列，存量 ops 账号为 manage 档。
+          # 008 快照不含 users / config_audit 的 ALTER ADD COLUMN（由 ensure_schema 探测后补列），故同样先经 ensure_schema。
+          from ib.ledger import schema as S  # noqa: E402
+          sql8 = pathlib.Path("src/deploy/migrations/008_config_versions.sql").read_text(encoding="utf-8")
+          assert norm(S.config_versions_ddl_script()) in norm(sql8), "008 snapshot != config_versions_ddl_script()"
+          assert pathlib.Path("src/deploy/migrations/007_folder_tree.sql").is_file(), "007_folder_tree.sql missing (001-007 must stay)"
+          assert "MANUAL_ROLLBACK_REQUIRED" in sql8.split("CREATE TABLE")[0], "008 header lacks rollback note"
+          for line in sql8.splitlines():
+              assert "DROP" not in line.split("--")[0].upper(), "008 contains an executable DROP"
+          f8 = sqlite3.connect(":memory:", isolation_level=None)
+          S.ensure_schema(f8)
+          f8.executescript(sql8)   # replay 1
+          f8.executescript(sql8)   # replay 2 (idempotent)
+          assert S.missing_config_version_columns(f8) == {}, S.missing_config_version_columns(f8)
+          t8 = {r[0] for r in f8.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+          assert {"config_versions", "config_head", "config_drafts", "builder_eval_cache"} <= t8, t8
+          o8 = sqlite3.connect(":memory:", isolation_level=None)
+          for st in S.DDL_STATEMENTS + S.ACCOUNT_DDL_STATEMENTS + S.CONFIG_AUDIT_DDL_STATEMENTS:
+              o8.execute(st)
+          o8.execute(
+              "INSERT INTO users (user_id, username, password_hash, role, project_id, status, must_change_password, "
+              "created_at, updated_at) VALUES ('u','ops1','h','ops','p','active',0,'2020','2020')"
+          )
+          S.ensure_schema(o8)
+          S.ensure_schema(o8)
+          o8.executescript(sql8)
+          assert S.missing_config_version_columns(o8) == {}, S.missing_config_version_columns(o8)
+          assert o8.execute("SELECT config_level FROM users WHERE user_id='u'").fetchone()[0] == "manage", "legacy ops must be manage"
+          print("PASS: 008_config_versions.sql syntax-ok / replay x2 idempotent / single-source / old-db upgrade")
           PY
 
       # ---- 阶段 3：Unit（基线 95/95，R13）----

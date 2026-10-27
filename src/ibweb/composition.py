@@ -197,6 +197,16 @@ class Deps:
     upload_batches: Any = None
     library: Any = None
     uploads: Any = None
+    # REV-26（MOD-R26-14）：配置版本 / 热生效 / 发布 / Builder / 试运行（由 `_install_config_runtime` 在装配末尾填充）。
+    version_store: Any = None
+    draft_store: Any = None
+    eval_cache: Any = None
+    runtime_cache: Any = None
+    publish_service: Any = None
+    draft_service: Any = None
+    builder_service: Any = None
+    trial_runner: Any = None
+    account_levels: Any = None  # AccountConfigLevelStore（与 account_store 同一实例，并列小端口）
 
     def __post_init__(self) -> None:
         self._lock = threading.Lock()
@@ -221,6 +231,8 @@ class Deps:
         with self._lock:
             self.projects = fresh
             self._orchestrators = {}
+        if self.runtime_cache is not None:
+            self.runtime_cache.invalidate()  # REV-26：项目集变化 ⇒ 运行时快照重新冷编译
         self._sync_project_artifacts(fresh)
 
     def _sync_project_artifacts(self, projects: dict[str, ProjectRecord]) -> None:
@@ -263,8 +275,47 @@ class Deps:
     # 每项目一份编排器（工具按项目绑定）
     # ------------------------------------------------------------------ #
 
+    def runtime_for(self, project_id: str) -> Any:
+        """[IFC-R26-130] 取该项目当前版本的运行时租约（`RuntimeLease`）：整个回答绑定同一版本。
+
+        未登记项目 → 与 `orchestrator_for` 同一条 fail-closed 路径（`StartupError`，不回退其他项目）。
+        """
+        self._assert_registered(project_id)
+        if self.runtime_cache is None:
+            raise StartupError("运行时配置缓存未装配（REV-26 热生效不可用）")
+        try:
+            return self.runtime_cache.acquire(project_id)
+        except ConfigError:
+            if project_id in self.definitions:
+                raise  # 已装配项目的配置损坏 ⇒ fail-closed，不回退
+            # 热登记项目在定义存储里尚无文档（`_sync_project_artifacts` 已记 ERROR 日志并跳过）：沿用既有的
+            # 防御性回落（旧路径），行为与 REV-26 之前逐位一致；版本记为 0（虚拟版本）。
+            return _LegacyLease(_LegacyCompiled(self._legacy_orchestrator_for(project_id)))
+
+    def _assert_registered(self, project_id: str) -> None:
+        if project_id not in self.projects:
+            from ib.observability import log_event
+
+            log_event(
+                "expert_domain",
+                "failclosed",
+                project_id=project_id,
+                reason="unregistered_project",
+                level="ERROR",
+            )
+            raise StartupError(f"项目未在配置中登记：{project_id}（不得回退到其他项目的作用域）")
+
     def orchestrator_for(self, project_id: str) -> Any:
-        """取（或构造）该项目的作用域绑定编排器。未登记项目 → 明确报错，不回退默认。"""
+        """取该项目当前版本的编排器（REV-26：薄包装 = `runtime_for(...).compiled.orchestrator`，不再长期缓存）。
+
+        未装配运行时缓存（仅离线 / 旧调用方手工构造 `Deps`）时回落到旧的“每项目缓存一份”路径。
+        """
+        if self.runtime_cache is not None:
+            return self.runtime_for(project_id).compiled.orchestrator
+        return self._legacy_orchestrator_for(project_id)
+
+    def _legacy_orchestrator_for(self, project_id: str) -> Any:
+        """旧路径：取（或构造）该项目的作用域绑定编排器。未登记项目 → 明确报错，不回退默认。"""
         with self._lock:
             existing = self._orchestrators.get(project_id)
             if existing is not None:
@@ -397,8 +448,12 @@ def _search_tool(
     retrieval: Any,
     top_k: int | None = None,
     score_threshold: float | None = None,
+    knowledge: Any = None,
 ) -> ToolResult:
     """知识库检索工具的实现体。
+
+    **REV-26**：`knowledge` 由 `build_agent_tools` 以 partial 闭包注入（不在 JSON Schema 内，LLM 不可见）；
+    `None` ⇒ 与既有行为逐位一致。
 
     `scope` / `retrieval` 由 `bind_scope` 在构造期注入（**不由调用方指定**）——
     因此 LLM 传什么都改变不了检索范围。`search_as_tool` 永不抛异常（降级时 `ok=True`
@@ -409,8 +464,12 @@ def _search_tool(
     `functools.partial` 注入成**默认值**；此处**原样透传**给检索服务（`None` ⇒ 用装配期
     配置），不做任何取值裁决 —— 优先级语义仍由既有契约（调用方显式实参优先）唯一确定。
     """
+    if knowledge is None:
+        return retrieval.search_as_tool(
+            query, scope=scope, top_k=top_k, score_threshold=score_threshold
+        )
     return retrieval.search_as_tool(
-        query, scope=scope, top_k=top_k, score_threshold=score_threshold
+        query, scope=scope, top_k=top_k, score_threshold=score_threshold, knowledge=knowledge
     )
 
 
@@ -645,7 +704,13 @@ def _assemble() -> Deps:
     from ib.blob import build_blob_store
     from ib.chunking import SlidingWindowChunker
     from ib.embedding import build_embedder, collection_spec_for
-    from ib.ledger import build_entry_tree, build_ledger, build_upload_batch_store, load_project_record
+    from ib.ledger import (
+        TreeDocScopeResolver,
+        build_entry_tree,
+        build_ledger,
+        build_upload_batch_store,
+        load_project_record,
+    )
     from ib.library import LibraryService
     from ib.library.uploads import UploadBatchService, UploadLimits
     from ib.llm import build_llm_provider
@@ -751,6 +816,9 @@ def _assemble() -> Deps:
         candidate_multiplier=cfg.retrieval.candidate_multiplier,
         hot_timeout_s=cfg.embedding.hot_timeout_s,
         entry_resolver=tree,  # 台账存活过滤 + 当前名称/路径回填（MOD-005）
+        # REV-26（IFC-R26-080）：按资料目录限定知识范围（agent 级）；未配 resolver 时目录范围恒 0 命中（fail-closed）
+        doc_scope_resolver=TreeDocScopeResolver(tree),
+        doc_scope_max_ids=_env_positive_int("IB_DOC_SCOPE_MAX_IDS", 5000),
     )
     rebuild = RebuildService(
         ledger=ledger,
@@ -882,6 +950,8 @@ def _assemble() -> Deps:
         library=library,
         uploads=uploads,
     )
+    # 4f) REV-26（MOD-R26-14 / IFC-R26-134）：版本化配置 / 热生效运行时 / 发布 / Builder / 试运行。
+    _install_config_runtime(deps)
     log_event(
         "startup",
         "succeeded",
@@ -895,6 +965,306 @@ def _assemble() -> Deps:
         egress_data=",".join(str(c) for c in getattr(deps.egress, "data_categories", []) or []),
     )
     return deps
+
+
+@dataclass(frozen=True)
+class _LegacyCompiled:
+    """旧路径编排器的最小“编译产物”外形（仅 `runtime_for` 的防御性回落使用）。"""
+
+    orchestrator: Any
+    version: int = 0
+    view: Any = None
+
+
+@dataclass(frozen=True)
+class _LegacyLease:
+    compiled: _LegacyCompiled
+
+
+class _LiveDefinitionStore:
+    """定义文档存储的“按调用时解析”代理：始终转发给 `deps.definition_store` 的当前实例。
+
+    原因：`Deps` 是可变的装配结果（离线 / 测试会整体替换存储实例）；发布服务若在装配期捕获旧实例，
+    就会写到不再被读取的存储上。
+    """
+
+    def __init__(self, deps: "Deps") -> None:
+        self._deps = deps
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._deps.definition_store, name)
+
+
+def _env_positive_int(key: str, default: int) -> int:
+    """读取正整数环境变量（缺省 / 非法 → 缺省；只登记键名，不回显值）。"""
+    raw = os.environ.get(key, "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+class _FilesLoader:
+    """`ConfigSourceLoader` 的组合根适配器：文件态（定义文档 + 提示词两层）→ `ConfigSnapshot`。不修改任何文件。"""
+
+    def __init__(self, deps: "Deps") -> None:
+        self._deps = deps
+
+    def load_files(self, project_id: str) -> Any:
+        from ib.config.versioning import build_snapshot
+
+        doc = self._deps.definition_store.load(project_id)
+        return build_snapshot(doc, self.load_layers(project_id, [e.name for e in doc.experts]))
+
+    def load_layers(self, project_id: str, names: Any) -> dict[str, Any]:
+        """读取指定专家在提示词目录里的两层（缺层为 None）。供发布合并“新专家的提示词已先落盘”的场景使用。"""
+        from ib.core import IbError as IbErrorBase
+        from ib.core import PromptLayers
+
+        store = (self._deps.prompt_stores or {}).get(project_id)
+        out: dict[str, Any] = {}
+        for name in names:
+            layers = PromptLayers(None, None)
+            if store is not None:
+                try:
+                    bundle = store.load_bundle(name)
+                    layers = PromptLayers(bundle.main_prompt, (bundle.fallback_prompt or None))
+                except IbErrorBase:
+                    pass  # 两层皆缺：留空，由校验 / 编译 fail-closed 判定（停用专家允许无提示词）
+            out[name] = layers
+        return out
+
+
+def _project_folder_index(deps: "Deps", project_id: str) -> dict[str, str]:
+    """项目的资料目录 id → 展示用路径名（读台账目录树；失败 ⇒ 空，由调用方 fail-closed 决定）。"""
+    scope = Scope(project_id=project_id)
+    folders = list(deps.tree.list_subtree_folders(scope, ""))
+    by_id = {f.folder_id: f for f in folders}
+    out: dict[str, str] = {}
+    for f in folders:
+        parts: list[str] = []
+        cur: Any = f
+        guard = 0
+        while cur is not None and guard < 64:
+            parts.append(cur.name)
+            cur = by_id.get(cur.parent_id) if cur.parent_id else None
+            guard += 1
+        out[f.folder_id] = "/".join(reversed(parts))
+    return out
+
+
+def _install_config_runtime(deps: "Deps") -> None:
+    """装配 REV-26 的版本存储 / 运行时缓存 / 发布服务 / Builder / 试运行（IFC-R26-134）。
+
+    * 版本存储与审计同库同事务（CR-009）：SQLite 路径下审计行并入 `commit_publish` 的事务；内存路径用审计存储作 sink；
+    * 发布与装配期**共用**同一校验入口 `validate_two_domains`（含目录存在性）；
+    * 装配期对每个项目执行 `recover`（回收崩溃遗留的陈旧 pending，CR-002）。
+    """
+    from dataclasses import replace as _replace
+
+    from ib.builder.egress import EgressGuard
+    from ib.builder.service import BuilderService
+    from ib.builder.types import AgentDigest, FolderDigest, ParamDigest, ProjectContext, ToolDigest
+    from ib.config import validate_two_domains
+    from ib.config.versioning import prompt_refs_of_snapshot
+    from ib.confsvc import ConfigDraftService, ConfigPublishService
+    from ib.context import utc_now_iso
+    from ib.ledger.config_versions import (
+        build_builder_eval_cache,
+        build_config_draft_store,
+        build_config_version_store,
+    )
+    from ib.observability import log_event
+    from ib.runtime import ExemplarVectorCache, ProjectRuntimeCache, RuntimeDeps, TrialRunner, compile_project_config
+    from ib.tools import ToolRegistry
+
+    cfg = deps.cfg
+    ledger_path = str(getattr(cfg, "ledger_path", "") or ":memory:")
+    state = deps.storage_state
+    file_backed = bool(
+        state is not None and state.definition_store == "file" and state.prompt_store == "file"
+    )
+    audit_store = deps.config_audit_store
+    deps.version_store = build_config_version_store(
+        cfg, ledger_path=ledger_path, file_backed=file_backed, audit_sink=audit_store
+    )
+    deps.draft_store = build_config_draft_store(cfg, ledger_path=ledger_path)
+    deps.eval_cache = build_builder_eval_cache(cfg, ledger_path=ledger_path)
+    if hasattr(deps.account_store, "_audit_sink"):  # 内存账户存储：权限变更与审计同点写（SQLite 实现与审计表同库同事务）
+        deps.account_store._audit_sink = audit_store
+    deps.account_levels = deps.account_store
+
+    # ---- 运行时依赖包 ----
+    graph_runtime = os.environ.get("IB_GRAPH_RUNTIME", "").strip().lower() or "dag"
+    if graph_runtime not in ("dag", "legacy"):
+        raise StartupError("IB_GRAPH_RUNTIME 取值须为 dag / legacy。只登记键名，不回显值。")
+    _checkpointers: dict[str, Any] = {}
+    _cp_lock = threading.Lock()
+
+    def _checkpointer_for(key: str) -> Any:
+        from langgraph.checkpoint.memory import MemorySaver
+
+        with _cp_lock:
+            if key not in _checkpointers:
+                _checkpointers[key] = MemorySaver()
+            return _checkpointers[key]
+
+    rt_deps = RuntimeDeps(
+        llm=deps.llm,
+        retrieval=deps.retrieval,
+        embedder=deps.embedder,
+        sessions=deps.sessions,
+        tool_registry_factory=lambda: register_builtin_tools(ToolRegistry()),
+        tool_param_specs=known_tool_param_specs(),
+        graph_config_factory=lambda route: _graph_config(cfg, route),
+        related_images_provider_factory=lambda scope: _make_related_images_provider(deps.ledger, scope),
+        exemplar_vector_cache=ExemplarVectorCache(),
+        graph_runtime=graph_runtime,  # type: ignore[arg-type]
+        exemplar_seed=_load_exemplars,
+        checkpointer_for=_checkpointer_for,
+    )
+    try:
+        interval = float(os.environ.get("IB_CONFIG_HEAD_CHECK_INTERVAL_S", "").strip() or 1.0)
+    except ValueError:
+        raise StartupError("IB_CONFIG_HEAD_CHECK_INTERVAL_S 须为数字。只登记键名，不回显值。") from None
+    loader = _FilesLoader(deps)
+    deps.runtime_cache = ProjectRuntimeCache(
+        versions=deps.version_store, loader=loader, deps=rt_deps, check_interval_s=max(0.0, interval)
+    )
+
+    # ---- 发布服务 ----
+    def _validator(snapshot: Any) -> tuple[Any, ...]:
+        needs_folders = any(e.knowledge_scope.folder_ids for e in snapshot.definition.experts)
+        folder_ids: frozenset[str] | None = None
+        if needs_folders:
+            try:
+                folder_ids = frozenset(_project_folder_index(deps, snapshot.definition.project_id))
+            except Exception:  # noqa: BLE001 - 目录树不可读：不能证明引用存在 ⇒ fail-closed 地不放行
+                from ib.core import ValidationErrorItem
+
+                return (
+                    ValidationErrorItem(
+                        path="knowledge_scope", code="knowledge_folder_unverifiable",
+                        message="资料目录暂不可读，无法校验知识范围引用，请稍后重试",
+                    ),
+                )
+        return _plain_validate(snapshot, folder_ids)
+
+    def _plain_validate(snapshot: Any, folder_ids: Any) -> tuple[Any, ...]:
+        report = validate_two_domains(
+            snapshot.definition,
+            known_tools=known_tool_names(),
+            tool_param_specs=known_tool_param_specs(),
+            prompt_refs=prompt_refs_of_snapshot(snapshot),
+            known_folder_ids=folder_ids,
+        )
+        return tuple(report.errors)
+
+    def _precompile(project_id: str, version: int, snapshot: Any) -> Any:
+        return compile_project_config(project_id, version, snapshot, deps=rt_deps, source="snapshot")
+
+    def _on_published(project_id: str, version: int, compiled: Any) -> None:
+        deps.runtime_cache.install(compiled)
+        # 其余读路径（提示词列表 / 派生视图）以已发布文件态为准刷新；失败不影响已提交的发布
+        try:
+            doc, view = _load_and_admit(
+                deps.definition_store, (deps.prompt_stores or {}).get(project_id), project_id,
+                known_tool_param_specs(),
+            )
+            deps.definitions[project_id] = doc
+            deps.derived_views[project_id] = view
+        except Exception:  # noqa: BLE001
+            pass
+        log_event("definition_config", "published", project_id=project_id, config_version=int(version))
+
+    deps.publish_service = ConfigPublishService(
+        versions=deps.version_store,
+        definition_store=_LiveDefinitionStore(deps),
+        prompt_store_for=lambda pid: deps.prompt_stores[pid],
+        loader=loader,
+        precompile=_precompile,
+        on_published=_on_published,
+        audit=audit_store,
+        validator=_validator,
+        clock=utc_now_iso,
+        keep_versions=50,
+    )
+    deps.draft_service = ConfigDraftService(store=deps.draft_store, clock=utc_now_iso)
+
+    # ---- 试运行 ----
+    deps.trial_runner = TrialRunner(deps=rt_deps, validator=_validator)
+
+    # ---- Agent Builder（只读项目摘要；不接触资料正文 / 会话 / 账号） ----
+    def _context(project_id: str, actor: str) -> Any:
+        snap = deps.publish_service.current(project_id)
+        registry = register_builtin_tools(ToolRegistry())
+        specs = known_tool_param_specs()
+        tools: list[Any] = []
+        for item in registry.registered():
+            owned = tuple(
+                ParamDigest(
+                    name=s.name,
+                    type=s.type,  # type: ignore[arg-type]
+                    minimum=s.minimum,
+                    maximum=s.maximum,
+                    default=(s.default if s.default != "" else None),
+                    choices=tuple(s.choices or ()),
+                )
+                for s in specs
+                if s.name.startswith(f"{item.spec.name}.")
+            )
+            tools.append(
+                ToolDigest(
+                    name=item.spec.name, description=item.spec.description, params=owned,
+                    is_retrieval=bool(item.spec.needs_scope),
+                )
+            )
+        try:
+            folders = tuple(
+                FolderDigest(folder_id=fid, path=path)
+                for fid, path in list(_project_folder_index(deps, project_id).items())[:200]
+            )
+        except Exception:  # noqa: BLE001 - 目录不可读：Builder 仍可用，只是没有可选的知识范围
+            folders = ()
+        return ProjectContext(
+            project_id=project_id,
+            agents=tuple(
+                AgentDigest(name=e.name, cn_label=e.cn_label, keywords=tuple(e.keywords), exemplars=tuple(e.exemplars))
+                for e in snap.definition.experts
+            ),
+            tools=tuple(tools),
+            folders=folders,
+        )
+
+    def _complete(system: str, user: str, *, temperature: float, timeout_s: float) -> str:
+        return deps.llm.complete(system, user, temperature=temperature, timeout_s=timeout_s)  # 取调用时的 provider
+
+    guard = EgressGuard(completer=_complete, audit=audit_store, clock=utc_now_iso, timeout_s=60.0, pool_size=2)
+    deps.builder_service = BuilderService(
+        guard=guard, cache=deps.eval_cache, context_provider=_context, clock=utc_now_iso,
+        model_id=str(getattr(cfg.llm, "model", "") or "llm"),
+    )
+    # 外发声明追加 Builder 类别（describe_egress 的 data_categories 是展示用声明，不改变 provider 行为）
+    try:
+        cats = list(getattr(deps.egress, "data_categories", []) or [])
+        if getattr(deps.egress, "remote", False) and "builder" not in cats:
+            cats.append("builder")
+            deps.egress = _replace(deps.egress, data_categories=cats)
+    except Exception:  # noqa: BLE001
+        pass
+
+    # ---- 崩溃恢复：回收陈旧 pending（CR-002）----
+    for pid in list(deps.projects):
+        try:
+            recovered = deps.publish_service.recover(pid)
+            if recovered is not None:
+                log_event("definition_config", "pending_recovered", project_id=pid, config_version=int(recovered))
+        except Exception as exc:  # noqa: BLE001 - 恢复失败不阻断启动，但必须可见
+            log_event("definition_config", "recover_failed", project_id=pid, error_code=type(exc).__name__,
+                      level="ERROR")
 
 
 def _offline_view(cfg: Any) -> Any:

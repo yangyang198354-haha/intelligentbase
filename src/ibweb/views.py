@@ -249,6 +249,11 @@ def _ctx_of(request: Any) -> Any:
     return ctx
 
 
+def ctx_actor_of(request: Any) -> str:
+    """请求主体标识（审计 / 版本记录的“操作人”）。"""
+    return str(_ctx_of(request).authz.actor_id)
+
+
 def error_response(exc: BaseException) -> Any:
     """领域异常 → HTTP 响应（**单点映射**，见模块文档表格）。"""
     if isinstance(exc, ValidationError):
@@ -636,13 +641,24 @@ def chat_stream_endpoint(request: Any) -> Any:
         # 显式拒绝，不猜测（AC-IB-20-01）。400 属 ValidationError 单点映射。
         return error_response(ValidationError("缺少会话标识 session_id（不得回退到默认会话）"))
     try:
-        orchestrator = deps.orchestrator_for(ctx.authz.project_id)
+        # REV-26（IFC-R26-131）：流开始前取租约，整个回答（含生成器闭包）绑定该版本；之后保存生效不影响本次回答。
+        if getattr(deps, "runtime_cache", None) is not None:
+            lease = deps.runtime_for(ctx.authz.project_id)
+            orchestrator = lease.compiled.orchestrator
+            bound_version = int(lease.compiled.version)
+        else:
+            orchestrator = deps.orchestrator_for(ctx.authz.project_id)
+            bound_version = 0
     except IbError as exc:
         return error_response(exc)
 
     def _events() -> Any:
-        log_event("chat", "started", project_id=ctx.authz.project_id, session_id=session_id)
+        log_event(
+            "chat", "started", project_id=ctx.authz.project_id, session_id=session_id,
+            config_version=bound_version,
+        )
         yield from orchestrator.run(query, ctx=ctx, session_key=ctx.session_key)
+        log_event("chat", "completed", project_id=ctx.authz.project_id, config_version=bound_version)
 
     return streaming_sse_response(_events())
 
@@ -712,9 +728,9 @@ def chat_resume_endpoint(request: Any) -> Any:
     except ScopeViolationError as exc:
         return error_response(exc)
 
-    # 3) 确认门未启用 → 不存在「待确认中间态」，恢复不可用（fail-closed，不新建会话）
-    if not bool(getattr(deps.cfg, "confirmation_gate_enabled", False)):
-        return error_response(ConflictError("确认门未开启（默认关闭），无可恢复的挂起操作"))
+    # 3) 确认门未启用 → 不存在「待确认中间态」，恢复不可用（fail-closed，不新建会话）。
+    #    REV-26：图内 `confirm` 节点挂起的会话（`state.config_version != 0`）不依赖该全局开关。
+    gate_enabled = bool(getattr(deps.cfg, "confirmation_gate_enabled", False))
 
     # 4) SessionStore.load（IFC-IB-221）；存储不可用 → 503（fail-closed）
     try:
@@ -724,6 +740,9 @@ def chat_resume_endpoint(request: Any) -> Any:
     except Exception as exc:  # noqa: BLE001 - 会话存储不可用即 fail-closed
         log_event("chat", "resume_store_failed", error_type=type(exc).__name__)
         return error_response(DependencyUnavailableError("会话存储不可用，无法恢复", dependency="session"))
+    dag_suspended = state is not None and int(getattr(state, "config_version", 0) or 0) != 0
+    if not gate_enabled and not dag_suspended:
+        return error_response(ConflictError("确认门未开启（默认关闭），无可恢复的挂起操作"))
     if state is None:
         return error_response(NotFoundError("会话不存在或已过期，无法恢复（fail-closed）"))
 
@@ -743,7 +762,14 @@ def chat_resume_endpoint(request: Any) -> Any:
         return error_response(ConflictError("决策与会话状态不一致，拒绝恢复（fail-closed）"))
 
     try:
-        orchestrator = deps.orchestrator_for(project_id)
+        pinned = int(getattr(state, "config_version", 0) or 0)
+        if getattr(deps, "runtime_cache", None) is not None and pinned > 0:
+            # REV-26（IFC-R26-131 / AC-015-03）：恢复按挂起时的版本（即使其后已发布新版本 / 该版本中的 agent 已被删除）；
+            # 版本已被修剪 → 409 config_version_expired（fail-closed，不新建会话重跑）。
+            deps._assert_registered(project_id)
+            orchestrator = deps.runtime_cache.acquire_version(project_id, pinned).compiled.orchestrator
+        else:
+            orchestrator = deps.orchestrator_for(project_id)
     except IbError as exc:
         return error_response(exc)
 
@@ -882,7 +908,15 @@ def _validation_failure_response(items: Any, message: str) -> Any:
 
 
 def _get_definition_config(request: Any) -> Any:
+    """`GET /api/config/definition`：REV-26 起委托 `config_views.get_definition`（既有响应的超集）。
+
+    未装配发布服务（手工构造的最小 `Deps`）时回落到下面保留的旧实现。
+    """
     deps = composition.get_deps()
+    if getattr(deps, "publish_service", None) is not None:
+        from ibweb import config_views
+
+        return config_views.get_definition(request)
     try:
         ctx = _ctx_of(request)
         project_id = composition.resolve_scope(ctx).project_id
@@ -911,16 +945,22 @@ def _get_definition_config(request: Any) -> Any:
 def _put_definition_config(request: Any) -> Any:
     from ib.config import document_from_json, non_editable_changes, validate_two_domains
 
+    from ibweb import config_views
+
     deps = composition.get_deps()
     submitted = None
+    raw_document: Any = None
     try:
-        ctx = _require_manage(request)  # 写操作需管理权限（否则 403）
+        # REV-26：写操作需“编辑”档及以上（旧口径“管理权限”= manager 角色在存量账号上仍是 manage 档）；仍须具备 manager 角色
+        _require_manage(request)
+        ctx = config_views.require_level(request, "publish")
         actor = ctx.authz.actor_id
         project_id = composition.resolve_scope(ctx).project_id
         raw_body = json.loads(request.body.decode("utf-8") or "{}") if request.body else {}
         form = DefinitionConfigInputSerializer(data=raw_body)
         form.is_valid(raise_exception=True)
         expected = form.validated_data.get("expected_content_hash") or None
+        raw_document = form.validated_data["document"]
         # **REV-20（ADR-48 决定 3）**：legacy `fallback_prompt` 键改为一律 fail-closed
         # （比对基准已随代码内置兜底层退役），故此处**不再**注入任何内置映射。
         submitted = document_from_json(
@@ -928,6 +968,8 @@ def _put_definition_config(request: Any) -> Any:
             json.dumps(form.validated_data["document"], ensure_ascii=False),
         )
         current = deps.definition_store.load(project_id)
+    except config_views.LevelDenied as exc:
+        return config_views.denied_response(exc)
     except ConfigError:
         return _read_failure_response()
     except IbError as exc:
@@ -936,6 +978,14 @@ def _put_definition_config(request: Any) -> Any:
         return error_response(ValidationError(f"请求体不合法：{type(exc).__name__}"))
 
     changed = composition.changed_field_names(current, submitted)
+
+    # ⓪ DEF-R26-002 / AC-021-03：请求体里主动提交的 temperature（任何位置）→ 400 field_not_editable
+    from ib.config.definition import submitted_temperature_items
+
+    temp_items = submitted_temperature_items(raw_document)
+    if temp_items:
+        _audit_definition_save(deps, project_id, actor, changed, "rejected", temp_items)
+        return _validation_failure_response(temp_items, "存在不可编辑字段的变更（temperature）")
 
     # ① 白名单：非编辑字段（拓扑 / 归属）被改动 → 400
     illegal = non_editable_changes(current, submitted)
@@ -964,7 +1014,21 @@ def _put_definition_config(request: Any) -> Any:
         _audit_definition_save(deps, project_id, actor, changed, "rejected", report.errors)
         return _validation_failure_response(report.errors, "定义文档校验不通过")
 
-    # ③ 原子写回（乐观并发）
+    # ③ REV-26（IFC-R26-132）：旧端点退化为“发布包装”——经发布协议落盘并立即热生效（取代“保存 + 重启生效”，CL-003）；
+    #    响应形状保持（SaveResult 投影）并追加 `version` / `applied`。未装配发布服务时回落到下面的旧写回路径。
+    if getattr(deps, "publish_service", None) is not None:
+        try:
+            return config_views.publish_legacy_definition(
+                deps, project_id, actor, submitted, current, expected, tuple(changed)
+            )
+        except ConfigError:
+            return _read_failure_response()
+        except IbError as exc:
+            return error_response(exc)
+        except Exception as exc:  # noqa: BLE001
+            return error_response(exc)
+
+    # ③' 原子写回（乐观并发）——旧路径
     try:
         result = deps.definition_store.save(
             project_id, submitted, expected_content_hash=expected
@@ -1021,6 +1085,7 @@ def _audit_definition_save(
     items: Any = (),
     *,
     detail_code: str | None = None,
+    action: str = "definition.save",
 ) -> None:
     """保存路径审计挂钩（IFC-IB-360）。
 
@@ -1033,7 +1098,7 @@ def _audit_definition_save(
         timestamp=utc_now_iso(),
         project=project_id,
         actor=actor,
-        action="definition.save",
+        action=action,
         changed_field_names=tuple(changed_field_names or ()),
         result=result,  # type: ignore[arg-type]
         detail_code=effective_detail,
@@ -1103,9 +1168,13 @@ def config_audit_endpoint(request: Any) -> Any:
             {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
             status.HTTP_405_METHOD_NOT_ALLOWED,
         )
+    from ibweb import config_views
+
     deps = composition.get_deps()
     try:
-        ctx = _require_manage(request)  # 非管理者 → 403
+        # REV-26（AC-023-04）：读审计需“管理”档；仅有“编辑 / 查看”档的账号 → 403（响应含所需档位）
+        config_views.require_level(request, "read_audit")
+        ctx = _ctx_of(request)
         project_id = ctx.authz.project_id  # 服务端结论（只认它，忽略请求体）
         store = getattr(deps, "config_audit_store", None)
         if store is None:
@@ -1115,11 +1184,14 @@ def config_audit_endpoint(request: Any) -> Any:
             )
         limit = _query_int(request, "limit", default=50, minimum=0)
         offset = _query_int(request, "offset", default=0, minimum=0)
+        action_filter = (request.GET.get("action") or "").strip()[:40] or None
         all_items = store.list_by_project(
-            project_id, limit=_AUDIT_TOTAL_SCAN_LIMIT, offset=0
+            project_id, limit=_AUDIT_TOTAL_SCAN_LIMIT, offset=0, action=action_filter
         )
         total = len(all_items)
         items = all_items[offset : offset + limit]
+    except config_views.LevelDenied as exc:
+        return config_views.denied_response(exc)
     except IbError as exc:
         return error_response(exc)
     except Exception as exc:  # noqa: BLE001
@@ -1329,8 +1401,11 @@ def _prompt_result_body(result: Any) -> dict[str, Any]:
 
 
 def _put_prompt_layer(request: Any, expert: str, layer: str) -> Any:
+    from ibweb import config_views
+
     try:
         _require_manage(request)  # 写操作需管理权限（否则 403）
+        config_views.require_level(request, "publish")  # REV-26：并需“编辑”档及以上（查看档 → 403，AC-002-03）
         deps, store = _prompt_store_for(request)
         project_id = getattr(store, "project_id", "")
         raw_body = json.loads(request.body.decode("utf-8") or "{}") if request.body else {}
@@ -1349,6 +1424,8 @@ def _put_prompt_layer(request: Any, expert: str, layer: str) -> Any:
                 {"error": {"code": "not_found", "message": "专家不存在"}},
                 status.HTTP_404_NOT_FOUND,
             )
+    except config_views.LevelDenied as exc:
+        return config_views.denied_response(exc)
     except ConfigError:
         return _read_failure_response()
     except ValidationError as exc:
@@ -1357,6 +1434,19 @@ def _put_prompt_layer(request: Any, expert: str, layer: str) -> Any:
         return error_response(exc)
     except Exception as exc:  # noqa: BLE001
         return error_response(exc)
+
+    # REV-26（IFC-R26-132）：旧端点退化为“发布包装”（经发布协议落盘并立即热生效）；未装配发布服务时回落旧路径。
+    if getattr(deps, "publish_service", None) is not None:
+        try:
+            return config_views.publish_legacy_prompt(
+                deps, project_id, ctx_actor_of(request), expert, layer, content, expected
+            )
+        except ConfigError:
+            return _read_failure_response()
+        except IbError as exc:
+            return error_response(exc)
+        except Exception as exc:  # noqa: BLE001
+            return error_response(exc)
 
     try:
         result = store.save_layer(expert, layer, content, expected_hash=expected)  # IFC-IB-344
@@ -1590,6 +1680,8 @@ def _account_summary(user: Any) -> dict[str, Any]:
         "project_id": user.project_id,
         "status": user.status,
         "must_change_password": bool(user.must_change_password),
+        # REV-26（IFC-R26-133）：配置档位（view / edit / manage；admin 行恒按 manage 对待，此列对其无意义）。
+        "config_level": getattr(user, "config_level", "manage"),
     }
 
 
@@ -1965,9 +2057,26 @@ def accounts_endpoint(request: Any) -> Any:
                     {"error": {"code": "weak_password", "message": problem}},
                     status.HTTP_400_BAD_REQUEST,
                 )
+            # REV-26（IFC-R26-133）：配置档位。[ASSUMPTION] 缺省 manage（兼容既有调用方 = 存量 ops 账号的 A01 口径），
+            # 显式给出时必须是 view / edit / manage，否则 400；前端账号页显式选择。
+            level_raw = payload.get("config_level")
+            level = "manage" if level_raw is None else str(level_raw).strip()
+            if level not in ("view", "edit", "manage"):
+                raise ValidationError("config_level 只能为 view / edit / manage", field="config_level")
             from ib.ledger import hash_password
 
             user = store.create_user(username, hash_password(password), "ops", project_id)
+            if level != "manage":
+                now_iso = utc_now_iso()
+                store.set_config_level(
+                    user.user_id, level, now=now_iso,
+                    audit=ConfigAuditEntry(
+                        timestamp=now_iso, project=project_id, actor=_ctx_of(request).authz.actor_id,
+                        action="access.grant", changed_field_names=("config_level",), result="saved",
+                        detail_code=None, object_summary=(f"user:{user.user_id}", "from:manage", f"to:{level}"),
+                    ),
+                )
+                user = store.get_user(user.user_id) or user
             audit("account", outcome="created", status="ok", project_id=project_id)
             return _json(_account_summary(user), status.HTTP_201_CREATED)
         return _json(

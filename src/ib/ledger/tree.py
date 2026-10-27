@@ -56,6 +56,7 @@ __all__ = [
     "SqliteEntryTree",
     "MemoryEntryTree",
     "build_entry_tree",
+    "TreeDocScopeResolver",
 ]
 
 
@@ -115,6 +116,9 @@ class EntryTreeStore(Protocol):
     def count_subtree(self, scope: Scope, folder_id: str) -> SubtreeCount: ...
     def list_subtree_documents(self, scope: Scope, folder_id: str, *, limit: int) -> list[DocumentRecord]: ...
     def list_subtree_folders(self, scope: Scope, folder_id: str) -> list[FolderRecord]: ...  # 增量
+    def live_doc_ids_in_subtrees(
+        self, project_id: str, folder_ids: Sequence[str], *, limit: int
+    ) -> tuple[tuple[str, ...], bool]: ...  # REV-26 IFC-R26-055
 
     # ---- 目录变更 ----
     def create_folder(self, scope: Scope, parent_id: str, name: str, *, max_depth: int) -> FolderRecord: ...
@@ -335,6 +339,28 @@ class _TreeLogic:
         pid = scope.project_id
         self._require_folder(pid, folder_id)
         return self._p_descendants(pid, folder_id)
+
+    def live_doc_ids_in_subtrees(
+        self, project_id: str, folder_ids: Sequence[str], *, limit: int
+    ) -> tuple[tuple[str, ...], bool]:
+        """REV-26 IFC-R26-055：所给目录及其子孙内“存活且已索引”的 doc_id（排除修订行），及是否因 limit 截断。
+
+        不存在 / 不属于本项目的目录贡献空集（fail-closed，不抛错）；同 project_id 条件显式下推。
+        """
+        ids: set[str] = set()
+        for fid in dict.fromkeys(folder_ids):
+            if fid and self._p_folder(project_id, fid) is None:
+                continue
+            ids.add(fid)
+            ids.update(d.folder_id for d in self._p_descendants(project_id, fid))
+        if not ids:
+            return (), False
+        docs = self._p_docs_in_folders(project_id, sorted(ids), include_revisions=False)
+        live = sorted(
+            d.doc_id for d in docs if d.revision_of is None and str(getattr(d.status, "value", d.status)) == "indexed"
+        )
+        cap = max(0, int(limit))
+        return tuple(live[:cap]), len(live) > cap
 
     def list_subtree_documents(self, scope: Scope, folder_id: str, *, limit: int) -> list[DocumentRecord]:
         pid = scope.project_id
@@ -1355,6 +1381,18 @@ class MemoryEntryTree(_TreeLogic):
             item = self._ledger._purge.get(doc_id)
             if item is not None:
                 self._ledger._purge[doc_id] = {**item, "attempts": int(item["attempts"]) + 1}
+
+
+class TreeDocScopeResolver:
+    """`DocScopeResolver` 适配器（IFC-R26-055）：把目录树存储适配为检索层端口。"""
+
+    def __init__(self, tree: Any) -> None:
+        self._tree = tree
+
+    def live_doc_ids(
+        self, project_id: str, folder_ids: Sequence[str], *, limit: int
+    ) -> tuple[tuple[str, ...], bool]:
+        return self._tree.live_doc_ids_in_subtrees(project_id, folder_ids, limit=limit)
 
 
 def build_entry_tree(ledger: Any) -> EntryTreeStore:

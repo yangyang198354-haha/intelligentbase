@@ -16,7 +16,41 @@
 
 from __future__ import annotations
 
-from . import accounts, enums, errors, library, ports, types
+from . import accounts, enums, errors, graph, library, ports, types
+from .graph import (
+    ELSE_BRANCH,
+    RELAY_PREFIX,
+    ConditionBranch,
+    ConditionPredicate,
+    GraphEdge,
+    GraphNode,
+    GraphSpec,
+)
+from .ports import (
+    AccountConfigLevelStore,
+    BeginResult,
+    BuilderEvalCache,
+    ConfigAuditRetention,
+    ConfigDraftStore,
+    ConfigVersionStore,
+    DocScopeResolver,
+    DraftRecord,
+    NewVersion,
+)
+from .types import (
+    LEVEL_RANK,
+    AgentRuntime,
+    ConfigLevel,
+    ConfigSnapshot,
+    ConflictItem,
+    ConflictReceipt,
+    DiffItem,
+    HeadState,
+    KnowledgeScope,
+    ProjectRuntimeView,
+    PromptLayers,
+    VersionRecord,
+)
 from .library import (
     NAME_MAX_LEN,
     ROOT_FOLDER_ID,
@@ -366,4 +400,34 @@ __all__ = [
     "EntryLocation",
     "LibraryConflictError",
     "LibraryValidationError",
+    # REV-26（IFC-R26-001~005）：图 / 版本 / 档位 / 新端口
+    "graph",
+    "GraphSpec",
+    "GraphNode",
+    "GraphEdge",
+    "ConditionPredicate",
+    "ConditionBranch",
+    "ELSE_BRANCH",
+    "RELAY_PREFIX",
+    "KnowledgeScope",
+    "ConfigLevel",
+    "LEVEL_RANK",
+    "PromptLayers",
+    "ConfigSnapshot",
+    "VersionRecord",
+    "HeadState",
+    "DiffItem",
+    "ConflictItem",
+    "ConflictReceipt",
+    "AgentRuntime",
+    "ProjectRuntimeView",
+    "NewVersion",
+    "BeginResult",
+    "ConfigVersionStore",
+    "DraftRecord",
+    "ConfigDraftStore",
+    "ConfigAuditRetention",
+    "DocScopeResolver",
+    "BuilderEvalCache",
+    "AccountConfigLevelStore",
 ]

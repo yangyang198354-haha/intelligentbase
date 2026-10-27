@@ -24,8 +24,8 @@
  *
  * ## 生效口径显式提示（ADR-32 / C-IB-40，强制）
  *
- * 保存成功后**必须**提示「保存成功；重启 `ib-web` / `ib-worker` 后生效」—— 保存只做原子落盘，
- * **不**热重载、**不**在运行期重编译编排图。界面不得暗示「即时生效」。
+ * REV-26（CL-003 取代 ADR-32 / C-IB-40）：保存经发布协议落盘并**立即热生效**，保存成功须提示「已生效」，
+ * 不得再要求重启。
  *
  * ## 视图侧零持久化（ADR-14 强制约束①②）
  *
@@ -452,7 +452,7 @@ async function save(): Promise<void> {
     baseHash.value = result.content_hash;
     dirty.value = false;
     await load(); // **以文档为准**刷新（AC-IB-17-03），绝不用陈旧视图反向覆盖
-    banner.value = '已保存。专家 / 路由 / 编排变更自**下次装配**生效（图编译一次常驻）。';
+    banner.value = '已保存并生效。';
   } catch (err) {
     if (err instanceof ApiClientError) {
       if (err.status === 401) {
@@ -673,7 +673,7 @@ async function savePromptLayer(expertName: string, layer: PromptLayer): Promise<
     promptHashes.value[expertName] = hash;
     promptDirty.value = { ...promptDirty.value, [`${expertName}:${layer}`]: false };
     // **生效口径显式提示（强制）**：保存只原子落盘，重启后装配期才重新合并（ADR-32 / C-IB-40）。
-    promptBanner.value = '保存成功；重启 `ib-web` / `ib-worker` 后生效（保存仅原子落盘，不热重载）。';
+    promptBanner.value = '保存成功，已生效（无需重启）。';
   } catch (err) {
     if (err instanceof ApiClientError) {
       if (err.status === 401) {
@@ -708,8 +708,7 @@ async function savePromptLayer(expertName: string, layer: PromptLayer): Promise<
     <!-- REV-16-4（IFC-IB-363）：内存态**非静默**提示（任一 store == "memory"）。 -->
     <p v-if="memoryNotice" class="notice notice-warn">
       注意：{{ memoryDomains }}配置**仅内存生效、不跨重启保留** ——
-      服务重启后重新装配将回到种子默认（未配置文件存储路径）。保存与生效口径不变：
-      保存仅原子落盘，需**重启服务重新装配**后生效（不热重载）。
+      服务重启后重新装配将回到种子默认（未配置文件存储路径）。保存后立即生效；但服务重启后将回到种子默认。
     </p>
     <p v-else-if="storageBanner" class="notice notice-warn">
       存储态读取失败（fail-closed，**不静默当作文件态**）：{{ storageBanner }}
@@ -899,7 +898,7 @@ async function savePromptLayer(expertName: string, layer: PromptLayer): Promise<
       <h3>工具参数（既有工具的可配参数；留空即用工具默认）</h3>
       <p class="hint">
         参数规格由**既有工具声明**派生（不新增工具本体）。取值随定义文档保存，
-        **调用方显式实参优先**；重启后装配期注入生效。
+        **调用方显式实参优先**；保存后立即生效。
       </p>
       <div v-for="expert in draft.experts" :key="`tp-${expert.name}`" class="tool-params">
         <strong>{{ expert.name }}</strong>
@@ -970,8 +969,7 @@ async function savePromptLayer(expertName: string, layer: PromptLayer): Promise<
         <p class="hint">
           两层文件**皆可缺**；合并优先序为 主 <code>main.md</code> &gt; 兜底
           <code>fallback.md</code>（**代码内置兜底已退役**；**两层皆缺 ⇒ <code>prompt_missing</code>，
-          该专家无法装配**，ADR-48）。保存**不热重载** ——
-          重启 <code>ib-web</code> / <code>ib-worker</code> 后装配期才重新合并生效（ADR-32）。
+          该专家无法装配**，ADR-48）。保存后立即生效（无需重启）。
         </p>
         <p class="hint">
           目录口径：<code>{{ promptEnvelope.layout.file_pattern }}</code>（

@@ -77,6 +77,10 @@ LOG_FIELDS: frozenset[str] = frozenset(
         "vectors",
         "blob",
         "size_bytes",
+        # --- REV-26：配置版本与节点执行轨迹（`chat.node` / `chat.started` 的 `config_version`）---
+        # 沿用下方先例：只新增**精确键名**，值为短标签 / 整数，不引入任何正文通道。
+        "node_id",
+        "config_version",
         # --- 外发边界声明专用三键（IFC-IB-215 / NFR-08）---
         # 为什么必须新增：`EgressDescriptor` 要求「输出至启动日志与 /healthz/deps」，
         # 而白名单之外的一切键都会被**静默丢弃**。实测发现的失败形态：首个版本的启动钩子

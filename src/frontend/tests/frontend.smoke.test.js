@@ -469,14 +469,11 @@ describe('R16 前端冒烟：提示词分层 + 工具勾选/参数 + 生效口�
     assert.match(text, /主提示词缺失，当前生效 = 兜底/, '缺少回退可见文案');
   });
 
-  it('23. 生效口径显式提示（ADR-32 / C-IB-40）：保存成功必须提示重启后生效', () => {
+  it('23. 生效口径提示（REV-26 重新基线：取代 ADR-32 / C-IB-40 / REQ-FUNC-IB-40，见 CL-003）：保存成功提示“已生效”，不再要求重启', () => {
     const text = page();
-    assert.match(
-      text,
-      /保存成功；重启 `ib-web` \/ `ib-worker` 后生效/,
-      '缺少「保存成功；重启 ib-web / ib-worker 后生效」强制提示',
-    );
-    assert.match(text, /不热重载/, '应显式声明不热重载');
+    assert.match(text, /保存成功，已生效（无需重启）/, '缺少「保存成功，已生效」提示');
+    assert.doesNotMatch(text, /重启 `ib-web`/, '不得再要求重启 ib-web / ib-worker 后生效（AC-014-05）');
+    assert.doesNotMatch(text, /不热重载/, '不得再声明不热重载');
     // 不得暗示运行期即时生效（无热重载轮询 / 运行期重建编排图的入口）。
     assert.doesNotMatch(
       text,
@@ -929,5 +926,148 @@ describe('R25 前端冒烟：资料库目录式界面', () => {
     assert.doesNotMatch(clientTs, /axios/, '禁用 axios');
     const store = stripComments(readText(r25.store));
     assert.doesNotMatch(store, /\bfetch\(/, 'store 不得绕过 client.ts 直接 fetch');
+  });
+});
+
+// --------------------------------------------------------------------------- //
+// REV-26 前端冒烟：动态编排图 / 悬停卡片 / 自由画布 / 发布与版本 / Agent Builder（MOD-R26-18~21）
+// --------------------------------------------------------------------------- //
+
+const r26dir = join(root, 'src', 'components', 'config');
+const r26 = (f) => stripComments(readText(join(r26dir, f)));
+
+describe('REV-26 前端冒烟：graphModel 纯函数（离线可跑）', () => {
+  let m;
+  const graph = () => ({
+    nodes: [
+      { id: 'start', kind: 'start', x: 0, y: 0 },
+      { id: 'route-1', kind: 'route', x: 0, y: 0 },
+      { id: 'kb-agent', kind: 'agent', x: 0, y: 0, expert: 'kb-agent', input_mode: 'query_only' },
+      { id: 'end', kind: 'end', x: 0, y: 0 },
+    ],
+    edges: [
+      { id: 'e1', source: 'start', target: 'route-1' },
+      { id: 'e2', source: 'route-1', target: 'kb-agent', branch_key: 'kb-agent' },
+      { id: 'e3', source: 'kb-agent', target: 'end' },
+    ],
+  });
+  const agents = () =>
+    new Map([['kb-agent', { name: 'kb-agent', cn_label: '知识库助手', is_default: true, tool_names: ['search_knowledge'], prompt_main_present: true, prompt_main_head: '你是知识库助手' }]]);
+
+  it('46. 悬停卡片模型：agent 含标签 / name / 默认 / 工具 / 提示词存在；无工具显示“无”', async () => {
+    m = await import('../src/components/config/graphModel.ts');
+    const g = graph();
+    const card = m.buildHoverCardModel(g.nodes[2], agents());
+    assert.equal(card.title, '知识库助手');
+    const text = JSON.stringify(card.lines);
+    assert.ok(text.includes('默认专家') && text.includes('search_knowledge') && text.includes('存在'));
+    const bare = m.buildHoverCardModel(g.nodes[2], new Map([['kb-agent', { name: 'kb-agent', cn_label: 'x', tool_names: [] }]]));
+    assert.ok(bare.lines.some((l) => l.label === '已授权工具' && l.value === '无'));
+    const route = m.buildHoverCardModel(g.nodes[1], agents(), { tau: 0.65, margin: 0.05, max_expert_steps: 8, default_expert: 'kb-agent' });
+    assert.ok(route.lines.some((l) => l.label === 'tau' && l.value === '0.65'));
+  });
+
+  it('47. 连线预校验 / 位置 / 删除：不可指入开始、不可自环、不可重复；节点删除统计受影响边数', async () => {
+    m = await import('../src/components/config/graphModel.ts');
+    const g = graph();
+    assert.equal(m.precheckConnection(g, 'kb-agent', 'start').ok, false);
+    assert.equal(m.precheckConnection(g, 'kb-agent', 'kb-agent').ok, false);
+    assert.equal(m.precheckConnection(g, 'start', 'route-1').ok, false);
+    assert.equal(m.precheckConnection(g, 'route-1', 'end').ok, true);
+    assert.equal(m.edgesTouching(g, 'kb-agent'), 2);
+    assert.equal(m.removeNode(g, 'kb-agent').edges.length, 1);
+    const moved = m.applyPositions(g, new Map([['kb-agent', { x: 12.6, y: 5 }]]));
+    assert.equal(moved.nodes[2].x, 13);
+    const flow = m.graphToFlow(g, agents());
+    assert.equal(flow.nodes.length, 4);
+    assert.ok(flow.nodes.find((n) => n.id === 'kb-agent').data.label.includes('（默认）'));
+  });
+
+  it('48. 节点面板只含受限节点类型（无代码 / 表达式节点）', async () => {
+    m = await import('../src/components/config/graphModel.ts');
+    assert.deepEqual([...m.ADDABLE_KINDS].sort(), ['agent', 'condition', 'confirm', 'join', 'route']);
+  });
+});
+
+describe('REV-26 前端冒烟：组件源码结构与导航入口', () => {
+  it('49. 画布：只读档不可拖拽 / 连线；悬停事件；不使用 v-html', () => {
+    const t = r26('FlowCanvas.vue');
+    assert.match(t, /:nodes-draggable="!readonly"/);
+    assert.match(t, /:nodes-connectable="!readonly"/);
+    assert.match(t, /@node-mouse-enter/);
+    assert.match(t, /@edge-mouse-enter/);
+    for (const f of ['FlowCanvas.vue', 'NodeHoverCard.vue', 'AgentDetailPanel.vue', 'BuilderDrawer.vue', 'TrialPanel.vue', 'PublishDialog.vue']) {
+      assert.doesNotMatch(r26(f), /v-html/, `${f} 不得使用 v-html（提示词 / 关键词一律纯文本）`);
+    }
+  });
+
+  it('50. 保存流程：先差异预览再确认，校验错误无“忽略”选项，冲突走 ConflictDialog，成功提示“已生效”', () => {
+    const studio = stripComments(readText(join(root, 'src', 'views', 'ConfigStudio.vue')));
+    assert.match(studio, /publishPreview\(/);
+    assert.match(studio, /confirmSave/);
+    assert.match(studio, /已生效（版本/);
+    assert.doesNotMatch(studio, /重启 `?ib-web/);
+    assert.match(studio, /ConflictDialog/);
+    assert.doesNotMatch(r26('PublishDialog.vue'), /忽略并继续|forceSave|skipValidation/);
+  });
+
+  it('51. 导航入口可达：路由 config 指向 ConfigHub（默认编排画布），侧栏仍含 config', () => {
+    const router = stripComments(readText(join(root, 'src', 'router', 'index.ts')));
+    assert.match(router, /name: 'config',[\s\S]*?component: ConfigHub/);
+    assert.match(stripComments(readText(join(root, 'src', 'views', 'ConfigHub.vue'))), /ConfigStudio/);
+    assert.match(stripComments(readText(join(root, 'src', 'layouts', 'ConsoleLayout.vue'))), /TOP_ORDER\s*=\s*\[[^\]]*'config'/);
+  });
+
+  it('52. client.ts：新方法齐备、HTTP 只经 request/fetch、无 axios / localStorage / CDN', () => {
+    const c = stripComments(readText(join(root, 'src', 'api', 'client.ts')));
+    for (const method of ['configStatus', 'definitionConfigV2', 'publishPreview', 'publish', 'listVersions', 'rollback', 'saveDraft', 'trialStream', 'builderDraft', 'builderEvaluate', 'builderOptimize', 'builderReviewExisting', 'putAccess']) {
+      assert.match(c, new RegExp(`\\n\\s+(async )?${method}\\(`), `ApiClient 缺少方法 ${method}`);
+    }
+    assert.doesNotMatch(c, /axios|localStorage/);
+    const store = stripComments(readText(join(root, 'src', 'stores', 'configDraft.ts')));
+    assert.doesNotMatch(store, /localStorage|indexedDB|\bfetch\(/);
+  });
+
+  it('53. Builder：空白 / 克隆 / 按需求生成 / 评审四入口；重名须改名才可加入画布；LLM 判定项带标注', () => {
+    const b = r26('BuilderDrawer.vue');
+    for (const label of ['空白表单', '克隆已有', '按需求生成', '评审并优化已有']) assert.ok(b.includes(label), label);
+    assert.match(b, /name 已存在，请修改/);
+    assert.match(b, /:disabled="problems\.length > 0"/);
+    assert.match(r26('BuilderEvalView.vue'), /LLM 判定/);
+  });
+
+  it('54. CR-012 档位管理：入口在编排画布“权限管理”页签（仅管理档），经 getAccess/putAccess，改后刷新', () => {
+    const studio = stripComments(readText(join(root, 'src', 'views', 'ConfigStudio.vue')));
+    assert.match(studio, /import AccessPanel from/);
+    assert.match(studio, /v-if="level === 'manage'"[^>]*label="权限管理"/);
+    const p = r26('AccessPanel.vue');
+    assert.match(p, /getAccess\(/);
+    assert.match(p, /putAccess\(row\.user_id, next\)/);
+    assert.match(p, /finally[\s\S]*await load\(\)/, '改完以服务端为准刷新');
+    for (const label of ['查看', '编辑', '管理']) assert.ok(p.includes(label), label);
+    assert.match(p, /canManage/);
+    assert.doesNotMatch(p, /axios|localStorage|v-html|\bfetch\(/);
+  });
+
+  it('55. CR-012 账号创建页：档位选择，默认 manage，随 createAccount 提交；列表展示档位', () => {
+    const a = stripComments(readText(join(root, 'src', 'views', 'AccountsPage.vue')));
+    assert.match(a, /config_level: 'manage' as ConfigLevel/);
+    assert.match(a, /createForm\.config_level = 'manage'/);
+    assert.match(a, /config_level: createForm\.config_level/);
+    assert.match(a, /v-model="createForm\.config_level"/);
+    for (const v of ['view', 'edit', 'manage']) assert.match(a, new RegExp(`value="${v}"`));
+    assert.match(a, /label="配置档位"/);
+  });
+
+  it('56. 查看档只读（AC-010-01 / AC-011-04）：readonly 贯通画布 / 面板 / 调色板，保存与 Builder 入口隐藏', () => {
+    const studio = stripComments(readText(join(root, 'src', 'views', 'ConfigStudio.vue')));
+    assert.match(studio, /const readonly = computed\(\(\) => level\.value === 'view'\)/);
+    assert.match(studio, /v-if="!readonly"[^>]*保存并生效|v-if="!readonly"[^\n]*startSave/);
+    assert.match(studio, /<FlowCanvas[\s\S]*?:readonly="readonly"/);
+    assert.match(studio, /<AgentDetailPanel[\s\S]*?:readonly="readonly"/);
+    assert.match(r26('FlowCanvas.vue'), /:nodes-draggable="!readonly"/);
+    assert.match(r26('FlowCanvas.vue'), /:nodes-connectable="!readonly"/);
+    assert.match(r26('NodePalette.vue'), /v-if="!readonly"/);
+    assert.match(r26('AgentDetailPanel.vue'), /:readonly="readonly"/);
   });
 });

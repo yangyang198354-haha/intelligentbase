@@ -352,7 +352,10 @@ def test_TC_INT_084_definition_endpoint_contract_matrix(http_app):
     got = client.get(PATH, **AUTH)
     assert got.status_code == 200, got.content
     payload = json.loads(got.content)
-    assert set(payload) == {"document", "derived", "editable_fields", "config_key_names"}
+    # REV-26 重新基线（IFC-R26-141，REQ-FUNC-001/014）：在既有四键之上**仅**追加 version / level / graph
+    assert set(payload) == {
+        "document", "derived", "editable_fields", "config_key_names", "version", "level", "graph",
+    }
     assert payload["config_key_names"] == ["IB_DEFINITION_DOC_PATH", "IB_VISUAL_CONFIG_ENABLED"]
     assert "orchestration" not in payload["editable_fields"]
     assert payload["derived"]["expert_names"] and payload["derived"]["nodes"]
@@ -381,7 +384,8 @@ def test_TC_INT_084_definition_endpoint_contract_matrix(http_app):
         **AUTH,
     )
     assert saved.status_code == 200, saved.content
-    assert set(json.loads(saved.content)) == {"ok", "content_hash", "conflict", "errors"}
+    # REV-26 重新基线（IFC-R26-132）：旧端点退化为发布包装，响应形状保持并追加 `version`
+    assert set(json.loads(saved.content)) == {"ok", "content_hash", "conflict", "errors", "version"}
     assert json.loads(saved.content)["ok"] is True
 
     after = json.loads(client.get(PATH, **AUTH).content)

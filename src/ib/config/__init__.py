@@ -191,6 +191,15 @@ IB_RUNTIME_ENV_KEYS: tuple[str, ...] = (
     "IB_UPLOAD_BATCH_MAX_TOTAL_MB",
     "IB_LIBRARY_MAX_DEPTH",
     "IB_UPLOAD_BATCH_TTL_HOURS",
+    # REV-26（IFC-R26-190 / MOD-R26-22）：热生效 / 图运行时 / 检索范围的可选键名（只登记键名，均有缺省值）。
+    #   IB_CONFIG_HEAD_CHECK_INTERVAL_S —— 运行时缓存探测 head 版本的节流秒数（缺省 1.0）。
+    #   IB_GRAPH_RUNTIME —— `dag`（缺省）或 `legacy`（回退到旧固定拓扑，仅作回退与等价性基准）。
+    #   IB_LLM_CLIENT_CACHE_MAX —— LLM 客户端有界 LRU 容量（缺省 128）。
+    #   IB_DOC_SCOPE_MAX_IDS —— 检索按目录过滤时 doc_id 集合上限（缺省 5000，超出走后过滤降级）。
+    "IB_CONFIG_HEAD_CHECK_INTERVAL_S",
+    "IB_GRAPH_RUNTIME",
+    "IB_LLM_CLIENT_CACHE_MAX",
+    "IB_DOC_SCOPE_MAX_IDS",
 )
 
 #: v1 支持的 4 种格式（**OQ-IB-02 默认值**：其余格式按扩展点预留，不实现）。

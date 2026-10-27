@@ -128,5 +128,8 @@ def test_TC_INT_122_migration_single_source_column_parity(tmp_path):
     finally:
         migrated.close()
 
-    assert runtime_users == migrated_users, "users 列与迁移 003 漂移"
+    # REV-26：008 经 ensure_schema 的 ALTER 为 users 追加 config_level（003 不改）；只允许这批已登记的追加列。
+    from ib.ledger.schema import USERS_ADDED_COLUMNS
+
+    assert runtime_users == migrated_users + [c for c, _ in USERS_ADDED_COLUMNS], "users 列与迁移 003 + 008 漂移"
     assert runtime_sessions == migrated_sessions, "sessions 列与迁移 003 漂移"

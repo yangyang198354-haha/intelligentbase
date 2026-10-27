@@ -644,6 +644,107 @@ EXPECTED_COLUMNS: dict[str, tuple[str, ...]] = {
 }
 
 
+# --------------------------------------------------------------------------- #
+# REV-26 配置版本 / 草稿 / 评审缓存 DDL（IFC-R26-052；迁移 008 的单源）
+# --------------------------------------------------------------------------- #
+#
+# 新表全部 `IF NOT EXISTS`；`users` / `config_audit` 的新列由 `ensure_schema` 以
+# `PRAGMA table_info` 探测后逐列 `ALTER TABLE ... ADD COLUMN`（SQLite 无 IF NOT EXISTS），
+# 因此**不在** 008 快照里（与 007 对 documents 新列的处理一致）。
+
+CONFIG_VERSION_DDL_STATEMENTS: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS config_versions (
+        project_id       TEXT NOT NULL,
+        version          INTEGER NOT NULL,
+        parent_version   INTEGER NOT NULL,
+        status           TEXT NOT NULL,
+        kind             TEXT NOT NULL,
+        rolled_back_to   INTEGER,
+        actor            TEXT NOT NULL,
+        created_at       TEXT NOT NULL,
+        summary          TEXT NOT NULL,
+        manifest_hash    TEXT NOT NULL,
+        snapshot_json    TEXT NOT NULL,
+        snapshot_bytes   INTEGER NOT NULL,
+        PRIMARY KEY (project_id, version),
+        CHECK (status IN ('pending', 'published', 'aborted')),
+        CHECK (kind IN ('publish', 'rollback', 'baseline', 'adopt'))
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_config_versions_status
+        ON config_versions(project_id, status, version)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS config_head (
+        project_id         TEXT PRIMARY KEY,
+        published_version  INTEGER NOT NULL,
+        pending_version    INTEGER,
+        updated_at         TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS config_drafts (
+        draft_id       TEXT PRIMARY KEY,
+        project_id     TEXT NOT NULL,
+        owner          TEXT NOT NULL,
+        label          TEXT NOT NULL,
+        base_version   INTEGER NOT NULL,
+        payload_json   TEXT NOT NULL,
+        payload_bytes  INTEGER NOT NULL,
+        created_at     TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_config_drafts_owner
+        ON config_drafts(project_id, owner, created_at)
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS builder_eval_cache (
+        cache_key       TEXT PRIMARY KEY,
+        rubric_version  TEXT NOT NULL,
+        result_json     TEXT NOT NULL,
+        created_at      TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_builder_eval_created
+        ON builder_eval_cache(created_at)
+    """,
+)
+
+#: `users` 表 REV-26 追加列（存量 ops 默认 manage，OQ-R26-A01 / A01 裁决）。
+USERS_ADDED_COLUMNS: tuple[tuple[str, str], ...] = (
+    (
+        "config_level",
+        "TEXT NOT NULL DEFAULT 'manage' CHECK (config_level IN ('view','edit','manage'))",
+    ),
+)
+
+#: `config_audit` 表 REV-26 追加列（既有行为 NULL；`result` 的 CHECK 不变）。
+CONFIG_AUDIT_ADDED_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("version_before", "INTEGER"),
+    ("version_after", "INTEGER"),
+    ("object_summary", "TEXT"),
+)
+
+CONFIG_VERSION_EXPECTED_COLUMNS: dict[str, tuple[str, ...]] = {
+    "config_versions": (
+        "project_id", "version", "parent_version", "status", "kind", "rolled_back_to", "actor",
+        "created_at", "summary", "manifest_hash", "snapshot_json", "snapshot_bytes",
+    ),
+    "config_head": ("project_id", "published_version", "pending_version", "updated_at"),
+    "config_drafts": (
+        "draft_id", "project_id", "owner", "label", "base_version", "payload_json", "payload_bytes",
+        "created_at",
+    ),
+    "builder_eval_cache": ("cache_key", "rubric_version", "result_json", "created_at"),
+    "users": ("config_level",),
+    "config_audit": ("version_before", "version_after", "object_summary"),
+}
+
+
 def ddl_script() -> str:
     """把 DDL 拼为单条脚本（供 `001_ledger_init.sql` 交付物与手工建库使用）。"""
     return ";\n".join(statement.strip() for statement in DDL_STATEMENTS) + ";\n"
@@ -683,6 +784,14 @@ def folder_tree_ddl_script() -> str:
         + FOLDER_TREE_UNIQUE_INDEX_STATEMENTS
     )
     return ";\n".join(statement.strip() for statement in statements) + ";\n"
+
+
+def config_versions_ddl_script() -> str:
+    """REV-26 配置版本 DDL（新表 + 索引）拼为单条脚本（供 `008_config_versions.sql` 快照；单源）。
+
+    不含 `users` / `config_audit` 的 `ALTER TABLE ... ADD COLUMN`（由 `ensure_schema` 探测后补列）。
+    """
+    return ";\n".join(statement.strip() for statement in CONFIG_VERSION_DDL_STATEMENTS) + ";\n"
 
 
 class _WriteTxn:
@@ -798,8 +907,27 @@ def _ensure_project_registry_columns(connection) -> None:
         cursor.close()
 
 
+def _ensure_added_columns(connection, table: str, added: tuple[tuple[str, str], ...]) -> None:
+    """幂等给既有表补列（`PRAGMA table_info` 探测；表不存在则 no-op）。表名 / 列 DDL 均为模块常量。"""
+    cursor = connection.cursor()
+    try:
+        cursor.execute(f"PRAGMA table_info({table})")
+        actual = {row[1] for row in cursor.fetchall()}
+        if not actual:
+            return
+        for column, column_ddl in added:
+            if column not in actual:
+                cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_ddl}")
+    finally:
+        cursor.close()
+
+
 def ensure_schema(connection) -> None:
     """幂等建表 + 开 PRAGMA（运行期自愈）。
+
+    **REV-26（008）**：最后补 `users.config_level` / `config_audit` 三列（探测后 ALTER），
+    再建配置版本 / 草稿 / 评审缓存表与索引；全程幂等，可重放。
+
 
     刻意**不**引入版本号表：DDL 全部为 `IF NOT EXISTS`，且新增列通过显式 ALTER 迁移脚本
     （`src/deploy/migrations/`）落地 —— 基座的表结构变更应当**显式且可审计**，
@@ -844,8 +972,19 @@ def ensure_schema(connection) -> None:
         for statement in FOLDER_TREE_UNIQUE_INDEX_STATEMENTS:
             cursor.execute(statement)
         connection.commit()
+        # REV-26（008）：补列 → 新表 / 索引。
+        _ensure_added_columns(connection, "users", USERS_ADDED_COLUMNS)
+        _ensure_added_columns(connection, "config_audit", CONFIG_AUDIT_ADDED_COLUMNS)
+        for statement in CONFIG_VERSION_DDL_STATEMENTS:
+            cursor.execute(statement)
+        connection.commit()
     finally:
         cursor.close()
+
+
+def missing_config_version_columns(connection) -> dict[str, list[str]]:
+    """REV-26 配置版本新表 / 新列的缺失检查（IFC-R26-052）。空字典表示结构完整。"""
+    return _missing(connection, CONFIG_VERSION_EXPECTED_COLUMNS)
 
 
 def missing_columns(connection) -> dict[str, list[str]]:

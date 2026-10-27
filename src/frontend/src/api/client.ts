@@ -41,6 +41,8 @@
  */
 
 /** 与后端 `DocumentRecord` 序列化字段**逐字段对齐**（后端 `ibweb/serializers.py`）。 */
+import type { AdaptationNoteDto, AgentDraftDto, FieldChangeDto, RubricResultDto } from './builderTypes';
+
 export type DocumentRecord = {
   doc_id: string;
   kb_id: string;
@@ -471,6 +473,8 @@ export type AccountSummary = {
   project_id: string | null;
   status: 'active' | 'disabled';
   must_change_password: boolean;
+  /** REV-26（IFC-R26-133）：配置档位（查看 / 编辑 / 管理）。 */
+  config_level?: ConfigLevel;
 };
 
 /**
@@ -551,6 +555,126 @@ export type LlmKeyStatus = {
  * 提供者缺省 / 返回空对象时**不注入** `X-IB-Project`（保持 fail-closed）。
  */
 export type ProjectHeaderProvider = () => Record<string, string>;
+
+// --------------------------------------------------------------------------- //
+// REV-26（IFC-R26-140 ~ 163、IFC-R26-180）：热生效配置 / 自由画布 / 版本 / 试运行 / Agent Builder 的 DTO
+// 与后端手写 DTO 一一对应；HTTP 只经本文件（无 axios、无第二处拼令牌）。
+// --------------------------------------------------------------------------- //
+
+export type ConfigLevel = 'view' | 'edit' | 'manage';
+export type NodeKind = 'start' | 'end' | 'route' | 'agent' | 'condition' | 'join' | 'confirm';
+
+export interface GraphNodeDto {
+  id: string;
+  kind: NodeKind;
+  x: number;
+  y: number;
+  expert?: string;
+  input_mode?: 'query_only' | 'with_upstream';
+  predicate?: { kind: 'keyword' | 'upstream_degraded'; branches: { key: string; keywords: string[] }[] };
+  message?: string;
+}
+export interface GraphEdgeDto {
+  id: string;
+  source: string;
+  target: string;
+  branch_key?: string | null;
+}
+export interface GraphDto {
+  nodes: GraphNodeDto[];
+  edges: GraphEdgeDto[];
+}
+export interface DiffItemDto {
+  kind: string;
+  object_id: string;
+  field: string;
+  before: string | null;
+  after: string | null;
+}
+export interface ConflictReceiptDto {
+  base_version: number;
+  head_version: number;
+  base_available: boolean;
+  conflicts: { kind: string; object_id: string; fields: string[] }[];
+}
+export interface PublishResultDto {
+  version: number;
+  previous_version: number;
+  content_hash: string;
+  applied: true;
+}
+export interface VersionRecordDto {
+  version: number;
+  parent_version: number;
+  kind: 'publish' | 'rollback' | 'baseline' | 'adopt';
+  rolled_back_to: number | null;
+  actor: string;
+  created_at: string;
+  summary: string;
+}
+export interface ConfigStatusDto {
+  version: number;
+  applied_version: number;
+  apply_state: 'ok' | 'applying' | 'apply_failed';
+  drift: boolean;
+  pending: boolean;
+  schema_version: 1 | 2;
+  legacy: boolean;
+  level: ConfigLevel;
+}
+export interface PublishPreviewDto {
+  base_version: number;
+  head_version: number;
+  items: DiffItemDto[];
+  layout_only: boolean;
+  errors: ValidationErrorItem[];
+}
+export interface ConfigCatalogDto {
+  available_tools: string[];
+  tool_param_specs: ToolParamSpec[];
+  folders: { folder_id: string; path: string }[];
+  agents: {
+    name: string;
+    prompt_main_present: boolean;
+    prompt_main_head: string;
+    prompt_fallback_present: boolean;
+    tool_count: number;
+    nondefault_param_count: number;
+  }[];
+  schema_version: 1 | 2;
+}
+/** v2 文档（含 graph）的最小外形；专家条目另含 status / max_steps / knowledge_scope。 */
+export interface DefinitionDocumentV2 {
+  schema_version: number;
+  project_id: string;
+  content_hash: string;
+  experts: (ExpertSpecInput & {
+    status?: 'active' | 'disabled';
+    max_steps?: number | null;
+    knowledge_scope?: { mode: 'all' | 'folders'; folder_ids: string[] };
+  })[];
+  route: RouteSpecInput;
+  tool_grants: ToolGrantSpec[];
+  graph?: GraphDto;
+  [key: string]: unknown;
+}
+export interface DefinitionEnvelopeV2 extends DefinitionConfigEnvelope {
+  version: number;
+  level: ConfigLevel;
+  graph: GraphDto;
+}
+export type PromptPatch = Record<string, { main?: string | null; fallback?: string | null }>;
+export interface PublishPayload {
+  document: DefinitionDocumentV2 | DefinitionDocument;
+  prompts?: PromptPatch;
+}
+export type { AgentDraftDto, AdaptationNoteDto, RubricResultDto, FieldChangeDto } from './builderTypes';
+export interface AccessItemDto {
+  user_id: string;
+  username: string;
+  config_level: ConfigLevel;
+  status: string;
+}
 
 /**
  * 页面图端点的站内相对路径（IFC-IB-283）。
@@ -1187,6 +1311,7 @@ export class ApiClient {
     password: string;
     project_id: string;
     role?: 'ops';
+    config_level?: ConfigLevel;
   }): Promise<AccountSummary> {
     return this.request<AccountSummary>('/api/accounts', {
       method: 'POST',
@@ -1320,6 +1445,152 @@ export class ApiClient {
   /** 清除 LLM Key（回到未配置态）→ `204`。 */
   async clearLlmKey(): Promise<void> {
     await this.request<null>('/api/llm-key', { method: 'DELETE' });
+  }
+
+  // ------------------------------------------------------------------ //
+  // REV-26（IFC-R26-140 ~ 153）：热生效配置 / 版本 / 草稿 / 权限 / 试运行
+  // 错误统一抛 `ApiClientError`（`status` / `code` / `details.items` / `details.receipt` / `details.required_level`）。
+  // ------------------------------------------------------------------ //
+
+  configStatus(): Promise<ConfigStatusDto> {
+    return this.request<ConfigStatusDto>('/api/config/status');
+  }
+
+  /** 扩展后的定义文档读取（含 `version` / `level` / `graph`）。 */
+  definitionConfigV2(): Promise<DefinitionEnvelopeV2> {
+    return this.request<DefinitionEnvelopeV2>('/api/config/definition');
+  }
+
+  configCatalog(): Promise<ConfigCatalogDto> {
+    return this.request<ConfigCatalogDto>('/api/config/catalog');
+  }
+
+  validateDraft(payload: PublishPayload): Promise<{ ok: boolean; errors: ValidationErrorItem[] }> {
+    return this.request('/api/config/validate', this.jsonInit('POST', payload));
+  }
+
+  publishPreview(baseVersion: number, payload: PublishPayload): Promise<PublishPreviewDto> {
+    return this.request('/api/config/publish/preview', this.jsonInit('POST', { base_version: baseVersion, ...payload }));
+  }
+
+  publish(baseVersion: number, payload: PublishPayload, message?: string): Promise<PublishResultDto> {
+    return this.request('/api/config/publish', this.jsonInit('POST', { base_version: baseVersion, ...payload, message }));
+  }
+
+  listVersions(limit = 50, before?: number): Promise<{ head: number; items: VersionRecordDto[] }> {
+    const q = new URLSearchParams({ limit: String(limit) });
+    if (before !== undefined) q.set('before', String(before));
+    return this.request(`/api/config/versions?${q.toString()}`);
+  }
+
+  getVersion(n: number, includePrompts = false): Promise<{
+    record: VersionRecordDto;
+    document: DefinitionDocumentV2;
+    prompts_summary: { expert: string; main_len: number; fallback_len: number }[];
+    prompts?: PromptPatch;
+  }> {
+    return this.request(`/api/config/versions/${n}${includePrompts ? '?include=prompts' : ''}`);
+  }
+
+  diffVersions(n: number, against: number | 'head' = 'head'): Promise<{
+    from: number;
+    to: number;
+    items: DiffItemDto[];
+    layout_only: boolean;
+  }> {
+    return this.request(`/api/config/versions/${n}/diff?against=${against}`);
+  }
+
+  rollback(targetVersion: number, baseVersion: number, message?: string): Promise<PublishResultDto> {
+    return this.request(
+      '/api/config/rollback',
+      this.jsonInit('POST', { target_version: targetVersion, base_version: baseVersion, message }),
+    );
+  }
+
+  adoptDrift(baseVersion: number): Promise<PublishResultDto> {
+    return this.request('/api/config/adopt-drift', this.jsonInit('POST', { base_version: baseVersion }));
+  }
+
+  listDrafts(): Promise<{ items: { draft_id: string; label: string; base_version: number; created_at: string; payload_bytes: number }[] }> {
+    return this.request('/api/config/drafts');
+  }
+
+  saveDraft(label: string, baseVersion: number, payload: PublishPayload): Promise<{ draft_id: string; label: string }> {
+    return this.request('/api/config/drafts', this.jsonInit('POST', { label, base_version: baseVersion, ...payload }));
+  }
+
+  loadDraft(id: string): Promise<{ record: { draft_id: string; label: string; base_version: number }; document: DefinitionDocumentV2; prompts: PromptPatch }> {
+    return this.request(`/api/config/drafts/${encodeURIComponent(id)}`);
+  }
+
+  async deleteDraft(id: string): Promise<void> {
+    await this.request<null>(`/api/config/drafts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }
+
+  getAccess(): Promise<{ items: AccessItemDto[] }> {
+    return this.request('/api/config/access');
+  }
+
+  putAccess(userId: string, level: ConfigLevel): Promise<AccessItemDto> {
+    return this.request(`/api/config/access/${encodeURIComponent(userId)}`, this.jsonInit('PUT', { config_level: level }));
+  }
+
+  /** 试运行（SSE）：用草稿配置对话，不进入正式会话，不改在用版本。校验失败 → 400（不开流）；繁忙 → 429。 */
+  async trialStream(
+    payload: PublishPayload,
+    query: string,
+    sessionId: string,
+    onEvent: (event: StreamEvent) => void,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/api/config/trial`, {
+      method: 'POST',
+      headers: this.headers({ Accept: 'text/event-stream', 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ ...payload, query, session_id: sessionId }),
+      signal,
+    });
+    if (!response.ok) {
+      await this.decode(response);
+      return;
+    }
+    if (!response.body) {
+      throw new ApiClientError({ status: 0, code: 'no_body', message: '流式响应缺少响应体' });
+    }
+    for await (const frame of parseSseStream(response.body)) {
+      onEvent(frame);
+      if (frame.kind === 'done') return;
+    }
+  }
+
+  // ------------------------------------------------------------------ //
+  // REV-26（IFC-R26-160 ~ 163）：Agent Builder（只产出草案，不写配置）
+  // ------------------------------------------------------------------ //
+
+  builderDraft(requirement: string): Promise<{ draft: AgentDraftDto; notes: AdaptationNoteDto[]; evaluation: RubricResultDto }> {
+    return this.request('/api/builder/draft', this.jsonInit('POST', { requirement }));
+  }
+
+  builderEvaluate(draft: AgentDraftDto): Promise<{ evaluation: RubricResultDto }> {
+    return this.request('/api/builder/evaluate', this.jsonInit('POST', { draft }));
+  }
+
+  builderOptimize(draft: AgentDraftDto, instruction?: string): Promise<{
+    draft: AgentDraftDto;
+    notes: AdaptationNoteDto[];
+    before: RubricResultDto;
+    after: RubricResultDto;
+    changes: FieldChangeDto[];
+  }> {
+    return this.request('/api/builder/optimize', this.jsonInit('POST', { draft, instruction }));
+  }
+
+  builderReviewExisting(expert: string, mode: 'evaluate' | 'optimize', instruction?: string): Promise<{
+    evaluation: RubricResultDto;
+    proposal: AgentDraftDto | null;
+    changes: FieldChangeDto[];
+  }> {
+    return this.request('/api/builder/review-existing', this.jsonInit('POST', { expert, mode, instruction }));
   }
 }
 

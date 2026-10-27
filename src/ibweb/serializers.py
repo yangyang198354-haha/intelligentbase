@@ -334,6 +334,10 @@ class ConfigAuditEntrySerializer(serializers.Serializer):
             "changed_field_names": list(instance.changed_field_names),
             "result": instance.result,
             "detail_code": instance.detail_code,
+            # REV-26（IFC-R26-054 / 153）：版本前后号与对象摘要（只含对象 id / 类别；永不含正文与凭据）。
+            "version_before": getattr(instance, "version_before", None),
+            "version_after": getattr(instance, "version_after", None),
+            "object_summary": list(getattr(instance, "object_summary", ()) or ()),
         }
 
 

@@ -18,11 +18,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal, Mapping, Sequence, TypeAlias
+from typing import Any, Final, Literal, Mapping, Sequence, TypeAlias
+
+from .graph import GraphSpec, InputMode
 
 # --------------------------------------------------------------------------- #
 # 类型别名
 # --------------------------------------------------------------------------- #
+
+#: REV-26 配置访问档位（IFC-R26-005）。
+ConfigLevel: TypeAlias = Literal["view", "edit", "manage"]
+LEVEL_RANK: Final[Mapping[str, int]] = {"view": 0, "edit": 1, "manage": 2}
 
 #: 稠密向量。长度必须等于 `CollectionSpec.dim` / `EmbedderDescriptor.dim`。
 Vector: TypeAlias = Sequence[float]
@@ -785,6 +791,7 @@ class CompletionPayload:
 
     citations: tuple[CitationItem, ...] = ()
     had_content: bool = True
+    config_version: int = 0  # REV-26：本次回答绑定的配置版本（0 = 旧路径 / 虚拟版本）
 
 
 @dataclass(frozen=True, slots=True)
@@ -865,6 +872,7 @@ class SessionState:
     turns: tuple[SessionTurn, ...] = ()
     gate: "ConfirmationGateState | None" = None
     updated_at: str = ""
+    config_version: int = 0  # REV-26：会话挂起时绑定的配置版本
 
 
 @dataclass(frozen=True, slots=True)
@@ -926,6 +934,18 @@ class GraphConfig:
 # --------------------------------------------------------------------------- #
 
 
+KnowledgeMode: TypeAlias = Literal["all", "folders"]
+ExpertStatus: TypeAlias = Literal["active", "disabled"]
+
+
+@dataclass(frozen=True, slots=True)
+class KnowledgeScope:
+    """REV-26 IFC-R26-002：agent 的知识范围。`all` = 项目内全部资料（存量默认）。"""
+
+    mode: KnowledgeMode = "all"
+    folder_ids: tuple[str, ...] = ()  # mode="folders"：空 = 无知识范围（0 命中）；<=200 项
+
+
 @dataclass(frozen=True, slots=True)
 class ExpertSpecInput:
     """定义文档中的**专家规格输入**（IFC-IB-287 / 288）。
@@ -949,6 +969,10 @@ class ExpertSpecInput:
     is_data_expert: bool
     is_delegating: bool
     is_default: bool
+    # REV-26 IFC-R26-002（append-only，带默认值）
+    status: ExpertStatus = "active"
+    max_steps: int | None = None  # 1..8；None = 默认 4（OQ-R26-A05）
+    knowledge_scope: KnowledgeScope = KnowledgeScope()
 
 
 @dataclass(frozen=True, slots=True)
@@ -1048,6 +1072,7 @@ class DefinitionDocument:
     orchestration: OrchestrationSpecInput
     tool_grants: tuple[ToolGrantSpec, ...]
     updated_at: str
+    graph: GraphSpec | None = None  # REV-26：schema_version=2 时必填
 
 
 @dataclass(frozen=True, slots=True)
@@ -1369,6 +1394,7 @@ class UserRecord:
     locked_until: str | None
     created_at: str
     updated_at: str
+    config_level: ConfigLevel = "manage"  # REV-26 IFC-R26-053；admin 行忽略
 
 
 @dataclass(frozen=True, slots=True)
@@ -1458,6 +1484,10 @@ class ConfigAuditEntry:
     changed_field_names: tuple[str, ...]
     result: ConfigAuditResult
     detail_code: str | None
+    # REV-26 IFC-R26-054：全部带默认值，既有构造点不变。
+    version_before: int | None = None
+    version_after: int | None = None
+    object_summary: tuple[str, ...] = ()  # 对象 id / 类别清单，不含正文与凭据
 
 
 @dataclass(frozen=True, slots=True)
@@ -1548,7 +1578,123 @@ class LlmKeyRecord:
     updated_at: str
 
 
+# --------------------------------------------------------------------------- #
+# REV-26 配置版本 / 差异 / 冲突 / 运行期视图（IFC-R26-003）
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True, slots=True)
+class PromptLayers:
+    main: str | None
+    fallback: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ConfigSnapshot:
+    definition: DefinitionDocument
+    prompts: tuple[tuple[str, PromptLayers], ...]  # 按专家名升序；只含 definition.experts 中的专家
+
+
+VersionKind: TypeAlias = Literal["publish", "rollback", "baseline", "adopt"]
+VersionStatus: TypeAlias = Literal["pending", "published", "aborted"]
+
+
+@dataclass(frozen=True, slots=True)
+class VersionRecord:
+    project_id: str
+    version: int
+    parent_version: int
+    status: VersionStatus
+    kind: VersionKind
+    rolled_back_to: int | None
+    actor: str
+    created_at: str
+    summary: str
+    manifest_hash: str
+    snapshot_bytes: int
+
+
+@dataclass(frozen=True, slots=True)
+class HeadState:
+    project_id: str
+    published_version: int  # 0 = 虚拟版本（存量 v1 项目尚无版本行）
+    pending_version: int | None
+    updated_at: str
+
+
+DiffKind: TypeAlias = Literal[
+    "agent_added", "agent_removed", "agent_disabled", "agent_enabled", "agent_field", "prompt",
+    "tool_grant", "tool_param", "knowledge_scope", "route_param",
+    "node_added", "node_removed", "node_changed", "edge_added", "edge_removed", "edge_changed", "layout",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class DiffItem:
+    kind: DiffKind
+    object_id: str
+    field: str
+    before: str | None  # 摘要 <=120 字符；prompt 只给 长度 + 哈希前 8 位
+    after: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ConflictItem:
+    kind: str
+    object_id: str
+    fields: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ConflictReceipt:
+    base_version: int
+    head_version: int
+    base_available: bool
+    conflicts: tuple[ConflictItem, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class AgentRuntime:
+    name: str
+    system_prompt: str
+    tools: tuple[BoundTool, ...]  # 仅本 agent 被授权的工具，参数 / 目录范围已闭包注入
+    max_steps: int  # 1..8
+    input_mode: InputMode
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectRuntimeView:
+    """运行期只读视图（不含编译产物），供编排层消费。"""
+
+    version: int
+    experts: tuple[ExpertSpec, ...]  # 仅 status="active"
+    default_expert: str
+    prompts: Mapping[str, str]
+    prompt_sources: Mapping[str, Literal["main_file", "fallback_file"]]
+    cn_labels: Mapping[str, str]
+    agents: Mapping[str, AgentRuntime]
+    graph: GraphSpec
+    max_expert_steps: int
+
+
 __all__ = [
+    "ConfigLevel",
+    "LEVEL_RANK",
+    "KnowledgeScope",
+    "KnowledgeMode",
+    "ExpertStatus",
+    "PromptLayers",
+    "ConfigSnapshot",
+    "VersionKind",
+    "VersionStatus",
+    "VersionRecord",
+    "HeadState",
+    "DiffKind",
+    "DiffItem",
+    "ConflictItem",
+    "ConflictReceipt",
+    "AgentRuntime",
+    "ProjectRuntimeView",
     "Vector",
     "DistanceLiteral",
     "SourceKindLiteral",

@@ -150,6 +150,10 @@ def test_TC_UNIT_125_audit_surface_is_read_only_and_value_free():
         "changed_field_names",
         "result",
         "detail_code",
+        # REV-26 IFC-R26-054：版本前后号与对象摘要（仅 id / 类别，不含取值）追加；值无关断言保持不变
+        "version_before",
+        "version_after",
+        "object_summary",
     }
     assert not {n for n in entry_fields if "value" in n or "secret" in n or "token" in n}
 

@@ -176,4 +176,6 @@ def test_TC_INT_R16_prompt_save_does_not_rebuild_graph(http_app):
     ok = _put_layer(client, "kb-agent", "fallback", {"content": "兜底"})
     assert ok.status_code == 200, ok.content
     after = deps.orchestrator_for("p_alpha")
-    assert before is after  # 未重建编排图
+    # REV-26 重新基线（取代 REQ-FUNC-IB-40 / C-IB-40 / ADR-32，见 CL-003）：保存经发布协议立即热生效，
+    # 运行时换成新版本的编排器（旧引用仍可被进行中的回答持有）。
+    assert before is not after

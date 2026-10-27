@@ -2117,7 +2117,10 @@ def definition_config_endpoints() -> None:
     r = client.get("/api/config/definition", **auth)
     assert r.status_code == 200, r.content
     payload = r.json()
-    assert set(payload) == {"document", "derived", "editable_fields", "config_key_names"}, payload
+    # REV-26（IFC-R26-141）：既有四键 + version / level / graph
+    assert set(payload) == {
+        "document", "derived", "editable_fields", "config_key_names", "version", "level", "graph",
+    }, payload
     # 只登记**键名**：两个新键名出现，但响应体中不得出现任何环境变量**值**
     assert payload["config_key_names"] == ["IB_DEFINITION_DOC_PATH", "IB_VISUAL_CONFIG_ENABLED"]
     assert "orchestration" not in payload["editable_fields"], "拓扑不得进入可编辑白名单"
@@ -2138,7 +2141,7 @@ def definition_config_endpoints() -> None:
         **auth,
     )
     assert r2.status_code == 200, r2.content
-    assert set(r2.json()) == {"ok", "content_hash", "conflict", "errors"} and r2.json()["ok"]
+    assert set(r2.json()) == {"ok", "content_hash", "conflict", "errors", "version"} and r2.json()["ok"]  # REV-26 追加 version
 
     # 非法（**零个**默认专家）→ 400，逐条 path/code/message
     # **REV-20（ADR-50）**：默认文档只有一位专家（`kb-agent`），无法再造「两个默认」，
@@ -3530,9 +3533,14 @@ def r13_deploy_discipline() -> None:
         "[B25]",
         "[B26]",
         "[B27]",
+        "[B28]",
+        "[B29]",
     ):
         assert item in checklists, f"checklists.txt 缺少验收项 {item}"
     assert "B1–B27" in checklists, "签署行未同步到 B27"
+    # B28（R25）/ B29（R26）在签署段各有独立签署行。
+    assert re.search(r"^\[ \] B28（", checklists, re.MULTILINE), "签署行缺少 B28"
+    assert re.search(r"^\[ \] B29（", checklists, re.MULTILINE), "签署行缺少 B29"
 
     # 4b) REV-18 迁移：005 / 006 存在、幂等（IF EXISTS）、且**纯追加**（只建新表 / 不回改旧表）。
     for name, table in (
@@ -4366,6 +4374,106 @@ def folder_tree_integrity() -> None:
             ledger.close()
 
 
+@_case("config_versions_schema_single_source：008 与 schema 生成器单源 / 幂等 / 老库补列（REV-26 MOD-R26-22）")
+def config_versions_schema_single_source() -> None:
+    import pathlib
+    import sqlite3
+
+    from ib.ledger import schema as S
+
+    deploy = pathlib.Path(_SRC) / "deploy" / "migrations"
+    sql = (deploy / "008_config_versions.sql").read_text(encoding="utf-8")
+    norm = lambda s: "".join(s.split())  # noqa: E731
+    assert norm(S.config_versions_ddl_script()) in norm(sql), "008_config_versions.sql 与 config_versions_ddl_script() 不一致（单源）"
+    for old in ("001_ledger_init", "002_chunk_image", "003_accounts", "004_config_audit", "005_projects",
+                "006_llm_key", "007_folder_tree"):
+        assert (deploy / f"{old}.sql").is_file(), f"既有迁移 {old}.sql 缺失（001~007 不得删改）"
+    assert "MANUAL_ROLLBACK_REQUIRED" in sql.split("CREATE TABLE")[0], "008 头注释缺回滚说明"
+    for line in sql.splitlines():
+        assert "DROP" not in line.split("--")[0].upper(), "008 含可执行的 DROP 语句"
+    # 新库：ensure_schema → 008 重放两遍；老库（001 + 003 + 004 形态）：ensure_schema 两遍
+    fresh = sqlite3.connect(":memory:", isolation_level=None)
+    S.ensure_schema(fresh)
+    fresh.executescript(sql)
+    fresh.executescript(sql)
+    assert S.missing_config_version_columns(fresh) == {}, S.missing_config_version_columns(fresh)
+    old = sqlite3.connect(":memory:", isolation_level=None)
+    for st in S.DDL_STATEMENTS + S.ACCOUNT_DDL_STATEMENTS + S.CONFIG_AUDIT_DDL_STATEMENTS:
+        old.execute(st)
+    old.execute(
+        "INSERT INTO users (user_id, username, password_hash, role, project_id, status, must_change_password, "
+        "created_at, updated_at) VALUES ('u','ops1','h','ops','p','active',0,'2020','2020')"
+    )
+    S.ensure_schema(old)
+    S.ensure_schema(old)
+    assert S.missing_config_version_columns(old) == {}
+    assert old.execute("SELECT config_level FROM users WHERE user_id='u'").fetchone()[0] == "manage", "存量 ops 应为 manage 档"
+
+
+@_case("graph_validate_offline：图校验 / 规范化 / 层归一化 / 条件谓词纯函数离线可跑（REV-26 REQ-NFUNC-013）")
+def graph_validate_offline() -> None:
+    from ib.config.graph import canonical_graph_from_experts, evaluate_condition, layerize_graph, validate_graph
+    from ib.core import ELSE_BRANCH, ConditionBranch, ConditionPredicate, GraphEdge, GraphSpec
+    from ib.core.types import ExpertSpecInput
+
+    ex = (
+        ExpertSpecInput("kb-agent", "知识库助手", ("kb",), (), True, False, True),
+        ExpertSpecInput("other", "其他", ("oth",), (), False, False, False),
+    )
+    g = canonical_graph_from_experts(ex, "kb-agent")
+    assert validate_graph(g, experts=ex, default_expert="kb-agent") == ()
+    plan = layerize_graph(g)
+    assert all(plan.levels[e.target] - plan.levels[e.source] == 1 for e in g.edges if not plan.relays)
+    cyc = GraphSpec(g.nodes, g.edges + (GraphEdge("e-x", "end", "start"),))
+    codes = {i.code for i in validate_graph(cyc, experts=ex, default_expert="kb-agent")}
+    assert "graph_cycle" in codes, codes
+    pred = ConditionPredicate("keyword", (ConditionBranch("b1", ("退款",)),))
+    assert evaluate_condition(pred, query=" 我要 退款 ", upstream_degraded=False) == "b1"
+    assert evaluate_condition(pred, query="你好", upstream_degraded=False) == ELSE_BRANCH
+
+
+@_case("builder_no_data_imports：ib.builder 不 import 检索 / 向量 / blob / 会话 / ib_embed（REV-26 REQ-NFUNC-014）")
+def builder_no_data_imports() -> None:
+    import ast
+    import pathlib
+
+    forbidden = ("ib.retrieval", "ib.vectorstore", "ib.blob", "ib.streaming", "ib_embed", "ib.confsvc")
+    root = pathlib.Path(_SRC) / "ib" / "builder"
+    assert root.is_dir()
+    for path in sorted(root.glob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            mods: list[str] = []
+            if isinstance(node, ast.Import):
+                mods = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+                mods = [node.module]
+            for m in mods:
+                assert not any(m == f or m.startswith(f + ".") for f in forbidden), f"{path.name} 引用了 {m}"
+
+
+@_case("builder_single_egress：provider 的补全方法只在 egress.py 内被引用（REV-26 REQ-NFUNC-014）")
+def builder_single_egress() -> None:
+    import pathlib
+    import re
+
+    root = pathlib.Path(_SRC) / "ib" / "builder"
+    pattern = re.compile(r"\.complete\s*\(|\bcomplete\s*=")
+    for path in sorted(root.glob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        if path.name == "egress.py":
+            continue
+        assert not pattern.search(text), f"{path.name} 直接引用了补全方法（须经 EgressGuard）"
+    # 外发载荷类型的字段集 = 白名单（类型层没有会话 / 资料 / 账号字段）
+    from dataclasses import fields
+
+    from ib.builder.egress import OutboundPayload
+
+    assert {f.name for f in fields(OutboundPayload)} == {
+        "kind", "requirement_text", "instruction_text", "project_digest", "selected_agent", "rubric_items",
+    }
+
+
 def main() -> int:
     print("=" * 72)
     print("intelligentbase 离线自检（GROUP_C 自我验证；正式测试套件属 GROUP_D）")
@@ -4435,6 +4543,11 @@ def main() -> int:
         # ---- 资料库目录增量（007 迁移单源 + 目录完整性对账；MOD-001 / MOD-015） ----
         folder_tree_migration_007,
         folder_tree_integrity,
+        # ---- REV-26：配置版本迁移 / 图纯函数 / Builder 外发边界 ----
+        config_versions_schema_single_source,
+        graph_validate_offline,
+        builder_no_data_imports,
+        builder_single_egress,
     ]
     for case in cases:
         case()

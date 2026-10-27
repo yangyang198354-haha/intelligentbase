@@ -51,14 +51,27 @@ from ib.core import (
     ValidationErrorItem,
     ValidationReport,
 )
+from ib.core import (  # REV-26：图 / 知识范围
+    ConditionBranch,
+    ConditionPredicate,
+    GraphEdge,
+    GraphNode,
+    GraphSpec,
+    KnowledgeScope,
+)
+
+from .graph import canonical_graph_from_experts, validate_graph
 
 __all__ = [
+    "SUPPORTED_SCHEMA_VERSIONS",
+    "upgrade_to_v2",
     "SUPPORTED_SCHEMA_VERSION",
     "DEFAULT_MAX_EXPERT_STEPS",
     "content_hash_conflict_item",
     "semantic_hash",
     "editable_field_whitelist",
     "non_editable_changes",
+    "submitted_temperature_items",
     "validate",
     "validate_definition_full",
     "validate_two_domains",
@@ -73,7 +86,15 @@ __all__ = [
 ]
 
 SUPPORTED_SCHEMA_VERSION = 1
+#: REV-26 IFC-R26-030：v1（固定拓扑）与 v2（自由 DAG）并存；首次保存才升级为 v2。
+SUPPORTED_SCHEMA_VERSIONS: frozenset[int] = frozenset({1, 2})
 DEFAULT_MAX_EXPERT_STEPS = 8
+#: REV-26 单 agent 最大步数（工具调用轮数）默认值与范围（OQ-R26-A05）。
+AGENT_MAX_STEPS_DEFAULT = 4
+AGENT_MAX_STEPS_RANGE = (1, 8)
+EXPERT_KEYWORDS_LIMIT = 20
+EXPERT_EXEMPLARS_LIMIT = 10
+KNOWLEDGE_FOLDERS_LIMIT = 200
 
 #: 可编辑白名单**之外**的显式清单（供审核与前端对照；等价于「白名单的补集」中语义敏感的项）。
 #: 拓扑相关字段**永久不可编辑**（REQ-FUNC-IB-26 ②）：节点 / 边集合与条件边存在性。
@@ -96,23 +117,70 @@ NON_EDITABLE_FIELDS: frozenset[str] = frozenset(
 # --------------------------------------------------------------------------- #
 
 
+def _expert_payload(e: ExpertSpecInput) -> dict[str, Any]:
+    """专家语义载荷。REV-26 新键**仅在取非默认值时**出现（IFC-R26-033：存量文档哈希逐位不变）。"""
+    d: dict[str, Any] = {
+        "name": e.name,
+        "cn_label": e.cn_label,
+        "keywords": list(e.keywords),
+        "exemplars": list(e.exemplars),
+        "is_data_expert": e.is_data_expert,
+        "is_delegating": e.is_delegating,
+        "is_default": e.is_default,
+    }
+    if e.status != "active":
+        d["status"] = e.status
+    if e.max_steps is not None:
+        d["max_steps"] = e.max_steps
+    if e.knowledge_scope != KnowledgeScope():
+        d["knowledge_scope"] = {
+            "mode": e.knowledge_scope.mode,
+            "folder_ids": list(e.knowledge_scope.folder_ids),
+        }
+    return d
+
+
+def _graph_payload(g: GraphSpec) -> dict[str, Any]:
+    nodes: list[dict[str, Any]] = []
+    for n in g.nodes:
+        nd: dict[str, Any] = {"id": n.id, "kind": n.kind, "x": n.x, "y": n.y}
+        if n.expert is not None:
+            nd["expert"] = n.expert
+        if n.kind == "agent":
+            nd["input_mode"] = n.input_mode
+        if n.predicate is not None:
+            nd["predicate"] = {
+                "kind": n.predicate.kind,
+                "branches": [{"key": b.key, "keywords": list(b.keywords)} for b in n.predicate.branches],
+            }
+        if n.message:
+            nd["message"] = n.message
+        nodes.append(nd)
+    edges: list[dict[str, Any]] = []
+    for e in g.edges:
+        ed: dict[str, Any] = {"id": e.id, "source": e.source, "target": e.target}
+        if e.branch_key is not None:
+            ed["branch_key"] = e.branch_key
+        edges.append(ed)
+    return {"nodes": nodes, "edges": edges}
+
+
 def _semantic_payload(doc: DefinitionDocument) -> dict[str, Any]:
     """构造**语义载荷**：显式排除 `content_hash` 与 `updated_at`（二者非语义内容）。"""
+    payload = _semantic_payload_v1_shape(doc)
+    if doc.schema_version == 2:
+        # v2：拓扑由 graph 承载，不再输出 orchestration（IFC-R26-030）。
+        payload.pop("orchestration", None)
+    if doc.graph is not None:
+        payload["graph"] = _graph_payload(doc.graph)
+    return payload
+
+
+def _semantic_payload_v1_shape(doc: DefinitionDocument) -> dict[str, Any]:
     return {
         "schema_version": doc.schema_version,
         "project_id": doc.project_id,
-        "experts": [
-            {
-                "name": e.name,
-                "cn_label": e.cn_label,
-                "keywords": list(e.keywords),
-                "exemplars": list(e.exemplars),
-                "is_data_expert": e.is_data_expert,
-                "is_delegating": e.is_delegating,
-                "is_default": e.is_default,
-            }
-            for e in doc.experts
-        ],
+        "experts": [_expert_payload(e) for e in doc.experts],
         "route": {
             "tau": doc.route.tau,
             "margin": doc.route.margin,
@@ -190,6 +258,13 @@ def editable_field_whitelist() -> frozenset[str]:
             "tool_grants[].tool_names",
             # REV-16-2：工具参数取值可编辑（授权勾选 + 参数可配；ADR-30）
             "tool_grants[].param_values",
+            # REV-26（IFC-R26-032）：状态 / 最大步数 / 知识范围 / 自由 DAG 图
+            "experts[].status",
+            "experts[].max_steps",
+            "experts[].knowledge_scope",
+            "graph",
+            "graph.nodes",
+            "graph.edges",
         }
     )
 
@@ -203,6 +278,28 @@ def _err(path: str, code: str, message: str) -> ValidationErrorItem:
     return ValidationErrorItem(path=path, code=code, message=message)
 
 
+def submitted_temperature_items(raw: Any) -> tuple[ValidationErrorItem, ...]:
+    """DEF-R26-002 / AC-021-03：请求体文档里**主动提交**的 temperature（顶层 / route / experts[] / graph.nodes[]）
+    一律判 `field_not_editable`。纯函数，只看请求体原始 dict；读取存量旧文档（`document_from_json`）不经此处，legacy 键处置不变。"""
+    if not isinstance(raw, dict):
+        return ()
+    items: list[ValidationErrorItem] = []
+
+    def _chk(obj: Any, path: str) -> None:
+        if isinstance(obj, dict) and "temperature" in obj:
+            items.append(_err(f"{path}.temperature" if path else "temperature", "field_not_editable",
+                              "temperature 不在可编辑白名单内（路由分类器温度固定为 0）"))
+
+    _chk(raw, "")
+    _chk(raw.get("route"), "route")
+    for i, e in enumerate(raw.get("experts") or []):
+        _chk(e, f"experts[{i}]")
+    g = raw.get("graph")
+    for i, n in enumerate((g.get("nodes") if isinstance(g, dict) else None) or []):
+        _chk(n, f"graph.nodes[{i}]")
+    return tuple(items)
+
+
 def non_editable_changes(
     current: DefinitionDocument,
     submitted: DefinitionDocument,
@@ -214,11 +311,20 @@ def non_editable_changes(
     `updated_at`）不参与比较（它们由服务端重算，非「编辑对象」）。
     """
     items: list[ValidationErrorItem] = []
-    if submitted.schema_version != current.schema_version:
+    # REV-26（IFC-R26-032）：允许 1→2 升级（须带 graph）；v2 不得降级，也不得跳到其他版本。
+    upgrade_ok = (
+        current.schema_version == 1 and submitted.schema_version == 2 and submitted.graph is not None
+    )
+    if submitted.schema_version != current.schema_version and not upgrade_ok:
         items.append(_err("schema_version", "field_not_editable", "schema_version 不在可编辑白名单内"))
     if submitted.project_id != current.project_id:
         items.append(_err("project_id", "field_not_editable", "project_id 不在可编辑白名单内"))
-    if _semantic_payload(submitted)["orchestration"] != _semantic_payload(current)["orchestration"]:
+    # v1→v1 仍按原规则拒绝拓扑变更；v2 的拓扑（graph）在可编辑白名单内。
+    if (
+        current.schema_version == 1
+        and submitted.schema_version == 1
+        and _semantic_payload(submitted)["orchestration"] != _semantic_payload(current)["orchestration"]
+    ):
         items.append(
             _err(
                 "orchestration",
@@ -261,7 +367,7 @@ def validate(
     errors: list[ValidationErrorItem] = []
 
     # 1. schema 版本
-    if doc.schema_version != SUPPORTED_SCHEMA_VERSION:
+    if doc.schema_version not in SUPPORTED_SCHEMA_VERSIONS:
         errors.append(
             _err(
                 "schema_version",
@@ -269,6 +375,13 @@ def validate(
                 f"不支持的 schema_version={doc.schema_version}（仅支持 {SUPPORTED_SCHEMA_VERSION}）",
             )
         )
+    is_v2 = doc.schema_version == 2
+    # REV-26：v2 的拓扑由 graph 承载，v1 的 orchestration 校验对 v2 不适用（改调 validate_graph）。
+    orch = (
+        OrchestrationSpecInput(nodes=tuple(e.name for e in doc.experts), conditional_edges=(), edges=())
+        if is_v2
+        else doc.orchestration
+    )
 
     # 2. project_id
     if not doc.project_id:
@@ -323,10 +436,10 @@ def validate(
         )
 
     # 7. 编排
-    node_set = set(doc.orchestration.nodes)
-    if not doc.orchestration.nodes:
+    node_set = set(orch.nodes)
+    if not orch.nodes:
         errors.append(_err("orchestration.nodes", "orchestration_nodes_empty", "编排节点集合不得为空"))
-    for ce in doc.orchestration.conditional_edges:
+    for ce in orch.conditional_edges:
         if not ce.branch_map:
             errors.append(
                 _err(
@@ -358,7 +471,7 @@ def validate(
     # 会让界面上出现一条指向合成端点的条件边，语义上无从解释。
     edge_endpoints = node_set | RESERVED_GRAPH_ENDPOINTS
     seen_edges: set[tuple[str, str]] = set()
-    for index, edge in enumerate(doc.orchestration.edges):
+    for index, edge in enumerate(orch.edges):
         for role, endpoint in (("from_node", edge.from_node), ("to_node", edge.to_node)):
             if endpoint not in edge_endpoints:
                 errors.append(
@@ -436,6 +549,8 @@ def validate(
     #     撞车 → L0「关键词唯一命中」判据并列命中、路由结果不可复现，故装配期 fail-fast 拒绝。
     kw_owner: dict[str, str] = {}
     for e in doc.experts:
+        if e.status != "active":
+            continue  # REV-26：已停用专家不参与路由，其关键词不构成撞车
         for kw in e.keywords:
             normalized = kw.strip().lower()
             if not normalized:
@@ -513,7 +628,49 @@ def validate(
             else:
                 within[normalized] = kw
 
+    # 13. REV-26 v2 追加项（仅 schema_version == 2；全部追加在既有项之后，使用全新错误码）
+    if is_v2:
+        errors.extend(_validate_v2_extras(doc))
+
     return ValidationReport(ok=not errors, errors=tuple(errors))
+
+
+def _validate_v2_extras(doc: DefinitionDocument) -> list[ValidationErrorItem]:
+    """REV-26 v2 校验（IFC-R26-031）：专家扩展字段 + 图合法性。纯函数。"""
+    out: list[ValidationErrorItem] = []
+    lo, hi = AGENT_MAX_STEPS_RANGE
+    for e in doc.experts:
+        p = f"experts[{e.name}]"
+        if e.status not in ("active", "disabled"):
+            out.append(_err(f"{p}.status", "expert_status_invalid", "专家状态须为 active 或 disabled"))
+        if e.status == "disabled" and e.name == doc.route.default_expert:
+            out.append(_err(f"{p}.status", "expert_default_disabled", "默认专家不得停用"))
+        if e.max_steps is not None and not (
+            isinstance(e.max_steps, int) and not isinstance(e.max_steps, bool) and lo <= e.max_steps <= hi
+        ):
+            out.append(_err(f"{p}.max_steps", "expert_max_steps_range", f"最大步数须在 {lo}..{hi} 之间"))
+        if len(e.keywords) > EXPERT_KEYWORDS_LIMIT:
+            out.append(_err(f"{p}.keywords", "expert_keywords_limit", f"路由关键词不得超过 {EXPERT_KEYWORDS_LIMIT} 条"))
+        if len(e.exemplars) > EXPERT_EXEMPLARS_LIMIT:
+            out.append(_err(f"{p}.exemplars", "expert_exemplars_limit", f"示例句不得超过 {EXPERT_EXEMPLARS_LIMIT} 条"))
+        ks = e.knowledge_scope
+        if ks.mode not in ("all", "folders") or (ks.mode == "all" and ks.folder_ids) or len(ks.folder_ids) > KNOWLEDGE_FOLDERS_LIMIT:
+            out.append(_err(f"{p}.knowledge_scope", "knowledge_scope_invalid", "知识范围不合法"))
+    disabled = {e.name for e in doc.experts if e.status == "disabled"}
+    for g in doc.tool_grants:
+        if g.expert_name in disabled and g.tool_names:
+            out.append(
+                _err(
+                    f"tool_grants[{g.expert_name}]",
+                    "tool_grant_expert_disabled",
+                    "已停用的专家不得持有工具授权",
+                )
+            )
+    if doc.graph is None:
+        out.append(_err("graph", "graph_missing", "schema_version=2 的文档必须携带 graph"))
+    else:
+        out.extend(validate_graph(doc.graph, experts=doc.experts, default_expert=doc.route.default_expert))
+    return out
 
 
 def validate_definition_full(
@@ -558,6 +715,7 @@ def validate_two_domains(
     known_tools: tuple[str, ...] | frozenset[str] | set[str] | None = None,
     tool_param_specs: tuple[ToolParamSpec, ...] = (),
     prompt_refs: tuple[ExpertPromptDocumentRef, ...] = (),
+    known_folder_ids: frozenset[str] | None = None,
 ) -> ValidationReport:
     """**跨域统合校验**（REV-17 / ADR-36）。**纯函数**：无 I/O、无副作用。
 
@@ -586,6 +744,18 @@ def validate_two_domains(
     )
     errors: list[ValidationErrorItem] = list(report.errors)
     errors.extend(validate_prompt_directory(prompt_refs, doc=doc))
+    # REV-26：知识范围引用的目录须存在（known_folder_ids 为 None 时跳过，离线可测）。
+    if known_folder_ids is not None and doc.schema_version == 2:
+        for e in doc.experts:
+            for fid in e.knowledge_scope.folder_ids:
+                if fid not in known_folder_ids:
+                    errors.append(
+                        _err(
+                            f"experts[{e.name}].knowledge_scope.folder_ids[{fid}]",
+                            "knowledge_folder_missing",
+                            "知识范围引用的资料目录不存在",
+                        )
+                    )
     return ValidationReport(ok=not errors, errors=tuple(errors))
 
 
@@ -636,6 +806,7 @@ def build_definition_document(
     tool_grants: tuple[ToolGrantSpec, ...] = (),
     schema_version: int = SUPPORTED_SCHEMA_VERSION,
     updated_at: str = "",
+    graph: GraphSpec | None = None,
 ) -> DefinitionDocument:
     """构造定义文档并计算其语义哈希（`content_hash` 由内容决定，不由调用方指定）。"""
     draft = DefinitionDocument(
@@ -647,8 +818,28 @@ def build_definition_document(
         orchestration=orchestration,
         tool_grants=tool_grants,
         updated_at=updated_at,
+        graph=graph,
     )
     return replace(draft, content_hash=semantic_hash(draft))
+
+
+def upgrade_to_v2(
+    doc: DefinitionDocument,
+    *,
+    positions: dict[str, tuple[float, float]] | None = None,
+) -> DefinitionDocument:
+    """IFC-R26-034：v1 → v2（纯函数）。`graph = canonical_graph_from_experts(...)`，`orchestration` 置空，重算哈希；
+    已是 v2 原样返回。"""
+    if doc.schema_version == 2:
+        return doc
+    graph = canonical_graph_from_experts(doc.experts, doc.route.default_expert, positions=positions)
+    up = replace(
+        doc,
+        schema_version=2,
+        graph=graph,
+        orchestration=OrchestrationSpecInput(nodes=(), conditional_edges=(), edges=()),
+    )
+    return replace(up, content_hash=semantic_hash(up))
 
 
 def document_to_json(doc: DefinitionDocument) -> str:
@@ -682,6 +873,59 @@ def _check_legacy_fallback_keys(data: dict[str, Any]) -> None:
         )
 
 
+def _scope_from_json(raw: Any) -> KnowledgeScope:
+    if raw is None:
+        return KnowledgeScope()
+    if not isinstance(raw, dict):
+        raise TypeError("knowledge_scope")
+    return KnowledgeScope(
+        mode=str(raw.get("mode", "all")),  # type: ignore[arg-type]
+        folder_ids=tuple(str(x) for x in raw.get("folder_ids", [])),
+    )
+
+
+def _graph_from_json(raw: Any) -> GraphSpec:
+    """解析 graph（REV-26）。结构非法抛 TypeError / KeyError / ValueError，由调用方转 ConfigError。"""
+    if not isinstance(raw, dict):
+        raise TypeError("graph")
+    nodes: list[GraphNode] = []
+    for n in raw.get("nodes", []):
+        pr = n.get("predicate")
+        predicate = (
+            None
+            if pr is None
+            else ConditionPredicate(
+                kind=str(pr["kind"]),  # type: ignore[arg-type]
+                branches=tuple(
+                    ConditionBranch(key=str(b["key"]), keywords=tuple(str(k) for k in b.get("keywords", [])))
+                    for b in pr.get("branches", [])
+                ),
+            )
+        )
+        nodes.append(
+            GraphNode(
+                id=str(n["id"]),
+                kind=str(n["kind"]),  # type: ignore[arg-type]
+                x=float(n.get("x", 0.0)),
+                y=float(n.get("y", 0.0)),
+                expert=None if n.get("expert") is None else str(n["expert"]),
+                input_mode=str(n.get("input_mode", "query_only")),  # type: ignore[arg-type]
+                predicate=predicate,
+                message=str(n.get("message", "")),
+            )
+        )
+    edges = tuple(
+        GraphEdge(
+            id=str(e["id"]),
+            source=str(e["source"]),
+            target=str(e["target"]),
+            branch_key=None if e.get("branch_key") is None else str(e["branch_key"]),
+        )
+        for e in raw.get("edges", [])
+    )
+    return GraphSpec(nodes=tuple(nodes), edges=edges)
+
+
 def document_from_json(
     project_id: str,
     text: str,
@@ -712,6 +956,9 @@ def document_from_json(
                 is_data_expert=bool(e.get("is_data_expert", False)),
                 is_delegating=bool(e.get("is_delegating", False)),
                 is_default=bool(e.get("is_default", False)),
+                status=str(e.get("status", "active")),  # type: ignore[arg-type]
+                max_steps=(None if e.get("max_steps") is None else int(e["max_steps"])),
+                knowledge_scope=_scope_from_json(e.get("knowledge_scope")),
             )
             for e in data.get("experts", [])
         )
@@ -750,11 +997,18 @@ def document_from_json(
             )
             for g in data.get("tool_grants", [])
         )
-    except (KeyError, TypeError, ValueError, IndexError) as exc:
+        graph = _graph_from_json(data.get("graph")) if data.get("graph") is not None else None
+        schema_version = int(data.get("schema_version", SUPPORTED_SCHEMA_VERSION))
+    except (KeyError, TypeError, ValueError, IndexError, AttributeError) as exc:
         raise ConfigError("定义文档缺失或不可解析（IB_DEFINITION_DOC_PATH）", key="IB_DEFINITION_DOC_PATH") from exc
+    if schema_version not in SUPPORTED_SCHEMA_VERSIONS:
+        raise ConfigError(
+            f"定义文档 schema_version={schema_version} 不受支持（仅支持 {sorted(SUPPORTED_SCHEMA_VERSIONS)}）",
+            key="IB_DEFINITION_DOC_PATH",
+        )
 
     doc = DefinitionDocument(
-        schema_version=int(data.get("schema_version", SUPPORTED_SCHEMA_VERSION)),
+        schema_version=schema_version,
         project_id=str(data.get("project_id", project_id)),
         content_hash=str(data.get("content_hash", "")),
         experts=experts,
@@ -762,6 +1016,7 @@ def document_from_json(
         orchestration=orchestration,
         tool_grants=grants,
         updated_at=str(data.get("updated_at", "")),
+        graph=graph,
     )
     # 内容哈希以**重算**为准：文件里的 content_hash 若被手改，重算可使其失效（乐观并发可信）。
     return replace(doc, content_hash=semantic_hash(doc), project_id=project_id)

@@ -905,8 +905,9 @@ class ConfigAuditStore(Protocol):
         *,
         limit: int = 50,
         offset: int = 0,
+        action: str | None = None,
     ) -> tuple[ConfigAuditEntry, ...]:
-        """按项目列出审计记录（IFC-IB-359），稳定升序（`entry_id` 追加序）。
+        """按项目列出审计记录（IFC-IB-359；REV-26 追加可选 `action` 过滤），稳定升序（`entry_id` 追加序）。
 
         审计表是套在**追加台账**上的读视图：分页必须稳定，故按写入序升序回放。
         """
@@ -994,3 +995,152 @@ class LlmKeyStore(Protocol):
     def clear(self) -> None:
         """清空 Key（单行删除）。幂等。"""
         ...
+
+
+# =========================================================================== #
+# MOD-R26-01 REV-26 增量端口（IFC-R26-004）
+#
+# 既有 19 个端口的方法集不变（仅 ConfigAuditStore.list_by_project 追加可选关键字 `action`）；
+# 以下为与之并列的小端口，由 ib.ledger 适配器实现。
+# =========================================================================== #
+
+from dataclasses import dataclass  # noqa: E402
+from typing import Literal  # noqa: E402
+
+from .types import (  # noqa: E402
+    ConfigLevel,
+    ConfigSnapshot,
+    HeadState,
+    VersionKind,
+    VersionRecord,
+)
+
+BeginOutcome = Literal["ok", "stale_base", "busy"]
+
+
+@dataclass(frozen=True, slots=True)
+class NewVersion:
+    kind: VersionKind
+    actor: str
+    summary: str
+    rolled_back_to: int | None
+    manifest_hash: str
+
+
+@dataclass(frozen=True, slots=True)
+class BeginResult:
+    outcome: BeginOutcome
+    version: int | None  # outcome="ok" 时为新（pending）版本号
+    head_version: int  # stale_base / busy 时回执当前 head
+    pending_version: int | None
+
+
+class ConfigVersionStore(Protocol):
+    def head(self, project_id: str) -> HeadState: ...
+
+    def get_version(self, project_id: str, version: int) -> tuple[VersionRecord, ConfigSnapshot] | None: ...
+
+    def list_versions(
+        self, project_id: str, *, limit: int, before_version: int | None
+    ) -> tuple[VersionRecord, ...]: ...
+
+    def begin_publish(
+        self,
+        project_id: str,
+        *,
+        base_version: int,
+        new: NewVersion,
+        snapshot: ConfigSnapshot,
+        extra_baseline: ConfigSnapshot | None,
+        now: str,
+        stale_after_s: float,
+    ) -> BeginResult: ...
+
+    def commit_publish(
+        self, project_id: str, version: int, *, now: str, keep: int, audit: "ConfigAuditEntry | None" = None
+    ) -> HeadState: ...  # audit 非空：审计行与提交同事务（REQ-NFUNC-006，CR-009）
+
+    def abort_publish(self, project_id: str, version: int, *, reason_code: str, now: str) -> bool: ...
+
+    def claim_stale_pending(self, project_id: str, *, now: str, stale_after_s: float) -> int | None: ...
+
+    def prune_all(self, *, keep: int) -> int: ...  # 维护步骤专用
+
+
+@dataclass(frozen=True, slots=True)
+class DraftRecord:
+    draft_id: str
+    project_id: str
+    owner: str
+    label: str  # 1..60 字符
+    base_version: int
+    created_at: str
+    payload_bytes: int
+
+
+class ConfigDraftStore(Protocol):
+    def save(
+        self,
+        project_id: str,
+        owner: str,
+        *,
+        label: str,
+        base_version: int,
+        payload_json: str,
+        now: str,
+        max_per_owner: int,
+    ) -> DraftRecord: ...
+
+    def list(self, project_id: str, owner: str) -> tuple[DraftRecord, ...]: ...
+
+    def load(self, project_id: str, owner: str, draft_id: str) -> tuple[DraftRecord, str] | None: ...
+
+    def delete(self, project_id: str, owner: str, draft_id: str) -> bool: ...
+
+    def purge_older_than(self, cutoff_iso: str) -> int: ...
+
+
+class ConfigAuditRetention(Protocol):
+    """仅注入 ib-worker；Web 层不持有（审计表对 Web 仍是 append-only）。"""
+
+    def purge_before(self, cutoff_iso: str) -> int: ...
+
+
+class DocScopeResolver(Protocol):
+    def live_doc_ids(
+        self, project_id: str, folder_ids: Sequence[str], *, limit: int
+    ) -> tuple[tuple[str, ...], bool]: ...
+
+
+class BuilderEvalCache(Protocol):
+    def get(self, cache_key: str) -> str | None: ...
+
+    def put(self, cache_key: str, *, rubric_version: str, result_json: str, now: str) -> None: ...
+
+    def purge(self, *, keep: int, older_than_iso: str) -> int: ...
+
+
+class AccountConfigLevelStore(Protocol):
+    """与 AccountStore 并列的小端口（AccountStore 的方法集不变）。"""
+
+    def get_config_level(self, user_id: str) -> ConfigLevel | None: ...
+
+    def set_config_level(
+        self, user_id: str, level: ConfigLevel, *, now: str, audit: "ConfigAuditEntry | None" = None
+    ) -> bool: ...  # audit 非空：权限变更与审计行同事务（CR-009）
+
+    def list_project_levels(self, project_id: str) -> tuple[tuple[str, str, ConfigLevel, str], ...]: ...
+
+
+__all__ += [
+    "BeginOutcome",
+    "NewVersion",
+    "BeginResult",
+    "ConfigVersionStore",
+    "DraftRecord",
+    "ConfigDraftStore",
+    "ConfigAuditRetention",
+    "DocScopeResolver",
+    "BuilderEvalCache",
+    "AccountConfigLevelStore",
+]

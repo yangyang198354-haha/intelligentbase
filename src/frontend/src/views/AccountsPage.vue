@@ -31,7 +31,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 
 import { client } from '../app/env';
-import { ApiClientError, type AccountSummary, type ProjectSummary } from '../api/client';
+import { ApiClientError, type AccountSummary, type ConfigLevel, type ProjectSummary } from '../api/client';
 
 const accounts = ref<AccountSummary[]>([]);
 const projects = ref<ProjectSummary[]>([]);
@@ -40,7 +40,8 @@ const loadError = ref('');
 
 const createVisible = ref(false);
 const createSubmitting = ref(false);
-const createForm = reactive({ username: '', password: '', project_id: '' });
+const createForm = reactive({ username: '', password: '', project_id: '', config_level: 'manage' as ConfigLevel });
+const LEVEL_LABEL: Record<ConfigLevel, string> = { view: '查看', edit: '编辑', manage: '管理' };
 
 const resetVisible = ref(false);
 const resetSubmitting = ref(false);
@@ -89,6 +90,7 @@ function openCreate(): void {
   createForm.username = '';
   createForm.password = '';
   createForm.project_id = projects.value[0]?.project_id ?? '';
+  createForm.config_level = 'manage'; // 默认“管理”（与存量 ops 账号 A01 口径一致）
   createVisible.value = true;
 }
 
@@ -103,6 +105,7 @@ async function submitCreate(): Promise<void> {
       username: createForm.username.trim(),
       password: createForm.password,
       project_id: createForm.project_id.trim(),
+      config_level: createForm.config_level,
     });
     createForm.password = ''; // 立即清空，口令不留驻内存
     createVisible.value = false;
@@ -268,6 +271,12 @@ onMounted(load);
           <span v-else class="ib-muted">全部项目</span>
         </template>
       </el-table-column>
+      <el-table-column label="配置档位" width="100">
+        <template #default="{ row }">
+          <span v-if="row.role === 'admin'" class="ib-muted">全部</span>
+          <span v-else>{{ LEVEL_LABEL[(row.config_level as ConfigLevel) ?? 'manage'] }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
           <el-tag :type="row.status === 'active' ? 'success' : 'danger'" disable-transitions>
@@ -327,6 +336,13 @@ onMounted(load);
               :label="`${p.name}（${p.project_id}）`"
               :value="p.project_id"
             />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="配置档位">
+          <el-select v-model="createForm.config_level" style="width: 100%">
+            <el-option label="查看（只读）" value="view" />
+            <el-option label="编辑（可修改并发布）" value="edit" />
+            <el-option label="管理（默认；另可回滚 / 调整档位）" value="manage" />
           </el-select>
         </el-form-item>
         <p class="ib-muted form-hint">

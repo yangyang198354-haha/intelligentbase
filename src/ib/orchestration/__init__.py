@@ -316,7 +316,13 @@ class Orchestrator:
         tools_by_expert: dict[str, list[Any]] | None = None,
         related_images_provider: Any = None,
         confirmation_prompt_builder: Any = None,
+        view: Any = None,
+        dag: Any = None,
     ) -> None:
+        #: REV-26（IFC-R26-091）：`view` 给定 ⇒ 专家 / 提示词 / 标签一律读该版本视图，不读 `ib.experts` 进程级全局；
+        #: `dag` 给定 ⇒ 用 DAG 编译图执行（`IB_GRAPH_RUNTIME=legacy` 时组合根不传 dag，沿用旧固定拓扑）。
+        self._view = view
+        self._dag = dag
         self._graph = graph
         self._router = router
         self._sessions = sessions
@@ -365,6 +371,10 @@ class Orchestrator:
         from ib.streaming import StreamEvent, completion_event
 
         history = self._load_history(session_key)
+        if self._dag is not None and self._view is not None:
+            # REV-26：自由 DAG 运行时（路由发生在图内的 route 节点；确认门 = 图内 confirm 节点）。
+            yield from self._run_dag_turn(query, session_key=session_key, history=history, resume=not gate)
+            return
         decision = self._decide(query, history=history, scope=self._scope)
 
         # 路由事件（reasoning 折叠框内容；不含内部分工，只给进度感）
@@ -407,7 +417,72 @@ class Orchestrator:
         self._save_history(session_key, history, query, answer, decision)
         # R8（IFC-IB-302）：终态经 `completion_event` 单发（`payload=None` → `data=""`，
         # 与既有 `StreamEvent(DONE)` 逐字节相同；未产出结构化产物即不臆造引用，AC-IB-19-05）。
-        yield completion_event(None)
+        yield completion_event(self._completion_payload())
+
+    def _completion_payload(self) -> Any:
+        """终态载荷：`None` ⇒ `done` 的 data 为空串（既有 SSE 线上契约逐字节不变）。
+
+        仅试运行（`view.version < 0`）在 `done` 里带 `config_version:-1`（IFC-R26-152）；正式回答的绑定版本
+        记在结构化日志 `chat.started` / `chat.completed` 的 `config_version`（运行记录），不改动线上契约。
+        """
+        if self._view is None or int(self._view.version) >= 0:
+            return None
+        from ib.core import CompletionPayload
+
+        return CompletionPayload(citations=(), had_content=True, config_version=int(self._view.version))
+
+    def _run_dag_turn(
+        self, query: str, *, session_key: str, history: Sequence[Message], resume: bool
+    ) -> Iterator[Any]:
+        """DAG 运行时的一轮（REQ-FUNC-011/014/015）：执行 / 续跑 → 汇聚叶子作答 → 单发 content → 终态。
+
+        含 confirm 节点且被挂起：落 `SessionState.gate` + `config_version`（恢复时按该版本取编排器），
+        只发一条 `confirmation_required` + 终态；重启后检查点（进程内）丢失 ⇒ `resume` fail-closed（OQ-R26-A06）。
+        """
+        import uuid
+
+        from ib.observability import log_event
+        from ib.orchestration.dag import resume_dag, run_dag
+        from ib.streaming import StreamEvent, completion_event
+
+        view = self._view
+        dag = self._dag
+        yield StreamEvent(StreamEventKind.REASONING, "正在分析问题…")
+        if resume:
+            outcome = resume_dag(dag, view=view, llm=self._llm, query=query, thread_id=session_key)
+        else:
+            outcome = run_dag(dag, view=view, llm=self._llm, query=query, history=history, thread_id=session_key)
+        if outcome.suspended_at is not None:
+            node = outcome.suspended_at
+            gate_id = f"{session_key}#{node}#{uuid.uuid4().hex[:8]}"
+            gate = ConfirmationGateState(
+                gate_id=gate_id,
+                prompt=ConfirmationPrompt(
+                    gate_id=gate_id, expert_name=node, summary=str(dag.confirm_messages.get(node, ""))
+                ),
+                decision=None,
+            )
+            self._persist_gate(session_key, gate, query=query, config_version=int(view.version))
+            yield from self._gate_suspend_events(gate)
+            return
+        if outcome.unauthorized_tools:
+            log_event("chat", "unauthorized_tool_denied", count=len(outcome.unauthorized_tools),
+                      config_version=int(view.version))
+        collected = list(outcome.results)
+        first_degraded = next((r for r in collected if r.degraded), None)
+        if first_degraded is not None:
+            for event in self._emit_degraded(first_degraded):
+                yield event
+        answer = self._aggregate(query, collected)
+        yield StreamEvent(StreamEventKind.CONTENT, answer)
+        for event in self._related_images_events():
+            yield event
+        answered = next((r.expert for r in collected if r.expert and not r.degraded and r.content), "")
+        self._save_history(
+            session_key, history, query, answer,
+            RouteDecision(experts=[answered] if answered else [], tier=RouteTier.DEFAULT, confidence=0.0),
+        )
+        yield completion_event(self._completion_payload())
 
     def resume(self, session_key: str, payload: dict) -> Iterator[Any]:
         """[IFC-IB-233] 恢复被确认门挂起的会话。
@@ -424,7 +499,8 @@ class Orchestrator:
         """
         from ib.streaming import StreamEvent, completion_event
 
-        if not self._config.confirmation_gate_enabled:
+        dag_confirm = self._dag is not None and bool(getattr(self._dag, "has_confirm", False))
+        if not self._config.confirmation_gate_enabled and not dag_confirm:
             yield StreamEvent(
                 StreamEventKind.ERROR,
                 "确认门未开启（OQ-IB-07 默认关闭），无可恢复的挂起操作",
@@ -540,7 +616,9 @@ class Orchestrator:
         yield StreamEvent(StreamEventKind.ERROR, message)
         yield completion_event(None)
 
-    def _persist_gate(self, session_key: str, gate: ConfirmationGateState, *, query: str) -> None:
+    def _persist_gate(
+        self, session_key: str, gate: ConfirmationGateState, *, query: str, config_version: int = 0
+    ) -> None:
         """把待确认中间态写入会话（保留既有历史；同时记录原提问以便续跑）。
 
         * 既有 `messages` / `last_expert` / `sticky_turns_left` **原样保留**（不因挂起而丢历史）；
@@ -570,6 +648,7 @@ class Orchestrator:
             turns=turns,
             gate=gate,
             updated_at=_now_iso(),
+            config_version=int(config_version),
         )
         try:
             self._sessions.save(session_key, state)
@@ -606,7 +685,13 @@ class Orchestrator:
                 (str(name), self._prompt_of(str(name))) for name in (decision.experts or ())
             ]
 
-        from ib.experts import default_expert, delegating_experts
+        if self._view is not None:
+            # REV-26：专家集取自本版本视图（不读进程级全局）。
+            _view = self._view
+            default_expert = lambda: _view.default_expert  # noqa: E731
+            delegating_experts = lambda: tuple(s.name for s in _view.experts if s.is_delegating)  # noqa: E731
+        else:
+            from ib.experts import default_expert, delegating_experts
 
         # 开启分支：**保留**去重（避免同一专家被重复补入）与上限约束。
         base: list[str] = []
@@ -715,6 +800,10 @@ class Orchestrator:
         try:
             return self._router.classify_experts(query, history=history, scope=scope)
         except Exception:  # noqa: BLE001 - 路由失败不得让问答失败（REQ-FUNC-IB-19）
+            if self._view is not None:
+                return RouteDecision(
+                    experts=[self._view.default_expert], tier=RouteTier.DEFAULT, confidence=0.0
+                )
             from ib.experts import default_expert
 
             return RouteDecision(
@@ -731,6 +820,8 @@ class Orchestrator:
         ADR-48 决定 4）；本函数返回值作为 `system_prompt` 传给 `build_expert`
         （见 `_run_expert`），**真正落进 system 消息位**。
         """
+        if self._view is not None:
+            return str(self._view.prompts.get(expert, ""))  # REV-26：本版本视图的生效提示词（main > fallback）
         from ib.experts import fallback_prompts, get, prompt_bundles
 
         bundle = prompt_bundles().get(expert)
@@ -783,7 +874,7 @@ class Orchestrator:
             text,
             RouteDecision(experts=[], tier=RouteTier.OOD, confidence=0.0),
         )
-        yield completion_event(None)
+        yield completion_event(self._completion_payload())
 
     def _general_answer(self, query: str) -> str:
         try:
@@ -823,6 +914,14 @@ class Orchestrator:
             return ""
         return result.content
 
+    def _strip(self, text: str) -> str:
+        """确定性清洗；有版本视图 ⇒ 禁止词取该版本的专家标签（不读进程级全局）。"""
+        if self._view is None:
+            return _strip_internal_labels(text, self._config)
+        return _strip_internal_labels(
+            text, self._config, labels=forbidden_labels(dict(self._view.cn_labels))
+        )
+
     def _aggregate(self, query: str, results: Sequence[ExpertResult]) -> str:
         """融合多专家结果。**禁止暴露内部分工**（AC-IB-09-03）。
 
@@ -835,21 +934,21 @@ class Orchestrator:
         if not texts:
             return "抱歉，暂时无法从知识库中获取答案，请稍后再试。"
         if len(texts) == 1:
-            return _strip_internal_labels(texts[0], self._config)
+            return self._strip(texts[0])
         joined = "\n\n".join(texts)
         try:
             role = self._llm.build_aggregator()
             impl = getattr(role, "impl", None)
             if impl is None:
-                return _strip_internal_labels(joined, self._config)
+                return self._strip(joined)
             prompt = (
                 "把下面几点融合成一段连贯的回答。要求：不要提及任何内部分工、专家名称或角色；"
                 "重复内容合并；保持事实不变。\n\n" + joined
             )
             merged = _text_of(impl.invoke(prompt) if hasattr(impl, "invoke") else impl(prompt))
-            return _strip_internal_labels(merged or joined, self._config)
+            return self._strip(merged or joined)
         except Exception:  # noqa: BLE001 - 聚合失败时退回「拼接」，不丢内容
-            return _strip_internal_labels(joined, self._config)
+            return self._strip(joined)
 
     def _related_images_events(self) -> Iterator[Any]:
         """产出 `related_images` 事件（**至多一条**；无图 / 无 provider / 出错都不产出）。
@@ -947,8 +1046,13 @@ def build_graph(
     tools_by_expert: dict[str, list[Any]] | None = None,
     related_images_provider: Any = None,
     confirmation_prompt_builder: Any = None,
+    view: Any = None,
+    dag: Any = None,
 ) -> Orchestrator:
     """[IFC-IB-231] 构造并编译编排图，返回可直接 `run()` 的 `Orchestrator`。
+
+    **REV-26（IFC-R26-091，append-only）**：`view`（`ProjectRuntimeView`）给定 ⇒ 专家 / 提示词 / 标签读该版本视图；
+    `dag`（`CompiledDag`）给定 ⇒ 以 DAG 执行（旧固定拓扑图不再编译）；两者缺省 ⇒ 与既有行为逐位一致。
 
     **业务零依赖**：本函数不构造人格文本、不解析身份、不决定 scope ——
     全部由调用方在参数中给出（ADR-09 语义段）。
@@ -976,13 +1080,14 @@ def build_graph(
     from ib.routing import IntentRouter
 
     effective_router = router or IntentRouter(llm_provider=llm, semantic=None)
-    graph = _compile_graph(
+    graph = None if dag is not None else _compile_legacy_graph(
         llm=llm,
         experts=experts,
         tools=list(tools),
         config=config,
         scope=scope,
         tools_by_expert=tools_by_expert or {},
+        view=view,
     )
     orchestrator = Orchestrator(
         graph=graph,
@@ -994,13 +1099,15 @@ def build_graph(
         tools_by_expert=tools_by_expert or {},
         related_images_provider=related_images_provider,
         confirmation_prompt_builder=confirmation_prompt_builder,
+        view=view,
+        dag=dag,
     )
     global _ORCHESTRATOR
     _ORCHESTRATOR = orchestrator
     return orchestrator
 
 
-def _compile_graph(
+def _compile_legacy_graph(
     *,
     llm: Any,
     experts: Any,
@@ -1008,8 +1115,12 @@ def _compile_graph(
     config: GraphConfig,
     scope: Scope,
     tools_by_expert: dict[str, list[Any]],
+    view: Any = None,
 ) -> Any:
-    """编译 StateGraph（route → 条件边 fan-out → expert×N / general → gate → aggregate）。"""
+    """编译旧固定拓扑 StateGraph（route → 条件边 fan-out → expert×N / general → gate → aggregate）。
+
+    REV-26：仅保留作 `IB_GRAPH_RUNTIME=legacy` 的回退与等价性基准（原名 `_compile_graph`，下方保留别名）。
+    """
     try:
         from langgraph.graph import END, START, StateGraph
         from langgraph.types import Send
@@ -1053,7 +1164,7 @@ def _compile_graph(
         非 reducer 键会被 LangGraph 判为冲突而报错 —— 所以步数这类单值状态一律不在
         并行分支里写。
         """
-        return {"expert_results": [_run_expert(payload, llm, tools_by_expert)]}
+        return {"expert_results": [_run_expert(payload, llm, tools_by_expert, view)]}
 
     def _general_node(state: GraphState) -> dict:
         return {
@@ -1102,7 +1213,13 @@ def _compile_graph(
     return builder.compile()
 
 
-def _run_expert(payload: dict, llm: Any, tools_by_expert: dict[str, list[Any]]) -> ExpertResult:
+#: 旧名保留（既有测试 / 调用方按此名导入）。
+_compile_graph = _compile_legacy_graph
+
+
+def _run_expert(
+    payload: dict, llm: Any, tools_by_expert: dict[str, list[Any]], view: Any = None
+) -> ExpertResult:
     """执行一个专家：调用其 LLM 角色，附带该专家被授权工具的能力摘要。
 
     失败语义（严格按要求）：**降级而非抛出** —— 一个专家挂了不该让整轮问答失败，
@@ -1112,9 +1229,12 @@ def _run_expert(payload: dict, llm: Any, tools_by_expert: dict[str, list[Any]]) 
     query = str(payload.get("query", ""))
     prompt = str(payload.get("prompt", ""))
     try:
-        from ib.experts import get
+        if view is not None:
+            spec = next((s for s in view.experts if s.name == expert), None)  # REV-26：本版本视图
+        else:
+            from ib.experts import get
 
-        spec = get(expert)
+            spec = get(expert)
         if spec is None:
             return ExpertResult(
                 expert=expert, content="", degraded=True, degrade_reason="unknown_expert"
@@ -1202,7 +1322,7 @@ def aresume(session_key: str, payload: dict) -> Any:
 # --------------------------------------------------------------------------- #
 
 
-def _strip_internal_labels(text: str, config: GraphConfig) -> str:
+def _strip_internal_labels(text: str, config: GraphConfig, labels: "tuple[str, ...] | None" = None) -> str:
     """确定性清洗：去掉内部分工词汇（AC-IB-09-03 的兜底实现）。
 
     `aggregation_forbids_internal_labels=False` 时不清洗（供「明示分工」的内部调试模式）。
@@ -1212,7 +1332,7 @@ def _strip_internal_labels(text: str, config: GraphConfig) -> str:
     if not config.aggregation_forbids_internal_labels or not text:
         return text
     cleaned = text
-    for label in _active_forbidden_labels():
+    for label in (labels if labels is not None else _active_forbidden_labels()):
         cleaned = cleaned.replace(label, "")
     # 清洗后的多余空白收拢（避免出现「由  负责」这类空洞）
     return "\n".join(" ".join(line.split()) for line in cleaned.split("\n")).strip()

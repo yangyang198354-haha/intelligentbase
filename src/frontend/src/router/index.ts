@@ -32,7 +32,7 @@ import ConsoleLayout from '../layouts/ConsoleLayout.vue';
 import ChatPage from '../views/ChatPage.vue';
 import UploadPage from '../views/UploadPage.vue';
 import RebuildPage from '../views/RebuildPage.vue';
-import ConfigPage from '../views/ConfigPage.vue';
+import ConfigHub from '../views/ConfigHub.vue'; // REV-26：导航入口“可视化配置”→ 编排画布（旧形态项目另有传统表单页签）
 import AccountsPage from '../views/AccountsPage.vue';
 // REV-18（IFC-IB-376 / ADR-42）：系统管理三分 IA 的父级容器与新页面。
 import SystemSection from '../views/SystemSection.vue';
@@ -88,7 +88,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'config',
         name: 'config',
-        component: ConfigPage,
+        component: ConfigHub,
         props: () => ({ client }),
         meta: { title: '可视化配置' },
       },

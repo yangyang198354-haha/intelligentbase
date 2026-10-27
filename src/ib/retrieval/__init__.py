@@ -31,16 +31,22 @@ REQ-FUNC-IB-14/16/17/23；AC-IB-06-02、AC-IB-08-03/04、AC-IB-13-01/02、AC-IB-
 
 from __future__ import annotations
 
+import threading
+import time
 from typing import Any, Callable
 
 from ib.core import (
     DegradeReason,
+    KnowledgeScope,
     PointFilter,
     RetrievalResult,
     RetrievedChunk,
     Scope,
     ToolResult,
 )
+
+#: 目录范围解析结果的进程内缓存时长（秒，[ESTIMATE]；ADR-62）。
+_SCOPE_CACHE_TTL_S = 5.0
 
 __all__ = [
     "RetrievalService",
@@ -76,7 +82,14 @@ class RetrievalService:
         candidate_multiplier: int = 4,
         hot_timeout_s: float = 5.0,
         entry_resolver: Any = None,
+        doc_scope_resolver: Any = None,
+        doc_scope_max_ids: int = 5000,
     ) -> None:
+        #: REV-26（IFC-R26-080）：知识范围解析（目录子树 → doc_id 集合）；None = 不支持范围（按 mode="all" 处理的调用方不受影响）。
+        self._doc_scope_resolver = doc_scope_resolver
+        self._doc_scope_max_ids = max(1, int(doc_scope_max_ids))
+        self._scope_cache: dict[tuple[str, tuple[str, ...]], tuple[float, tuple[str, ...], bool]] = {}
+        self._scope_cache_lock = threading.Lock()
         #: MOD-005：存活解析端口（`resolve_live(project_id, doc_ids) -> Mapping[doc_id, EntryLocation]`）；
         #: None = 不过滤、不回填（基线行为）。
         self._entry_resolver = entry_resolver
@@ -101,19 +114,49 @@ class RetrievalService:
         scope: Scope,
         top_k: int | None = None,
         score_threshold: float | None = None,
+        knowledge: KnowledgeScope | None = None,
     ) -> RetrievalResult:
         """检索。**任何异常都在此被转换为降级结果**，调用方（编排/工具）无需 try。
 
         流程：绑定读路径 collection → 热路径向量化 → 向量查询 → 映射 `RetrievedChunk`。
 
         `top_k` / `score_threshold` 为 `None` 时取构造期配置；显式传入便于专家级调参。
+
+        **REV-26（IFC-R26-080）**：`knowledge` 为 `None` 或 `mode="all"` → 行为与既有逐位一致；
+        `mode="folders"`：空 `folder_ids` → 0 命中且**不查询向量库**（空范围 ≠ 依赖故障，`degraded=False`）；
+        否则经 `doc_scope_resolver` 把目录子树解析为 `doc_ids` 作为 `PointFilter.doc_ids`（`project_id` 恒在）。
         """
         from ib.observability import Timer, log_event
 
         eff_top_k = max(1, int(top_k)) if top_k is not None else self._top_k
         eff_threshold = float(score_threshold) if score_threshold is not None else self._score_threshold
+        scoped = knowledge is not None and knowledge.mode == "folders"
+        doc_filter: tuple[str, ...] | None = None
+        overflow_allowed: frozenset[str] | None = None
+        multiplier = self._candidate_multiplier
 
         with Timer() as timer:
+            if scoped:
+                assert knowledge is not None
+                if not knowledge.folder_ids or self._doc_scope_resolver is None:
+                    # 空范围 / 无解析器：fail-closed 为 0 命中（不查向量库）。
+                    return self._empty_result(scope, timer)
+                try:
+                    ids, truncated = self._resolve_doc_scope(scope.project_id, knowledge.folder_ids)
+                except Exception as exc:  # noqa: BLE001 - 端口契约要求无异常出口
+                    return self._degrade(
+                        scope, DegradeReason.LEDGER_UNAVAILABLE, timer, exc, stage="retrieval"
+                    )
+                if not ids:
+                    return self._empty_result(scope, timer)
+                if truncated:
+                    # 集合过大：不加 doc_ids，候选 ×2，并以已解析（截断后）的集合做后过滤——可能漏召回，但绝不越界。
+                    log_event("retrieval", "doc_scope_overflow", project_id=scope.project_id)
+                    overflow_allowed = frozenset(ids)
+                    multiplier = multiplier * 2
+                else:
+                    doc_filter = ids
+
             # --- 1) 绑定读路径 collection（重建期间读旧版本，AC-IB-16-03） ---
             #  拆成 1a/1b 两段，是为了让**降级原因如实指向失败依赖**（AC-IB-13-02）：
             #  此前这两段共用一个 `except` 并一律报 `vectorstore_unavailable`，于是
@@ -165,17 +208,19 @@ class RetrievalService:
                 candidates = self._vectors.query(
                     vector,
                     scope=scope,
-                    top_k=eff_top_k * self._candidate_multiplier,
+                    top_k=eff_top_k * multiplier,
                     score_threshold=eff_threshold,
                     filter=PointFilter(
                         project_id=scope.project_id,
                         kb_ids=tuple(scope.kb_ids) if scope.kb_ids else None,
-                        doc_ids=None,
+                        doc_ids=doc_filter,
                     ),
                 )
             except Exception as exc:  # noqa: BLE001
                 reason = _reason_of(exc, default=DegradeReason.VECTORSTORE_UNAVAILABLE)
                 return self._degrade(scope, reason, timer, exc, stage="retrieval")
+            if overflow_allowed is not None:
+                candidates = [p for p in candidates if p.payload.doc_id in overflow_allowed]
 
             # --- 3b) 台账存活过滤 + 当前名称/路径回填（MOD-005 / ADR-005；fail-closed） ---
             #  台账是“存活与展示名/路径”的权威：被删除 / 被替换 / 修订行的向量对检索不可见；
@@ -249,6 +294,7 @@ class RetrievalService:
         scope: Scope,
         top_k: int | None = None,
         score_threshold: float | None = None,
+        knowledge: KnowledgeScope | None = None,
     ) -> ToolResult:
         """供 MOD-IB-17 绑定的工具形态：把 `RetrievalResult` 压成**可进 LLM 上下文**的文本。
 
@@ -262,9 +308,12 @@ class RetrievalService:
         由调用方（组合根的工具实现，经 `build_authorized_tools` 注入专家级配置后）给定，
         **原样透传**给 `self.search` —— 本方法不做任何取值裁决。
         """
-        result = self.search(
-            query, scope=scope, top_k=top_k, score_threshold=score_threshold
-        )
+        if knowledge is None:
+            result = self.search(query, scope=scope, top_k=top_k, score_threshold=score_threshold)
+        else:
+            result = self.search(
+                query, scope=scope, top_k=top_k, score_threshold=score_threshold, knowledge=knowledge
+            )
         if result.degraded:
             return ToolResult(
                 ok=True,
@@ -279,6 +328,36 @@ class RetrievalService:
             where = hit.page_or_section or hit.locator or "位置未知"
             lines.append(f"[{index}] {hit.doc_path or hit.doc_name} ({where})\n{hit.content}")
         return ToolResult(ok=True, content="\n\n".join(lines))
+
+    def _resolve_doc_scope(
+        self, project_id: str, folder_ids: tuple[str, ...]
+    ) -> tuple[tuple[str, ...], bool]:
+        """目录子树 → doc_id 集合；进程内 5 s 缓存 `(project_id, folder_ids)`。解析器异常原样上抛（由调用方降级）。"""
+        key = (project_id, tuple(folder_ids))
+        now = time.monotonic()
+        with self._scope_cache_lock:
+            hit = self._scope_cache.get(key)
+            if hit is not None and hit[0] > now:
+                return hit[1], hit[2]
+        ids, truncated = self._doc_scope_resolver.live_doc_ids(  # type: ignore[union-attr]
+            project_id, tuple(folder_ids), limit=self._doc_scope_max_ids
+        )
+        with self._scope_cache_lock:
+            if len(self._scope_cache) > 256:
+                self._scope_cache.clear()
+            self._scope_cache[key] = (now + _SCOPE_CACHE_TTL_S, tuple(ids), bool(truncated))
+        return tuple(ids), bool(truncated)
+
+    def _empty_result(self, scope: Scope, timer: Any) -> RetrievalResult:
+        """空范围的结果：不是降级（依赖都正常，只是范围内没有资料）。"""
+        return RetrievalResult(
+            hits=[],
+            degraded=False,
+            degrade_reason=None,
+            scope=scope,
+            elapsed_ms=getattr(timer, "elapsed_ms", 0),
+            candidate_count=0,
+        )
 
     # ------------------------------------------------------------------ #
     # 降级构造（**单一出口**，避免各处漏填字段）

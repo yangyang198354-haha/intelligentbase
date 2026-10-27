@@ -255,8 +255,11 @@ def test_TC_E2E_R19_003_save_definition_takes_effect_only_after_restart(accounts
     )
     assert put.status_code == 200, put.content
 
-    # ② 未重启：仍在用**既有配置**（图对象未重建；ADR-32 / C-IB-40）
-    assert deps.orchestrator_for("p_alpha") is graph_before, "保存触发了运行期热重载（违反 ADR-32）"
+    # ② REV-26 重新基线（取代 REQ-FUNC-IB-40 / C-IB-40 / ADR-32 的“保存 + 重启后生效”，见 CL-003 与
+    #    requirements_spec 取代登记）：保存即热生效——无需重启，编排器已换成新版本（升级前基线 v1 + 本次 v2）。
+    after = deps.orchestrator_for("p_alpha")
+    assert after is not graph_before, "保存后应已热生效（REV-26 取代“重启后生效”）"
+    assert deps.runtime_for("p_alpha").compiled.version == 2
 
     # ③ 「重启」= 新进程视角：新 store 实例从磁盘读回 → 变更生效
     fresh = FileDefinitionDocumentStore(str(tmp_path), known_tools=known_tool_names())

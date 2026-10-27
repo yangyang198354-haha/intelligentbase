@@ -478,23 +478,24 @@ def completion_payload_json(payload: CompletionPayload) -> str:
     """
     import json
 
-    return json.dumps(
-        {
-            "citations": [
-                {
-                    "doc_id": item.doc_id,
-                    "doc_name": item.doc_name,
-                    "page_or_section": item.page_or_section,
-                    "locator": item.locator,
-                    "score": item.score,
-                    "doc_path": item.doc_path,
-                }
-                for item in payload.citations
-            ],
-            "had_content": bool(payload.had_content),
-        },
-        ensure_ascii=False,
-    )
+    body = {
+        "citations": [
+            {
+                "doc_id": item.doc_id,
+                "doc_name": item.doc_name,
+                "page_or_section": item.page_or_section,
+                "locator": item.locator,
+                "score": item.score,
+                "doc_path": item.doc_path,
+            }
+            for item in payload.citations
+        ],
+        "had_content": bool(payload.had_content),
+    }
+    if int(getattr(payload, "config_version", 0) or 0) != 0:
+        # REV-26：本次回答绑定的配置版本（试运行 = -1）；0（旧路径）时不出该键，既有字节形状不变。
+        body["config_version"] = int(payload.config_version)
+    return json.dumps(body, ensure_ascii=False)
 
 
 def completion_event(payload: CompletionPayload | None = None) -> StreamEvent:

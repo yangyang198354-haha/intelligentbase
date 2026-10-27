@@ -72,6 +72,7 @@ _U_COLUMNS = (
     "locked_until",
     "created_at",
     "updated_at",
+    "config_level",  # REV-26（IFC-R26-053）：由 ensure_schema 探测补列，存量默认 manage
 )
 
 #: `sessions` 表列顺序（与 `_row_to_session` 索引一一对应）。
@@ -141,6 +142,7 @@ def _row_to_user(row: Sequence[Any]) -> UserRecord:
         locked_until=row[8],
         created_at=row[9],
         updated_at=row[10],
+        config_level=row[11] if row[11] in ("view", "edit", "manage") else "view",  # 未知值 fail-closed 为最低档
     )
 
 
@@ -169,6 +171,7 @@ def _u_values(record: UserRecord) -> tuple[Any, ...]:
         record.locked_until,
         record.created_at,
         record.updated_at,
+        record.config_level,
     )
 
 
@@ -605,6 +608,55 @@ class SqliteAccountStore:
             cursor.close()
         return int(changed or 0)
 
+    # --- REV-26 `AccountConfigLevelStore`（与 AccountStore 并列的小端口；13 方法不变） --- #
+
+    def get_config_level(self, user_id: str) -> Any:
+        record = self.get_user(user_id)
+        return None if record is None else record.config_level
+
+    def set_config_level(self, user_id: str, level: Any, *, now: str, audit: Any = None) -> bool:
+        """改档位。`audit` 非空时与审计行**同一事务**写入（同库 config_audit 表；CR-009）：审计写失败 → 回滚档位变更并上抛。"""
+        if level not in ("view", "edit", "manage"):
+            raise ValueError("unknown config level")
+        connection = self._conn()
+        if audit is None:
+            cursor = connection.cursor()
+            try:
+                cursor.execute(
+                    "UPDATE users SET config_level = ?, updated_at = ? WHERE user_id = ?",
+                    (level, now, user_id),
+                )
+                changed = cursor.rowcount
+                connection.commit()
+            finally:
+                cursor.close()
+            return bool(changed)
+        from ib.ledger.config_audit import insert_audit_row
+
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            cur = connection.execute(
+                "UPDATE users SET config_level = ?, updated_at = ? WHERE user_id = ?",
+                (level, now, user_id),
+            )
+            changed = cur.rowcount
+            if changed:
+                insert_audit_row(connection, audit)
+            connection.execute("COMMIT")
+        except BaseException:
+            if connection.in_transaction:
+                connection.execute("ROLLBACK")
+            raise
+        return bool(changed)
+
+    def list_project_levels(self, project_id: str) -> tuple[tuple[str, str, Any, str], ...]:
+        """本项目 ops 账号的 (user_id, username, config_level, status)；admin 不在其中。"""
+        return tuple(
+            (u.user_id, u.username, u.config_level, u.status)
+            for u in self.list_users(project_id)
+            if u.role != "admin"
+        )
+
 
 # --------------------------------------------------------------------------- #
 # 内存实现（IFC-IB-315，离线替身）
@@ -627,6 +679,8 @@ class MemoryAccountStore:
         self._sessions: dict[str, SessionRecord] = {}
         self._max_failures = max(0, int(max_failures))
         self._lock_seconds = max(0, int(lock_seconds))
+        #: REV-26（CR-009）：带审计的权限变更写入的内存审计存储（组合根注入；SQLite 实现与审计表同库同事务）。
+        self._audit_sink: Any = None
 
     def get_user_by_username(self, username: str) -> UserRecord | None:
         with self._lock:
@@ -822,6 +876,36 @@ class MemoryAccountStore:
                 self._sessions[digest] = _replace(session, revoked_at=now)
                 changed += 1
             return changed
+
+    # --- REV-26 `AccountConfigLevelStore` --- #
+
+    def get_config_level(self, user_id: str) -> Any:
+        with self._lock:
+            record = self._users.get(user_id)
+            return None if record is None else record.config_level
+
+    def set_config_level(self, user_id: str, level: Any, *, now: str, audit: Any = None) -> bool:
+        if level not in ("view", "edit", "manage"):
+            raise ValueError("unknown config level")
+        with self._lock:
+            record = self._users.get(user_id)
+            if record is None:
+                return False
+            if audit is not None:
+                # 审计先写：写失败则不改档位（与 SQLite 的同事务回滚等价）。`audit_sink` 由组合根注入。
+                if self._audit_sink is None:
+                    raise DependencyUnavailableError("未配置审计后端，拒绝带审计的权限变更", dependency="ledger")
+                self._audit_sink.record(audit)
+            self._users[user_id] = _replace(record, config_level=level, updated_at=now)
+            return True
+
+    def list_project_levels(self, project_id: str) -> tuple[tuple[str, str, Any, str], ...]:
+        with self._lock:
+            return tuple(
+                (u.user_id, u.username, u.config_level, u.status)
+                for u in sorted(self._users.values(), key=lambda x: x.username)
+                if u.project_id == project_id and u.role != "admin"
+            )
 
 
 # --------------------------------------------------------------------------- #
