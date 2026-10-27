@@ -16,4 +16,5 @@
 ## 待验证
 - [P-DE-001] 往 checklists.txt 追加 [Bn] 时，selfcheck.py（约 :3535）断言子串 "B1–B27" 在文件中：保留旧签署行、另起一行写新项，避免越权改 selfcheck；并建议 software-developer 后续把断言扩到新号 — 自记 2026-10-24 · 证据 R25 E1（selfcheck 实跑仍 53/54）
 - [P-DE-002] 迁移前基线查询不得引用迁移新增的列/表；台账只读查询用 `sudo -u ib-web … file:…?mode=ro`（不用 root）；远端 `pgrep -f` 会匹配 ssh 命令自身，用 `[i]bweb` 括号写法 — 自记 2026-10-24 · 证据 R25 E1 计划推演
+- [P-DE-004] 改 ci.yml 迁移门后，用 yaml.safe_load 抽出该 step 的 run 脚本、在 venv 里原样执行，再对副本做反例变异（如删 IF NOT EXISTS）确认门会失败；热生效探针 hot_effect_probe.py 只核对版本一致与耗时分布，不测"发布到生效"的收敛时间，计划中须如实写明边界；目标机跑 selfcheck 用 git archive 的临时导出，避免在部署树写文件 — 自记 2026-10-27 · 证据 R26 E1
 - [P-DE-003] 远端命令要用本地变量：`ssh host bash -s -- "$A" "$B" <<'EOF'`（heredoc 单引号定界，远端用 $1 $2），比双引号转义稳；markdown 里嵌在列表项中的 heredoc 代码块要顶格，否则粘贴时 EOF/python 缩进失效 — 自记 2026-10-24 · 证据 R25 E1 自检

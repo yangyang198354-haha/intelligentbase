@@ -26,4 +26,10 @@
 - [P-SD-001] 检索接入“台账存活过滤”后，凡是直接 upsert 向量点而不建台账行的夹具（selfcheck `isolation_scope_required` 的 d1）会被判不存活而召回 0；夹具需补一条存活台账行，并成对断言“全不存活=不降级且空 / 解析故障=LEDGER_UNAVAILABLE” — 自记 2026-10-24 · 证据 selfcheck retrieval_happy_path 改动前失败
 - [P-SD-002] 给端口 Protocol 已有方法加可选关键字参数时，同步改 `ib/core/ports.py` 的签名，否则 selfcheck `port_conformance`（按参数名集合比对）会失败；新增响应键（如 doc_path）要同步 selfcheck/测试里按“精确键集”的断言 — 自记 2026-10-24 · 证据 list_documents(include_revisions)、related_images 键集
 - [P-SD-004] 想验证“修复前行为”时，不要对工作区文件 `git stash`（会连同未提交的其他增量一并收走）；改用测试内 `monkeypatch` 把新增的模块级常量置回旧值重放 — 自记 2026-10-24 · 证据 DEF-R25-001 修复轮（REDIRECT_REBUILD_STATES）
+- [P-SD-005] LangGraph 汇聚：边跨层不等时汇聚节点会被触发多次，必须“最长路径定层 + 跨层边插无操作中继”才恰好一次；检查点(MemorySaver)状态里放自定义 dataclass 会触发“Deserializing unregistered type”将被阻断的告警，状态只放原语 dict — 自记 2026-10-27 · 证据 tests/integration/test_langgraph_contract_r26.py（含反证用例）
+- [P-SD-006] 给 ConfigAuditEntry / UserRecord / users 表这类已有“字段集或列集精确断言”的结构追加字段，会让 test_TC_UNIT_125、test_TC_INT_122 失败；追加前先 grep 这类断言，调整时只放行已登记的追加名（如 USERS_ADDED_COLUMNS） — 自记 2026-10-27 · 证据 REV-26 MOD-R26-06
+- [P-SD-007] 测试里常用 `OpenAiCompatibleProvider.__new__` 绕过 `__init__` 并手设 `_clients={}`：给该类加新实例属性/改容器类型时用 getattr 默认值与 hasattr 兜底，否则 test_prompt_system_slot_r17 两例失败 — 自记 2026-10-27 · 证据 llm 有界 LRU 改动首轮失败
+- [P-SD-008] 给组合根装配的服务传存储时用“按调用时解析”的代理（如 `_LiveDefinitionStore`）而非装配期捕获实例：离线/测试会整体替换 `deps.definition_store`，捕获旧实例会写到无人读取的存储 — 自记 2026-10-27 · 证据 REV-26 发布服务首轮 e2e 失败
+- [P-SD-009] 版本时间戳必须与存储里 `_age_s` 解析格式一致（`utc_now_iso` 的 `Z` 定长）；格式不符会被判“永远陈旧”而误回收他人的 pending — 自记 2026-10-27 · 证据 ledger/config_versions.py `_age_s`
+- [P-SD-010] 精确键集断言的既有契约测试（GET definition / 审计项 / SSE done 数据）在加字段前先 grep；能不动线上契约就不动（done 仅试运行带版本），必须动的逐条在计划里登记取代依据 — 自记 2026-10-27 · 证据 REV-26 重新基线 8 处
 - [P-SD-003] 无 django/pytest 的机器上，可在 scratchpad 放 stub 的 rest_framework/django.http + 假 request 对象驱动视图函数做冒烟（不入库、不算测试），能抓出序列化/错误映射类缺陷；PUT multipart 解析等 Django 特有路径仍须标未验证 — 自记 2026-10-24 · 证据 library_views 冒烟

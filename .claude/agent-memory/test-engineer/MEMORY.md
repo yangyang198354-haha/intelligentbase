@@ -18,3 +18,7 @@
 - [P-TE-002] 重建共存类用例：`RebuildService.step_rebuild` 把任务置 succeeded 后写路径不再重定向到目标版本（IN_FLIGHT_REBUILD_STATES 仅 planned/running）；测"重建在途"要在 start_rebuild + process_pending 之后、不调 step_rebuild；succeeded 未激活窗口是已登记缺陷窗口 — 自记 2026-10-24 · 证据 DEF-R25-001 / TC-INT-R25-055
 - [P-TE-003] 可控时钟只能替换各模块已导入的 `utc_now_iso`；`iso_plus_seconds`（批次 expires_at）用真实墙钟，TTL 类用例应把时钟起点设为真实当前时间或给 purge_expired 传显式 now_iso — 自记 2026-10-24 · 证据 TC-UNIT-R25-106/110
 - [P-TE-004] 测 start_rebuild 的“不同目标版本冲突”：plan_rebuild 恒取 active+1，succeeded 窗口内只会得到同版本（幂等）；要构造不同版本须 dataclasses.replace(plan, to_version=..., target_collection=...)，HTTP 端点无法构造 — 自记 2026-10-24 · 证据 TC-INT-R25-057
+- [P-TE-005] 新增 `_r26` 等测试里的中文样例词会撞上全仓扫描用例 test_TC_UNIT_122（旧 cn_label 退役词，如“知识库”+“问答”连写）；样例提问避开该连写，整层 unit 才不会被自己新写的文件打红 — 自记 2026-10-27 · 证据 tests/unit/test_prompt_tool_config_unit_r16d.py:459 / test_config_publish_api_r26.py
+- [P-TE-006] 观察“哪个 agent 以什么提示词作答”：在 FakeLlmProvider 实例上包装 `build_expert`（monkeypatch 测试替身实例，非被测模块）记录 (spec.name, system_prompt)；DAG 内部 trace 则直接用 `run_dag(lease.compiled.dag, …)` 的 DagOutcome.trace；同一 session_key 会带历史影响路由，断言路由时每问用不同 session — 自记 2026-10-27 · 证据 tests/config_r26_support.py::ExpertRecorder / test_dag_execution_r26.py
+- [P-TE-007] 故障注入测发布协议：替身的写失败必须是“一次性”故障，否则还原写入同样失败而掩盖被测的还原逻辑；v1 旧项目首次发布失败后 head 停在基线 v1（非 0），失败用例的“在用版本不变”应在已发布到 head≥2 的环境里断言 — 自记 2026-10-27 · 证据 test_publish_protocol_r26.py TC-UNIT-R26-127/141
+- [P-TE-008] 后台长跑 pytest 时，scratchpad 里同名旧日志会被误读成本次结果（曾见与开发自验证逐字相同的计数）：日志用唯一文件名，等待条件用 `-nt` 比较 mtime，且不要用会匹配自身命令行的 `pgrep -f` — 自记 2026-10-27 · 证据 本次复测 int.log 误读
