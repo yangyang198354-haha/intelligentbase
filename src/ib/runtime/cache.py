@@ -100,15 +100,17 @@ class ProjectRuntimeCache:
         entry = self._entry(project_id)
         if entry.current is None:
             self._cold_compile(project_id, entry)
-        else:
-            now = self._clock()
-            if now - entry.last_check >= self._interval:
-                entry.last_check = now
-                head = self._read_head(project_id)
-                if head is not None and head.published_version > 0 and head.published_version != entry.current.version:
-                    self.refresh_async(project_id)
-        assert entry.current is not None
-        return RuntimeLease(entry.current)
+            assert entry.current is not None
+            return RuntimeLease(entry.current)
+        # 先记快照再触发后台编译：本次调用只绑定触发前的版本，不受编译线程时序影响。
+        snap = entry.current
+        now = self._clock()
+        if now - entry.last_check >= self._interval:
+            entry.last_check = now
+            head = self._read_head(project_id)
+            if head is not None and head.published_version > 0 and head.published_version != snap.version:
+                self.refresh_async(project_id)
+        return RuntimeLease(snap)
 
     def acquire_version(self, project_id: str, version: int) -> RuntimeLease:
         entry = self._entry(project_id)

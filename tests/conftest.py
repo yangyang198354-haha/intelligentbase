@@ -62,6 +62,20 @@ OFFLINE_RAW: dict = {
 }
 
 
+@pytest.fixture(autouse=True)
+def _fast_bcrypt(monkeypatch):
+    """测试内把 bcrypt 成本因子降到 4（仅测试生效，生产仍用默认 12）。
+
+    成本因子内嵌在摘要里，verify 会自动按摘要里的强度校验，因此无需改生产代码。
+    """
+    try:
+        import bcrypt
+    except ImportError:
+        return
+    real = bcrypt.gensalt
+    monkeypatch.setattr(bcrypt, "gensalt", lambda rounds=4, prefix=b"2b": real(rounds=4, prefix=prefix))
+
+
 def offline_raw() -> dict:
     """每次返回一份**深拷贝**，避免用例之间共享可变配置字典。"""
     import copy

@@ -936,6 +936,15 @@ describe('R25 前端冒烟：资料库目录式界面', () => {
 const r26dir = join(root, 'src', 'components', 'config');
 const r26 = (f) => stripComments(readText(join(r26dir, f)));
 
+// Node 20 无类型剥离：用工程已有的 typescript 转译为 ESM，经 data: URL 导入（与 config_studio_r26.test.js 同法；graphModel.ts 仅有 type 导入，转译后被擦除）
+const loadGraphModel = async () => {
+  const { default: ts } = await import('typescript');
+  const js = ts.transpileModule(readText(join(r26dir, 'graphModel.ts')), {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
+};
+
 describe('REV-26 前端冒烟：graphModel 纯函数（离线可跑）', () => {
   let m;
   const graph = () => ({
@@ -955,7 +964,7 @@ describe('REV-26 前端冒烟：graphModel 纯函数（离线可跑）', () => {
     new Map([['kb-agent', { name: 'kb-agent', cn_label: '知识库助手', is_default: true, tool_names: ['search_knowledge'], prompt_main_present: true, prompt_main_head: '你是知识库助手' }]]);
 
   it('46. 悬停卡片模型：agent 含标签 / name / 默认 / 工具 / 提示词存在；无工具显示“无”', async () => {
-    m = await import('../src/components/config/graphModel.ts');
+    m = await loadGraphModel();
     const g = graph();
     const card = m.buildHoverCardModel(g.nodes[2], agents());
     assert.equal(card.title, '知识库助手');
@@ -968,7 +977,7 @@ describe('REV-26 前端冒烟：graphModel 纯函数（离线可跑）', () => {
   });
 
   it('47. 连线预校验 / 位置 / 删除：不可指入开始、不可自环、不可重复；节点删除统计受影响边数', async () => {
-    m = await import('../src/components/config/graphModel.ts');
+    m = await loadGraphModel();
     const g = graph();
     assert.equal(m.precheckConnection(g, 'kb-agent', 'start').ok, false);
     assert.equal(m.precheckConnection(g, 'kb-agent', 'kb-agent').ok, false);
@@ -984,7 +993,7 @@ describe('REV-26 前端冒烟：graphModel 纯函数（离线可跑）', () => {
   });
 
   it('48. 节点面板只含受限节点类型（无代码 / 表达式节点）', async () => {
-    m = await import('../src/components/config/graphModel.ts');
+    m = await loadGraphModel();
     assert.deepEqual([...m.ADDABLE_KINDS].sort(), ['agent', 'condition', 'confirm', 'join', 'route']);
   });
 });
