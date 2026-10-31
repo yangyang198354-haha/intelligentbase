@@ -128,7 +128,7 @@ class EmbedService:
     （C5：离线单测不得联网；且 `port_conformance` 式的对拍需要直接调用语义层）。
     """
 
-    def __init__(self, cfg: EmbedConfig, runtime: RuntimePort) -> None:
+    def __init__(self, cfg: EmbedConfig, runtime: RuntimePort, *, warm: bool = False) -> None:
         self._cfg = cfg
         self._runtime = runtime
         #: 有界并发：同时进入**推理**的请求数。
@@ -136,7 +136,8 @@ class EmbedService:
         self._lock = threading.Lock()
         self._admitted = 0
         self._inflight = 0
-        self._warm = False
+        #: 启动预热成功即为 True（见 `_startup_warmup`）；否则首个成功请求后置 True。
+        self._warm = bool(warm)
         self._last_elapsed_ms = 0
 
     # --- 容量与可观测（AC-IB-13-02：降级必须可观测）--- #
@@ -469,17 +470,29 @@ _INVALID = _Invalid()
 
 
 def build_http_server(
-    cfg: EmbedConfig, runtime: RuntimePort, *, host: str | None = None, port: int | None = None
+    cfg: EmbedConfig,
+    runtime: RuntimePort,
+    *,
+    host: str | None = None,
+    port: int | None = None,
+    warm: bool = False,
 ) -> ThreadingHTTPServer:
     """构造（未启动的）HTTP 服务器；`port=0` 时由内核分配（离线冒烟测试用）。"""
-    service = EmbedService(cfg, runtime)
+    service = EmbedService(cfg, runtime, warm=warm)
     httpd = ThreadingHTTPServer((host or cfg.host, cfg.port if port is None else port), _handler_factory(service))
     httpd.daemon_threads = True
     return httpd
 
 
-def serve(cfg: EmbedConfig, runtime: RuntimePort, *, host: str | None = None, port: int | None = None) -> None:
-    httpd = build_http_server(cfg, runtime, host=host, port=port)
+def serve(
+    cfg: EmbedConfig,
+    runtime: RuntimePort,
+    *,
+    host: str | None = None,
+    port: int | None = None,
+    warm: bool = False,
+) -> None:
+    httpd = build_http_server(cfg, runtime, host=host, port=port, warm=warm)
     logger.info(
         "ib-embed 启动 host=%s port=%s model_id=%s dim=%s max_concurrency=%s queue_depth=%s",
         host or cfg.host,
@@ -496,19 +509,20 @@ def serve(cfg: EmbedConfig, runtime: RuntimePort, *, host: str | None = None, po
 WARMUP_TEXTS: tuple[str, ...] = ("warmup", "预热")
 
 
-def _startup_warmup(runtime: RuntimePort, cfg: EmbedConfig) -> None:
+def _startup_warmup(runtime: RuntimePort, cfg: EmbedConfig) -> bool:
     """启动后、开始监听前，在主线程跑一次真实推理。
 
     目标机 CPU（Ivy Bridge，仅 AVX）上曾出现 MKL 选中 AVX-512 内核导致 SIGILL（REV-27 排查）。
     预热让这类问题在启动期暴露：崩了由 systemd 重启，而不是在首个用户请求时崩。
-    预热失败（非崩溃）只记日志，不阻止启动。
+    预热失败（非崩溃）只记日志，不阻止启动。返回是否预热成功（决定 /healthz 的 warm）。
     """
     try:
         runtime.embed(list(WARMUP_TEXTS), batch_size=len(WARMUP_TEXTS), max_tokens=cfg.max_tokens)
     except Exception as exc:  # noqa: BLE001 - 预热失败不阻止启动，/embed 照常按契约报错
         logger.warning("启动预热失败 code=warmup_failed exc=%s", type(exc).__name__)
-        return
+        return False
     logger.info("启动预热完成")
+    return True
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -539,6 +553,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     runtime = load_runtime(cfg)
+    warm = False
     try:
         runtime.load()
     except InferenceUnavailable as exc:
@@ -558,9 +573,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 flush=True,
             )
             return 3
-        _startup_warmup(runtime, cfg)
+        warm = _startup_warmup(runtime, cfg)
 
-    serve(cfg, runtime, host=args.host, port=args.port)
+    serve(cfg, runtime, host=args.host, port=args.port, warm=warm)
     return 0
 
 

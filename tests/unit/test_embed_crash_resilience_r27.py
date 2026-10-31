@@ -82,7 +82,7 @@ def test_ib_embed_startup_warmup_runs_inference_and_tolerates_failure(caplog):
         def embed(self, texts, *, batch_size, max_tokens):
             seen.append(list(texts))
 
-    server._startup_warmup(_Ok(), cfg)
+    assert server._startup_warmup(_Ok(), cfg) is True
     assert seen == [list(server.WARMUP_TEXTS)]
 
     class _Broken:
@@ -90,6 +90,18 @@ def test_ib_embed_startup_warmup_runs_inference_and_tolerates_failure(caplog):
             raise RuntimeError("boom")
 
     caplog.set_level("WARNING")
-    server._startup_warmup(_Broken(), cfg)  # 不抛出
+    assert server._startup_warmup(_Broken(), cfg) is False  # 不抛出
     assert any("warmup_failed" in r.getMessage() for r in caplog.records)
     assert not any("boom" in r.getMessage() for r in caplog.records)
+
+
+def test_ib_embed_healthz_reports_warm_after_startup_warmup():
+    from ib_embed.config import load_config
+    from ib_embed.runtime import FakeRuntime
+    from ib_embed.server import EmbedService
+
+    cfg = load_config({"IB_EMBED_MODEL_PATH": "/opt/bge-m3", "IB_EMBED_MODEL_ID": "fake-bge-m3"})
+    runtime = FakeRuntime()
+    runtime.load()
+    assert EmbedService(cfg, runtime).healthz().body["warm"] is False
+    assert EmbedService(cfg, runtime, warm=True).healthz().body["warm"] is True
