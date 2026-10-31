@@ -1,4 +1,4 @@
-<phase_status project="intelligentbase" mode="INCREMENTAL" created="2026-10-31T09:38:25+08:00" updated="2026-10-31T15:52:33+08:00">
+<phase_status project="intelligentbase" mode="INCREMENTAL" created="2026-10-31T09:38:25+08:00" updated="2026-10-31T16:15:08+08:00">
   <request><![CDATA[在可视化配置页面，当我新增一个节点，比如agent，路由，分支等等尚未完整编辑，没有通过校验。只有一个放弃改动按钮放弃添加的所有东西。我需要一个能放弃或者说删除一个节点的功能。先整理需求和用户故事。确认后开始开发。]]></request>
   <revision>REV-27</revision>
   <scope>本轮（调用方指定）只执行 GROUP_A（PHASE_01、PHASE_02），以现有代码为基线；GROUP_A 门控后写检查点停止，用户确认用户故事后再进入 GROUP_B。</scope>
@@ -16,8 +16,8 @@
     <group id="GROUP_D" agent="test-engineer" status="APPROVED" gate_decision="PASS_WITH_CONDITIONS" retries="0" defect_loops="0">
       <phase id="PHASE_07" status="APPROVED"/><phase id="PHASE_08" status="APPROVED"/><phase id="PHASE_09" status="APPROVED"/>
     </group>
-    <group id="GROUP_E1" agent="devops-engineer" status="PENDING" gate_decision="PENDING" retries="0">
-      <phase id="PHASE_10" status="PENDING"/><phase id="PHASE_11a" status="PENDING"/>
+    <group id="GROUP_E1" agent="devops-engineer" status="APPROVED" gate_decision="PASS_WITH_CONDITIONS" retries="0">
+      <phase id="PHASE_10" status="APPROVED"/><phase id="PHASE_11a" status="APPROVED"/>
     </group>
     <group id="GROUP_E2" agent="devops-engineer" status="NOT_AUTHORIZED" environment=""/>
   </groups>
@@ -34,6 +34,8 @@
     <artifact path="docs/sdlc/intelligentbase/unit_test_report.md" version="1.0.0" status="APPROVED" group="GROUP_D"/>
     <artifact path="docs/sdlc/intelligentbase/integration_test_report.md" version="1.0.0" status="APPROVED" group="GROUP_D"/>
     <artifact path="docs/sdlc/intelligentbase/e2e_test_report.md" version="1.0.0" status="APPROVED" group="GROUP_D"/>
+    <artifact path="docs/sdlc/intelligentbase/cicd_pipeline.md" version="1.0.0" status="APPROVED" group="GROUP_E1"/>
+    <artifact path="docs/sdlc/intelligentbase/deployment_plan.md" version="1.0.0" status="APPROVED" group="GROUP_E1"/>
   </artifacts>
   <legacy_baseline>REV-26 已批准产物（archive/rev26/ 副本；原位文件 architecture_design.md / module_design.md 等在 GROUP_B 重写前作为基线只读）；本轮需求基线以现有代码为准。</legacy_baseline>
   <invocations>
@@ -43,6 +45,7 @@
     <invocation id="intelligentbase-R27-GROUP_B-003" agent="system-architect" start="2026-10-31T15:17:13+08:00" end="2026-10-31T15:28:12+08:00" result="SUCCESS"/>
     <invocation id="intelligentbase-R27-GROUP_C-001" agent="software-developer" start="2026-10-31T15:28:12+08:00" end="2026-10-31T15:34:35+08:00" result="SUCCESS"/>
     <invocation id="intelligentbase-R27-GROUP_D-001" agent="test-engineer" start="2026-10-31T15:34:35+08:00" end="2026-10-31T15:52:33+08:00" result="SUCCESS"/>
+    <invocation id="intelligentbase-R27-GROUP_E1-001" agent="devops-engineer" start="2026-10-31T16:09:12+08:00" end="2026-10-31T16:15:08+08:00" result="SUCCESS"/>
   </invocations>
   <gate_reviews>
     <gate_review id="GR-A-001" invocation_id="intelligentbase-R27-GROUP_A-001" decision="PASS_WITH_CONDITIONS" time="2026-10-31T09:45:04+08:00">
@@ -107,9 +110,27 @@ backend 未改动，未复跑 pytest / selfcheck]]></verification>
 grep -cE "\.skip|\.todo|skip:|todo:" src/frontend/tests/config_studio_r27.test.js -> 0
 ls -l --time-style=full-iso: tests 15:41:01/15:42:31 < reports 15:47:02~15:49:21; product src 15:29:19~15:30:42]]></verification>
     </gate_review>
+    <gate_review id="GR-E1-001" invocation_id="intelligentbase-R27-GROUP_E1-001" decision="PASS_WITH_CONDITIONS" time="2026-10-31T16:15:08+08:00">
+      <reviewed_files><file path="docs/sdlc/intelligentbase/cicd_pipeline.md" version="0.1.0"/><file path="docs/sdlc/intelligentbase/deployment_plan.md" version="0.1.0"/></reviewed_files>
+      <criterion id="J-E1 齐全" result="SATISFIED">两份文档存在，0.1.0 DRAFT；ci.yml 未改（git status 无 ci.yml）</criterion>
+      <criterion id="J-E1 DEPLOY/ROLLBACK" result="SATISFIED">DEPLOY-001 git pull --ff-only / 002 备份 web root + 目标机构建 + 拷贝 / 003、004 条件重启（缺省不执行）；ROLLBACK-001a/001b/002/003/004 + web root 紧急还原；M-08 测试项目写入标 [MANUAL_ROLLBACK_REQUIRED]（deployment_plan.md:320）</criterion>
+      <criterion id="J-E1 预检" result="SATISFIED">PRE-00~06；PRE-01 实测目标机 HEAD 作回滚锚点，不假定 REV-26 已部署；PRE-02 按 HEAD..1dde3d4 差异分 CLASS-A/B/C 门控</criterion>
+      <criterion id="J-E1 禁用项与本地状态" result="SATISFIED">scp/rsync/sudo -S 只出现在禁止说明（:77、:207）；无 reset --hard/clean/stash（:40、:235）；不触碰 /etc/intelligentbase/*.env、/var/lib/intelligentbase/、venv、node_modules（:235）；无 daemon-reload/nginx reload</criterion>
+      <criterion id="J-E1 环境与策略" result="SATISFIED">仅 production，recreate，前端不重启服务（画像 P7 / SKILL.md §6）</criterion>
+      <criterion id="J-E1 部署后验证" result="SATISFIED">V-01~V-09；V-06 人工浏览器验收 M-01/03/06/07/08 必做、V-07 目标机 1 秒校准</criterion>
+      <finding id="GR-E1-001-F01" severity="MINOR">cicd_pipeline 记"1dde3d4 在 src/frontend/src 下 6 改 1 新"有误：PM 用 git show --name-status 核得 5 M + 2 A（nodeRemoval.ts、publishDiff.ts 均为新增），即 PM 原口径正确。下次修订 cicd_pipeline 时更正，不影响部署步骤。</finding>
+      <finding id="GR-E1-001-F02" severity="MINOR">PM 核实 git diff --stat bb3ac4b 1dde3d4 -- src 确含 src/ib/runtime/cache.py（20 行，来自 6bfdef4），"纯前端发布"可能夹带后端文件；PRE-02 CLASS-B 处置合理。</finding>
+      <condition>E2 前：CI 已绿（见 verification）；PRE-02 若判为 CLASS-B，须用户在三选一中裁决（先单独发布后端 / 授权 INCLUDE_BACKEND_RESTART=true / 接受盘上代码领先进程）；CLASS-C 则停止并回到 REV-26 计划。</condition>
+      <condition>E2 只能在主会话模式由用户本轮明确授权（PRODUCTION_DEPLOY_CONFIRM=true，production，DEPLOY_COMMIT=1dde3d45e6e58df2c410593a9ba1d8d3d5e7ed6d）；部署后 V-06 人工验收 critical path 5 条通过才闭合 GR-D-001 条件。</condition>
+      <verification><![CDATA[git show --name-status --format= 1dde3d4 -- src/frontend/src -> 5 M + 2 A (nodeRemoval.ts, publishDiff.ts)
+git diff --stat bb3ac4b 1dde3d4 -- src | grep -v frontend -> src/ib/runtime/cache.py | 20 +-
+gh run view 41183387985 --json status,conclusion -> completed success  (CI for 1dde3d4, checked after devops' 16:09 in_progress snapshot)
+git status --short -> only cicd_pipeline.md, deployment_plan.md, phase_status.md, devops-engineer MEMORY.md modified; ci.yml unchanged]]></verification>
+    </gate_review>
   </gate_reviews>
   <clarifications>
     <clarification id="CL-001" answered_by="用户（经主会话转述）" time="2026-10-31T14:17:52+08:00">CP-001 用户原话「1A 2A 3A 4 A」。Q1=A：确认 US-001~011，OQ-R27-01~10 与 INF-1~3 全部按推荐；Q2=A：通用"删除节点"/Delete 键对 agent = 仅从画布移除，"删除 agent"留在详情面板；Q3=A：以 R26 软删/历史保留为准，改确认文案，架构阶段核对服务端提示词文件处置；Q4=A：用户口头确认 REV-26 已在别处部署完成，未提供部署时间/版本等细节，PM 未核验、未访问生产机。调用方转述用户最初要求"确认后开始开发"：续跑 GROUP_B→C→D，不部署、不 commit。</clarification>
+    <clarification id="CL-002" answered_by="用户（经主会话转述）" time="2026-10-31T16:09:12+08:00">CP-002 用户原话「1A 2B」。Q1=A：继续 GROUP_E1（CI/CD + 部署计划），不执行部署；Q2=B：commit 并 push——主会话已执行 commit 1dde3d4 并 push origin/main（c1b491f..1dde3d4）。PM 核实：git log HEAD=1dde3d4，origin/main=1dde3d45e6e58df2c410593a9ba1d8d3d5e7ed6d，工作区干净。E1 新产出留在工作区不提交。</clarification>
   </clarifications>
   <checkpoints>
     <checkpoint id="CP-001" time="2026-10-31T09:45:04+08:00" group="GROUP_A" reason="GROUP_A 已批准；按调用范围停在用户确认用户故事与开放问题之前" status="ANSWERED">
@@ -118,7 +139,7 @@ ls -l --time-style=full-iso: tests 15:41:01/15:42:31 < reports 15:47:02~15:49:21
       <question id="Q3" blocking="false">OQ-R27-07（冲突点 X1）删除 agent 定义时提示词文件：A) 以 R26 软删/历史保留为准，改文案，架构阶段核对服务端（推荐）；B) 以现文案为准，提示词文件一并移除。</question>
       <question id="Q4" blocking="false">REV-26 收尾：旧状态文件里 E2 生产部署仍为 PENDING。A) 已在别处部署完成，按已收尾处理（请告知）；B) 尚未部署，REV-27 开发完后一起部署（推荐）；C) 先单独部署 REV-26（须在主会话 claude --agent pm-orchestrator 中授权）。</question>
     </checkpoint>
-    <checkpoint id="CP-002" time="2026-10-31T15:52:33+08:00" group="GROUP_D" reason="调用方指定范围 B→C→D 已完成；E1（CI/部署计划）与提交需用户决定" status="OPEN">
+    <checkpoint id="CP-002" time="2026-10-31T15:52:33+08:00" group="GROUP_D" reason="调用方指定范围 B→C→D 已完成；E1（CI/部署计划）与提交需用户决定" status="ANSWERED">
       <question id="Q1" blocking="true">下一步：A) 继续 GROUP_E1，产出 CI 与部署计划（仅前端重建、不重启服务），不执行部署（推荐）；B) 先在本地/目标机按 e2e_test_report 人工验收清单 M-01~M-08 验收，再决定；C) 到此为止。</question>
       <question id="Q2" blocking="false">提交：A) 由主会话在用户确认后 commit（含 archive/rev26/、REV-27 文档、7 个前端源文件、2 个测试文件、agent 记忆），不 push（推荐，待部署时再 push）；B) commit 并 push；C) 暂不提交。</question>
     </checkpoint>
@@ -142,5 +163,9 @@ ls -l --time-style=full-iso: tests 15:41:01/15:42:31 < reports 15:47:02~15:49:21
     <event time="2026-10-31T15:34:35+08:00" type="INVOCATION" actor="pm-orchestrator">调用 test-engineer（intelligentbase-R27-GROUP_D-001，PHASE_07,PHASE_08,PHASE_09）。</event>
     <event time="2026-10-31T15:52:33+08:00" type="GATE" actor="pm-orchestrator">GR-D-001 PASS_WITH_CONDITIONS；四份测试文档 0.1.0→1.0.0 APPROVED。PM 复跑前端 129/129、后端 910 passed。收件箱已有 hook 记录。critical path 待人工验证 5 条。</event>
     <event time="2026-10-31T15:52:33+08:00" type="RUN" actor="pm-orchestrator">按调用方范围（B→C→D）停止，写检查点 CP-002；未调用 E1/E2，未部署、未 commit。</event>
+    <event time="2026-10-31T16:09:12+08:00" type="RUN" actor="pm-orchestrator">续跑（子代理模式）：CP-002 改 ANSWERED，记 CL-002；主会话已提交并推送 1dde3d4（PM 核实 HEAD=origin/main，工作区干净）。</event>
+    <event time="2026-10-31T16:09:12+08:00" type="INVOCATION" actor="pm-orchestrator">调用 devops-engineer（intelligentbase-R27-GROUP_E1-001，PHASE_10,PHASE_11a）；E2 NOT_AUTHORIZED。</event>
+    <event time="2026-10-31T16:15:08+08:00" type="GATE" actor="pm-orchestrator">GR-E1-001 PASS_WITH_CONDITIONS；cicd_pipeline / deployment_plan 0.1.0→1.0.0 APPROVED（REV-26 版本在 archive/rev26/）。CI run 41183387985（1dde3d4）completed success。</event>
+    <event time="2026-10-31T16:15:08+08:00" type="DEPLOY_AUTH" actor="pm-orchestrator">子代理模式：流程止于 E1，不调用 E2；GROUP_E2 保持 NOT_AUTHORIZED。部署须用户在主会话模式（claude --agent pm-orchestrator）本轮授权。delivery_report 与 PHASE_12 蒸馏待部署与人工验收后执行。</event>
   </audit_log>
 </phase_status>
