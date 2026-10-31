@@ -492,6 +492,25 @@ def serve(cfg: EmbedConfig, runtime: RuntimePort, *, host: str | None = None, po
     httpd.serve_forever()
 
 
+#: 启动预热用的固定短文本（无业务含义，不进日志）。
+WARMUP_TEXTS: tuple[str, ...] = ("warmup", "预热")
+
+
+def _startup_warmup(runtime: RuntimePort, cfg: EmbedConfig) -> None:
+    """启动后、开始监听前，在主线程跑一次真实推理。
+
+    目标机 CPU（Ivy Bridge，仅 AVX）上曾出现 MKL 选中 AVX-512 内核导致 SIGILL（REV-27 排查）。
+    预热让这类问题在启动期暴露：崩了由 systemd 重启，而不是在首个用户请求时崩。
+    预热失败（非崩溃）只记日志，不阻止启动。
+    """
+    try:
+        runtime.embed(list(WARMUP_TEXTS), batch_size=len(WARMUP_TEXTS), max_tokens=cfg.max_tokens)
+    except Exception as exc:  # noqa: BLE001 - 预热失败不阻止启动，/embed 照常按契约报错
+        logger.warning("启动预热失败 code=warmup_failed exc=%s", type(exc).__name__)
+        return
+    logger.info("启动预热完成")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """入口（systemd `ExecStart=... -m ib_embed.server --host … --port …`）。
 
@@ -539,6 +558,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 flush=True,
             )
             return 3
+        _startup_warmup(runtime, cfg)
 
     serve(cfg, runtime, host=args.host, port=args.port)
     return 0

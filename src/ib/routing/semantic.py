@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import math
 import threading
+import time
 from typing import Any, Callable, Iterable, Sequence
 
 from ib.core import Scope
@@ -59,6 +60,10 @@ DEFAULT_TAU = 0.65
 
 #: 分差阈值（"top 与次高之差 ≥ margin"）。0.05 同样偏保守：复合意图宁可交给 LLM。
 DEFAULT_MARGIN = 0.05
+
+#: 范例装载失败后的冷却秒数：冷却期内该项目直接穿透（不反复打必然失败的远端），
+#: 过期后自动重试一次。原先是"永久穿透直到进程重启"，ib-embed 偶发崩溃重启后路由也不恢复（REV-27 排查）。
+FAILURE_RETRY_S = 300.0
 
 
 def cosine(left: Sequence[float], right: Sequence[float]) -> float:
@@ -150,6 +155,8 @@ class SemanticRouter:
         exemplars_provider: Callable[[str], dict[str, list[str]]],
         tau: float = DEFAULT_TAU,
         margin: float = DEFAULT_MARGIN,
+        failure_retry_s: float = FAILURE_RETRY_S,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._embed_texts = embed_texts
         self._exemplars_provider = exemplars_provider
@@ -158,8 +165,10 @@ class SemanticRouter:
         self._lock = threading.Lock()
         #: project_id -> {expert: [vector, ...]}（**已按项目分区**，FM-6）
         self._cache: dict[str, dict[str, list[list[float]]]] = {}
-        #: 装载失败的项目（避免每次请求都重试一次必然失败的远端调用）
-        self._failed: set[str] = set()
+        #: 装载失败的项目 -> 失败时刻（冷却期内不重试，过期后自动重试）
+        self._failed: dict[str, float] = {}
+        self._failure_retry_s = float(failure_retry_s)
+        self._clock = clock
 
     def route(self, query: str, *, scope: Scope) -> str | None:
         """[IFC-IB-193] 高置信单专家或 `None`。**fail-open：任何异常 → `None`**。"""
@@ -197,8 +206,11 @@ class SemanticRouter:
             cached = self._cache.get(project_id)
             if cached is not None:
                 return cached
-            if project_id in self._failed:
-                return {}
+            failed_at = self._failed.get(project_id)
+            if failed_at is not None:
+                if self._clock() - failed_at < self._failure_retry_s:
+                    return {}
+                del self._failed[project_id]
         texts = self._exemplars_provider(project_id) or {}
         if not texts:
             with self._lock:
@@ -210,9 +222,9 @@ class SemanticRouter:
                 if not items:
                     continue
                 built[expert] = self._embed_texts(list(items))
-        except Exception:  # noqa: BLE001 - 装载失败 → 该项目永久穿透（不反复重试）
+        except Exception:  # noqa: BLE001 - 装载失败 → 冷却期内穿透，过期后重试
             with self._lock:
-                self._failed.add(project_id)
+                self._failed[project_id] = self._clock()
             return {}
         with self._lock:
             self._cache[project_id] = built
@@ -227,4 +239,4 @@ class SemanticRouter:
                 self._failed.clear()
             else:
                 self._cache.pop(project_id, None)
-                self._failed.discard(project_id)
+                self._failed.pop(project_id, None)

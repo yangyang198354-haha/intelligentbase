@@ -358,6 +358,21 @@ ssh ... 'journalctl -u ib-web --since "2026-10-07 12:00:00" -p warning --no-page
 9. **`ib-worker` 单实例**：多实例会双双 OOM，检查只有一份在跑。
 10. **`qdrant` 的 `LimitNOFILE=65536`** 不要调回默认，否则 collection 多了会随机 500
     且报错指向 storage 层，很难联想到 limit。
+11. **ib-embed 偶发 `status=4/ILL` 崩溃**（2026-10-17、10-31）：torch 自带 MKL 在本机
+    （仅 AVX）选中了 AVX-512 的 tanh 内核。判据：`journalctl -k | grep "invalid opcode"`
+    指向 `libtorch_cpu.so`。处置：`/etc/intelligentbase/ib-embed.env` 须含
+    `MKL_ENABLE_INSTRUCTIONS=AVX`（模板见 `src/deploy/ib-embed.env.example`），改后
+    `sudo -n systemctl restart ib-embed`。ib-embed 启动时会预热一次，日志应有"启动预热完成"。
+    崩溃后 ib-web 的语义路由会对该项目穿透 5 分钟再自动重试（REV-27 前是永久穿透到 ib-web 重启）。
+
+### 8.1 外网接入（2026-10-31 实测；补充 §1 / §2）
+
+同一台目标机可经外网 `ai-freeark.xin` 端口 `9999` SSH 登录（主机指纹与 §1 相同）。
+Linux 开发机用 `~/.ssh/id_ed25519`（公钥已装入目标机 `authorized_keys`）：
+
+```bash
+ssh -p 9999 -o BatchMode=yes -o ConnectTimeout=10 yangyang198354@ai-freeark.xin '<远程命令>'
+```
 
 ---
 
