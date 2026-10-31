@@ -3,23 +3,11 @@
 import { ref } from 'vue';
 
 import type { DiffItemDto, ValidationErrorItem } from '../../api/client';
-
-const KIND_LABEL: Record<string, string> = {
-  agent_added: '新增 agent', agent_removed: '删除 agent', agent_disabled: '停用 agent', agent_enabled: '启用 agent',
-  agent_field: '修改 agent 字段', prompt: '修改 提示词', tool_grant: '修改 工具授权', tool_param: '修改 工具参数',
-  knowledge_scope: '修改 知识范围', route_param: '修改 路由参数', node_added: '新增节点', node_removed: '删除节点',
-  node_changed: '修改节点', edge_added: '新增边', edge_removed: '删除边', edge_changed: '修改边', layout: '调整布局',
-};
+import { formatDiffLine } from './publishDiff';
 
 defineProps<{ visible: boolean; items: DiffItemDto[]; layoutOnly: boolean; errors: ValidationErrorItem[]; busy: boolean }>();
 const emit = defineEmits<{ (e: 'confirm', message?: string): void; (e: 'cancel'): void }>();
 const message = ref('');
-
-function line(i: DiffItemDto): string {
-  const kind = KIND_LABEL[i.kind] ?? i.kind;
-  const delta = i.before !== null || i.after !== null ? `：${i.before ?? '∅'} → ${i.after ?? '∅'}` : '';
-  return `${kind}：${i.object_id}${i.field ? ` · ${i.field}` : ''}${delta}`;
-}
 </script>
 
 <template>
@@ -31,7 +19,7 @@ function line(i: DiffItemDto): string {
     <div v-else>
       <p v-if="!items.length">没有任何变更。</p>
       <p v-else-if="layoutOnly">仅调整了节点位置（不改变行为，仍会产生新版本）。</p>
-      <ul><li v-for="(i, k) in items" :key="k">{{ line(i) }}</li></ul>
+      <ul><li v-for="(i, k) in items" :key="k">{{ formatDiffLine(i) }}</li></ul>
       <el-input v-model="message" maxlength="200" placeholder="变更说明（可选，≤200 字）" />
     </div>
     <template #footer>

@@ -3,6 +3,7 @@
  * @module MOD-R26-21
  * @implements REQ-FUNC-001~003/011/014~017/023 编排画布页壳：动态图 + 悬停卡片 + 详情面板 + Agent Builder +
  *             保存并生效（先看差异再确认）+ 版本历史 / 回滚 + 试运行。
+ * @implements REQ-FUNC-001~013（R27，MOD-R27-06）节点删除编排：请求删除 → 可行性 → 确认 → 变换草稿 → 清选中 → 登记撤销。
  * 保存成功提示“已生效（版本 N）”，不再出现“重启后生效”。视图侧零持久化：草稿只在内存，
  * 离开前可“另存为服务端草稿副本”。
  */
@@ -31,7 +32,15 @@ import NodePalette from '../components/config/NodePalette.vue';
 import PublishDialog from '../components/config/PublishDialog.vue';
 import TrialPanel from '../components/config/TrialPanel.vue';
 import VersionHistory from '../components/config/VersionHistory.vue';
-import { addNodeOfKind, edgesTouching, removeNode, type AgentInfo } from '../components/config/graphModel';
+import { KIND_LABEL, addNodeOfKind, type AgentInfo } from '../components/config/graphModel';
+import {
+  deleteAgentDefinition,
+  planConfirm,
+  removalVerdict,
+  removeFromCanvas,
+  unplacedAgents,
+  type RemovalMode,
+} from '../components/config/nodeRemoval';
 import { createConfigDraft } from '../stores/configDraft';
 
 const props = defineProps<{ client: ApiClient }>();
@@ -99,33 +108,59 @@ function onAddNode(kind: NodeKind): void {
   const doc = store.document.value;
   if (!doc) return;
   if (kind === 'agent') {
-    const placed = new Set(graph.value.nodes.map((n) => n.expert ?? n.id));
-    const free = doc.experts.find((e) => !placed.has(e.name) && (e.status ?? 'active') === 'active');
-    if (!free) {
+    const free = unplacedAgents(doc, graph.value);
+    if (free.length === 0) {
       ElMessage.info('没有尚未上图的 agent，请用 Agent Builder 创建新 agent');
       return;
     }
-    setGraph({ nodes: [...graph.value.nodes, addNodeOfKind(graph.value, 'agent', free.name)], edges: graph.value.edges });
+    if (free.length === 1) {
+      placeAgent(free[0].name);
+      return;
+    }
+    pickedAgent.value = free[0].name;
+    pickerOpen.value = true;
     return;
   }
   setGraph({ nodes: [...graph.value.nodes, addNodeOfKind(graph.value, kind)], edges: graph.value.edges });
 }
+const pickerOpen = ref(false);
+const pickedAgent = ref('');
+const unplaced = computed(() => (store.document.value ? unplacedAgents(store.document.value, graph.value) : []));
+function placeAgent(name: string): void {
+  pickerOpen.value = false;
+  setGraph({ nodes: [...graph.value.nodes, addNodeOfKind(graph.value, 'agent', name)], edges: graph.value.edges });
+}
 function onUpdateNode(n: GraphNodeDto): void {
   setGraph({ nodes: graph.value.nodes.map((x) => (x.id === n.id ? n : x)), edges: graph.value.edges });
 }
-function onRemoveAgent(name: string): void {
+/** 请求删除节点（Delete 键 / 面板“删除节点” = canvas；面板“删除 agent” = definition）。 */
+function requestRemove(nodeId: string, mode: RemovalMode = 'canvas'): void {
   const doc = store.document.value;
-  if (!doc) return;
-  const n = edgesTouching(graph.value, name);
-  if (n > 0 && !window.confirm(`将同时删除 ${n} 条边，继续？`)) return;
-  const g = removeNode(graph.value, name);
-  store.document.value = {
-    ...doc,
-    experts: doc.experts.filter((e) => e.name !== name),
-    tool_grants: doc.tool_grants.filter((x) => x.expert_name !== name),
-    graph: g,
-  };
+  if (!doc || readonly.value) return;
+  const verdict = removalVerdict(doc, graph.value, nodeId, mode);
+  if (!verdict.ok) {
+    ElMessage.info(verdict.reason ?? '无法删除');
+    return;
+  }
+  const node = graph.value.nodes.find((n) => n.id === nodeId);
+  if (!node) return;
+  const label = node.kind === 'agent' ? (agents.value.get(node.expert ?? node.id)?.cn_label ?? node.id) : KIND_LABEL[node.kind];
+  const plan = planConfirm(graph.value, nodeId, store.isBaselineNode(nodeId), mode, label);
+  if (plan.needConfirm && !window.confirm(plan.text)) return;
+  const state = { document: doc, promptPatch: store.promptPatch.value };
+  const next = mode === 'definition' ? deleteAgentDefinition(state, nodeId) : removeFromCanvas(state, nodeId);
+  store.applyRemoval(`${label}「${nodeId}」`, next);
   selectedId.value = null;
+  tab.value = 'detail';
+}
+function onRemoveAgent(nodeId: string): void {
+  requestRemove(nodeId, 'definition');
+}
+function onUndo(): void {
+  if (store.undoRemoval()) {
+    selectedId.value = null;
+    ElMessage.success('已撤销删除');
+  }
 }
 function onBuilderAdd(d: AgentDraftDto): void {
   const doc = store.document.value;
@@ -270,7 +305,13 @@ onMounted(load);
           @update:graph="setGraph"
           @select-node="(id: string) => { selectedId = id; tab = 'detail'; }"
           @notice="(t: string) => (banner = t)"
+          @request-remove="(id: string) => requestRemove(id)"
+          @hint="(t: string) => ElMessage.info(t)"
         />
+        <div v-if="!readonly && store.canUndo.value" class="undo-bar">
+          已删除 {{ store.undoLabel.value }}
+          <el-button link type="primary" size="small" @click="onUndo">撤销</el-button>
+        </div>
         <p class="hint">鼠标悬停节点或边可查看其配置；点击节点在右侧查看 / 编辑详情与提示词。{{ readonly ? '（查看档：只读）' : '' }}</p>
       </div>
       <div class="right">
@@ -286,6 +327,7 @@ onMounted(load);
               @change="(d) => (store.document.value = d)"
               @prompt="(e, l, t) => store.setPrompt(e, l, t)"
               @remove-agent="onRemoveAgent"
+              @request-remove="(id: string) => requestRemove(id)"
               @update-node="onUpdateNode"
             />
           </el-tab-pane>
@@ -302,6 +344,15 @@ onMounted(load);
       </div>
     </div>
 
+    <el-dialog v-model="pickerOpen" title="选择要放回画布的 agent" width="420px">
+      <el-radio-group v-model="pickedAgent">
+        <el-radio v-for="a in unplaced" :key="a.name" :value="a.name">{{ a.cn_label }}（{{ a.name }}）</el-radio>
+      </el-radio-group>
+      <template #footer>
+        <el-button @click="pickerOpen = false">取消</el-button>
+        <el-button type="primary" :disabled="!pickedAgent" @click="placeAgent(pickedAgent)">放回画布</el-button>
+      </template>
+    </el-dialog>
     <PublishDialog :visible="dialog" :items="diffItems" :layout-only="layoutOnly" :errors="diffErrors" :busy="busy" @confirm="confirmSave" @cancel="dialog = false" />
     <ConflictDialog :visible="receipt !== null" :receipt="receipt" @reload="() => { receipt = null; void load(); }" @save-draft="saveAsDraft" @close="receipt = null" />
     <BuilderDrawer :visible="builderOpen" :client="client" :doc="store.document.value" :catalog="catalog" @add-to-canvas="onBuilderAdd" @close="builderOpen = false" />
@@ -312,6 +363,7 @@ onMounted(load);
 .bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .spacer { flex: 1; }
 .body { display: grid; grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr); gap: 14px; }
+.undo-bar { margin-top: 6px; font-size: 13px; color: var(--el-text-color-regular); }
 .banner { color: var(--el-color-danger); }
 .hint { color: var(--el-text-color-secondary); font-size: 12px; }
 </style>

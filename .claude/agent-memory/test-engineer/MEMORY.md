@@ -22,3 +22,5 @@
 - [P-TE-006] 观察“哪个 agent 以什么提示词作答”：在 FakeLlmProvider 实例上包装 `build_expert`（monkeypatch 测试替身实例，非被测模块）记录 (spec.name, system_prompt)；DAG 内部 trace 则直接用 `run_dag(lease.compiled.dag, …)` 的 DagOutcome.trace；同一 session_key 会带历史影响路由，断言路由时每问用不同 session — 自记 2026-10-27 · 证据 tests/config_r26_support.py::ExpertRecorder / test_dag_execution_r26.py
 - [P-TE-007] 故障注入测发布协议：替身的写失败必须是“一次性”故障，否则还原写入同样失败而掩盖被测的还原逻辑；v1 旧项目首次发布失败后 head 停在基线 v1（非 0），失败用例的“在用版本不变”应在已发布到 head≥2 的环境里断言 — 自记 2026-10-27 · 证据 test_publish_protocol_r26.py TC-UNIT-R26-127/141
 - [P-TE-008] 后台长跑 pytest 时，scratchpad 里同名旧日志会被误读成本次结果（曾见与开发自验证逐字相同的计数）：日志用唯一文件名，等待条件用 `-nt` 比较 mtime，且不要用会匹配自身命令行的 `pgrep -f` — 自记 2026-10-27 · 证据 本次复测 int.log 误读
+- [P-TE-009] 前端 store（import 'vue' 的 .ts）可离线真实执行：transpileModule 后把裸导入 'vue' 说明符换成 data: URL 的 8 行替身（ref→{value}、computed→每次读取重算的 getter），再把相对导入换成已转译模块的 data URL；比纯源码结构断言能锁定 dirty/撤销等状态机语义，但不验证 Vue 响应式 — 自记 2026-10-31 · 证据 src/frontend/tests/config_studio_r27.test.js（52 例全过）
+- [P-TE-010] 前端结构断言里的“无 DOM 依赖”正则别写 `\bdocument\.`：会误伤 `state.document.xxx` 属性访问；用 `(?<![.\w])document\.(addEventListener|querySelector|…)` — 自记 2026-10-31 · 证据 TC-FE-R27-050 首跑失败

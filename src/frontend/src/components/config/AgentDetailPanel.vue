@@ -8,6 +8,7 @@
 import { ref, watch } from 'vue';
 
 import type { ApiClient, ConfigCatalogDto, DefinitionDocumentV2, GraphNodeDto } from '../../api/client';
+import { DEFAULT_EXPERT_HINT } from './nodeRemoval'; // MOD-R27-05
 
 const props = defineProps<{
   client: ApiClient;
@@ -20,7 +21,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'change', doc: DefinitionDocumentV2): void;
   (e: 'prompt', expert: string, layer: 'main' | 'fallback', text: string): void;
-  (e: 'remove-agent', name: string): void;
+  (e: 'remove-agent', nodeId: string): void;
+  (e: 'request-remove', nodeId: string): void;
   (e: 'update-node', node: GraphNodeDto): void;
 }>();
 
@@ -105,10 +107,6 @@ function setDefault(): void {
   for (const e of copy.experts) e.is_default = e.name === name;
   emit('change', copy);
 }
-function confirmRemove(): void {
-  const name = props.node?.expert ?? props.node?.id ?? '';
-  if (window.confirm(`确认删除 agent「${name}」？其连线与提示词文件将一并移除（保存后生效）。`)) emit('remove-agent', name);
-}
 function toggleFolder(id: string, on: boolean): void {
   patchExpert((e) => {
     const cur = new Set(e.knowledge_scope?.folder_ids ?? []);
@@ -139,6 +137,9 @@ function onPrompt(layer: 'main' | 'fallback', text: string): void {
         <el-form-item label="max_expert_steps"><el-input-number :model-value="doc.route.max_expert_steps" :min="1" :max="64" :disabled="readonly" @change="(v: number) => setRoute('max_expert_steps', v)" /></el-form-item>
       </el-form>
       <p class="hint">分类器 temperature 不可配置。</p>
+      <div v-if="!readonly" class="actions">
+        <el-button size="small" type="danger" plain @click="emit('request-remove', node.id)">删除节点</el-button>
+      </div>
     </template>
 
     <!-- agent 节点 -->
@@ -188,8 +189,10 @@ function onPrompt(layer: 'main' | 'fallback', text: string): void {
 
       <div v-if="!readonly" class="actions">
         <el-button size="small" :disabled="expert()?.is_default" @click="setDefault">设为默认专家</el-button>
-        <el-button size="small" type="danger" :disabled="expert()?.is_default" @click="confirmRemove">删除 agent</el-button>
-        <span v-if="expert()?.is_default" class="hint">默认专家不能删除，请先指定其他默认专家</span>
+        <el-button size="small" type="danger" :disabled="expert()?.is_default" @click="emit('remove-agent', node.id)">删除 agent</el-button>
+        <el-button size="small" type="danger" plain :disabled="expert()?.is_default" @click="emit('request-remove', node.id)">删除节点</el-button>
+        <span class="hint">“删除节点”仅从画布移除，agent 的定义与提示词保留</span>
+        <span v-if="expert()?.is_default" class="hint">{{ DEFAULT_EXPERT_HINT }}</span>
       </div>
     </template>
 
@@ -205,11 +208,28 @@ function onPrompt(layer: 'main' | 'fallback', text: string): void {
         <el-input size="small" :model-value="b.keywords.join(', ')" :disabled="readonly" placeholder="关键词，逗号分隔" @change="(v: string) => emit('update-node', { ...node!, predicate: { kind: 'keyword', branches: node!.predicate!.branches.map((x, j) => (j === i ? { ...x, keywords: v.split(/[,，]/).map((s) => s.trim()).filter(Boolean) } : x)) } })" />
       </div>
       <p class="hint">无表达式 / 代码；出边需配置分支键，并有“否则”分支。</p>
+      <div v-if="!readonly" class="actions">
+        <el-button size="small" type="danger" plain @click="emit('request-remove', node.id)">删除节点</el-button>
+      </div>
     </template>
     <template v-else-if="node?.kind === 'confirm'">
       <h4>人工确认</h4>
       <el-input :model-value="node.message" :disabled="readonly" maxlength="200" @change="(v: string) => emit('update-node', { ...node!, message: v })" />
       <p class="hint">挂起状态仅在进程内保留，服务重启后需重新提问。</p>
+      <div v-if="!readonly" class="actions">
+        <el-button size="small" type="danger" plain @click="emit('request-remove', node.id)">删除节点</el-button>
+      </div>
+    </template>
+    <template v-else-if="node?.kind === 'join'">
+      <h4>汇聚</h4>
+      <p class="hint">汇聚节点等待多路上游完成后再继续，无可配置项。</p>
+      <div v-if="!readonly" class="actions">
+        <el-button size="small" type="danger" plain @click="emit('request-remove', node.id)">删除节点</el-button>
+      </div>
+    </template>
+    <template v-else-if="node?.kind === 'start' || node?.kind === 'end'">
+      <h4>{{ node.kind === 'start' ? '开始' : '结束' }}</h4>
+      <p class="hint">开始 / 结束节点不可删除</p>
     </template>
     <p v-else class="hint">点击画布上的节点查看或编辑其配置。</p>
   </div>

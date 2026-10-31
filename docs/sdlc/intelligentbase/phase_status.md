@@ -1,225 +1,146 @@
-<phase_status project="intelligentbase" mode="INCREMENTAL" created="2026-10-26T23:55:36+08:00" updated="2026-10-28T00:09:56+08:00">
-  <request><![CDATA[核对确认需求可视化配置，能够对当前项目agent的编排以diagram的方式查看，图是动态的，鼠标放上去可以看到他的配置，agent 可以看到提示词，能够通过agent builder 创建新的agent，并且可以对agent 的路由，工具，权限、参数等等进行配置。保存后生效。 梳理并对比行业里面可视化编排agent， 工具的架构给出优化提示和建议。 整理用户故事。确认后开始开发。]]></request>
-  <revision>REV-26</revision>
-  <scope>本轮先只执行 GROUP_A（PHASE_01、PHASE_02，含行业可视化编排调研）；GROUP_A 门控后停止，用户确认用户故事后再进入 GROUP_B。</scope>
+<phase_status project="intelligentbase" mode="INCREMENTAL" created="2026-10-31T09:38:25+08:00" updated="2026-10-31T15:52:33+08:00">
+  <request><![CDATA[在可视化配置页面，当我新增一个节点，比如agent，路由，分支等等尚未完整编辑，没有通过校验。只有一个放弃改动按钮放弃添加的所有东西。我需要一个能放弃或者说删除一个节点的功能。先整理需求和用户故事。确认后开始开发。]]></request>
+  <revision>REV-27</revision>
+  <scope>本轮（调用方指定）只执行 GROUP_A（PHASE_01、PHASE_02），以现有代码为基线；GROUP_A 门控后写检查点停止，用户确认用户故事后再进入 GROUP_B。</scope>
   <profile version="1.0.0 (APPROVED, mtime 2026-10-24T16:57:39+08:00)"/>
   <groups>
     <group id="GROUP_A" agent="requirement-analyst" status="APPROVED" gate_decision="PASS_WITH_CONDITIONS" retries="0">
       <phase id="PHASE_01" status="APPROVED"/><phase id="PHASE_02" status="APPROVED"/>
     </group>
-    <group id="GROUP_B" agent="system-architect" status="APPROVED" gate_decision="PASS_WITH_CONDITIONS" retries="0">
+    <group id="GROUP_B" agent="system-architect" status="APPROVED" gate_decision="PASS_WITH_CONDITIONS" retries="1">
       <phase id="PHASE_03" status="APPROVED"/><phase id="PHASE_04" status="APPROVED"/>
     </group>
     <group id="GROUP_C" agent="software-developer" status="APPROVED" gate_decision="PASS_WITH_CONDITIONS" retries="0">
       <phase id="PHASE_05" status="APPROVED"/><phase id="PHASE_06" status="APPROVED"/>
     </group>
-    <group id="GROUP_D" agent="test-engineer" status="APPROVED" gate_decision="OVERRIDDEN" retries="0" defect_loops="1">
+    <group id="GROUP_D" agent="test-engineer" status="APPROVED" gate_decision="PASS_WITH_CONDITIONS" retries="0" defect_loops="0">
       <phase id="PHASE_07" status="APPROVED"/><phase id="PHASE_08" status="APPROVED"/><phase id="PHASE_09" status="APPROVED"/>
     </group>
-    <group id="GROUP_E1" agent="devops-engineer" status="APPROVED" gate_decision="PASS" retries="0">
-      <phase id="PHASE_10" status="APPROVED"/><phase id="PHASE_11a" status="APPROVED"/>
+    <group id="GROUP_E1" agent="devops-engineer" status="PENDING" gate_decision="PENDING" retries="0">
+      <phase id="PHASE_10" status="PENDING"/><phase id="PHASE_11a" status="PENDING"/>
     </group>
-    <group id="GROUP_E2" agent="devops-engineer" status="PENDING" gate_decision="PENDING" retries="0" environment="production" deploy_auth="GRANTED">
-      <phase id="PHASE_11b" status="PENDING"/>
-    </group>
+    <group id="GROUP_E2" agent="devops-engineer" status="NOT_AUTHORIZED" environment=""/>
   </groups>
   <artifacts>
-    <artifact path="docs/sdlc/intelligentbase/requirements_spec.md" version="1.0.0" status="SUPERSEDED" group="GROUP_A"/>
-    <artifact path="docs/sdlc/intelligentbase/requirements_spec.md" version="2.0.0" status="APPROVED" group="GROUP_A"/>
-    <artifact path="docs/sdlc/intelligentbase/user_stories.md" version="1.0.0" status="SUPERSEDED" group="GROUP_A"/>
-    <artifact path="docs/sdlc/intelligentbase/user_stories.md" version="2.0.0" status="APPROVED" group="GROUP_A"/>
-    <artifact path="docs/sdlc/intelligentbase/agent_orchestration_benchmark.md" version="1.0.0" status="SUPERSEDED" group="GROUP_A"/>
-    <artifact path="docs/sdlc/intelligentbase/agent_orchestration_benchmark.md" version="2.0.0" status="APPROVED" group="GROUP_A"/>
+    <artifact path="docs/sdlc/intelligentbase/archive/rev26/" version="REV-26 全套" status="SUPERSEDED" group="ARCHIVE"/>
+    <artifact path="docs/sdlc/intelligentbase/requirements_spec.md" version="1.0.0" status="APPROVED" group="GROUP_A"/>
+    <artifact path="docs/sdlc/intelligentbase/user_stories.md" version="1.0.0" status="APPROVED" group="GROUP_A"/>
     <artifact path="docs/sdlc/intelligentbase/architecture_design.md" version="1.0.0" status="APPROVED" group="GROUP_B"/>
     <artifact path="docs/sdlc/intelligentbase/module_design.md" version="1.0.0" status="APPROVED" group="GROUP_B"/>
     <artifact path="docs/sdlc/intelligentbase/tech_stack.md" version="1.0.0" status="APPROVED" group="GROUP_B"/>
-    <artifact path="docs/sdlc/intelligentbase/implementation_plan.md" version="1.0.0" status="SUPERSEDED" group="GROUP_C"/>
-    <artifact path="docs/sdlc/intelligentbase/implementation_plan.md" version="2.0.0" status="APPROVED" group="GROUP_C"/>
-    <artifact path="docs/sdlc/intelligentbase/code_review_report.md" version="1.0.0" status="SUPERSEDED" group="GROUP_C"/>
-    <artifact path="docs/sdlc/intelligentbase/code_review_report.md" version="2.0.0" status="APPROVED" group="GROUP_C"/>
+    <artifact path="docs/sdlc/intelligentbase/implementation_plan.md" version="1.0.0" status="APPROVED" group="GROUP_C"/>
+    <artifact path="docs/sdlc/intelligentbase/code_review_report.md" version="1.0.0" status="APPROVED" group="GROUP_C"/>
     <artifact path="docs/sdlc/intelligentbase/test_plan.md" version="1.0.0" status="APPROVED" group="GROUP_D"/>
     <artifact path="docs/sdlc/intelligentbase/unit_test_report.md" version="1.0.0" status="APPROVED" group="GROUP_D"/>
     <artifact path="docs/sdlc/intelligentbase/integration_test_report.md" version="1.0.0" status="APPROVED" group="GROUP_D"/>
     <artifact path="docs/sdlc/intelligentbase/e2e_test_report.md" version="1.0.0" status="APPROVED" group="GROUP_D"/>
-    <artifact path="docs/sdlc/intelligentbase/cicd_pipeline.md" version="1.0.0" status="SUPERSEDED" group="GROUP_E1"/>
-    <artifact path="docs/sdlc/intelligentbase/cicd_pipeline.md" version="2.0.0" status="APPROVED" group="GROUP_E1"/>
-    <artifact path="docs/sdlc/intelligentbase/deployment_plan.md" version="1.0.0" status="APPROVED" group="GROUP_E1"/>
   </artifacts>
-  <legacy_baseline status="CONFIRMED" confirmed_at="2026-10-26T23:55:36+08:00" confirmed_by="沿用用户 2026-10-24 确认（REV-25 Q3:A）的同类基线">只读、视为 APPROVED：docs/requirements_spec.md（v1.13.0 REV-21）、docs/user_stories.md（US-IB-01 ~ US-IB-54）、docs/agent_platform_research.md；现有代码 src/frontend/src/views/ConfigPage.vue、src/ibweb/views.py（definition/prompt config 端点）、src/ibweb/urls.py。REV-25 产物已归档 docs/sdlc/intelligentbase/archive/rev25/（只读参考）。</legacy_baseline>
+  <legacy_baseline>REV-26 已批准产物（archive/rev26/ 副本；原位文件 architecture_design.md / module_design.md 等在 GROUP_B 重写前作为基线只读）；本轮需求基线以现有代码为准。</legacy_baseline>
   <invocations>
-    <invocation id="intelligentbase-R26-GROUP_E1-002" agent="devops-engineer" start="2026-10-27T23:50:55+08:00" end="2026-10-27T23:55:08+08:00" result="SUCCESS"/>
-    <invocation id="intelligentbase-R26-GROUP_C-006" agent="software-developer" start="2026-10-27T23:39:05+08:00" end="2026-10-27T23:42:32+08:00" result="SUCCESS"/>
-    <invocation id="intelligentbase-R26-GROUP_E2-001" agent="devops-engineer" start="2026-10-27T22:30:44+08:00" end="2026-10-27T22:33:26+08:00" result="BLOCKED"/>
-    <invocation id="intelligentbase-R26-GROUP_C-005" agent="software-developer" start="2026-10-27T22:23:14+08:00" end="2026-10-27T22:30:44+08:00" result="SUCCESS"/>
-    <invocation id="intelligentbase-R26-GROUP_E1-001" agent="devops-engineer" start="2026-10-27T16:27:50+08:00" end="2026-10-27T16:38:20+08:00" result="SUCCESS"/>
-    <invocation id="intelligentbase-R26-GROUP_D-002" agent="test-engineer" start="2026-10-27T15:59:13+08:00" end="2026-10-27T16:21:51+08:00" result="SUCCESS"/>
-    <invocation id="intelligentbase-R26-GROUP_C-004" agent="software-developer" start="2026-10-27T14:37:56+08:00" end="2026-10-27T15:59:13+08:00" result="SUCCESS"/>
-    <invocation id="intelligentbase-R26-GROUP_D-001" agent="test-engineer" start="2026-10-27T10:12:54+08:00" end="2026-10-27T14:37:56+08:00" result="PARTIAL_SUCCESS"/>
-    <invocation id="intelligentbase-R26-GROUP_C-003" agent="software-developer" start="2026-10-27T10:02:01+08:00" end="2026-10-27T10:12:54+08:00" result="SUCCESS"/>
-    <invocation id="intelligentbase-R26-GROUP_C-002" agent="software-developer" start="2026-10-27T07:54:29+08:00" end="2026-10-27T10:02:01+08:00" result="PARTIAL_SUCCESS"/>
-    <invocation id="intelligentbase-R26-GROUP_C-001" agent="software-developer" start="2026-10-27T07:19:48+08:00" end="2026-10-27T07:54:29+08:00" result="PARTIAL_SUCCESS"/>
-    <invocation id="intelligentbase-R26-GROUP_B-001" agent="system-architect" start="2026-10-27T00:30:29+08:00" end="2026-10-27T00:55:47+08:00" result="PARTIAL_SUCCESS"/>
-    <invocation id="intelligentbase-GROUP_A-002" agent="requirement-analyst" start="2026-10-27T00:17:47+08:00" end="2026-10-27T00:28:27+08:00" result="SUCCESS"/>
-    <invocation id="intelligentbase-GROUP_A-001" agent="requirement-analyst" start="2026-10-26T23:55:43+08:00" end="2026-10-27T00:07:47+08:00" result="SUCCESS"/>
+    <invocation id="intelligentbase-R27-GROUP_A-001" agent="requirement-analyst" start="2026-10-31T09:38:47+08:00" end="2026-10-31T09:45:04+08:00" result="SUCCESS"/>
+    <invocation id="intelligentbase-R27-GROUP_B-001" agent="system-architect" start="2026-10-31T14:17:52+08:00" end="2026-10-31T14:33:50+08:00" result="INTERRUPTED"/>
+    <invocation id="intelligentbase-R27-GROUP_B-002" agent="system-architect" start="2026-10-31T14:33:50+08:00" end="2026-10-31T15:17:13+08:00" result="INTERRUPTED"/>
+    <invocation id="intelligentbase-R27-GROUP_B-003" agent="system-architect" start="2026-10-31T15:17:13+08:00" end="2026-10-31T15:28:12+08:00" result="SUCCESS"/>
+    <invocation id="intelligentbase-R27-GROUP_C-001" agent="software-developer" start="2026-10-31T15:28:12+08:00" end="2026-10-31T15:34:35+08:00" result="SUCCESS"/>
+    <invocation id="intelligentbase-R27-GROUP_D-001" agent="test-engineer" start="2026-10-31T15:34:35+08:00" end="2026-10-31T15:52:33+08:00" result="SUCCESS"/>
   </invocations>
   <gate_reviews>
-    <gate_review id="GR-A-001" invocation_id="intelligentbase-GROUP_A-001" decision="PASS_WITH_CONDITIONS" time="2026-10-27T00:07:47+08:00">
-      <reviewed_files><file path="docs/sdlc/intelligentbase/requirements_spec.md" version="0.1.0"/><file path="docs/sdlc/intelligentbase/user_stories.md" version="0.1.0"/><file path="docs/sdlc/intelligentbase/agent_orchestration_benchmark.md" version="0.1.0"/></reviewed_files>
-      <criterion id="J-A 来源" result="SATISFIED">抽查 4 处现状引用均属实：ConfigPage.vue:757-759（nodes-draggable/connectable/elements-selectable 均 false）；src/ibweb/accounts/policy.py:50-51（can_manage = admin|manager）；src/ib/core/types.py:945-951（ExpertSpecInput 仅 name/cn_label/keywords/exemplars/三个布尔）；src/ibweb/views.py:998-1005（保存后仅刷新 derived_views，生效点=下次装配）；ConfigPage.vue 中 mouseenter/node-mouse/tooltip 计数 0。用户原文与 CL-001/003/004 引用与 phase_status 一致</criterion>
-      <criterion id="J-A G/W/T" result="SATISFIED">user_stories.md 23 个 US、81 条唯一 AC（grep -oE AC-NNN-NN 去重），不含 Given…When…Then 的 AC 行数 = 0</criterion>
-      <criterion id="J-A 无技术实现" result="SATISFIED">未指定表结构/接口/组件；C-R26-08 声明边界；HTTP 409 仅作为基线行为引用（见 F01）</criterion>
-      <criterion id="J-A INFERRED" result="SATISFIED">5/30=16.7% ≤ 0.20（requirements_spec.md:28），INF-1~5 汇总于 §待确认推断项</criterion>
-      <criterion id="必读与调研" result="SATISFIED">notes 列出 §2.7/§2.10/§2.13/§2.14/§1.2 等按行段真实 Read；调研 8 平台 × 9 维度，WEB 来源带日期，未核实项如实标注</criterion>
-      <finding id="GR-A-001-F01" severity="MINOR">REQ-NFUNC-005 度量写"HTTP 409"属接口细节，修订时改为"冲突回执"即可（基线已有 409，不影响架构）。</finding>
-      <finding id="GR-A-001-F02" severity="MINOR">REQ-FUNC-016（差异确认）/017（版本回滚）定为 Should，但它们是 CL-003 热生效的安全网；且调研指出试运行（CAND-02）尚未覆盖。需随 OQ-R26-03 裁决调整优先级。</finding>
-      <condition>OQ-R26-01 ~ OQ-R26-12、INF-1 ~ INF-5 与候选点 CAND-01 ~ CAND-18 须经用户裁决；与推荐不一致或纳入新候选点时，由 requirement-analyst 定向修订（1.1.0）后再进入 GROUP_B。</condition>
-      <condition>F01/F02 在修订中处理。</condition>
+    <gate_review id="GR-A-001" invocation_id="intelligentbase-R27-GROUP_A-001" decision="PASS_WITH_CONDITIONS" time="2026-10-31T09:45:04+08:00">
+      <reviewed_files><file path="docs/sdlc/intelligentbase/requirements_spec.md" version="0.1.0"/><file path="docs/sdlc/intelligentbase/user_stories.md" version="0.1.0"/></reviewed_files>
+      <criterion id="J-A 文件存在与文件头" result="SATISFIED">两文件存在（09:42/09:43），文件头齐全，0.1.0 DRAFT，timestamp 2026-10-31T09:41:01+08:00 为真实时间</criterion>
+      <criterion id="J-A 来源" result="SATISFIED">13 条 REQ-FUNC + 3 条 REQ-NFUNC 均有来源列。PM 抽查 3 条：FlowCanvas.vue:97 确为 deletable: false（REQ-FUNC-001）；configDraft.ts:46-51 仅 discard/markSaved/setGraph，无移除提示词补丁接口，:20 dirty 以 document+promptPatch 快照判定（REQ-FUNC-010）；graphModel.ts:40-41 ADDABLE_KINDS 不含 start/end（REQ-FUNC-007）。用户原文引用与转述一致</criterion>
+      <criterion id="J-A AC 格式" result="SATISFIED">grep "^- AC" 共 50 行，不含 Given…When…Then 的 0 行</criterion>
+      <criterion id="J-A INFERRED 占比" result="SATISFIED">3/16=18.75% ≤ 0.20（requirements_spec.md:30），INF-1~3 已汇总于"待确认推断项"</criterion>
+      <criterion id="J-A 无技术实现" result="SATISFIED">需求正文为行为描述；代码标识只出现在来源列；REQ-NFUNC-003 的 npm 命令为验收度量</criterion>
+      <criterion id="J-A 必读" result="SATISFIED">notes 已读清单含协议、画像、通用经验、R26 基线两份与全部 input_files</criterion>
+      <finding id="GR-A-001-F01" severity="MINOR">OQ-R27-07（X1 删除 agent 后提示词文件处置）与 REQ-FUNC-012（差异清单对非 agent 节点的覆盖）依赖服务端现状，需求阶段未核实；交 GROUP_B 核对。</finding>
+      <condition>用户确认 OQ-R27-01~10 与 INF-1~3（尤其 OQ-R27-02 agent 默认语义、OQ-R27-07 冲突点 X1）后才进入 GROUP_B；改选项时由 requirement-analyst 定向修订。</condition>
+      <condition>GROUP_B 须核对服务端删除 agent 时提示词文件的实际处置（X1）与差异清单对 route/condition/join/confirm 节点的覆盖（REQ-FUNC-012），写进 module_design。</condition>
     </gate_review>
-    <gate_review id="GR-A-002" invocation_id="intelligentbase-GROUP_A-002" decision="PASS_WITH_CONDITIONS" time="2026-10-27T00:28:27+08:00">
-      <reviewed_files><file path="docs/sdlc/intelligentbase/requirements_spec.md" version="1.1.0"/><file path="docs/sdlc/intelligentbase/user_stories.md" version="1.1.0"/><file path="docs/sdlc/intelligentbase/agent_orchestration_benchmark.md" version="1.1.0"/></reviewed_files>
-      <criterion id="J-A 来源" result="SATISFIED">OQ-R26-10 用户原话（requirements_spec.md:44、:264）与 CL-005 逐字一致；REQ-FUNC-018~023、REQ-NFUNC-014/015 均有来源列；基线引用沿用 GR-A-001 已核实项</criterion>
-      <criterion id="J-A G/W/T" result="SATISFIED">30 个 US、121 条唯一 AC，不含 Given…When…Then 的 AC 行 = 0</criterion>
-      <criterion id="J-A 无技术实现" result="SATISFIED">C-R26-12 把"可运行在 LangGraph"限定为用户原话与约束；REQ-NFUNC-005 度量已改"冲突回执"（:189，409 仅作基线引用）</criterion>
-      <criterion id="J-A INFERRED" result="SATISFIED">6/38=15.8% ≤ 0.20；INF-1~6 标"架构阶段目标机实测校准"</criterion>
-      <criterion id="GR-A-001 条件" result="SATISFIED">OQ-R26-01~12 改"已确认（用户裁决 2026-10-27）"；F01 已改；F02：REQ-FUNC-016/017、US-016/017 升 Must；CAND 裁决列已加（benchmark）</criterion>
-      <finding id="GR-A-002-F01" severity="MINOR">OQ-R26-13（requirements_spec.md:267）与 C-R26-11 把"不得含资料正文以外的敏感数据"标为"用户原话"，实为 PM 在调用指令中的转述；用户原话只有 CL-005 那一句。下次修订改为"PM 转述（待用户确认）"。PM 侧教训已记 P-PM-002。</finding>
-      <finding id="GR-A-002-F02" severity="MINOR">notes 自述 docs/requirements_spec.md §2.13 未通读（required_reading 要求）；已读 REQ-FUNC-IB-54~58 与 OOS-23 所在行，产出未见因此出错。下次调用点名要求先读。</finding>
-      <condition>OQ-R26-13~16（非阻塞，AC 已按推荐项书写）由用户确认；与推荐不一致时定向修订。</condition>
-      <condition>F01 的来源标注在下一次修订（或 GROUP_B 前）改正。</condition>
-    </gate_review>
-    <gate_review id="GR-B-001" invocation_id="intelligentbase-R26-GROUP_B-001" decision="PASS_WITH_CONDITIONS" time="2026-10-27T00:55:47+08:00">
+    <gate_review id="GR-B-001" invocation_id="intelligentbase-R27-GROUP_B-003" decision="PASS_WITH_CONDITIONS" time="2026-10-31T15:28:12+08:00">
       <reviewed_files><file path="docs/sdlc/intelligentbase/architecture_design.md" version="0.1.0"/><file path="docs/sdlc/intelligentbase/module_design.md" version="0.1.0"/><file path="docs/sdlc/intelligentbase/tech_stack.md" version="0.1.0"/></reviewed_files>
-      <criterion id="J-B 覆盖" result="SATISFIED">module_design.md:1076-1120 需求覆盖表：REQ-FUNC-001~023、REQ-NFUNC-001~015 每行至少一个 MOD（逐号 grep 均命中）</criterion>
-      <criterion id="J-B 无环" result="SATISFIED">module_design.md §依赖关系：每条边 w(A)&gt;w(B)，MOD-R26-01~22 拓扑序，人工复核 02→01 … 21→18,19,20 无回边</criterion>
-      <criterion id="J-B ADR" result="SATISFIED">ADR-53~69 共 17 条均有 Status；抽读 ADR-53（5 方案）、ADR-54（4 方案）、ADR-64（3 方案）；ADR-69 标 constraint-driven</criterion>
-      <criterion id="J-B 引用真实" result="SATISFIED">核实 composition.py:340（tools_by_expert 项目并集）、:839-840（首个项目注入）、:1859（_load_exemplars 环境目录）、orchestration/__init__.py:1115（运行期读 ib.experts）、vectorstore/__init__.py:368-381（doc_ids filter 已贯通）、ledger/tree.py:110（EntryTreeStore）、llm/__init__.py:162（_clients 无界 dict）、views.py:639/746（orchestrator_for 仅此两处调用）均存在且语义相符</criterion>
-      <criterion id="J-B 迁移与运行单元" result="SATISFIED">module_design.md:1153 数据迁移（008_config_versions.sql，与 schema.py 单源、IF NOT EXISTS、回滚说明，DROP 由用户执行）；:1181 受影响运行单元（上线需 ib-web/ib-worker 各重启一次，nginx 无改动）</criterion>
-      <criterion id="J-B 禁用项" result="SATISFIED">grep docker/redis/channels/axios/pymupdf/langchain-openai&gt;=0.3：仅出现于被否决方案与合规自检（architecture_design.md:125、:425-431）；无新增 systemd 单元、无新增第三方依赖（tech_stack.md:17）；langgraph 沿用 src/requirements.txt:23 的 &gt;=0.2,&lt;2.0</criterion>
-      <finding id="GR-B-001-F01" severity="MINOR">架构师称本机无 langgraph/pytest，假设 A-R26-01（LangGraph 超步合并、interrupt_before+MemorySaver）未验证；实际项目测试 venv /root/.venvs/intelligentbase 已有 pytest 9.1.1 / Django 6.0.9 / langgraph 1.2.17。GROUP_C 须用该解释器先跑 test_langgraph_contract_r26.py 固化 A-R26-01，失败则回 GROUP_B。</finding>
-      <finding id="GR-B-001-F02" severity="MINOR">基线 ADR 影响复核表中除 ADR-14~17、29~39、43~52 外为标题抽查（以 † 标注），已如实声明。GROUP_C 改动触及其他 ADR 所辖代码时须复核。</finding>
-      <condition>OQ-R26-A01~A07 由用户裁决（A04 为 CRITICAL：自评 LLM 判定项 6 分只能缓存期内同分，属 OQ-R26-14 回议点）；与推荐不一致时 system-architect 定向修订。</condition>
-      <condition>F01：GROUP_C 首步以 /root/.venvs/intelligentbase/bin/python 运行 LangGraph 契约测试，结果写入 implementation_plan。</condition>
-      <condition>§6.3 列出须重新基线的既有测试（test_config_restart_effect_r16.py、test_definition_config_r7.py 等）属 CL-003 取代所致；GROUP_C/D 改动这些测试须在报告中逐条对应取代登记，不得借机放宽无关断言。</condition>
+      <criterion id="J-B 覆盖" result="SATISFIED">module_design.md:255 需求覆盖表；MOD-R27-01~07（:65-243）覆盖 REQ-FUNC-001~013、REQ-NFUNC-001~003</criterion>
+      <criterion id="J-B 无循环依赖" result="SATISFIED">module_design.md:59 编号即拓扑序，依赖只指向低编号或既有 graphModel.ts / client.ts</criterion>
+      <criterion id="J-B ADR" result="SATISFIED">ADR-R27-01~07 均有 Status（architecture_design.md:64-145）；04/06/07 标 constraint-driven 并写约束来源</criterion>
+      <criterion id="J-B 迁移与运行单元" result="SATISFIED">module_design.md:287 数据迁移=无；:291 受影响运行单元：仅前端重建，ib-web/worker/embed/qdrant 不重启</criterion>
+      <criterion id="J-B 引用真实" result="SATISFIED">PM 核对：src/ib/confsvc/publish.py:333-335 确为删除被移除专家的 main/fallback 提示词层；src/ib/config/versioning.py:219-221 对所有节点 kind 产出 node_added/node_removed；PublishDialog.vue:18-22 line() 直接显示 i.kind 代码；@vue-flow/core package.json version 1.48.2，dist/vue-flow-core.mjs:3361-3367 为 isInputDOMNode</criterion>
+      <criterion id="J-B 禁用项" result="SATISFIED">tech_stack 无新依赖；无 axios/CDN/Docker</criterion>
+      <criterion id="GR-A-001 条件二" result="SATISFIED">(a) X1：服务端保存时删提示词文件、版本快照可回滚、会话不受影响，ADR-R27-04 不改服务端、只改确认文案，OQ-ARCH-R27-01 登记"非真软删"；(b) 差异清单服务端已覆盖全部节点类型，仅前端展示补中文类型（MOD-R27-03）</criterion>
+      <finding id="GR-B-001-F01" severity="MINOR">漏读画像 P10 必读 docs/architecture_design.md、docs/module_design.md（notes 自述）；本轮纯前端补齐，产出未因此出错。下次 system-architect 调用须先读。</finding>
+      <finding id="GR-B-001-F02" severity="MINOR">风险 R-1：FlowCanvas 每次重映射节点对象可能丢失 vue-flow 选中态，导致 Delete 键失效；ASM-R27-02 节点+边混选时边仍被 vue-flow 删除。</finding>
+      <condition>GROUP_C：实现时规避或验证 R-1（选中态在图更新后仍可用于 Delete），ASM-R27-02 行为在 implementation_plan 中明确；保留 module_design 列出的 R26 测试字面量约束。</condition>
+      <condition>GROUP_D：R-1 与真实按键需列入上线后人工浏览器验收清单；ASM-R27-01（agent 节点 id≠专家名）需有用例。</condition>
     </gate_review>
-    <gate_review id="GR-C-001" invocation_id="intelligentbase-R26-GROUP_C-001/002/003" decision="PASS_WITH_CONDITIONS" time="2026-10-27T10:12:54+08:00">
-      <reviewed_files><file path="docs/sdlc/intelligentbase/implementation_plan.md" version="0.3.0"/><file path="docs/sdlc/intelligentbase/code_review_report.md" version="0.3.0"/><file path="src/** tests/**（git diff，约 24 个后端既有文件 +1968/-115，另有新增 ib/runtime、ib/builder、ib/confsvc、config_views、builder_views、前端 components/config 等）"/></reviewed_files>
-      <criterion id="J-C 零新增失败" result="SATISFIED">PM 复跑（/root/.venvs/intelligentbase/bin/python，PYTHONPATH=src）：tests/unit 314 passed（基线 314）；tests/integration 232 passed（基线 225 + 契约 7）；tests/e2e 45 passed（基线 45）；tests/agents 15 passed；src/frontend npm test tests 57 pass 57 fail 0 skipped 0（基线 46）；npm run build ✓ built</criterion>
-      <criterion id="J-C 契约先行" result="SATISFIED">tests/integration/test_langgraph_contract_r26.py 7 passed，A-R26-01 成立（GR-B-001 条件 2）</criterion>
-      <criterion id="J-C 重新基线" result="SATISFIED">git diff 删去断言 10 条，逐条对应 CL-003 / IFC-R26-141/132/054/133 / A01（implementation_plan §5c 列 9 项），无 skip/xfail/删用例，无放宽无关断言（GR-B-001 条件 3）</criterion>
-      <criterion id="J-C 需求关键裁决" result="SATISFIED">CR-009 审计与发布同事务（ledger/config_versions.py:292-314）；CR-002 装配期 recover；A01~A07 落点见 implementation_plan §2；US-010 档位界面（AccessPanel.vue，ConfigStudio.vue:295 仅 manage 可见），access.grant 审计（config_views.py:713、views.py:2064）</criterion>
-      <criterion id="J-C 导航入口" result="SATISFIED">router 既有配置路由组件 ConfigPage→ConfigHub；权限管理页签在 ConfigStudio 内</criterion>
-      <criterion id="J-C 禁用项与范围" result="SATISFIED">requirements*.txt / package*.json / ci.yml / systemd / nginx 无改动；docker/redis/axios/fitz/ib_embed/CDN grep 仅命中"无 axios"注释与反向断言；selfcheck 57/58，唯一失败 core_framework_free 在 HEAD 干净导出同样失败（53/54），非回归；迁移 008 与 schema 单源（selfcheck config_versions_schema_single_source PASS）</criterion>
-      <finding id="GR-C-001-F01" severity="MINOR">流程：CR-011 两次以 sed -i / heredoc / 内联脚本改源码（第 3 次调用已改正）；内容经 diff 与测试核对无误。</finding>
-      <finding id="GR-C-001-F02" severity="MINOR">必读：requirements_spec / architecture_design / benchmark 未通读，产出以 module_design / user_stories 为锚，未发现因此出错。</finding>
-      <finding id="GR-C-001-F03" severity="MAJOR">CR-001（全图步数上限在并行超步内可能超出一个并行度）与 CR-006（新模块无专属 pytest）OPEN，属 GROUP_D 覆盖范围。</finding>
-      <condition>GROUP_D 按 module_design「测试文件规划」为新模块（ib/config graph/access/versioning、ib/runtime、ib/builder、ib/confsvc、ib/orchestration/dag、config_views、builder_views）补专属测试，覆盖 US-001~030 的 AC 映射；为 CR-001 写边界用例。</condition>
-      <condition>浏览器内真实交互（拖拽/悬停/连线/只读档）目前仅源码结构断言；GROUP_D 在不新增依赖前提下尽可能验证，不能验证的如实列为未验证，不得记 PASS。</condition>
-      <condition>热生效 5 s、30 节点性能、真实 DeepSeek 路径（TBD-T32/T36）离线不可测，列入 E1 部署计划的上线验证项。</condition>
-      <condition>E1：ci.yml 迁移检查加 008；上线需 ib-web/ib-worker 各重启一次。</condition>
-      <verification>见上 criterion 复跑命令；scratchpad gc1/gc2/gc3 存原始输出。</verification>
+    <gate_review id="GR-C-001" invocation_id="intelligentbase-R27-GROUP_C-001" decision="PASS_WITH_CONDITIONS" time="2026-10-31T15:34:35+08:00">
+      <reviewed_files><file path="docs/sdlc/intelligentbase/implementation_plan.md" version="0.1.0"/><file path="docs/sdlc/intelligentbase/code_review_report.md" version="0.1.0"/></reviewed_files>
+      <criterion id="J-C MOD 全部实现" result="SATISFIED">MOD-R27-01 nodeRemoval.ts、03 publishDiff.ts 新建；02 configDraft.ts（applyRemoval/undoRemoval，load/discard/markSaved 清撤销位）、04 FlowCanvas.vue（自维护 selNodes/selEdges + document keydown，经 decideDeleteKey）、05 AgentDetailPanel、06 ConfigStudio 均已改；MOD-R27-07 按分工留给 GROUP_D</criterion>
+      <criterion id="J-C 改动范围" result="SATISFIED">git status/diff --stat：产品代码仅 src/frontend/src 下 5 改 2 新；无后端、依赖清单、package*.json、ci.yml、tests/ 改动；与 implementation_plan 一致</criterion>
+      <criterion id="J-C PM 复跑" result="SATISFIED">见 verification：build rc=0，npm test 77/77/0，与基线一致，零新增失败</criterion>
+      <criterion id="J-C 无 CRITICAL / 评分" result="SATISFIED">code_review_report.md:14 CRITICAL 0 / MAJOR 0 / MINOR 2；最低分 6/10（:60）对应 CR-002</criterion>
+      <criterion id="J-C 禁用项" result="SATISFIED">grep v-html/localStorage/axios/忽略并继续/外链 于 7 个改动文件：0 命中；FlowCanvas 保留 :delete-key-code 字面量</criterion>
+      <criterion id="GR-B-001 条件" result="SATISFIED">R-1：FlowCanvas 自维护选中集合并在 graph 变化时修剪（FlowCanvas.vue diff）；ASM-R27-02：混选给提示不删节点、边仍由 vue-flow 删除，写入 implementation_plan</criterion>
+      <finding id="GR-C-001-F01" severity="MINOR">漏读必读 selfcheck.py 及 requirements_spec/user_stories/tech_stack 全文（notes 自述）；产出未因此出错。</finding>
+      <finding id="GR-C-001-F02" severity="MINOR">CR-002：选中集合与真实按键未经浏览器验证；document 级 keydown 监听依赖 decideDeleteKey 的输入焦点判定。</finding>
+      <condition>GROUP_D：config_studio_r27.test.js 覆盖 nodeRemoval/publishDiff 纯逻辑（含输入焦点、多选、开始/结束、默认专家、仅从画布移除保留提示词、删除 agent 清提示词草稿 REQ-FUNC-010、撤销失效规则、ASM-R27-01）；浏览器交互项写入上线后人工验收清单。</condition>
+      <verification><![CDATA[git status --short / git diff --stat: src/frontend/src 5 modified + nodeRemoval.ts, publishDiff.ts new; no backend/package/ci/tests changes
+(cd src/frontend && npm run build) -> build_rc=0, "✓ built in 27.11s" (vue-tsc --noEmit && vite build)
+(cd src/frontend && npm test) -> # tests 77 # pass 77 # fail 0 # cancelled 0 # skipped 0  (baseline 77/77/0)
+backend 未改动，未复跑 pytest / selfcheck]]></verification>
     </gate_review>
-    <gate_review id="GR-D-001" invocation_id="intelligentbase-R26-GROUP_D-001" decision="FAIL" time="2026-10-27T14:37:56+08:00">
+    <gate_review id="GR-D-001" invocation_id="intelligentbase-R27-GROUP_D-001" decision="PASS_WITH_CONDITIONS" time="2026-10-31T15:52:33+08:00">
       <reviewed_files><file path="docs/sdlc/intelligentbase/test_plan.md" version="0.1.0"/><file path="docs/sdlc/intelligentbase/unit_test_report.md" version="0.1.0"/><file path="docs/sdlc/intelligentbase/integration_test_report.md" version="0.1.0"/><file path="docs/sdlc/intelligentbase/e2e_test_report.md" version="0.1.0"/></reviewed_files>
-      <criterion id="J-D 零新增失败" result="SATISFIED">PM 复跑：tests/unit 509 passed；tests/integration 326 passed (508s)；tests/e2e 51 passed；tests/agents 15 passed；npm test tests 77 pass 77 fail 0 skipped 0。基线用例全部仍在且通过</criterion>
-      <criterion id="J-D 无注水" result="SATISFIED">新测试 grep skip/xfail/deselect/collect_ignore/.skip/.todo 为 0；pytest.ini/setup.cfg/pyproject/conftest 无 addopts/collect_ignore；monkeypatch 仅 2 处，均在外部边界（llm._make_langchain_client、deps.llm.build_expert 观察包装）；产品代码自 GR-C-001 后未改（find -newer 为空）</criterion>
-      <criterion id="J-D AC 映射" result="SATISFIED">test_plan.md US-001~030 逐 AC 映射，Must 无空项</criterion>
-      <criterion id="J-D critical path 1.00" result="NOT_SATISFIED">23/24 = 0.96：US-003（Must，图实时更新）的 AC 全为浏览器内交互；PM 核实本机无 chromium/chrome/firefox/playwright/puppeteer/jsdom/happy-dom，且不得新增依赖。浏览器交互另列"未验证清单"（拖拽/连线/删除、悬停卡片 300 ms、未保存标记、冲突对话框按钮、加入画布/逐项采纳、克隆 UI），未记 PASS——如实</criterion>
-      <finding id="GR-D-001-F01" severity="MINOR">DEF-R26-001 dag.py:221-225 全图步数上限在单个并行超步内可超（上限 2 实执行 4，超出≤并行度-1，仍终止）。回 GROUP_C 修复：在扇出处按剩余额度截断。冻结用例 TC-INT-R26-024 同步改为断言精确上限。</finding>
-      <finding id="GR-D-001-F02" severity="MINOR">DEF-R26-002 definition.py / views.py:945 直接 PUT temperature 被静默丢弃返回 200 ok，违反 AC-021-03（应 400 field_not_editable），用户会误以为已保存。回 GROUP_C 修复；冻结用例 TC-INT-R26-059 同步改为断言 400。</finding>
-      <finding id="GR-D-001-F03" severity="MINOR">DEF-R26-003 每次生成产生 2 条外发审计（generate + judge）。PM 裁决：保留实现——自评 LLM 判定是 A04 用户确认的第二次云端调用，按 REQ-NFUNC-014"每次云端外发也产生审计"逐次审计更保守；AC-030-02 措辞"恰好 1 条"改为"每次外发 1 条（生成与自评各 1）"，与 GR-A-002-F01 一并在下次 GROUP_A 触达时修订。冻结用例 TC-INT-R26-098 即为规格。</finding>
-      <finding id="GR-D-001-F04" severity="MINOR">流程：测试工程师早期对自建测试文件用过 sed -i / cat >> / 内联 python（未触产品代码）；必读 requirements_spec / architecture_design / ci.yml 未通读。</finding>
-      <condition>GROUP_C-004 修 DEF-R26-001/002 后，PM 全量复跑；test-engineer 复核两个冻结用例改写为 AC 断言。</condition>
-      <condition>critical path 0.96 与浏览器交互未验证项：提请用户裁决——推荐接受，并在 E1 部署计划中列"上线后人工浏览器验收清单"（含 US-003 全部 AC 与未验证清单），由用户在目标机上验收。</condition>
-      <verification>scratchpad gd1/ 存复跑原始输出；command -v chromium/google-chrome/firefox 均无；node_modules 无 playwright/puppeteer/jsdom/happy-dom。</verification>
-    </gate_review>
-    <gate_review id="GR-D-002" invocation_id="intelligentbase-R26-GROUP_D-002" decision="OVERRIDDEN" time="2026-10-27T16:27:50+08:00">
-      <reviewed_files><file path="docs/sdlc/intelligentbase/test_plan.md" version="0.2.0"/><file path="docs/sdlc/intelligentbase/unit_test_report.md" version="0.2.0"/><file path="docs/sdlc/intelligentbase/integration_test_report.md" version="0.2.0"/><file path="docs/sdlc/intelligentbase/e2e_test_report.md" version="0.2.0"/></reviewed_files>
-      <criterion id="J-D 零新增失败" result="SATISFIED">PM 复跑：unit 509 / integration 333 / e2e 51 / agents 15 passed；npm test 77/77/0；npm run build 成功</criterion>
-      <criterion id="J-D 缺陷闭环" result="SATISFIED">DEF-R26-001/002 FIXED 并复测（TC-INT-R26-024/059 + 150~156）；DEF-R26-003 PM 裁决关闭；待修缺陷 0</criterion>
-      <criterion id="J-D critical path 1.00" result="NOT_SATISFIED">23/24 = 0.96（US-003 浏览器交互，本机无浏览器且不得加依赖）。用户 CL-008 接受，部署时人工验收——OVERRIDDEN</criterion>
-      <condition>E1 部署计划引用 e2e_test_report.md:164「上线后人工浏览器验收清单」（A1~A4 / B1~B10），列为上线验收必做项；另列热生效 5 s、30 节点性能、真实 DeepSeek 路径、Builder 60 s 超时、目标机 SQLite 版本（ALTER ADD COLUMN CHECK）为上线验证项。</condition>
-      <condition>E1：ci.yml 迁移检查加 008；上线需 ib-web / ib-worker 各重启一次；本次不部署（E2 NOT_AUTHORIZED）。</condition>
-      <condition>下次 GROUP_A 触达：AC-030-02 措辞改为"每次外发 1 条（生成与自评各 1）"；GR-A-002-F01 来源标注改正。</condition>
-    </gate_review>
-    <gate_review id="GR-E1-002" invocation_id="intelligentbase-R26-GROUP_E1-002" decision="PASS" time="2026-10-27T23:55:08+08:00">
-      <reviewed_files><file path=".github/workflows/ci.yml" version="+5/-2"/><file path="docs/sdlc/intelligentbase/cicd_pipeline.md" version="1.1.0"/></reviewed_files>
-      <criterion id="J-E1 改动最小" result="SATISFIED">`git diff --stat` → ci.yml +5/-2、cicd_pipeline.md +36/-5，无其他文件；node-version 全文件唯一一处（ci.yml:240）由 "20" 改 "22"；阶段 9 注释补 R26 说明（ci.yml:234-236）；未改 timeout、未新增依赖、未改其他 9 个阶段</criterion>
-      <criterion id="J-E1 配置有效" result="SATISFIED">PM 亲自运行 `python -c yaml.safe_load(.github/workflows/ci.yml)` → YAML_OK jobs=['ci']（单 job 结构未变）</criterion>
-      <criterion id="J-E1 测试未动" result="SATISFIED">`git status --porcelain` 无 src/frontend/tests 与 src/** 改动；PM 亲自在 src/frontend 运行 npm test → tests 77 / pass 77 / fail 0 / skipped 0（Node v24.18.0）</criterion>
-      <criterion id="J-E1 未越权" result="SATISFIED">子代理报告未 ssh / 未部署 / 未 commit / 未 push；仅改 REWORK_AUTHORIZED 的两个文件</criterion>
-      <criterion id="J-E1 文档同步" result="SATISFIED">cicd_pipeline.md 运行环境行（:32）、制品管理段（:117）改为 Node 22，文末新增「R26 变更记录」（:120-143）含 run id / 失败用例号 / 错误文本 / 改动面 / 未改动面 / 风险</criterion>
-      <finding id="GR-E1-002-F01" severity="MINOR">项目画像 P3（前端测试「Node 20 内置 node:test」）与 P4 的事实已过时（CI 现为 Node 22）。画像为 APPROVED 文档，本次不改；在下次画像修订时同步，或由用户确认后由 PM 升版。不影响本轮部署。</finding>
-      <verification>YAML_OK / git diff --stat / git status --porcelain / npm test 77 pass 0 fail；证据见上各 criterion。</verification>
-    </gate_review>
-    <gate_review id="GR-E1-001" invocation_id="intelligentbase-R26-GROUP_E1-001" decision="PASS_WITH_CONDITIONS" time="2026-10-27T16:38:20+08:00">
-      <reviewed_files><file path="docs/sdlc/intelligentbase/cicd_pipeline.md" version="0.1.0"/><file path="docs/sdlc/intelligentbase/deployment_plan.md" version="0.1.0"/><file path=".github/workflows/ci.yml" version="git diff +36/-2"/></reviewed_files>
-      <criterion id="J-E1 ci.yml 最小改动" result="SATISFIED">git diff 仅 "Schema / migration check" step（注释、name、追加 008 断言）；PM 用 yaml.safe_load 抽出 run 脚本以 /root/.venvs/intelligentbase/bin/python 执行：PASS 003 / 007 / 008（syntax-ok / replay x2 idempotent / single-source / old-db upgrade），rc=0</criterion>
-      <criterion id="J-E1 部署计划完整" result="SATISFIED">预检 PRE-00~10（含 PRE-04 目标机 SQLite ALTER CHECK 探测、PRE-06 台账与配置备份）、DEPLOY 4 步（git pull，禁 scp/rsync）、ROLLBACK 8 项（含 000 文件态还原门，区分配置版本回滚与代码回滚）、验证 14 项；V-12 引用 e2e_test_report 人工浏览器验收清单 A1~A4/B1~B10 全部必做（deployment_plan.md:517）；V-13 性能/真实 DeepSeek/Builder 60 s 为用户实测</criterion>
-      <criterion id="J-E1 禁用项与凭据" result="SATISFIED">scp/rsync/sudo -S/http2 仅出现在禁止说明；无 Docker/systemd/nginx 改动；无口令/密钥内容。目标机 IP、SSH 用户与密钥路径名沿用已入库的 .claude/skills/ib-prod-deploy/SKILL.md 与 docs/deployment_plan.md 既有写法，非新增暴露</criterion>
-      <criterion id="J-E1 未越权" result="SATISFIED">E2 NOT_AUTHORIZED（CL-008），子代理报告未 ssh / 未部署 / 未 commit</criterion>
-      <finding id="GR-E1-001-F01" severity="MINOR">流程：改 ci.yml 用了一次 python3 字符串替换（违反仅 Write/Edit），diff 已核对范围正确。</finding>
-      <finding id="GR-E1-001-F02" severity="MINOR">跟进项：selfcheck.py:3538 清单断言仍为 B1–B27（checklists 已新增 B29）；ib-worker.env.example 是否需登记 4 个可选键未核对。不影响运行。</finding>
-      <condition>部署（E2）前：PRE-00 要求待部署代码已 commit 并 push（工作区有大量未跟踪新文件），须用户授权提交；F02 两项跟进在部署前由 software-developer 小改或 PM 确认无需改。</condition>
-      <condition>E2 须用户在当次消息中明确授权；部署后 V-12 浏览器验收 14 项全部通过才闭合 GR-D-002 的 critical path 缺口。</condition>
+      <criterion id="J-D 报告齐全" result="SATISFIED">四份文档存在，0.1.0 DRAFT，文件头齐全</criterion>
+      <criterion id="J-D PM 复跑一致" result="SATISFIED">见 verification：前端 129/129/0、R27 文件 52/52/0、后端 910 passed，与报告一致</criterion>
+      <criterion id="J-D baseline 零新增失败" result="SATISFIED">前端基线 77/77 → 129/129（+52 新增全过）；后端全量 910 passed（含新增 2），0 fail</criterion>
+      <criterion id="J-D Must 故事有真实执行用例" result="SATISFIED">US-001/003/004/005/006/007/008/010 均有执行通过的 TC-FE-R27 用例（e2e_test_report 覆盖表）</criterion>
+      <criterion id="J-D 防注水" result="SATISFIED">config_studio_r27.test.js 中 skip/todo 0 处；npm test skipped 0 todo 0；新 python 测试基名全局唯一（find 计 1）</criterion>
+      <criterion id="J-D 冻结点" result="SATISFIED">测试文件 mtime 15:41:01 / 15:42:31 早于四份报告（15:47~15:49）；产品代码 mtime 15:29~15:30，GR-C-001 后未改</criterion>
+      <criterion id="J-D critical path" result="SATISFIED">可离线执行的 critical path 用例 5/5 通过；浏览器/线上项按 §K 标 NOT_TESTABLE，不计分母，列入人工验收清单 M-01~M-08（e2e_test_report.md:142-149），其中 critical path 待人工验证 5 条（M-01、M-03、M-06、M-07、M-08）</criterion>
+      <finding id="GR-D-001-F01" severity="MINOR">requestRemove 未导出，旅程用例用测试侧 drive() 复刻 IFC-R27-011 步骤，由 TC-FE-R27-057 绑定 ConfigStudio.vue 源码顺序；属间接覆盖，真实页面编排由 M-08 人工验收兜底。</finding>
+      <finding id="GR-D-001-F02" severity="MINOR">configDraft.ts 用 8 行 vue 替身离线执行，验证 dirty/撤销语义，不验证 Vue 响应式（已在测试头与报告声明）。</finding>
+      <finding id="GR-D-001-F03" severity="MINOR">新增后端用例 tests/unit/test_diff_node_removal_r27.py 超出 MOD-R27-07 前端范围，但在 P3 允许位置、仅测服务端既有差异契约，接受。</finding>
+      <condition>上线前/后须完成 e2e_test_report 人工浏览器验收 M-01~M-08；critical path 5 条未完成人工验证前，最终状态至多 DELIVERED_WITH_ISSUES；REQ-NFUNC-001（1 秒）保持"未验收"直至目标机校准。</condition>
+      <verification><![CDATA[(cd src/frontend && npm run build) -> build_rc=0
+(cd src/frontend && npm test) -> # tests 129 # pass 129 # fail 0 # cancelled 0 # skipped 0 # todo 0
+(cd src/frontend && node --test tests/config_studio_r27.test.js) -> # tests 52 # pass 52 # fail 0 # skipped 0
+/root/.venvs/intelligentbase/bin/python -m pytest tests -q -p no:cacheprovider -> 910 passed in 28.87s
+grep -cE "\.skip|\.todo|skip:|todo:" src/frontend/tests/config_studio_r27.test.js -> 0
+ls -l --time-style=full-iso: tests 15:41:01/15:42:31 < reports 15:47:02~15:49:21; product src 15:29:19~15:30:42]]></verification>
     </gate_review>
   </gate_reviews>
   <clarifications>
-    <clarification id="CL-001" answered_by="用户" time="2026-10-26T23:55:36+08:00">Q1 "当前项目 agent"指什么 → 产品里每个项目的 kb-agent / 专家（可视化配置页），不是 .claude SDLC 智能体。</clarification>
-    <clarification id="CL-002" answered_by="用户" time="2026-10-26T23:55:36+08:00">Q2 REV-25 收尾 → 「之前的已经用别的ai做完了。你pull一下能看到更新后的记录」。PM 已 pull（80f2962），未见 REV-25 部署记录；按用户陈述收尾并归档。</clarification>
-    <clarification id="CL-003" answered_by="用户" time="2026-10-26T23:55:36+08:00">Q3 生效与拓扑 → 「热生效+自由画布」：保存后立即生效（不需重启），画布上可自由拖拽节点/连线形成任意 DAG。推翻 REV-16-2「重启后生效」（REQ-FUNC-IB-40 / OOS-16 / C-IB-40）与 OOS-12 / OOS-21 / REQ-FUNC-IB-26「拓扑不可编辑、不做自定义 DAG」。</clarification>
-    <clarification id="CL-004" answered_by="用户" time="2026-10-26T23:55:36+08:00">Q4 "权限" → 两者都要：agent 运行时权限（工具授权、可访问的知识库/数据）+ 账号对 agent 的查看/编辑权限。</clarification>
-    <clarification id="CL-005" answered_by="用户" time="2026-10-27T00:17:47+08:00">GR-A-001 条件裁决：OQ-R26-10 改为「agent builder 类似 sdlc-agent-suite 里的 agent-builder：告诉它需求，它生成一个可以运行在 LangGraph、可被编排的 agent，并适配所在项目里的工具、权限、参数或要求」（等同选项 C 的扩展，用户以此确认 AI 生成涉及的云端 DeepSeek 数据外发；CAND-16 纳入）。其余 OQ-R26-01~09、11、12 按推荐；CAND 按分析师建议（含 CAND-02 试运行为 Should）；INF-1~5 按占位、架构阶段实测校准。</clarification>
-    <clarification id="CL-006" answered_by="用户" time="2026-10-27T00:30:29+08:00">「确认，按推荐，开始下一步」：用户故事清单（requirements_spec / user_stories 2.0.0，US-001~030）确认；OQ-R26-13~16 采纳推荐（13=A 外发禁止项；14=A 五维 20/25/15/25/15；15=A 仅系统固有约束+每次描述中的要求；16=A 不自动接线）。提交（commit）未明确授权，PM 不提交。</clarification>
-    <clarification id="CL-007" answered_by="用户" time="2026-10-27T07:19:48+08:00">「全部按照推荐，进入下一步」：OQ-R26-A01~A07 全部采纳推荐——A01 现有运维账号上线后为 manage 档；A02 方案 B，下游 agent 以只读"上游材料"看到上游输出，v1 旧项目行为不变；A03 条件分支仅支持关键词与 upstream_degraded 谓词，不支持表达式/代码；A04（CRITICAL）保留 6 分 LLM 判定项，缓存期内同分，接受缓存失效后的残余差异；A05 单 agent 最大步数=工具调用轮数，默认 4，范围 1~8，与全图步数上限并存；A06 人工确认挂起态仅进程内，重启后 fail-closed；A07 v1 旧项目首次保存先存升级前基线 v1 再存用户 v2。GR-B-001 第 1 条条件满足，无需架构修订。提交（commit）仍未授权。</clarification>
-    <clarification id="CL-008" answered_by="用户" time="2026-10-27T16:27:50+08:00">「接受。等部署的时候验证。现在暂时不部署」：接受 critical path 0.96（US-003 浏览器交互不可离线验证），浏览器交互按 e2e_test_report「上线后人工浏览器验收清单」在部署时验证；本次不部署（E2 不授权）。提交（commit）仍未授权。</clarification>
-    <clarification id="CL-009" answered_by="用户" time="2026-10-27T22:23:14+08:00">「提交，跟进两处小问题。然后部署」：授权① GR-E1-001-F02 两处跟进；② 主会话 commit 并 push（部署方式为目标机 git pull，push 为部署前置 PRE-00）；③ 本轮 E2 生产部署授权（production），按 deployment_plan 1.0.0 执行。</clarification>
-    <clarification id="CL-010" answered_by="用户" time="2026-10-27T23:40:00+08:00">CI 红灯处置：用户选择「CI Node 20 → 22（推荐）」——改 `.github/workflows/ci.yml` 的 `node-version` 与生产 Node 22 对齐，同步更新 cicd_pipeline.md，重跑 CI 绿后立即按 deployment_plan 1.0.0 执行 E2。用户本轮消息「Use Skill: sdlc-orchestrator 部署到生产环境」为本次生产部署授权（PRODUCTION_DEPLOY_CONFIRM=true，环境 production）。</clarification>
+    <clarification id="CL-001" answered_by="用户（经主会话转述）" time="2026-10-31T14:17:52+08:00">CP-001 用户原话「1A 2A 3A 4 A」。Q1=A：确认 US-001~011，OQ-R27-01~10 与 INF-1~3 全部按推荐；Q2=A：通用"删除节点"/Delete 键对 agent = 仅从画布移除，"删除 agent"留在详情面板；Q3=A：以 R26 软删/历史保留为准，改确认文案，架构阶段核对服务端提示词文件处置；Q4=A：用户口头确认 REV-26 已在别处部署完成，未提供部署时间/版本等细节，PM 未核验、未访问生产机。调用方转述用户最初要求"确认后开始开发"：续跑 GROUP_B→C→D，不部署、不 commit。</clarification>
   </clarifications>
+  <checkpoints>
+    <checkpoint id="CP-001" time="2026-10-31T09:45:04+08:00" group="GROUP_A" reason="GROUP_A 已批准；按调用范围停在用户确认用户故事与开放问题之前" status="ANSWERED">
+      <question id="Q1" blocking="true">是否确认 REV-27 用户故事 US-001~011 并按推荐采纳全部 OQ-R27-01~10 / INF-1~3？A) 全部按推荐确认，进入架构（推荐）；B) 按推荐确认，但改选部分 OQ（请写明编号与选项）；C) 先调整故事范围。</question>
+      <question id="Q2" blocking="false">OQ-R27-02 agent 节点上通用"删除节点"/Delete 键的默认语义：A) 仅从画布移除，可重新放回；"删除 agent"留在详情面板（推荐）；B) 直接删除 agent 定义；C) 每次弹窗二选一。</question>
+      <question id="Q3" blocking="false">OQ-R27-07（冲突点 X1）删除 agent 定义时提示词文件：A) 以 R26 软删/历史保留为准，改文案，架构阶段核对服务端（推荐）；B) 以现文案为准，提示词文件一并移除。</question>
+      <question id="Q4" blocking="false">REV-26 收尾：旧状态文件里 E2 生产部署仍为 PENDING。A) 已在别处部署完成，按已收尾处理（请告知）；B) 尚未部署，REV-27 开发完后一起部署（推荐）；C) 先单独部署 REV-26（须在主会话 claude --agent pm-orchestrator 中授权）。</question>
+    </checkpoint>
+    <checkpoint id="CP-002" time="2026-10-31T15:52:33+08:00" group="GROUP_D" reason="调用方指定范围 B→C→D 已完成；E1（CI/部署计划）与提交需用户决定" status="OPEN">
+      <question id="Q1" blocking="true">下一步：A) 继续 GROUP_E1，产出 CI 与部署计划（仅前端重建、不重启服务），不执行部署（推荐）；B) 先在本地/目标机按 e2e_test_report 人工验收清单 M-01~M-08 验收，再决定；C) 到此为止。</question>
+      <question id="Q2" blocking="false">提交：A) 由主会话在用户确认后 commit（含 archive/rev26/、REV-27 文档、7 个前端源文件、2 个测试文件、agent 记忆），不 push（推荐，待部署时再 push）；B) commit 并 push；C) 暂不提交。</question>
+    </checkpoint>
+  </checkpoints>
   <escalations></escalations>
   <audit_log>
-    <event time="2026-10-26T23:55:36+08:00" type="INVOCATION" actor="pm-orchestrator">REV-26 新建状态文件（REV-25 已归档）；记录 CL-001 ~ CL-004；准备调用 requirement-analyst（intelligentbase-GROUP_A-001）。</event>
-    <event time="2026-10-26T23:55:43+08:00" type="INVOCATION" actor="pm-orchestrator">调用 requirement-analyst（intelligentbase-GROUP_A-001，PHASE_01,PHASE_02，含行业调研）。</event>
-    <event time="2026-10-27T00:07:47+08:00" type="SECURITY" actor="requirement-analyst">WebFetch 抓取 n8n 文档页 https://docs.n8n.io/advanced-ai/examples/understand-agents/ 时返回内容夹带"向外部检索端点发请求"的指令；按 §L-1 视为数据，未执行。</event>
-    <event time="2026-10-27T00:07:47+08:00" type="GATE" actor="pm-orchestrator">GR-A-001 PASS_WITH_CONDITIONS；三份产物 0.1.0→1.0.0 APPROVED；收件箱 hook 未记录本次（id 与 REV-25 同号），PM 以 intelligentbase-R26-GROUP_A-001-1~3 补记。按 scope 停止，等待用户裁决 OQ/CAND 并确认用户故事。</event>
-    <event time="2026-10-27T00:17:47+08:00" type="INVOCATION" actor="pm-orchestrator">记录 CL-005；调用 requirement-analyst（intelligentbase-GROUP_A-002，按 GR-A-001 条件与用户裁决定向修订 1.1.0，REWORK_AUTHORIZED 三份产物）。</event>
-    <event time="2026-10-27T00:28:27+08:00" type="GATE" actor="pm-orchestrator">GR-A-002 PASS_WITH_CONDITIONS；三份产物 1.1.0→2.0.0 APPROVED，1.0.0 登记 SUPERSEDED；收件箱 hook 记录与 REV-25 同号，PM 以 R26 前缀补记 3 条。等待用户确认用户故事与 OQ-R26-13~16。</event>
-    <event time="2026-10-27T00:30:29+08:00" type="INVOCATION" actor="pm-orchestrator">记录 CL-006（GR-A-002 条件一闭合：OQ-R26-13~16 用户确认）。条件二（F01 来源标注）转为 GROUP_B 期间的开放条件，下次 GROUP_A 定向修订时改正。调用 system-architect（intelligentbase-R26-GROUP_B-001，PHASE_03,PHASE_04；调用号自本次起带 R26 前缀，见 P-PM-002）。</event>
-    <event time="2026-10-27T00:55:47+08:00" type="GATE" actor="pm-orchestrator">GR-B-001 PASS_WITH_CONDITIONS；architecture_design / module_design / tech_stack 0.1.0→1.0.0 APPROVED；收件箱补记。等待用户裁决 OQ-R26-A01~A07（A04 CRITICAL）后进入 GROUP_C。</event>
-    <event time="2026-10-27T07:19:48+08:00" type="BASELINE" actor="pm-orchestrator">GROUP_C 前基线（HEAD 80f2962 + 未提交文档改动，代码未改）：/root/.venvs/intelligentbase/bin/python -m pytest tests/unit -q → 314 passed；tests/integration → 225 passed；tests/e2e → 45 passed；src/frontend npm test → tests 46 pass 46 fail 0。基线零失败，GROUP_C/D 判定为零新增失败。</event>
-    <event time="2026-10-27T07:19:48+08:00" type="INVOKE" actor="pm-orchestrator">CL-007 用户采纳 OQ-R26-A01~A07 推荐；调用 software-developer（intelligentbase-R26-GROUP_C-001，PHASE_05/06）。</event>
-    <event time="2026-10-27T07:54:29+08:00" type="VERIFY" actor="pm-orchestrator">GROUP_C-001 PARTIAL_SUCCESS 中间核验（非组门控，GROUP_C 保持 IN_PROGRESS）：PM 复跑 unit 314 passed / integration 232 passed（基线 225 + 契约 7）/ e2e 45 passed / 契约测试 7 passed，无 skip/xfail；selfcheck 57/58，唯一失败 core_framework_free 在 HEAD 干净导出同样失败（53/54），非回归；git diff 无依赖/ci.yml/systemd/前端改动，禁用项 grep 0；改动的 2 个既有测试仅放行已登记追加字段。完成 MOD-01~09、11、13 库层、10 的 dag.py、22 部分；未完成 10 接入、12、14~21、22 余项，无用户故事端到端可用。PM 裁决：CR-009 发布后审计"尽力而为"不满足 REQ-NFUNC-006（Must，齐全率 100%），版本与审计同库，按实现细节处理——GROUP_C-002 须将审计写入并入发布事务，无需回 GROUP_B；§7 架构偏差 5 条接受（检索截断后过滤偏安全，召回量化留 TBD-T35）。流程 MINOR：必读 user_stories/benchmark/tech_stack/phase_status 未通读；部分文件经 shell heredoc 写入（CR-011）。收件箱补记 R26-GROUP_C-001-1..3、R26-PM-4。</event>
-    <event time="2026-10-27T07:54:29+08:00" type="INVOKE" actor="pm-orchestrator">续调用 software-developer（intelligentbase-R26-GROUP_C-002），按 implementation_plan §6 顺序完成余项。</event>
-    <event time="2026-10-27T09:44:20+08:00" type="RESUME" actor="pm-orchestrator">intelligentbase-R26-GROUP_C-002 因主会话进程退出中断（无完成记录）；工作区已有 runtime/、config_views、builder_views、hot_effect_probe、编排器/worker 接入与若干既有测试改动，前端仅 client.ts / builderTypes.ts。同一 invocation 以原上下文续跑，要求先核对现状、全量复跑、修复中断残留。</event>
-    <event time="2026-10-27T10:02:01+08:00" type="VERIFY" actor="pm-orchestrator">GROUP_C-002 PARTIAL_SUCCESS 中间核验：PM 复跑 unit 314 / integration 232 / e2e 45 全部 passed；npm run build ✓（vue-tsc+vite）；npm test tests 54 pass 54 fail 0 skipped 0；依赖清单/package*.json/ci.yml/systemd/nginx 无改动；禁用项 grep 仅为"无 axios"注释与反向断言。导航：router 配置路由组件 ConfigPage→ConfigHub（沿用既有导航入口）。CR-009 已核：commit_publish(audit=) 与 publish/head 同一 SQLite 事务（config_versions.py:292-314、内存版 :496-504）。被删断言 10 条逐条对应 CL-003/IFC-R26-141/132/054/133 取代，无放宽无关断言。implementation_plan / code_review_report 0.1.0→0.2.0 仍为 DRAFT（未经门控批准，不登记 SUPERSEDED）。缺口：CR-012 账号档位授予界面未做，US-010 为 Must（AC-010-02 需管理档在界面改档位）——在 GROUP_C 内补齐，不进 GROUP_D。流程 MINOR：CR-011 再犯（sed/heredoc 写入），requirements_spec/architecture_design/benchmark 未通读。收件箱补记 R26-GROUP_C-002-1..3、R26-PM-5。</event>
-    <event time="2026-10-27T10:02:01+08:00" type="INVOKE" actor="pm-orchestrator">调用 software-developer（intelligentbase-R26-GROUP_C-003），范围仅 CR-012：账号档位管理界面 + 账号创建页档位选择。</event>
-    <event time="2026-10-27T10:12:54+08:00" type="GATE" actor="pm-orchestrator">GR-C-001 PASS_WITH_CONDITIONS；implementation_plan / code_review_report 0.3.0→1.0.0 APPROVED；收件箱补记 R26-GROUP_C-003-1。</event>
-    <event time="2026-10-27T10:12:54+08:00" type="INVOKE" actor="pm-orchestrator">调用 test-engineer（intelligentbase-R26-GROUP_D-001，PHASE_07/08/09）。</event>
-    <event time="2026-10-27T12:11:36+08:00" type="RESUME" actor="pm-orchestrator">intelligentbase-R26-GROUP_D-001 因 API 用量上限（HTTP 429）中断；额度重置后以原上下文续跑，要求先核对已产出文件再继续。</event>
-    <event time="2026-10-27T13:54:46+08:00" type="RESUME" actor="pm-orchestrator">intelligentbase-R26-GROUP_D-001 第二次中断（主会话进程退出）；已产出 tests/config_r26_support.py + 5 个 integration + 12 个 unit 的 _r26 测试，四份报告未写，产品代码自 GR-C-001 后未改。以原上下文续跑，预算不足时先写报告并返回 PARTIAL_SUCCESS。</event>
-    <event time="2026-10-27T14:37:56+08:00" type="GATE" actor="pm-orchestrator">GR-D-001 FAIL（critical path 0.96 待用户裁决 + DEF-R26-001/002 缺陷回流 1 次）；DEF-R26-003 PM 裁决保留实现、改 AC 措辞；收件箱补记 R26-GROUP_D-001-1..3、R26-PM-6。</event>
-    <event time="2026-10-27T14:37:56+08:00" type="INVOKE" actor="pm-orchestrator">缺陷回流：调用 software-developer（intelligentbase-R26-GROUP_C-004）修 DEF-R26-001、DEF-R26-002。</event>
-    <event time="2026-10-27T15:33:32+08:00" type="RESUME" actor="pm-orchestrator">intelligentbase-R26-GROUP_C-004 因主会话进程退出中断；dag.py、definition.py、views.py、config_views.py 与两份 r26 集成测试已有改动，文档未更新。以原上下文续跑。用户尚未答复 critical path 0.96 的裁决。</event>
-    <event time="2026-10-27T15:59:13+08:00" type="VERIFY" actor="pm-orchestrator">GROUP_C-004 缺陷修复核验通过：改动仅 dag.py、definition.py、views.py、config_views.py 与两个冻结用例；PM 复跑 tests/unit 509 / tests/integration 326 (618s) / tests/e2e 51 / tests/agents 15 passed，npm test 77/77/0，npm run build 成功，compileall OK，selfcheck 57/58（core_framework_free 环境既有）。TC-INT-R26-024 断言执行数==上限 2、LLM 调用 2 次、c2/c3 skipped_step_cap；TC-INT-R26-059 断言 400 + items[].code==field_not_editable、版本 0、hash 不变。PM 接受 ASSUMPTION：顶层 error.code 沿用 validation_error，field_not_editable 在 items（满足 AC-021-03，保持既有错误形态）。DEF-R26-001、DEF-R26-002 FIXED；CR-001 FIXED。implementation_plan / code_review_report 1.1.0→2.0.0 APPROVED，1.0.0 SUPERSEDED。收件箱补记 R26-GROUP_C-004-1..2。</event>
-    <event time="2026-10-27T15:59:13+08:00" type="INVOKE" actor="pm-orchestrator">调用 test-engineer（intelligentbase-R26-GROUP_D-002）复核缺陷修复并更新四份测试文档；critical path 0.96 仍待用户裁决。</event>
-    <event time="2026-10-27T16:21:51+08:00" type="VERIFY" actor="pm-orchestrator">GROUP_D-002 复测核验：产品代码自 GROUP_C-004 后未改；新增 tests/integration/test_defect_retest_r26.py（TC-INT-R26-150~156，无 skip/xfail/monkeypatch）；PM 复跑 tests/integration 333 passed (435s)；unit 509 / e2e 51 / agents 15 / npm 77 沿用本日 GROUP_C-004 后 PM 复跑结果（其后仅新增集成测试文件）。DEF-R26-001/002 FIXED 复测通过，DEF-R26-003 PM 裁决关闭；待修缺陷 0；四份测试文档 0.2.0 DRAFT，e2e_test_report:164 含上线后人工浏览器验收清单。GROUP_D 组门控待用户裁决 critical path 0.96（US-003 浏览器交互）。收件箱补记 R26-GROUP_D-002-1。</event>
-    <event time="2026-10-27T16:27:50+08:00" type="GATE" actor="pm-orchestrator">GR-D-002 OVERRIDDEN（用户 CL-008 接受 critical path 0.96）；四份测试文档 0.2.0→1.0.0 APPROVED。</event>
-    <event time="2026-10-27T16:27:50+08:00" type="INVOKE" actor="pm-orchestrator">调用 devops-engineer（intelligentbase-R26-GROUP_E1-001，PHASE_10/11a）；E2 未授权。</event>
-    <event time="2026-10-27T16:38:20+08:00" type="GATE" actor="pm-orchestrator">GR-E1-001 PASS_WITH_CONDITIONS；cicd_pipeline / deployment_plan 0.1.0→1.0.0 APPROVED；收件箱补记 R26-GROUP_E1-001-1..3。A~E1 全部批准，E2 NOT_AUTHORIZED（用户：现在暂时不部署）；等待用户授权提交与将来的部署。</event>
-    <event time="2026-10-27T22:23:14+08:00" type="INVOKE" actor="pm-orchestrator">CL-009 用户授权提交与部署。先调用 software-developer（intelligentbase-R26-GROUP_C-005）处理 GR-E1-001-F02 两处跟进。</event>
-    <event time="2026-10-27T22:30:44+08:00" type="VERIFY" actor="pm-orchestrator">GROUP_C-005（GR-E1-001-F02）：selfcheck.py 清单断言扩到 B28/B29（含签署行正则），checklists.txt 不改；ib-worker.env.example 追加 REV-26 四个可选键注释（子代理首报"已有无需改"系误读，PM grep 核出后返工）。PM 复核：两文件四键各 4 处一致；selfcheck 57/58（core_framework_free 环境既有）；pytest tests/unit + test_accounts_deploy_int_r13 512 passed。</event>
-    <event time="2026-10-27T22:30:44+08:00" type="INVOCATION" actor="pm-orchestrator">主会话按 CL-009 提交（作者 Yang Yang，git -c 指定，未改配置）：7ea6b4c docs(sdlc) 归档 REV-25；971e14d feat(config) REV-26；5eedbd6 chore(agents) 记忆。push 前发现 origin/main 多 444520b（REV-25 部署报告），merge 9243ab4：REV-26 phase_status 保留本地，444520b 的 REV-25 phase_status 内容与 deployment_report / delivery_report 并入 archive/rev25/（追加更正事件）。git push origin main：444520b..9243ab4 成功。</event>
-    <event time="2026-10-27T22:30:44+08:00" type="DEPLOY_AUTH" actor="pm-orchestrator">用户本轮消息「提交，跟进两处小问题。然后部署」明确授权生产部署。PRODUCTION_DEPLOY_CONFIRM=true；环境 production；DEPLOY_COMMIT=9243ab4f05aac9249489ed7515c54fbb4290ffe3；计划 deployment_plan.md 1.0.0 APPROVED。生产当前 HEAD 80f2962（据 archive/rev25 GR-E2-001）。调用 devops-engineer（intelligentbase-R26-GROUP_E2-001）。</event>
-    <event time="2026-10-27T22:33:26+08:00" type="EXCEPTION" actor="pm-orchestrator">GROUP_E2-001 BLOCKED，生产未变更、无需回滚。PRE-00 通过（HEAD = origin/main = 9243ab4，关键文件 12/12 在提交中）。阻塞经 PM 亲自核实：① 本机无 ~/.ssh/ib_prod_ed25519（仅 id_ed25519，子代理未用其试登，正确）；② 本机为云主机（eth0 168.144.100.158 / 10.x），192.168.31.133:22 不可达；③ PRE-06~10 需用户执行。另：本机无 gh，9243ab4 的 CI 结果未核对。部署授权（CL-009）仅对该次调用有效，换环境重做 E2 须用户重新授权。deployment_report.md 0.1.0 DRAFT 记录阻塞（未提交）。收件箱补记 R26-GROUP_E2-001-1。</event>
-    <event time="2026-10-27T22:38:25+08:00" type="INVOCATION" actor="pm-orchestrator">用户「先git commit push」：主会话提交 phase_status.md 与 deployment_report.md（0.1.0 DRAFT，记录 E2-001 BLOCKED）并 push，便于在局域网机器上 pull 后续做 E2。</event>
-    <event time="2026-10-27T23:12:25+08:00" type="DEPLOY_AUTH" actor="pm-orchestrator">用户本轮消息「Use Skill: sdlc-orchestrator 部署到生产环境」明确授权生产部署。PRODUCTION_DEPLOY_CONFIRM=true；环境 production；DEPLOY_COMMIT=bb3ac4b97bcdd51afc8725197693fd458d0eb798（本地 HEAD = origin/main，工作区干净）；计划 deployment_plan.md 1.0.0 APPROVED。本机（局域网）已核实：`~/.ssh/ib_prod_ed25519` 存在、192.168.31.133:22 可达、生产 HEAD=80f2962（=ANCHOR）、工作区干净、5 个单元 active、`sudo -n true` 通过。上次 E2-001 的三项阻塞全部解除。</event>
-    <event time="2026-10-27T23:15:00+08:00" type="VERIFY" actor="pm-orchestrator">PRE-00 CI 核查发现红灯：`gh run list --commit bb3ac4b` → run 40523055080 conclusion=failure（17m1s）；9243ab4 的 run 40521743636 同为 failure。根因经 `gh run view --log-failed` 定位：阶段9 `npm test` 77 例中 74 pass / 3 fail（46、47、48 与父套件 11），错误 `Unknown file extension ".ts"` for `src/frontend/src/components/config/graphModel.ts` —— CI `node-version: "20"` 不支持直接 import .ts（本机 Node 24 / 生产 Node 22 通过；`npm run build` 通过，产品运行时不受影响）。按 PRE-00「红灯不得部署」暂停，向用户请示。</event>
-    <event time="2026-10-27T23:39:05+08:00" type="EXCEPTION" actor="pm-orchestrator">GitHub Actions 失败（用户报告）：run 40521743636（9243ab4）失败于 Integration tests (阶段4)；run 40523055080（bb3ac4b，仅文档差异）阶段4 通过、失败于 Frontend build (阶段9)。日志下载需 admin（403），注解仅 exit code 1。PM 复现：① 阶段9 根因确定——CI 为 Node 20，frontend.smoke.test.js:958/971/987（用例 46~48）直接 import graphModel.ts，Node 20 无类型剥离报 ERR_UNKNOWN_FILE_EXTENSION（本机 Node 22.23 可剥离故 GROUP_C/D/PM 复跑均未发现）；Node 20.20.2 干净导出复现：npm ci/build 通过，npm test 77 中 fail 3。② 阶段4：按 CI 环境变量（IB_OFFLINE_MODE/IB_CONFIG_SOURCE=dict/IB_OFFLINE_TOKEN/IB_LOG_LEVEL）本地 333 passed，bb3ac4b 在 CI 上同阶段通过，判为偶发，正在循环复跑时序敏感用例定位。PM 门控教训：前端测试须在 CI 同版本 Node 20 下复跑。</event>
-    <event time="2026-10-27T23:39:05+08:00" type="INVOKE" actor="pm-orchestrator">调用 software-developer（intelligentbase-R26-GROUP_C-006）修 frontend.smoke 用例 46~48 的 .ts 直接导入。</event>
-    <event time="2026-10-27T23:40:00+08:00" type="CLARIFY" actor="pm-orchestrator">CL-010 用户选择 CI Node 20→22。停用 E2，先做 GROUP_E1 定向整改（`.github/workflows/ci.yml` node-version "20"→"22"，ci.yml:237 单处；同步 `docs/sdlc/intelligentbase/cicd_pipeline.md`），GROUP_E1 置 IN_PROGRESS，记 INVOCATION intelligentbase-R26-GROUP_E1-002；GROUP_E2 保持 PENDING（deploy_auth=GRANTED，待 CI 绿后调用）。</event>
-    <event time="2026-10-27T23:42:32+08:00" type="VERIFY" actor="pm-orchestrator">GROUP_C-006 核验：仅 frontend.smoke.test.js 用例 46~48 改为 loadGraphModel()（typescript.transpileModule + data: URL，同 config_studio_r26.test.js），断言未改、无 skip/try-catch。PM 复跑 Node 20.20.2：npm run build rc=0，npm test tests 77 pass 77 fail 0 skipped 0；Node 22.23.3：77/77/0。待用户授权提交推送以重跑 CI。阶段4 偶发失败定位中（时序敏感用例循环复跑）。</event>
-    <event time="2026-10-27T23:55:08+08:00" type="GATE" actor="pm-orchestrator">GR-E1-002 PASS（GROUP_E1 回到 APPROVED / gate_decision=PASS，PHASE_10 APPROVED）；cicd_pipeline.md 1.1.0→2.0.0 APPROVED，1.0.0 SUPERSEDED。PM 亲自核验：yaml.safe_load OK、git diff 仅两文件、npm test 77/77；finding F01（画像 P3/P4 的 Node 20 事实过时）记 MINOR，不阻塞。收件箱记录 R26-GROUP_E1-002 两条 proposal。</event>
-    <event time="2026-10-27T23:55:08+08:00" type="INVOCATION" actor="pm-orchestrator">主会话按 CL-010 提交 CI Node 升版（ci.yml + cicd_pipeline + phase_status），push 到 origin/main，等待真实 CI 结果作为 PRE-00 依据；绿后再调用 devops-engineer 执行 E2（intelligentbase-R26-GROUP_E2-002）。</event>
-    <event time="2026-10-28T00:09:56+08:00" type="VERIFY" actor="pm-orchestrator">CI 阶段4 偶发失败调查：GitHub API 显示 run 40521743636 阶段4 在 293 s 失败（非超时，job timeout-minutes 30），run 40523055080 同阶段 414 s 通过、阶段6 全量 476 s，job 总时长逼近 30 min。本地按 CI 环境变量：hot_effect/builder_api/dag_execution 40 passed；test_builder_api_r26 每例 setup 约 22 s（cProfile：bcrypt hashpw/checkpw 16 次×~1.1 s，Api 夹具建 3 账号并改密登录，生产 cost 12）。疑点 ib/runtime/cache.py:99-111 acquire 在 refresh_async 启动线程后才读 entry.current（返回值可能已是新版，违背"一次提问只绑定一个版本"的断言 TC-INT-R26-005），sys.setswitchinterval(1e-6) 下 005 连跑 40/40 通过，未复现。无 admin 无法取日志，失败用例未定位。</event>
-    <event time="2026-10-28T00:40:00+08:00" type="INVOCATION" actor="main-session">用户「修改并提交」：合并 origin/main fd0454b（CI Node 22）后提交 frontend.smoke 用例 46~48 转译导入（Node 20/22 均通过）、ib/runtime/cache.py acquire 先快照后触发 refresh_async（TC-INT-R26-005 时序窗口）、tests/conftest.py 自动夹具 bcrypt cost 4（仅测试）。本地复跑：unit 509、integration 333（≈21 s，原 ≈100 s）、e2e 51 全过；hot-effect 相关 30 轮 0 失败；Node 20 build+77/77。</event>
+    <event time="2026-10-31T09:38:25+08:00" type="RUN" actor="pm-orchestrator">运行模式=子代理模式。依据：第一条消息为调用方转述口吻（"用户需求（原文）…""本次调用范围…""返回给我"），判定规则 2。已读 shared_protocol.md、project_profile.md、knowledge_base/generic/pm-orchestrator.md。</event>
+    <event time="2026-10-31T09:38:25+08:00" type="INVOCATION" actor="pm-orchestrator">REV-27 新建状态文件。REV-26 全部 16 个文档复制到 archive/rev26/（含原 phase_status.md）。注意：REV-26 的 E2（生产部署）在原状态文件中仍为 PENDING、无部署报告更新，归档不代表已部署，已写入检查点问题。</event>
+    <event time="2026-10-31T09:38:47+08:00" type="INVOCATION" actor="pm-orchestrator">调用 requirement-analyst（intelligentbase-R27-GROUP_A-001，PHASE_01,PHASE_02，REWORK_AUTHORIZED requirements_spec.md / user_stories.md，REV-26 版本已归档）。</event>
+    <event time="2026-10-31T09:45:04+08:00" type="GATE" actor="pm-orchestrator">GR-A-001 PASS_WITH_CONDITIONS；requirements_spec / user_stories 0.1.0→1.0.0 APPROVED；收件箱已有 hook 记录（R27 前缀，1 条）。写检查点 CP-001，按调用范围停止，不进入 GROUP_B。</event>
+    <event time="2026-10-31T14:17:52+08:00" type="RUN" actor="pm-orchestrator">续跑（同一上下文，仍为子代理模式）：收到 CP-001 答复（经主会话转述），CP-001 改 ANSWERED，记 CL-001；GR-A-001 条件一闭合。</event>
+    <event time="2026-10-31T14:17:52+08:00" type="INVOCATION" actor="pm-orchestrator">调用 system-architect（intelligentbase-R27-GROUP_B-001，PHASE_03,PHASE_04；REWORK_AUTHORIZED architecture_design / module_design / tech_stack，REV-26 版本已在 archive/rev26/）。</event>
+    <event time="2026-10-31T14:33:50+08:00" type="EXCEPTION" actor="pm-orchestrator">intelligentbase-R27-GROUP_B-001 因会话结束中断，system-architect 未返回；git status 核实 architecture_design / module_design / tech_stack 未改动（仍为 REV-26 1.0.0）。同时中断的前端基线采集（npm build/test）无结果。按协议计入 retries（异常处理 4）。</event>
+    <event time="2026-10-31T14:33:50+08:00" type="INVOCATION" actor="pm-orchestrator">续跑（调用方转述，子代理模式）：重新调用 system-architect（intelligentbase-R27-GROUP_B-002），指令同 B-001。</event>
+    <event time="2026-10-31T14:35:38+08:00" type="BASELINE" actor="pm-orchestrator">GROUP_C 前前端基线（HEAD c1b491f，代码未改）：Node v22.23.3；src/frontend npm run build rc=0；npm test → tests 77 pass 77 fail 0 skipped 0。基线零失败，前端判定为零新增失败。</event>
+    <event time="2026-10-31T15:17:13+08:00" type="INTERRUPT" actor="pm-orchestrator">intelligentbase-R27-GROUP_B-002 因主会话进程退出中断（调用方转述，非 agent 失败），architecture_design / module_design / tech_stack 仍未改动。PM 裁决：宿主进程退出不属于子代理质量问题，本次不再累加 retries（保持 1，B-001 已计 1），否则会因宿主中断耗尽门控重试。</event>
+    <event time="2026-10-31T15:17:13+08:00" type="INVOCATION" actor="pm-orchestrator">重新调用 system-architect（intelligentbase-R27-GROUP_B-003），要求分步尽早落盘。前端基线复用 BASELINE 记录。</event>
+    <event time="2026-10-31T15:28:12+08:00" type="GATE" actor="pm-orchestrator">GR-B-001 PASS_WITH_CONDITIONS；architecture_design / module_design / tech_stack 0.1.0→1.0.0 APPROVED。GR-A-001 条件二闭合。</event>
+    <event time="2026-10-31T15:28:12+08:00" type="INVOCATION" actor="pm-orchestrator">调用 software-developer（intelligentbase-R27-GROUP_C-001，PHASE_05,PHASE_06）。</event>
+    <event time="2026-10-31T15:34:35+08:00" type="GATE" actor="pm-orchestrator">GR-C-001 PASS_WITH_CONDITIONS；implementation_plan / code_review_report 0.1.0→1.0.0 APPROVED（REV-26 版本在 archive/rev26/）。PM 复跑 build rc=0、npm test 77/77/0。</event>
+    <event time="2026-10-31T15:34:35+08:00" type="INVOCATION" actor="pm-orchestrator">调用 test-engineer（intelligentbase-R27-GROUP_D-001，PHASE_07,PHASE_08,PHASE_09）。</event>
+    <event time="2026-10-31T15:52:33+08:00" type="GATE" actor="pm-orchestrator">GR-D-001 PASS_WITH_CONDITIONS；四份测试文档 0.1.0→1.0.0 APPROVED。PM 复跑前端 129/129、后端 910 passed。收件箱已有 hook 记录。critical path 待人工验证 5 条。</event>
+    <event time="2026-10-31T15:52:33+08:00" type="RUN" actor="pm-orchestrator">按调用方范围（B→C→D）停止，写检查点 CP-002；未调用 E1/E2，未部署、未 commit。</event>
   </audit_log>
 </phase_status>

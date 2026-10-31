@@ -19,3 +19,4 @@
 - [P-RA-004] "现有能力 vs 诉求"对照表的"不能做什么"必须有代码证据（如 grep 无 tooltip / 事件处理、props 为 false、GET 与 PUT 的权限差异），不凭印象；读权限与写权限分开写 — 自记 2026-10-27 · 证据 intelligentbase-GROUP_A-001（requirements_spec 现状对照表）
 - [P-RA-005] 热生效 / 自由编辑类需求的风险清单（保存前校验、进行中会话、版本与回滚、并发冲突、越权、提示词注入、存量项目升级）各落成带可测指标的 NFUNC；业界证据：Copilot Studio 新内容仅对新会话生效，Dify / n8n 文档未说明进行中会话处理 — 自记 2026-10-27 · 证据 agent_orchestration_benchmark.md §3
 - [P-RA-006] "AI 生成配置 / agent"类需求拆成：生成 / 适配项目（只取既有工具、范围、白名单取值，越界项进"适配说明"）/ 自评（固定维度、同输入同分）/ 草案确认才生效 / 外发边界；外发边界用植入标记串（canary）在出站载荷中命中数 = 0 来度量，不写"不含敏感数据"这类不可测句 — 自记 2026-10-27 · 证据 intelligentbase-GROUP_A-002（REQ-FUNC-018~022、REQ-NFUNC-014）
+- [P-RA-007] "删除/撤销/放弃"类 UI 需求先查草稿残留：删除实体时关联的草稿补丁（如提示词补丁）是否一并清理、"未保存"判定是否随之回到基线；并区分"仅从画布移除"与"删除定义"两种语义，分别落 REQ 与 AC — 自记 2026-10-31 · 证据 intelligentbase-R27（ConfigStudio.vue:122-128 删除 agent 未清 promptPatch；configDraft.ts:20,46-51）
