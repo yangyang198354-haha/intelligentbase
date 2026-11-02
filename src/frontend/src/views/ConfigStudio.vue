@@ -58,6 +58,8 @@ const level = computed(() => status.value?.level ?? 'view');
 const readonly = computed(() => level.value === 'view');
 const graph = computed<GraphDto>(() => store.document.value?.graph ?? { nodes: [], edges: [] });
 const selectedNode = computed<GraphNodeDto | null>(() => graph.value.nodes.find((n) => n.id === selectedId.value) ?? null);
+const selectedEdgeId = ref<string | null>(null);
+const selectedEdge = computed(() => graph.value.edges.find((e) => e.id === selectedEdgeId.value) ?? null);
 
 const agents = computed(() => {
   const m = new Map<string, AgentInfo>();
@@ -85,6 +87,7 @@ async function load(): Promise<void> {
     catalog.value = cat;
     store.load(env.document as never, env.version, env.graph);
     selectedId.value = null;
+    selectedEdgeId.value = null;
     phase.value = 'ready';
   } catch (err) {
     phase.value = err instanceof ApiClientError && err.status === 403 ? 'forbidden' : 'unavailable';
@@ -98,6 +101,7 @@ function reloadWithConfirm(): void {
 function discard(): void {
   store.discard();
   selectedId.value = null;
+  selectedEdgeId.value = null;
 }
 
 // ---- 画布操作 ----
@@ -303,7 +307,8 @@ onMounted(load);
           :agents="agents"
           :route="store.document.value.route"
           @update:graph="setGraph"
-          @select-node="(id: string) => { selectedId = id; tab = 'detail'; }"
+          @select-node="(id: string) => { selectedId = id; selectedEdgeId = null; tab = 'detail'; }"
+          @select-edge="(id: string) => { selectedEdgeId = id; selectedId = null; tab = 'detail'; }"
           @notice="(t: string) => (banner = t)"
           @request-remove="(id: string) => requestRemove(id)"
           @hint="(t: string) => ElMessage.info(t)"
@@ -312,7 +317,7 @@ onMounted(load);
           已删除 {{ store.undoLabel.value }}
           <el-button link type="primary" size="small" @click="onUndo">撤销</el-button>
         </div>
-        <p class="hint">鼠标悬停节点或边可查看其配置；点击节点在右侧查看 / 编辑详情与提示词。{{ readonly ? '（查看档：只读）' : '' }}</p>
+        <p class="hint">鼠标悬停节点或边可查看其配置；点击节点在右侧查看 / 编辑详情与提示词，点击连线可修改其分支键。{{ readonly ? '（查看档：只读）' : '' }}</p>
       </div>
       <div class="right">
         <el-tabs v-model="tab">
@@ -322,6 +327,8 @@ onMounted(load);
               :doc="store.document.value"
               :catalog="catalog"
               :node="selectedNode"
+              :edge="selectedEdge"
+              :graph="graph"
               :readonly="readonly"
               :prompt-patch="store.promptPatch.value"
               @change="(d) => (store.document.value = d)"
@@ -329,6 +336,7 @@ onMounted(load);
               @remove-agent="onRemoveAgent"
               @request-remove="(id: string) => requestRemove(id)"
               @update-node="onUpdateNode"
+              @update-graph="setGraph"
             />
           </el-tab-pane>
           <el-tab-pane label="版本历史" name="versions" lazy>

@@ -161,10 +161,117 @@ export function defaultBranchKey(graph: GraphDto, source: string, target: string
   }
   if (s.kind === 'condition') {
     const keys = new Set(graph.edges.filter((e) => e.source === source).map((e) => e.branch_key));
-    const free = (s.predicate?.branches ?? []).find((b) => !keys.has(b.key));
-    return free ? free.key : keys.has(ELSE) ? null : ELSE;
+    const free = conditionBranchKeys(s).find((k) => !keys.has(k));
+    return free ?? (keys.has(ELSE) ? null : ELSE);
   }
   return null;
+}
+
+// ---- 条件分支编辑 / 边分支键编辑（纯函数；服务端 validate_graph 仍是唯一裁决者） ----
+
+/** 与服务端一致：上游降级谓词的固定分支键。 */
+export const DEGRADED_BRANCH = 'degraded';
+const BRANCH_KEY_MAX = 32;
+
+/** 条件节点声明的分支键（不含 __else__）：关键词谓词 = 各分支键；上游降级 = degraded。 */
+export function conditionBranchKeys(node: GraphNodeDto): string[] {
+  if (node.predicate?.kind === 'upstream_degraded') return [DEGRADED_BRANCH];
+  return (node.predicate?.branches ?? []).map((b) => b.key);
+}
+
+function replaceNode(graph: GraphDto, node: GraphNodeDto, edges = graph.edges): GraphDto {
+  return { nodes: graph.nodes.map((n) => (n.id === node.id ? node : n)), edges };
+}
+
+/** 新增关键词分支：键取第一个未占用的 a..z（再往后 b27、b28…），关键词留空待填。 */
+export function addConditionBranch(graph: GraphDto, nodeId: string): GraphDto {
+  const node = graph.nodes.find((n) => n.id === nodeId);
+  if (!node || node.kind !== 'condition' || node.predicate?.kind !== 'keyword') return graph;
+  const used = new Set(node.predicate.branches.map((b) => b.key));
+  let key = '';
+  for (let i = 0; !key; i += 1) {
+    const k = i < 26 ? String.fromCharCode(97 + i) : `b${i + 1}`;
+    if (!used.has(k)) key = k;
+  }
+  const branches = [...node.predicate.branches, { key, keywords: [] }];
+  return replaceNode(graph, { ...node, predicate: { kind: 'keyword', branches } });
+}
+
+/** 删除关键词分支，并一并删除该条件节点上使用这个分支键的出边；至少保留一个分支。 */
+export function removeConditionBranch(graph: GraphDto, nodeId: string, index: number): GraphDto {
+  const node = graph.nodes.find((n) => n.id === nodeId);
+  const branches = node?.predicate?.kind === 'keyword' ? node.predicate.branches : [];
+  if (!node || branches.length <= 1 || !branches[index]) return graph;
+  const gone = branches[index].key;
+  return replaceNode(
+    graph,
+    { ...node, predicate: { kind: 'keyword', branches: branches.filter((_, i) => i !== index) } },
+    graph.edges.filter((e) => !(e.source === nodeId && e.branch_key === gone)),
+  );
+}
+
+/** 重命名分支键，并同步改写该节点上使用旧键的出边。键不合法时返回 error，不改图。 */
+export function renameConditionBranch(
+  graph: GraphDto,
+  nodeId: string,
+  index: number,
+  newKey: string,
+): { graph: GraphDto; error?: string } {
+  const node = graph.nodes.find((n) => n.id === nodeId);
+  const branches = node?.predicate?.kind === 'keyword' ? node.predicate.branches : [];
+  const old = branches[index];
+  if (!node || !old) return { graph };
+  const key = newKey.trim();
+  if (key === old.key) return { graph };
+  if (!key) return { graph, error: '分支键不能为空' };
+  if (key.length > BRANCH_KEY_MAX) return { graph, error: `分支键不超过 ${BRANCH_KEY_MAX} 个字符` };
+  if (key === ELSE || key.startsWith('__')) return { graph, error: '分支键不能使用保留名 __else__ 或 __ 前缀' };
+  if (branches.some((b, i) => i !== index && b.key === key)) return { graph, error: `分支键 ${key} 已存在` };
+  return {
+    graph: replaceNode(
+      graph,
+      { ...node, predicate: { kind: 'keyword', branches: branches.map((b, i) => (i === index ? { ...b, key } : b)) } },
+      graph.edges.map((e) => (e.source === nodeId && e.branch_key === old.key ? { ...e, branch_key: key } : e)),
+    ),
+  };
+}
+
+/** 改某个分支的关键词（逗号分隔，中英文逗号均可）。 */
+export function setConditionKeywords(graph: GraphDto, nodeId: string, index: number, text: string): GraphDto {
+  const node = graph.nodes.find((n) => n.id === nodeId);
+  if (!node || node.predicate?.kind !== 'keyword' || !node.predicate.branches[index]) return graph;
+  const keywords = text.split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+  const branches = node.predicate.branches.map((b, i) => (i === index ? { ...b, keywords } : b));
+  return replaceNode(graph, { ...node, predicate: { kind: 'keyword', branches } });
+}
+
+export interface BranchKeyOption {
+  value: string;
+  label: string;
+  /** 已被同一起点的另一条边占用 */
+  taken: boolean;
+}
+
+/** 一条边可选的分支键；起点不是路由 / 条件节点时返回空数组（该边不带分支键）。 */
+export function edgeBranchOptions(graph: GraphDto, edgeId: string): BranchKeyOption[] {
+  const edge = graph.edges.find((e) => e.id === edgeId);
+  const src = edge && graph.nodes.find((n) => n.id === edge.source);
+  if (!edge || !src) return [];
+  let keys: string[];
+  if (src.kind === 'condition') keys = conditionBranchKeys(src);
+  else if (src.kind === 'route') {
+    const tgt = graph.nodes.find((n) => n.id === edge.target);
+    keys = tgt?.kind === 'agent' ? [tgt.expert ?? tgt.id] : [];
+  } else return [];
+  const takenBy = new Set(
+    graph.edges.filter((e) => e.source === src.id && e.id !== edgeId).map((e) => e.branch_key),
+  );
+  return [...keys, ELSE].map((k) => ({ value: k, label: k === ELSE ? '否则' : k, taken: takenBy.has(k) }));
+}
+
+/** 设置边的分支键（不做合法性裁决，非法组合留给保存时的服务端校验报出）。 */
+export function setEdgeBranchKey(graph: GraphDto, edgeId: string, key: string): GraphDto {
+  return { nodes: graph.nodes, edges: graph.edges.map((e) => (e.id === edgeId ? { ...e, branch_key: key } : e)) };
 }
 
 export function layeredPositions(graph: GraphDto): Map<string, { x: number; y: number }> {

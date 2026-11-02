@@ -5,9 +5,17 @@
  *             工具授权与参数、知识范围、最大步数、停用 / 删除（默认专家受保护）、路由参数。
  * 提示词一律在 <textarea> / 文本插值中展示，不执行；只读档没有任何保存控件。
  */
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
-import type { ApiClient, ConfigCatalogDto, DefinitionDocumentV2, GraphNodeDto } from '../../api/client';
+import type { ApiClient, ConfigCatalogDto, DefinitionDocumentV2, GraphDto, GraphEdgeDto, GraphNodeDto } from '../../api/client';
+import {
+  addConditionBranch,
+  edgeBranchOptions,
+  removeConditionBranch,
+  renameConditionBranch,
+  setConditionKeywords,
+  setEdgeBranchKey,
+} from './graphModel';
 import { DEFAULT_EXPERT_HINT } from './nodeRemoval'; // MOD-R27-05
 
 const props = defineProps<{
@@ -15,6 +23,9 @@ const props = defineProps<{
   doc: DefinitionDocumentV2;
   catalog: ConfigCatalogDto | null;
   node: GraphNodeDto | null;
+  /** 选中的边（未选中节点时显示边的分支键编辑） */
+  edge?: GraphEdgeDto | null;
+  graph?: GraphDto;
   readonly: boolean;
   promptPatch: Record<string, { main?: string | null; fallback?: string | null }>;
 }>();
@@ -24,7 +35,37 @@ const emit = defineEmits<{
   (e: 'remove-agent', nodeId: string): void;
   (e: 'request-remove', nodeId: string): void;
   (e: 'update-node', node: GraphNodeDto): void;
+  (e: 'update-graph', graph: GraphDto): void;
 }>();
+
+// ---- 条件分支 / 边分支键 ----
+const branchErr = ref('');
+watch(() => props.node?.id, () => (branchErr.value = ''));
+const emptyGraph: GraphDto = { nodes: [], edges: [] };
+function onAddBranch(): void {
+  if (props.node) emit('update-graph', addConditionBranch(props.graph ?? emptyGraph, props.node.id));
+}
+function onRemoveBranch(i: number): void {
+  if (props.node) emit('update-graph', removeConditionBranch(props.graph ?? emptyGraph, props.node.id, i));
+}
+function onRenameBranch(i: number, key: string): void {
+  if (!props.node) return;
+  const r = renameConditionBranch(props.graph ?? emptyGraph, props.node.id, i, key);
+  branchErr.value = r.error ?? '';
+  if (!r.error) emit('update-graph', r.graph);
+}
+function onBranchKeywords(i: number, text: string): void {
+  if (props.node) emit('update-graph', setConditionKeywords(props.graph ?? emptyGraph, props.node.id, i, text));
+}
+const edgeOptions = computed(() => (props.edge ? edgeBranchOptions(props.graph ?? emptyGraph, props.edge.id) : []));
+const nodeLabel = (id: string) => {
+  const n = props.graph?.nodes.find((x) => x.id === id);
+  const e = n?.kind === 'agent' ? props.doc.experts.find((x) => x.name === (n.expert ?? n.id)) : undefined;
+  return e?.cn_label ?? id;
+};
+function onEdgeKey(key: string): void {
+  if (props.edge) emit('update-graph', setEdgeBranchKey(props.graph ?? emptyGraph, props.edge.id, key));
+}
 
 type Layers = { main: string | null; fallback: string | null; source: string };
 const layers = ref<Layers>({ main: null, fallback: null, source: '' });
@@ -203,10 +244,19 @@ function onPrompt(layer: 'main' | 'fallback', text: string): void {
         <el-option value="keyword" label="关键词" />
         <el-option value="upstream_degraded" label="上游降级" />
       </el-select>
-      <div v-for="(b, i) in node.predicate?.branches ?? []" :key="i" class="params">
-        <el-input size="small" :model-value="b.key" :disabled="readonly" placeholder="分支键" @change="(v: string) => emit('update-node', { ...node!, predicate: { kind: 'keyword', branches: node!.predicate!.branches.map((x, j) => (j === i ? { ...x, key: v } : x)) } })" />
-        <el-input size="small" :model-value="b.keywords.join(', ')" :disabled="readonly" placeholder="关键词，逗号分隔" @change="(v: string) => emit('update-node', { ...node!, predicate: { kind: 'keyword', branches: node!.predicate!.branches.map((x, j) => (j === i ? { ...x, keywords: v.split(/[,，]/).map((s) => s.trim()).filter(Boolean) } : x)) } })" />
-      </div>
+      <template v-if="node.predicate?.kind === 'keyword'">
+        <div v-for="(b, i) in node.predicate.branches" :key="i" class="branch">
+          <el-input size="small" class="branch-key" :model-value="b.key" :disabled="readonly" placeholder="分支键" @change="(v: string) => onRenameBranch(i, v)" />
+          <el-input size="small" :model-value="b.keywords.join(', ')" :disabled="readonly" placeholder="关键词，逗号分隔" @change="(v: string) => onBranchKeywords(i, v)" />
+          <el-button v-if="!readonly" size="small" link type="danger" :disabled="node.predicate.branches.length <= 1" @click="onRemoveBranch(i)">删除</el-button>
+        </div>
+        <p v-if="branchErr" class="err">{{ branchErr }}</p>
+        <div v-if="!readonly" class="actions">
+          <el-button size="small" @click="onAddBranch">添加分支</el-button>
+        </div>
+        <p class="hint">按顺序匹配，第一个命中的分支胜出；都不命中走“否则”。删除分支会一并删除使用该分支键的连线，改分支键会同步改连线。</p>
+      </template>
+      <p v-if="node.predicate?.kind === 'upstream_degraded'" class="hint">上游任一 agent 失败时走 degraded 分支，否则走“否则”。</p>
       <p class="hint">无表达式 / 代码；出边需配置分支键，并有“否则”分支。</p>
       <div v-if="!readonly" class="actions">
         <el-button size="small" type="danger" plain @click="emit('request-remove', node.id)">删除节点</el-button>
@@ -231,6 +281,17 @@ function onPrompt(layer: 'main' | 'fallback', text: string): void {
       <h4>{{ node.kind === 'start' ? '开始' : '结束' }}</h4>
       <p class="hint">开始 / 结束节点不可删除</p>
     </template>
+    <template v-else-if="edge">
+      <h4>连线</h4>
+      <p>{{ nodeLabel(edge.source) }} → {{ nodeLabel(edge.target) }}</p>
+      <template v-if="edgeOptions.length">
+        <el-select size="small" :model-value="edge.branch_key ?? ''" :disabled="readonly" placeholder="选择分支键" @change="onEdgeKey">
+          <el-option v-for="o in edgeOptions" :key="o.value" :value="o.value" :label="o.taken ? `${o.label}（已被其他连线使用）` : o.label" :disabled="o.taken" />
+        </el-select>
+        <p class="hint">同一起点的每个分支键只能用在一条连线上；必须有一条“否则”。按 Delete 键可删除这条连线。</p>
+      </template>
+      <p v-if="!edgeOptions.length" class="hint">普通连线，没有分支键。按 Delete 键可删除这条连线。</p>
+    </template>
     <p v-else class="hint">点击画布上的节点查看或编辑其配置。</p>
   </div>
 </template>
@@ -251,6 +312,19 @@ function onPrompt(layer: 'main' | 'fallback', text: string): void {
 }
 .gap {
   margin-top: 8px;
+}
+.branch {
+  margin-top: 6px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.branch-key {
+  flex: 0 0 90px;
+}
+.err {
+  color: var(--el-color-danger);
+  font-size: 12px;
 }
 .actions {
   margin-top: 10px;
