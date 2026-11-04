@@ -134,6 +134,8 @@ def build_capability_digest(registry: ToolRegistry | None = None) -> str:
         reg = registry if registry is not None else default_registry
         lines: list[str] = []
         for item in reg.registered():
+            if getattr(item.spec, "route_visible", True) is False:  # REV-28：联网工具不进路由提示
+                continue
             desc = " ".join((item.spec.description or "").split())
             if len(desc) > _MAX_DESC_CHARS:
                 desc = desc[: _MAX_DESC_CHARS - 1] + "…"
@@ -178,6 +180,7 @@ def bind_scope(
                         description=item.description,
                         callable=_make_bound_callable(item, item.callable, scope, retrieval),
                         parameters=getattr(item, "parameters", None),
+                        timeout_s=getattr(item, "timeout_s", None),
                     )
                 )
             else:
@@ -291,29 +294,33 @@ def derive_tool_param_specs(registry: ToolRegistry) -> tuple[ToolParamSpec, ...]
     specs: list[ToolParamSpec] = []
     for item in registry.registered():
         schema = item.spec.parameters or {}
-        props = schema.get("properties") if isinstance(schema, dict) else None
-        if not isinstance(props, dict):
-            continue
-        for prop_name, prop in props.items():
-            if not isinstance(prop, dict):
+        groups = [schema.get("properties") if isinstance(schema, dict) else None]
+        # REV-28（IFC-R28-012）：平台限制类参数（LLM 不可见）同样派生为可配参数规格
+        cfg = getattr(item.spec, "config_parameters", None)
+        groups.append(cfg)
+        for props in groups:
+            if not isinstance(props, dict):
                 continue
-            param_type = _JSON_TYPE_TO_PARAM.get(prop.get("type"))
-            if param_type is None:
-                continue
-            default = prop.get("default")
-            minimum = prop.get("minimum")
-            maximum = prop.get("maximum")
-            enum = prop.get("enum")
-            specs.append(
-                ToolParamSpec(
-                    name=f"{item.spec.name}.{prop_name}",
-                    type=param_type,  # type: ignore[arg-type]
-                    default="" if default is None else str(default),
-                    minimum=float(minimum) if isinstance(minimum, (int, float)) else None,
-                    maximum=float(maximum) if isinstance(maximum, (int, float)) else None,
-                    choices=tuple(str(c) for c in enum) if isinstance(enum, list) else None,
+            for prop_name, prop in props.items():
+                if not isinstance(prop, dict):
+                    continue
+                param_type = _JSON_TYPE_TO_PARAM.get(prop.get("type"))
+                if param_type is None:
+                    continue
+                default = prop.get("default")
+                minimum = prop.get("minimum")
+                maximum = prop.get("maximum")
+                enum = prop.get("enum")
+                specs.append(
+                    ToolParamSpec(
+                        name=f"{item.spec.name}.{prop_name}",
+                        type=param_type,  # type: ignore[arg-type]
+                        default="" if default is None else str(default),
+                        minimum=float(minimum) if isinstance(minimum, (int, float)) else None,
+                        maximum=float(maximum) if isinstance(maximum, (int, float)) else None,
+                        choices=tuple(str(c) for c in enum) if isinstance(enum, list) else None,
+                    )
                 )
-            )
     return tuple(specs)
 
 
@@ -445,6 +452,7 @@ def build_agent_tools(
                 description=tool.description,
                 callable=functools.partial(tool.callable, knowledge=knowledge),
                 parameters=tool.parameters,
+                timeout_s=getattr(tool, "timeout_s", None),
             )
         scoped_in.append(tool)
     return bind_scope(scoped_in, scope, retrieval)
@@ -457,7 +465,10 @@ def _param_belongs(param_name: str, tool_spec: ToolSpec) -> bool:
         return owner == tool_spec.name
     schema = tool_spec.parameters or {}
     properties = schema.get("properties") if isinstance(schema, dict) else None
-    return bool(isinstance(properties, dict) and param_name in properties)
+    if isinstance(properties, dict) and param_name in properties:
+        return True
+    cfg = getattr(tool_spec, "config_parameters", None)
+    return bool(isinstance(cfg, dict) and param_name in cfg)
 
 
 def _wrap_with_params(registered: RegisteredTool, params: dict[str, Any]) -> BoundTool:
@@ -471,10 +482,52 @@ def _wrap_with_params(registered: RegisteredTool, params: dict[str, Any]) -> Bou
     spec = registered.spec
     fn = registered.fn
     owned = {_bare_param(k): v for k, v in params.items() if _param_belongs(k, spec)}
+    cfg_params = getattr(spec, "config_parameters", None)
+    if isinstance(cfg_params, dict) and cfg_params:
+        return _wrap_config_wins(spec, fn, owned, cfg_params)
     bound_fn: Callable[..., Any] = functools.partial(fn, **owned) if owned else fn
     return BoundTool(
         name=spec.name,
         description=spec.description,
         callable=bound_fn,
         parameters=getattr(spec, "parameters", None),
+    )
+
+
+def _wrap_config_wins(
+    spec: ToolSpec, fn: Callable[..., Any], owned: dict[str, Any], cfg_params: dict[str, Any]
+) -> BoundTool:
+    """[IFC-R28-012 / ADR-R28-06] 含平台限制类参数的工具：**配置胜出**。
+
+    属于 `config_parameters` 的参数：丢弃调用方（LLM）的同名实参，再注入配置值（未配置取 schema default）；
+    其余参数保持既有 partial 默认值语义（调用方实参优先）。`BoundTool.timeout_s` = 配置的超时值 + 1.0 秒宽限。
+    """
+    llm_defaults = {k: v for k, v in owned.items() if k not in cfg_params}
+    config_values: dict[str, Any] = {}
+    for name, prop in cfg_params.items():
+        if name in owned:
+            config_values[name] = owned[name]
+        elif isinstance(prop, dict) and "default" in prop:
+            config_values[name] = prop["default"]
+    base: Callable[..., Any] = functools.partial(fn, **llm_defaults) if llm_defaults else fn
+
+    def _config_wins(*args: Any, **kwargs: Any) -> Any:
+        clean = {k: v for k, v in kwargs.items() if k not in cfg_params}
+        clean.update(config_values)
+        return base(*args, **clean)
+
+    _config_wins.__name__ = f"config_wins__{spec.name}"
+    timeout_s: float | None = None
+    tp = getattr(spec, "timeout_param", None)
+    if tp and tp in config_values:
+        try:
+            timeout_s = float(config_values[tp]) + 1.0
+        except (TypeError, ValueError):
+            timeout_s = None
+    return BoundTool(
+        name=spec.name,
+        description=spec.description,
+        callable=_config_wins,
+        parameters=getattr(spec, "parameters", None),
+        timeout_s=timeout_s,
     )

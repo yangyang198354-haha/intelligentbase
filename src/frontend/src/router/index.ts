@@ -38,6 +38,7 @@ import AccountsPage from '../views/AccountsPage.vue';
 import SystemSection from '../views/SystemSection.vue';
 import ProjectsPage from '../views/ProjectsPage.vue';
 import LlmKeyPage from '../views/LlmKeyPage.vue';
+import WebGovernancePage from '../views/WebGovernancePage.vue'; // REV-28：联网全局用量上限（admin）
 
 /** 公共路由（不需要登录）。 */
 const PUBLIC_ROUTES = new Set(['login']);
@@ -118,6 +119,13 @@ const routes: RouteRecordRaw[] = [
             name: 'llm-key',
             component: LlmKeyPage,
             meta: { title: 'LLM Key 管理', requiresAdmin: true },
+          },
+          // REV-28（IFC-R28-028）：联网全局用量上限，与 LLM Key 并列（#/system/web-governance）。
+          {
+            path: 'web-governance',
+            name: 'web-governance',
+            component: WebGovernancePage,
+            meta: { title: '联网上限', requiresAdmin: true },
           },
         ],
       },

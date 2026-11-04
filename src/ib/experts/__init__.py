@@ -80,6 +80,9 @@ __all__ = [
     "builtin_default_registry",
     "builtin_expert_registry",
     "BUILTIN_DEFAULT_KB_AGENT",
+    # REV-28（IFC-R28-010）
+    "BUILTIN_ADVISOR",
+    "builtin_registry_with_advisor",
     # REV-20（ADR-48 / ADR-50）：
     #   * 原 REV-17（ADR-36）的 BUILTIN_FALLBACK_DEFAULT / BUILTIN_FALLBACKS /
     #     builtin_fallback_for / builtin_fallbacks_for **整体退役**（不在此导出）；
@@ -113,6 +116,19 @@ BUILTIN_DEFAULT_KB_AGENT: ExpertSpec = ExpertSpec(
     fallback_prompt="",
     is_delegating=False,
     is_default=True,
+)
+
+#: **REV-28 内置顾问**（IFC-R28-010；ADR-R28-05）：平台级可选内置 agent，保留名 `advisor` + `is_delegating=True`。
+#: 不在 `EXPERT_SPECS` / `builtin_default_registry()` 内——未启用顾问的项目专家集逐字不变。
+#: 标签“顾问”不得与 ADR-31 已退场的旧标签同字。
+BUILTIN_ADVISOR: ExpertSpec = ExpertSpec(
+    name="advisor",
+    cn_label="顾问",
+    keywords=(),
+    is_data_expert=False,
+    fallback_prompt="",
+    is_delegating=True,
+    is_default=False,
 )
 
 #: 当前生效的注册表（`install()` 可整体替换）。
@@ -457,3 +473,12 @@ def builtin_expert_registry() -> ExpertRegistryView:
     函数的**号 / 名 / 签名一字不变**（仅语义澄清）。
     """
     return builtin_default_registry()
+
+
+def builtin_registry_with_advisor() -> ExpertRegistryView:
+    """**启用顾问的新项目种子视图**（IFC-R28-010）：(kb-agent, advisor)；默认专家仍为 kb-agent。"""
+    return ExpertRegistryView(
+        project_id="",
+        experts=(BUILTIN_DEFAULT_KB_AGENT, BUILTIN_ADVISOR),
+        default_expert=BUILTIN_DEFAULT_KB_AGENT,
+    )

@@ -33,3 +33,8 @@
 - [P-SD-009] 版本时间戳必须与存储里 `_age_s` 解析格式一致（`utc_now_iso` 的 `Z` 定长）；格式不符会被判“永远陈旧”而误回收他人的 pending — 自记 2026-10-27 · 证据 ledger/config_versions.py `_age_s`
 - [P-SD-010] 精确键集断言的既有契约测试（GET definition / 审计项 / SSE done 数据）在加字段前先 grep；能不动线上契约就不动（done 仅试运行带版本），必须动的逐条在计划里登记取代依据 — 自记 2026-10-27 · 证据 REV-26 重新基线 8 处
 - [P-SD-003] 无 django/pytest 的机器上，可在 scratchpad 放 stub 的 rest_framework/django.http + 假 request 对象驱动视图函数做冒烟（不入库、不算测试），能抓出序列化/错误映射类缺陷；PUT multipart 解析等 Django 特有路径仍须标未验证 — 自记 2026-10-24 · 证据 library_views 冒烟
+- [P-SD-011] 回合级上下文（预算 / 审计主体）若要被 `_execute_tool` 看门狗线程池里的工具读到，必须用 `contextvars` + `copy_context().run` 提交；`threading.local` 在池线程里不可见 — 自记 2026-11-02 · 证据 REV-28 联网路径冒烟（顾问节点内工具预算 / 私有语料可见）
+- [P-SD-012] 新增依赖 `ledger_backend` 的存储构造器要“跟随台账后端 memory ⇒ 内存替身”（同 `build_config_audit_store`），否则离线夹具（`ledger_path=./var/ledger/…`）装配期 `unable to open database file` — 自记 2026-11-02 · 证据 REV-28 首轮全量 pytest ERROR（build_web_governance_store）
+- [P-SD-014] stdlib urllib 要“不跟随重定向”：`build_opener()` 总会补默认 HTTPRedirectHandler，应手工 `OpenerDirector` 只加 Proxy/HTTP/HTTPS/HTTPDefaultErrorHandler/HTTPErrorProcessor，3xx 经 HTTPError 取 `.code`、不读错误体；用 `[type(h).__name__ for h in opener.handlers]` 核对无 Redirect 处理器 — 自记 2026-11-03 · 证据 REV-28 deepseek.py 回环冒烟
+- [P-SD-015] 离线夹具（IB_OFFLINE_MODE=1）下 `_offline_view` 把搜索提供方整体置 fake，依赖“登记自定义提供方 + 非离线 Key 流向”的集成断言失效；Key→请求头→不入日志要直接用 `DeepSeekSearchProvider + FakeDeepSeekTransport.requests` 验证 — 自记 2026-11-03 · 证据 test_TC_INT_R28_223 改动
+- [P-SD-013] 全局工具登记点新增工具会改变“可授权工具 / 参数规格”断言：先 grep `available_tools`、`known_tool_names`、`known_tool_param_specs` 的测试与 selfcheck（REV-28 共 4 处测试断言 + 2 处 selfcheck 断言），只放行新增前缀、保留 `search_knowledge.*` 精确断言 — 自记 2026-11-02 · 证据 REV-28 AQ3=A

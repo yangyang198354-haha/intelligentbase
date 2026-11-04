@@ -629,6 +629,30 @@ export interface PublishPreviewDto {
   layout_only: boolean;
   errors: ValidationErrorItem[];
 }
+/** REV-28（IFC-R28-026）：内置 agent（顾问）目录项与联网概况。 */
+export interface BuiltinAgentDto {
+  id: 'advisor';
+  name: string;
+  cn_label: string;
+  summary: string;
+  expert: DefinitionDocumentV2['experts'][number];
+  prompt_main: string;
+  default_tool_grants: string[];
+  wiring_version: number;
+}
+export interface WebCatalogDto {
+  search_configured: boolean;
+  fetch_enabled: boolean;
+  caps?: { max_calls_per_turn: number; max_fetch_bytes_per_turn: number; max_seconds_per_turn: number };
+}
+export interface WebGovernanceDto {
+  max_calls_per_turn: number;
+  max_fetch_bytes_per_turn: number;
+  max_seconds_per_turn: number;
+  hard_max: { max_calls_per_turn: number; max_fetch_bytes_per_turn: number; max_seconds_per_turn: number };
+  updated_at: string;
+  updated_by: string;
+}
 export interface ConfigCatalogDto {
   available_tools: string[];
   tool_param_specs: ToolParamSpec[];
@@ -642,6 +666,9 @@ export interface ConfigCatalogDto {
     nondefault_param_count: number;
   }[];
   schema_version: 1 | 2;
+  /** REV-28：内置 agent 清单（顾问）；旧后端可能缺省。 */
+  builtin_agents?: BuiltinAgentDto[];
+  web?: WebCatalogDto;
 }
 /** v2 文档（含 graph）的最小外形；专家条目另含 status / max_steps / knowledge_scope。 */
 export interface DefinitionDocumentV2 {
@@ -1388,11 +1415,18 @@ export class ApiClient {
   // ------------------------------------------------------------------ //
 
   /** 新建项目（仅 admin）→ `201 ProjectRegistryEntry` | `409`（冲突）| `400`。 */
-  createProject(projectId: string, name: string): Promise<ProjectRegistryEntry> {
+  createProject(
+    projectId: string,
+    name: string,
+    opts?: { enableAdvisor?: boolean },
+  ): Promise<ProjectRegistryEntry> {
+    // REV-28（IFC-R28-026）：仅当 enableAdvisor === true 才在请求体加 enable_advisor，其余与既有请求逐字相同。
+    const body: Record<string, unknown> = { project_id: projectId, name };
+    if (opts?.enableAdvisor === true) body.enable_advisor = true;
     return this.request<ProjectRegistryEntry>('/api/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: projectId, name }),
+      body: JSON.stringify(body),
     });
   }
 
@@ -1445,6 +1479,24 @@ export class ApiClient {
   /** 清除 LLM Key（回到未配置态）→ `204`。 */
   async clearLlmKey(): Promise<void> {
     await this.request<null>('/api/llm-key', { method: 'DELETE' });
+  }
+
+  // ------------------------------------------------------------------ //
+  // REV-28（IFC-R28-023 / 024）：联网全局用量上限（**仅 admin**）
+  // ------------------------------------------------------------------ //
+
+  getWebGovernance(): Promise<WebGovernanceDto> {
+    return this.request<WebGovernanceDto>('/api/web-governance');
+  }
+
+  putWebGovernance(
+    body: Pick<WebGovernanceDto, 'max_calls_per_turn' | 'max_fetch_bytes_per_turn' | 'max_seconds_per_turn'>,
+  ): Promise<WebGovernanceDto> {
+    return this.request<WebGovernanceDto>('/api/web-governance', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
   }
 
   // ------------------------------------------------------------------ //

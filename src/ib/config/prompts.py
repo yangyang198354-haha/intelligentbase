@@ -85,6 +85,7 @@ __all__ = [
     "with_prompt_bundles",
     # REV-20（IFC-IB-389）
     "kb_agent_seed_prompt",
+    "advisor_seed_prompt",
     "FsExpertPromptStore",
     "InMemoryExpertPromptStore",
 ]
@@ -141,6 +142,28 @@ def kb_agent_seed_prompt() -> str:
     with open(path, encoding="utf-8") as fh:
         text = fh.read()
     _SEED_CACHE["kb-agent"] = text
+    return text
+
+
+def advisor_seed_prompt() -> str:
+    """**内置顾问提示词种子资产**（IFC-R28-010；ADR-R28-05）。
+
+    读取 `src/ib/expert_seeds/advisor.md`；与 `kb_agent_seed_prompt()` 同构：只读本地 I/O + 单次读缓存，
+    资产缺失 → `DependencyUnavailableError`（fail-closed，不静默返回空串）。
+    """
+    cached = _SEED_CACHE.get("advisor")
+    if cached is not None:
+        return cached
+    here = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.normpath(os.path.join(here, "..", "expert_seeds", "advisor.md"))
+    if not os.path.isfile(path):
+        raise DependencyUnavailableError(
+            "内置顾问提示词种子资产缺失（src/ib/expert_seeds/advisor.md）",
+            dependency="expert_seed_asset",
+        )
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    _SEED_CACHE["advisor"] = text
     return text
 
 

@@ -72,7 +72,8 @@ def test_TC_INT_R16_prompt_list_contract(http_app):
         "config_key_names",
     }
     # 既有工具名单（勾选只作用于既有工具集合；不新增工具本体）
-    assert payload["available_tools"] == ["search_knowledge"]
+    # REV-28（AQ3=A / AC-017-05）：全局工具目录恰好多出 web_search、web_fetch 2 项，其余项与顺序不变
+    assert payload["available_tools"] == ["search_knowledge", "web_fetch", "web_search"]
     names = {e["name"] for e in payload["experts"]}
     # **REV-20（ADR-50）**：内置专家集收敛为唯一 `kb-agent`（原三专家退役）。
     assert names == {"kb-agent"}
@@ -85,11 +86,14 @@ def test_TC_INT_R16_prompt_list_contract(http_app):
     assert all(not e["layers"]["fallback"]["exists"] for e in payload["experts"])
     # 参数规格由既有工具派生（不含新增工具本体）
     # **REV-23**：新增 `top_k` / `score_threshold` 两个**可选**参数规格（检索条数 / 阈值按专家可配）
-    assert {s["name"] for s in payload["tool_param_specs"]} == {
+    # REV-28（AQ3=A）：search_knowledge 的参数规格集不变；其余规格全部归属新增的 web_search / web_fetch
+    all_names = {s["name"] for s in payload["tool_param_specs"]}
+    assert {n for n in all_names if n.startswith("search_knowledge.")} == {
         "search_knowledge.query",
         "search_knowledge.top_k",
         "search_knowledge.score_threshold",
     }
+    assert {n.split(".")[0] for n in all_names} == {"search_knowledge", "web_search", "web_fetch"}
     # **只登记键名，不含任何值**
     assert payload["config_key_names"] == ["IB_EXPERT_PROMPT_DIR", "IB_EXPERT_PROMPT_ENABLED"]
     # **只读回执不含正文**（凭据与正文均不外泄）；令牌值不出现在响应体

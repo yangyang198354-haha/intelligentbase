@@ -524,11 +524,13 @@ def test_TC_UNIT_123_search_tool_spec_exposes_optional_retrieval_param_specs():
     assert not ({"scope", "retrieval", "project_id", "kb_ids"} & set(props))
 
     by_name = {s.name: s for s in known_tool_param_specs()}
-    assert set(by_name) == {
+    # REV-28（AQ3=A）：search_knowledge 的参数规格集不变；其余规格全部归属新增的 web_search / web_fetch
+    assert {n for n in by_name if n.startswith("search_knowledge.")} == {
         "search_knowledge.query",
         "search_knowledge.top_k",
         "search_knowledge.score_threshold",
     }
+    assert {n.split(".")[0] for n in by_name} == {"search_knowledge", "web_search", "web_fetch"}
     assert by_name["search_knowledge.top_k"].type == "int"
     assert (by_name["search_knowledge.top_k"].minimum, by_name["search_knowledge.top_k"].maximum) == (
         1.0,

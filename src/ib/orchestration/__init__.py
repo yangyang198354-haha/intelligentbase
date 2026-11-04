@@ -318,7 +318,10 @@ class Orchestrator:
         confirmation_prompt_builder: Any = None,
         view: Any = None,
         dag: Any = None,
+        turn_understander: Any = None,
     ) -> None:
+        #: REV-28（IFC-R28-019）：回合理解器（`ib.advisor.TurnUnderstander`）；仅顾问模式注入，缺省 None ⇒ 与现状逐位一致。
+        self._understander = turn_understander
         #: REV-26（IFC-R26-091）：`view` 给定 ⇒ 专家 / 提示词 / 标签一律读该版本视图，不读 `ib.experts` 进程级全局；
         #: `dag` 给定 ⇒ 用 DAG 编译图执行（`IB_GRAPH_RUNTIME=legacy` 时组合根不传 dag，沿用旧固定拓扑）。
         self._view = view
@@ -448,8 +451,74 @@ class Orchestrator:
         view = self._view
         dag = self._dag
         yield StreamEvent(StreamEventKind.REASONING, "正在分析问题…")
+        advisor_mode = bool(getattr(view, "advisor_id", None)) and self._understander is not None
+        advisor_turn = None
+        run_query = query
+        if advisor_mode and not resume:
+            from ib.advisor import AdvisorTurn, build_history_digest, passthrough, private_texts_of_history
+
+            try:
+                u = self._understander.understand(query, history)
+            except Exception:  # noqa: BLE001 - 理解步骤永不阻断问答（fail-open 为透传）
+                u = passthrough(query)
+            if u.needs_clarification:
+                # 澄清短路：不进图、不调用任何工具；仍写入会话历史
+                yield StreamEvent(StreamEventKind.CONTENT, u.clarification)
+                self._save_history(
+                    session_key, history, query, u.clarification,
+                    RouteDecision(experts=[], tier=RouteTier.DEFAULT, confidence=0.0),
+                )
+                log_event("chat", "advisor_turn", intents=",".join(u.intents), topic=u.topic, delegated=False,
+                          apology="", history_trimmed=0, config_version=int(view.version))
+                yield completion_event(self._completion_payload())
+                return
+            try:
+                digest = build_history_digest(history)
+                advisor_turn = AdvisorTurn(
+                    original_query=query,
+                    resolved_query=u.resolved_query,
+                    intents=tuple(u.intents),
+                    topic=u.topic,
+                    history_digest=digest.text,
+                    history_private=private_texts_of_history(history),
+                    history_trimmed=digest.trimmed,
+                    route_skip=u.route_skip,
+                )
+                run_query = u.delegate_query or u.resolved_query
+            except Exception as exc:  # noqa: BLE001 - DEF-002：回合准备异常 ⇒ 统一致歉，不暴露细节（AC-010-08）
+                from ib.advisor import advisor_apology_text
+
+                log_event("chat", "advisor_apology", apology="prepare_failed", error_code=type(exc).__name__,
+                          config_version=int(view.version))
+                apology = advisor_apology_text()
+                yield StreamEvent(StreamEventKind.CONTENT, apology)
+                self._save_history(
+                    session_key, history, query, apology,
+                    RouteDecision(experts=[], tier=RouteTier.DEFAULT, confidence=0.0),
+                )
+                yield completion_event(self._completion_payload())
+                return
         if resume:
             outcome = resume_dag(dag, view=view, llm=self._llm, query=query, thread_id=session_key)
+        elif advisor_mode:
+            try:
+                outcome = run_dag(
+                    dag, view=view, llm=self._llm, query=run_query, history=history,
+                    thread_id=session_key, advisor_turn=advisor_turn,
+                )
+            except Exception as exc:  # noqa: BLE001 - 未预期异常：只写日志，响应仅含致歉文案（A-12）
+                from ib.advisor import advisor_apology_text
+
+                log_event("chat", "advisor_apology", apology="summary_failed", error_code=type(exc).__name__,
+                          config_version=int(view.version))
+                apology = advisor_apology_text()
+                yield StreamEvent(StreamEventKind.CONTENT, apology)
+                self._save_history(
+                    session_key, history, query, apology,
+                    RouteDecision(experts=[], tier=RouteTier.DEFAULT, confidence=0.0),
+                )
+                yield completion_event(self._completion_payload())
+                return
         else:
             outcome = run_dag(dag, view=view, llm=self._llm, query=query, history=history, thread_id=session_key)
         if outcome.suspended_at is not None:
@@ -482,6 +551,21 @@ class Orchestrator:
             session_key, history, query, answer,
             RouteDecision(experts=[answered] if answered else [], tier=RouteTier.DEFAULT, confidence=0.0),
         )
+        if advisor_mode and advisor_turn is not None:
+            info = dict(outcome.advisor_info or {})
+            delegated = any(
+                t.kind == "agent" and t.status in ("ran", "failed") and t.node_id != view.advisor_id
+                for t in outcome.trace
+            )
+            log_event(
+                "chat", "advisor_turn",
+                intents=",".join(advisor_turn.intents), topic=advisor_turn.topic, delegated=delegated,
+                web_hosts=",".join(info.get("web_hosts") or ()),
+                tool_events=";".join(f"{e[0]}:{e[1]}:{e[2]}" for e in (info.get("tool_events") or ())),
+                degraded=bool(info.get("advisor_degraded")), apology=str(info.get("apology") or ""),
+                history_trimmed=advisor_turn.history_trimmed,
+                cited_external=bool(info.get("cited_external")), config_version=int(view.version),
+            )
         yield completion_event(self._completion_payload())
 
     def resume(self, session_key: str, payload: dict) -> Iterator[Any]:
@@ -918,9 +1002,12 @@ class Orchestrator:
         """确定性清洗；有版本视图 ⇒ 禁止词取该版本的专家标签（不读进程级全局）。"""
         if self._view is None:
             return _strip_internal_labels(text, self._config)
-        return _strip_internal_labels(
-            text, self._config, labels=forbidden_labels(dict(self._view.cn_labels))
-        )
+        cn_labels = dict(self._view.cn_labels)
+        advisor_id = getattr(self._view, "advisor_id", None)
+        if advisor_id:
+            # REV-28：顾问模式剔除顾问自己的中文标签（否则“财务顾问”等正常语句会被删字），其他 agent 标签照常清除
+            cn_labels = {k: v for k, v in cn_labels.items() if k != advisor_id}
+        return _strip_internal_labels(text, self._config, labels=forbidden_labels(cn_labels))
 
     def _aggregate(self, query: str, results: Sequence[ExpertResult]) -> str:
         """融合多专家结果。**禁止暴露内部分工**（AC-IB-09-03）。
@@ -1048,6 +1135,7 @@ def build_graph(
     confirmation_prompt_builder: Any = None,
     view: Any = None,
     dag: Any = None,
+    turn_understander: Any = None,
 ) -> Orchestrator:
     """[IFC-IB-231] 构造并编译编排图，返回可直接 `run()` 的 `Orchestrator`。
 
@@ -1101,6 +1189,7 @@ def build_graph(
         confirmation_prompt_builder=confirmation_prompt_builder,
         view=view,
         dag=dag,
+        turn_understander=turn_understander,
     )
     global _ORCHESTRATOR
     _ORCHESTRATOR = orchestrator

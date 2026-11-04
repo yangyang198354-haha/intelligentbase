@@ -407,6 +407,31 @@ LLM_KEY_DDL_STATEMENTS: tuple[str, ...] = (
     """,
 )
 
+#: REV-28（009）：联网全局用量上限单行表（`CHECK (id = 1)`；IFC-R28-008；与 `009_web_governance.sql` 逐字一致）。
+WEB_GOVERNANCE_DDL_STATEMENTS: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS web_governance (
+        id                       INTEGER PRIMARY KEY CHECK (id = 1),
+        max_calls_per_turn       INTEGER NOT NULL CHECK (max_calls_per_turn BETWEEN 1 AND 20),
+        max_fetch_bytes_per_turn INTEGER NOT NULL CHECK (max_fetch_bytes_per_turn BETWEEN 10000 AND 5242880),
+        max_seconds_per_turn     INTEGER NOT NULL CHECK (max_seconds_per_turn BETWEEN 1 AND 120),
+        updated_at               TEXT NOT NULL,
+        updated_by               TEXT NOT NULL
+    )
+    """,
+)
+
+WEB_GOVERNANCE_EXPECTED_COLUMNS: dict[str, tuple[str, ...]] = {
+    "web_governance": (
+        "id",
+        "max_calls_per_turn",
+        "max_fetch_bytes_per_turn",
+        "max_seconds_per_turn",
+        "updated_at",
+        "updated_by",
+    ),
+}
+
 #: 项目注册表侧期望列（与 `missing_project_registry_columns` 配套）。
 PROJECT_REGISTRY_EXPECTED_COLUMNS: dict[str, tuple[str, ...]] = {
     "projects": (
@@ -786,6 +811,11 @@ def folder_tree_ddl_script() -> str:
     return ";\n".join(statement.strip() for statement in statements) + ";\n"
 
 
+def web_governance_ddl_script() -> str:
+    """REV-28 联网治理 DDL 拼为单条脚本（供 `009_web_governance.sql` 快照；单源）。"""
+    return ";\n".join(statement.strip() for statement in WEB_GOVERNANCE_DDL_STATEMENTS) + ";\n"
+
+
 def config_versions_ddl_script() -> str:
     """REV-26 配置版本 DDL（新表 + 索引）拼为单条脚本（供 `008_config_versions.sql` 快照；单源）。
 
@@ -978,6 +1008,10 @@ def ensure_schema(connection) -> None:
         for statement in CONFIG_VERSION_DDL_STATEMENTS:
             cursor.execute(statement)
         connection.commit()
+        # REV-28（009）：联网全局用量上限单行表（新表，幂等）。
+        for statement in WEB_GOVERNANCE_DDL_STATEMENTS:
+            cursor.execute(statement)
+        connection.commit()
     finally:
         cursor.close()
 
@@ -985,6 +1019,11 @@ def ensure_schema(connection) -> None:
 def missing_config_version_columns(connection) -> dict[str, list[str]]:
     """REV-26 配置版本新表 / 新列的缺失检查（IFC-R26-052）。空字典表示结构完整。"""
     return _missing(connection, CONFIG_VERSION_EXPECTED_COLUMNS)
+
+
+def missing_web_governance_columns(connection) -> dict[str, list[str]]:
+    """REV-28 联网治理表的缺失列检查（IFC-R28-008）。空字典表示结构完整。"""
+    return _missing(connection, WEB_GOVERNANCE_EXPECTED_COLUMNS)
 
 
 def missing_columns(connection) -> dict[str, list[str]]:

@@ -102,6 +102,10 @@ def render_user_message(p: OutboundPayload) -> str:
     if p.project_digest is not None:
         d = asdict(p.project_digest)
         d.pop("project_id", None)  # 项目标识不外发
+        # DEF-004（AC-017-06）：is_external 仅在为真时输出，使既有工具条目序列化与基线逐字相同
+        for t in d.get("tools", ()):
+            if not t.get("is_external"):
+                t.pop("is_external", None)
         body["project"] = d
     if p.selected_agent is not None:
         body["agent"] = asdict(p.selected_agent)

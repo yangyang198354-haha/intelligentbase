@@ -56,7 +56,7 @@ type NavItem = { name: string; path: string; title: string; adminOnly: boolean }
  * （**资料管理**保持独立顶级，视图改为「项目域」）。
  */
 const TOP_ORDER = ['chat', 'files', 'rebuild', 'config'];
-const SYSTEM_ORDER = ['accounts', 'projects', 'llm-key'];
+const SYSTEM_ORDER = ['accounts', 'projects', 'llm-key', 'web-governance'];
 
 /** 从路由表派生**全部**带标题的导航项（唯一真源 = 路由表）。 */
 const NAV: NavItem[] = (router.getRoutes() ?? [])

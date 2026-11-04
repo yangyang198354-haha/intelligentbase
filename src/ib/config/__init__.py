@@ -85,6 +85,7 @@ __all__ = [
     "InMemoryExpertPromptStore",
     # REV-20（IFC-IB-389）：内置 kb-agent 提示词种子资产读取器
     "kb_agent_seed_prompt",
+    "advisor_seed_prompt",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -200,6 +201,14 @@ IB_RUNTIME_ENV_KEYS: tuple[str, ...] = (
     "IB_GRAPH_RUNTIME",
     "IB_LLM_CLIENT_CACHE_MAX",
     "IB_DOC_SCOPE_MAX_IDS",
+    # REV-28（IFC-R28-011）：联网搜索 / 抓取（只登记键名；搜索不新增任何凭据键——
+    # 复用 LLM 的同一 Key 解析点 `resolve_llm_api_key`，Key 不进入配置值字典与任何可打印结构）。
+    #   IB_WEB_SEARCH_PROVIDER —— 搜索提供方标识：`none`（缺省，联网搜索关闭）或 `deepseek`；`fake` 仅离线。
+    #   IB_WEB_FETCH_ENABLED —— 网页抓取总开关，缺省 0（关闭）。
+    #   IB_WEB_GOVERNANCE_BACKEND —— 联网上限存储后端，`sqlite`（缺省）或 `memory`。
+    "IB_WEB_SEARCH_PROVIDER",
+    "IB_WEB_FETCH_ENABLED",
+    "IB_WEB_GOVERNANCE_BACKEND",
 )
 
 #: v1 支持的 4 种格式（**OQ-IB-02 默认值**：其余格式按扩展点预留，不实现）。
@@ -408,6 +417,10 @@ class GlobalConfig:
     #: 同一条纪律（`sqlite` 默认 / `memory` 离线替身）；同库同迁移机制（ADR-37 / ADR-38）。
     project_registry_backend: str = "sqlite"  # IB_PROJECT_REGISTRY_BACKEND
     llm_key_backend: str = "sqlite"  # IB_LLM_KEY_BACKEND
+    #: REV-28（IFC-R28-011）：联网搜索 / 抓取 / 上限存储（均有默认值；API Key 不在此处）。
+    web_search_provider: str = "none"  # IB_WEB_SEARCH_PROVIDER
+    web_fetch_enabled: bool = False  # IB_WEB_FETCH_ENABLED
+    web_governance_backend: str = "sqlite"  # IB_WEB_GOVERNANCE_BACKEND
     max_upload_mb: int = 50  # IB_MAX_UPLOAD_MB
     #: 资料库目录与批量上传限额（MOD-009）。总大小默认值 1024MB 为 [ESTIMATE]（A-01，部署阶段再确认）。
     upload_batch_max_files: int = 1000  # IB_UPLOAD_BATCH_MAX_FILES
@@ -755,6 +768,11 @@ def resolve_global_config(raw: RawConfig) -> GlobalConfig:
             values.get("project_registry_backend", GlobalConfig.project_registry_backend)
         ),
         llm_key_backend=str(values.get("llm_key_backend", GlobalConfig.llm_key_backend)),
+        web_search_provider=str(values.get("web_search_provider", GlobalConfig.web_search_provider) or "none"),
+        web_fetch_enabled=_as_bool(values.get("web_fetch_enabled"), default=False, key="IB_WEB_FETCH_ENABLED"),
+        web_governance_backend=str(
+            values.get("web_governance_backend", GlobalConfig.web_governance_backend) or "sqlite"
+        ),
         max_upload_mb=_warn_if_over_proxy_limit(
             _as_int(values.get("max_upload_mb"), default=GlobalConfig.max_upload_mb, key="IB_MAX_UPLOAD_MB")
         ),
@@ -902,11 +920,39 @@ def validate_required(
         # REV-18（IFC-IB-369）：项目注册表 / LLM Key 后端值域（sqlite 默认 / memory 离线替身）。
         "IB_PROJECT_REGISTRY_BACKEND": (cfg.project_registry_backend, {"sqlite", "memory"}),
         "IB_LLM_KEY_BACKEND": (cfg.llm_key_backend, {"sqlite", "memory"}),
+        # REV-28：联网上限存储后端值域。
+        "IB_WEB_GOVERNANCE_BACKEND": (cfg.web_governance_backend, {"sqlite", "memory"}),
     }
     for key, (value, allowed) in choices.items():
         if value not in allowed:
             errors.append(
                 ConfigError(f"配置键 {key} 取值非法（允许：{'/'.join(sorted(allowed))}）", key=key)
+            )
+
+    # 2b) REV-28（IFC-R28-032 / ADR-R28-13）：联网搜索提供方值域。`fake` 不在其中（替身仅离线可用，
+    #     离线分支已在函数开头提前返回）；`deepseek` 要求 LLM 服务方即 DeepSeek（Key 只会发往固定主机）。
+    #     错误只报键名与允许值，不含所配值。
+    if cfg.web_search_provider not in {"none", "deepseek"}:
+        errors.append(
+            ConfigError(
+                "配置键 IB_WEB_SEARCH_PROVIDER 取值非法（允许：deepseek/none）", key="IB_WEB_SEARCH_PROVIDER"
+            )
+        )
+    elif cfg.web_search_provider == "deepseek":
+        from urllib.parse import urlsplit
+
+        from ib.core import DEEPSEEK_API_HOST
+
+        try:
+            llm_host = (urlsplit(cfg.llm.base_url).hostname or "").lower()
+        except ValueError:
+            llm_host = ""
+        if llm_host != DEEPSEEK_API_HOST:
+            errors.append(
+                ConfigError(
+                    "配置键 IB_WEB_SEARCH_PROVIDER=deepseek 要求 LLM 服务方为 DeepSeek（见 LLM base_url 配置）",
+                    key="IB_WEB_SEARCH_PROVIDER",
+                )
             )
 
     # 3) 维度与模型一致性
@@ -989,4 +1035,5 @@ from .prompts import (  # noqa: E402  (REV-16-2 提示词域；同「置于模�
     validate_tool_params,
     with_prompt_bundles,
     kb_agent_seed_prompt,
+    advisor_seed_prompt,
 )

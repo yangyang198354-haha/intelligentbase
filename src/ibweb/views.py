@@ -149,6 +149,8 @@ __all__ = [
     "project_detail_endpoint",
     "account_detail_endpoint",
     "llm_key_endpoint",
+    # REV-28 联网全局用量上限（IFC-R28-023 / 024）
+    "web_governance_endpoint",
 ]
 
 #: 分页上限：**服务端硬上限**（不接受客户端指定更大的值）。
@@ -813,6 +815,10 @@ def healthz_deps_endpoint(request: Any) -> Any:
         "llm": HealthStatusSerializer(_safe_health(deps.llm)).data,
         "egress": EgressDescriptorSerializer(_egress_of(deps)).data,
     }
+    # REV-28（IFC-R28-025）：联网外发声明；为空时响应与基线逐字节相同
+    egress_web = tuple(getattr(deps, "egress_web", ()) or ())
+    if egress_web:
+        payload["egress_web"] = [EgressDescriptorSerializer(d).data for d in egress_web]
     return _json(payload, status.HTTP_200_OK)
 
 
@@ -1568,6 +1574,13 @@ def projects_endpoint(request: Any) -> Any:
                 raise ValidationError("缺少项目名称")
             if _PROJECT_ID_PATTERN.match(project_id) is None:
                 raise ValidationError("project_id 只能含字母 / 数字 / 下划线 / 连字符（1~128 字符）")
+            # REV-28（IFC-R28-022）：可选 `enable_advisor`；缺省 / false ⇒ 与现状逐位一致；存在且非 bool ⇒ 400（先于创建）
+            enable_advisor = False
+            if "enable_advisor" in payload:
+                flag = payload["enable_advisor"]
+                if not isinstance(flag, bool):
+                    raise ValidationError("enable_advisor 必须为布尔值")
+                enable_advisor = flag
             now = utc_now_iso()
             created = _project_registry().create(
                 ProjectRegistryEntry(
@@ -1582,7 +1595,10 @@ def projects_endpoint(request: Any) -> Any:
             # 写 `<dir>/<project_id>.json`（专家集 + 单一默认编排流）+ 提示词目录骨架。
             # 种子真源：`demo` = 三对齐专家；其余 = 内置默认单例（1 个 KB 问答 agent）。
             # **原子回滚**：播种失败 → 软删注册表项 + 删除半成品，返回明确错误（不静默）。
-            _seed_created_project(project_id)
+            if enable_advisor:
+                _seed_created_project(project_id, with_advisor=True)
+            else:
+                _seed_created_project(project_id)
             audit("project", outcome="created", status="ok", project_id=project_id)
             deps.reload_projects()
             return _json(ProjectRegistryEntrySerializer(created).data, status.HTTP_201_CREATED)
@@ -1751,7 +1767,7 @@ def _project_registry() -> Any:
     return registry
 
 
-def _seed_created_project(project_id: str) -> Any:
+def _seed_created_project(project_id: str, *, with_advisor: bool = False) -> Any:
     """REV-19 创建期播种（ADR-45 / IFC-IB-385；REQ-FUNC-IB-52 / IB-53）。
 
     调用组合根 `seed_project`（内置默认单例 = 1 个 KB 问答 agent；`demo` = 三对齐专家）。
@@ -1760,7 +1776,14 @@ def _seed_created_project(project_id: str) -> Any:
     from ib.experts import builtin_default_registry
 
     try:
-        result = composition.seed_project(project_id, registry_view=builtin_default_registry())
+        if with_advisor:
+            from ib.experts import builtin_registry_with_advisor
+
+            result = composition.seed_project(
+                project_id, registry_view=builtin_registry_with_advisor(), with_advisor=True
+            )
+        else:
+            result = composition.seed_project(project_id, registry_view=builtin_default_registry())
         log_event("project", "seeded", project_id=project_id, created=int(bool(result.created)))
         return result
     except Exception as exc:  # noqa: BLE001 - 播种失败须回滚，不静默
@@ -2191,6 +2214,86 @@ def llm_key_endpoint(request: Any) -> Any:
             store.clear()
             audit("llm_key", outcome="cleared", status="ok")
             return _no_content()
+        return _json(
+            {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+    except IbError as exc:
+        return error_response(exc)
+
+
+_WEB_GOV_KEYS = ("max_calls_per_turn", "max_fetch_bytes_per_turn", "max_seconds_per_turn")
+
+
+def _web_governance_payload(caps: Any) -> dict[str, Any]:
+    from ib.core import WEB_BYTES_HARD_MAX, WEB_CALLS_HARD_MAX, WEB_SECONDS_HARD_MAX
+
+    return {
+        "max_calls_per_turn": caps.max_calls_per_turn,
+        "max_fetch_bytes_per_turn": caps.max_fetch_bytes_per_turn,
+        "max_seconds_per_turn": caps.max_seconds_per_turn,
+        "hard_max": {
+            "max_calls_per_turn": WEB_CALLS_HARD_MAX,
+            "max_fetch_bytes_per_turn": WEB_BYTES_HARD_MAX,
+            "max_seconds_per_turn": WEB_SECONDS_HARD_MAX,
+        },
+        "updated_at": caps.updated_at,
+        "updated_by": caps.updated_by,
+    }
+
+
+def web_governance_endpoint(request: Any) -> Any:
+    """`GET|PUT /api/web-governance`（REV-28 IFC-R28-023 / 024；**仅 admin**）。
+
+    * `GET` → `200 {三项上限, hard_max, updated_at, updated_by}`；存储不可用 → `503`（fail-closed，不以默认值冒充）；
+    * `PUT`（恰含三个整数键）→ `200` 同 GET 形状 | `400`（缺键 / 多余键 / 非整数 / bool / 越界，逐字段）| `403`。
+    """
+    try:
+        _require_admin(request)
+        deps = composition.get_deps()
+        store = getattr(deps, "web_governance", None)
+        if store is None:
+            raise DependencyUnavailableError("联网上限存储不可用", dependency="ledger")
+        if request.method == "GET":
+            try:
+                caps = store.get()
+            except IbError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                raise DependencyUnavailableError("联网上限存储不可用", dependency="ledger") from exc
+            return _json(_web_governance_payload(caps), status.HTTP_200_OK)
+        if request.method == "PUT":
+            from ib.core import WebGovernance
+
+            payload = _json_body(request)
+            if not isinstance(payload, dict):
+                raise ValidationError("请求体必须为 JSON 对象")
+            problems: list[str] = []
+            extra = sorted(k for k in payload if k not in _WEB_GOV_KEYS)
+            if extra:
+                problems.append("不支持的字段：" + ", ".join(str(k) for k in extra))
+            ranges = {
+                "max_calls_per_turn": (1, 20),
+                "max_fetch_bytes_per_turn": (10000, 5242880),
+                "max_seconds_per_turn": (1, 120),
+            }
+            values: dict[str, int] = {}
+            for key in _WEB_GOV_KEYS:
+                lo, hi = ranges[key]
+                v = payload.get(key)
+                if key not in payload or isinstance(v, bool) or not isinstance(v, int) or not (lo <= v <= hi):
+                    problems.append(f"{key} 须为 {lo}..{hi} 的整数")
+                else:
+                    values[key] = v
+            if problems:
+                raise ValidationError("；".join(problems))
+            actor = ctx_actor_of(request)
+            try:
+                saved = store.set(WebGovernance(**values), actor=actor)
+            except ValueError as exc:
+                raise ValidationError(str(exc)) from exc
+            audit("web_governance", outcome="updated", status="ok")
+            return _json(_web_governance_payload(saved), status.HTTP_200_OK)
         return _json(
             {"error": {"code": "method_not_allowed", "message": "不支持的方法"}},
             status.HTTP_405_METHOD_NOT_ALLOWED,

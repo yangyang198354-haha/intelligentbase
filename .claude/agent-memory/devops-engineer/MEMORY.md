@@ -19,3 +19,4 @@
 - [P-DE-004] 改 ci.yml 迁移门后，用 yaml.safe_load 抽出该 step 的 run 脚本、在 venv 里原样执行，再对副本做反例变异（如删 IF NOT EXISTS）确认门会失败；热生效探针 hot_effect_probe.py 只核对版本一致与耗时分布，不测"发布到生效"的收敛时间，计划中须如实写明边界；目标机跑 selfcheck 用 git archive 的临时导出，避免在部署树写文件 — 自记 2026-10-27 · 证据 R26 E1
 - [P-DE-005] "纯前端"增量的部署区间 ANCHOR..DEPLOY_COMMIT 可能夹带其他提交的后端文件（R27 区间含 6bfdef4 改 src/ib/runtime/cache.py）：E1 用 `git diff --name-only <上一已批准提交> <待部署>` 核对，计划里做 PRE 分类门（A 纯前端 / B 夹带后端运行时 / C 迁移或依赖），目标机 HEAD 不可假定时尤其必要 — 自记 2026-10-31 · 证据 R27 E1（git diff bb3ac4b 1dde3d4 -- src）
 - [P-DE-003] 远端命令要用本地变量：`ssh host bash -s -- "$A" "$B" <<'EOF'`（heredoc 单引号定界，远端用 $1 $2），比双引号转义稳；markdown 里嵌在列表项中的 heredoc 代码块要顶格，否则粘贴时 EOF/python 缩进失效 — 自记 2026-10-24 · 证据 R25 E1 自检
+- [P-DE-006] 增量新增"工具/授权类"配置能力时，代码回滚前须先在新代码下清除已保存的该类授权：旧代码定义校验对未知工具报 `tool_grant_tool_unknown`（definition.py:531），项目会加载失败；回滚计划里放 ROLLBACK-000（用户经配置页"版本→回滚"）并以只读脚本核验命中 0 — 自记 2026-11-04 · 证据 R28 E1（src/ib/config/definition.py:531）

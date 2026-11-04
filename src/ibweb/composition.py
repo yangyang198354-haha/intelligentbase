@@ -82,6 +82,8 @@ __all__ = [
     "build_application",
     "resolve_scope",
     "register_builtin_tools",
+    "build_web_runtime",
+    "builtin_agents_catalog",
     "admit",
     "SEARCH_TOOL_SPEC",
     # REV-16-2（提示词域 / 工具参数；IFC-IB-339 / 340 / 353）
@@ -207,6 +209,10 @@ class Deps:
     builder_service: Any = None
     trial_runner: Any = None
     account_levels: Any = None  # AccountConfigLevelStore（与 account_store 同一实例，并列小端口）
+    # REV-28（MOD-R28-14）：联网运行时 / 全局上限存储 / 外发声明（未配置联网时 egress_web 为空 ⇒ /healthz/deps 与基线逐字节相同）。
+    web_runtime: Any = None
+    web_governance: Any = None
+    egress_web: tuple[Any, ...] = ()
 
     def __post_init__(self) -> None:
         self._lock = threading.Lock()
@@ -415,14 +421,15 @@ class Deps:
         """
         from ib.tools import ToolRegistry, bind_scope, build_authorized_tools
 
-        registry = register_builtin_tools(ToolRegistry())
+        registry = register_builtin_tools(ToolRegistry(), web=self.web_runtime)
         grants = self._effective_grants(scope.project_id)
         if grants:
             authorized = build_authorized_tools(
                 grants, registry=registry, specs=self.tool_param_specs()
             )
             return bind_scope(authorized, scope, self.retrieval)
-        return bind_scope(registry.registered(), scope, self.retrieval)
+        # 防御性回落：联网类工具只经显式授权绑定，不进入“全部已登记工具”路径（REQ-NFUNC-001）
+        return bind_scope([r for r in registry.registered() if not r.spec.external], scope, self.retrieval)
 
     def _effective_grants(self, project_id: str) -> tuple[Any, ...]:
         """取该项目定义文档的工具授权（无文档 / 无授权 → 空元组，回退既有路径）。"""
@@ -473,7 +480,7 @@ def _search_tool(
     )
 
 
-def register_builtin_tools(registry: Any) -> Any:
+def register_builtin_tools(registry: Any, *, web: Any = None) -> Any:
     """把**基座自带工具**登记进给定注册表（`ToolRegistry`），返回同一注册表。
 
     ## 为什么必须是唯一登记点（FND-GROUP-D-01 的根因修复）
@@ -492,7 +499,60 @@ def register_builtin_tools(registry: Any) -> Any:
     「每项目一次、绝不跨项目复用」的纪律不变。
     """
     registry.register(SEARCH_TOOL_SPEC, _search_tool)
+    # REV-28（IFC-R28-021）：联网工具恒登记（AQ3=A，授权才可见）；web=None ⇒ 等价 NullWebRuntime（搜索未配置、抓取关闭）。
+    from ib.webtools.tools import NullWebRuntime, register_web_tools
+
+    register_web_tools(registry, web if web is not None else NullWebRuntime)
     return registry
+
+
+def build_web_runtime(cfg: Any, *, audit: Any, governance: Any, api_key: str | None) -> Any:
+    """[IFC-R28-021] 由配置构造联网运行时。
+
+    `api_key` = `resolve_llm_api_key(cfg, 台账 LLM Key)`（IFC-R28-031），由 `_assemble` 装配期解析一次传入：
+    与 LLM 同一份 Key、不新增凭据，不进入任何日志 / 描述。
+    """
+    from ib.context import utc_now_iso
+    from ib.webtools.fetch import SafeFetcher
+    from ib.webtools.gate import WebEgressGate
+    from ib.webtools.search import WebSearchSettings, build_search_provider
+    from ib.webtools.tools import WebRuntime
+
+    provider = build_search_provider(
+        WebSearchSettings(provider_id=str(getattr(cfg, "web_search_provider", "none") or "none")),
+        api_key,
+        offline=bool(getattr(cfg, "offline_mode", False)),
+    )
+    fetcher = SafeFetcher() if bool(getattr(cfg, "web_fetch_enabled", False)) else None
+    gate = WebEgressGate(audit=audit, clock=utc_now_iso, concurrency=3)
+    return WebRuntime(provider=provider, fetcher=fetcher, gate=gate, governance=governance)
+
+
+def _web_turn_scope_factory(deps: "Deps") -> Any:
+    """顾问节点的回合作用域适配器（编排层不 import ib.webtools，经 RuntimeDeps 注入）。"""
+    from contextlib import contextmanager
+
+    from ib.core import WebGovernance
+    from ib.webtools.gate import WebTurn, bind_web_turn
+
+    @contextmanager
+    def _scope(info: Any):
+        gov = deps.web_governance
+        try:
+            caps = gov.get() if gov is not None else WebGovernance()
+        except Exception:  # noqa: BLE001 - 上限存储不可读：回合内按保守默认值（不放大权限）
+            caps = WebGovernance()
+        turn = WebTurn(
+            turn_id=str(info.get("turn_id") or ""),
+            project_id=str(info.get("project_id") or ""),
+            actor_id=str(info.get("actor_id") or ""),
+            private_texts=tuple(info.get("private_texts") or ()),
+            caps=caps,
+        )
+        with bind_web_turn(turn) as budget:
+            yield budget
+
+    return _scope
 
 
 def _make_related_images_provider(ledger: Any, scope: Scope) -> Any:
@@ -862,6 +922,22 @@ def _assemble() -> Deps:
         cfg, ledger_path=str(getattr(cfg, "ledger_path", "") or ":memory:")
     )
 
+    # 4d-3) REV-28（IFC-R28-021 / ADR-R28-03）：联网运行时。默认关闭（搜索 provider=none、抓取开关=0）。
+    #       API Key 复用 LLM 的同一解析点（IFC-R28-031），装配期解析一次（不进 GlobalConfig / 日志 / 审计）。
+    from ib.ledger import build_web_governance_store
+    from ib.llm import resolve_llm_api_key
+
+    web_governance = build_web_governance_store(
+        cfg, ledger_path=str(getattr(cfg, "ledger_path", "") or ":memory:")
+    )
+    web_runtime = build_web_runtime(
+        cfg,
+        audit=config_audit_store,
+        governance=web_governance,
+        api_key=resolve_llm_api_key(cfg, resolved_llm_key),
+    )
+    egress_web = web_runtime.egress_descriptors()
+
     # 4e) R13 登录限速（IFC-IB-326 / DEFECT-R13-01）：**装配期构建一次、按请求复用**。
     #     为什么必须在组合根构建：`LoginThrottle` 的滑动窗口计数器 `_hits` 是**实例状态**，
     #     若在每个请求内 `build_throttle()` 新建，则每次都得到空窗口、计数永不累积，
@@ -949,6 +1025,9 @@ def _assemble() -> Deps:
         upload_batches=upload_batches,
         library=library,
         uploads=uploads,
+        web_runtime=web_runtime,
+        web_governance=web_governance,
+        egress_web=egress_web,
     )
     # 4f) REV-26（MOD-R26-14 / IFC-R26-134）：版本化配置 / 热生效运行时 / 发布 / Builder / 试运行。
     _install_config_runtime(deps)
@@ -964,6 +1043,13 @@ def _assemble() -> Deps:
         egress_host=getattr(deps.egress, "endpoint_host", "") or "",
         egress_data=",".join(str(c) for c in getattr(deps.egress, "data_categories", []) or []),
     )
+    if egress_web:
+        log_event(
+            "startup",
+            "web_egress",
+            web_search_host=next((d.endpoint_host for d in egress_web if d.endpoint_host != "*"), ""),
+            web_fetch_enabled=bool(getattr(cfg, "web_fetch_enabled", False)),
+        )
     return deps
 
 
@@ -1117,7 +1203,7 @@ def _install_config_runtime(deps: "Deps") -> None:
         retrieval=deps.retrieval,
         embedder=deps.embedder,
         sessions=deps.sessions,
-        tool_registry_factory=lambda: register_builtin_tools(ToolRegistry()),
+        tool_registry_factory=lambda: register_builtin_tools(ToolRegistry(), web=deps.web_runtime),
         tool_param_specs=known_tool_param_specs(),
         graph_config_factory=lambda route: _graph_config(cfg, route),
         related_images_provider_factory=lambda scope: _make_related_images_provider(deps.ledger, scope),
@@ -1125,6 +1211,8 @@ def _install_config_runtime(deps: "Deps") -> None:
         graph_runtime=graph_runtime,  # type: ignore[arg-type]
         exemplar_seed=_load_exemplars,
         checkpointer_for=_checkpointer_for,
+        web_turn_scope=_web_turn_scope_factory(deps),
+        web_governance=deps.web_governance,
     )
     try:
         interval = float(os.environ.get("IB_CONFIG_HEAD_CHECK_INTERVAL_S", "").strip() or 1.0)
@@ -1161,7 +1249,29 @@ def _install_config_runtime(deps: "Deps") -> None:
             prompt_refs=prompt_refs_of_snapshot(snapshot),
             known_folder_ids=folder_ids,
         )
-        return tuple(report.errors)
+        errors = list(report.errors)
+        # REV-28（IFC-R28-021）：联网授权的保存期校验（域名格式 / 超出全局上限）。上限存储不可读时，
+        # 对“含联网授权”的文档 fail-closed；不含联网授权的文档跳过（未启用项目零影响）。
+        grants = snapshot.definition.tool_grants
+        has_web = any(
+            (t in ("web_search", "web_fetch")) for g in grants for t in g.tool_names
+        ) or any(pv.name.startswith(("web_search.", "web_fetch.")) for g in grants for pv in g.param_values)
+        if has_web:
+            from ib.core import ValidationErrorItem
+            from ib.webtools.policy import validate_web_grants
+
+            try:
+                caps = deps.web_governance.get()
+            except Exception:  # noqa: BLE001
+                errors.append(
+                    ValidationErrorItem(
+                        path="tool_grants", code="web_governance_unavailable",
+                        message="联网上限暂不可读，无法校验联网授权，请稍后重试",
+                    )
+                )
+            else:
+                errors.extend(validate_web_grants(grants, caps))
+        return tuple(errors)
 
     def _precompile(project_id: str, version: int, snapshot: Any) -> Any:
         return compile_project_config(project_id, version, snapshot, deps=rt_deps, source="snapshot")
@@ -1200,7 +1310,7 @@ def _install_config_runtime(deps: "Deps") -> None:
     # ---- Agent Builder（只读项目摘要；不接触资料正文 / 会话 / 账号） ----
     def _context(project_id: str, actor: str) -> Any:
         snap = deps.publish_service.current(project_id)
-        registry = register_builtin_tools(ToolRegistry())
+        registry = register_builtin_tools(ToolRegistry(), web=deps.web_runtime)
         specs = known_tool_param_specs()
         tools: list[Any] = []
         for item in registry.registered():
@@ -1220,6 +1330,7 @@ def _install_config_runtime(deps: "Deps") -> None:
                 ToolDigest(
                     name=item.spec.name, description=item.spec.description, params=owned,
                     is_retrieval=bool(item.spec.needs_scope),
+                    is_external=bool(getattr(item.spec, "external", False)),
                 )
             )
         try:
@@ -1277,6 +1388,8 @@ def _offline_view(cfg: Any) -> Any:
         return cfg
     return replace(
         cfg,
+        # REV-28（REQ-FUNC-019 离线侧）：搜索提供方非 none 时整体切替身（none 保持 none）。
+        web_search_provider=("none" if str(cfg.web_search_provider or "none") == "none" else "fake"),
         ledger_backend="memory",
         # REV-18：注册表 / LLM Key 后端一并切到内存替身（离线零外部 IO）。
         project_registry_backend="memory",
@@ -1866,10 +1979,67 @@ def _definition_document_from_specs(project_id: str, *, specs: Any, default_name
     )
 
 
+def _advisor_definition_document(doc: Any, specs: Any, default_name: str) -> Any:
+    """[IFC-R28-021] 把规范 v1 种子文档升为含顾问规范图的 v2 文档：授权 kb-agent=(search_knowledge)、advisor=()。"""
+    from dataclasses import replace as _dc_replace
+
+    from ib.config import semantic_hash
+    from ib.config.graph import canonical_graph_with_advisor
+    from ib.core import OrchestrationSpecInput, ToolGrantSpec
+
+    graph = canonical_graph_with_advisor(doc.experts, default_name)
+    grants = tuple(
+        ToolGrantSpec(
+            expert_name=spec.name,
+            tool_names=() if spec.name == "advisor" else ("search_knowledge",),
+        )
+        for spec in specs
+    )
+    up = _dc_replace(
+        doc,
+        schema_version=2,
+        graph=graph,
+        orchestration=OrchestrationSpecInput(nodes=(), conditional_edges=(), edges=()),
+        tool_grants=grants,
+    )
+    return _dc_replace(up, content_hash=semantic_hash(up))
+
+
+def builtin_agents_catalog() -> list[dict[str, Any]]:
+    """[IFC-R28-021] 目录追加键 `builtin_agents`：内置顾问的专家规格 / 主提示词种子 / 接线规则版本（只读，不含凭据）。"""
+    from ib.config import advisor_seed_prompt
+    from ib.config.definition import _expert_payload
+    from ib.core import ExpertSpecInput
+    from ib.experts import BUILTIN_ADVISOR
+
+    spec = ExpertSpecInput(
+        name=BUILTIN_ADVISOR.name,
+        cn_label=BUILTIN_ADVISOR.cn_label,
+        keywords=tuple(BUILTIN_ADVISOR.keywords),
+        exemplars=(),
+        is_data_expert=BUILTIN_ADVISOR.is_data_expert,
+        is_delegating=BUILTIN_ADVISOR.is_delegating,
+        is_default=BUILTIN_ADVISOR.is_default,
+    )
+    return [
+        {
+            "id": "advisor",
+            "name": "advisor",
+            "cn_label": BUILTIN_ADVISOR.cn_label,
+            "summary": "面向客户的专业顾问：先理解意图与上下文，经路由委托资料检索，再统一措辞作答；可选联网。",
+            "expert": _expert_payload(spec),
+            "prompt_main": advisor_seed_prompt(),
+            "default_tool_grants": [],
+            "wiring_version": 1,
+        }
+    ]
+
+
 def seed_project(
     project_id: str,
     *,
     registry_view: Any = None,
+    with_advisor: bool = False,
     definition_dir: str | None = None,
     prompt_root: str | None = None,
 ) -> Any:
@@ -1905,9 +2075,16 @@ def seed_project(
     if prompt_root is None:
         prompt_root = _os.environ.get("IB_EXPERT_PROMPT_DIR", "").strip()
 
-    chosen = registry_view if registry_view is not None else builtin_default_registry()
+    if registry_view is not None:
+        chosen = registry_view
+    elif with_advisor:
+        from ib.experts import builtin_registry_with_advisor
+
+        chosen = builtin_registry_with_advisor()  # REV-28：(kb-agent, advisor)；默认专家仍为 kb-agent
+    else:
+        chosen = builtin_default_registry()
     names = tuple(chosen.names())
-    seed_note = "builtin_default_seed"
+    seed_note = "builtin_advisor_seed" if with_advisor else "builtin_default_seed"
 
     written_doc: str | None = None
     created_dirs: list[str] = []
@@ -1930,22 +2107,26 @@ def seed_project(
             doc = _definition_document_from_specs(
                 project_id, specs=tuple(chosen.experts), default_name=chosen.default_name()
             )
+            if with_advisor:
+                doc = _advisor_definition_document(doc, tuple(chosen.experts), chosen.default_name())
             store.save(project_id, doc, expected_content_hash=None)
             written_doc = target
 
         if prompt_root:
-            from ib.config import FsExpertPromptStore, kb_agent_seed_prompt
+            from ib.config import FsExpertPromptStore, advisor_seed_prompt, kb_agent_seed_prompt
 
             seed_text = kb_agent_seed_prompt()
             prompt_store = FsExpertPromptStore(prompt_root, project_id)
             for expert in names:
+                # REV-28：顾问取自己的种子；其余专家沿用 kb 种子（with_advisor=False 时恒为 kb 种子，与现状一致）
+                expert_seed = advisor_seed_prompt() if (with_advisor and expert == "advisor") else seed_text
                 d = _os.path.join(prompt_root, project_id, expert)
                 _os.makedirs(d, exist_ok=True)
                 created_dirs.append(d)
                 # IFC-IB-390：落盘主提示词；**已存在不覆盖**（幂等，保护用户编辑）
                 main_path = _os.path.join(d, "main.md")
                 if not _os.path.isfile(main_path):
-                    result = prompt_store.save_layer(expert, "main", seed_text, expected_hash=None)
+                    result = prompt_store.save_layer(expert, "main", expert_seed, expected_hash=None)
                     if not result.saved:
                         raise ConfigError(
                             f"创建期提示词落盘失败（expert={expert}，IB_EXPERT_PROMPT_DIR）"
@@ -1957,7 +2138,7 @@ def seed_project(
             document_path=written_doc or "",
             prompt_root=prompt_root or "",
             expert_names=names,
-            orchestration="default",
+            orchestration="advisor" if with_advisor else "default",
             notes=(seed_note,),
         )
     except BaseException:

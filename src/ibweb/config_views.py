@@ -452,6 +452,20 @@ def _catalog(deps: Any, ctx: Any, pid: str, request: Any) -> Any:
         folders = [{"folder_id": fid, "path": p} for fid, p in composition._project_folder_index(deps, pid).items()]
     except Exception:  # noqa: BLE001 - 目录不可读不影响配置读取
         folders = []
+    # REV-28（IFC-R28-025）：目录追加键——内置 agent 清单与联网概况（不含凭据；caps 读不到时省略，不阻断目录）
+    web: dict[str, Any] = {
+        "search_configured": _web_search_configured(deps),
+        "fetch_enabled": bool(getattr(getattr(deps, "web_runtime", None), "fetcher", None) is not None),
+    }
+    try:
+        caps = deps.web_governance.get()
+        web["caps"] = {
+            "max_calls_per_turn": caps.max_calls_per_turn,
+            "max_fetch_bytes_per_turn": caps.max_fetch_bytes_per_turn,
+            "max_seconds_per_turn": caps.max_seconds_per_turn,
+        }
+    except Exception:  # noqa: BLE001
+        pass
     return _ok(
         {
             "available_tools": list(composition.known_tool_names()),
@@ -459,8 +473,20 @@ def _catalog(deps: Any, ctx: Any, pid: str, request: Any) -> Any:
             "folders": folders,
             "agents": _agents_summary(doc, snapshot),
             "schema_version": doc.schema_version,
+            "builtin_agents": composition.builtin_agents_catalog(),
+            "web": web,
         }
     )
+
+
+def _web_search_configured(deps: Any) -> bool:
+    runtime = getattr(deps, "web_runtime", None)
+    if runtime is None:
+        return False
+    try:
+        return bool(runtime.provider.describe_egress().remote)
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def catalog_endpoint(request: Any) -> Any:

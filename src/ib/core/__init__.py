@@ -431,3 +431,36 @@ __all__ = [
     "BuilderEvalCache",
     "AccountConfigLevelStore",
 ]
+
+
+# REV-28 追加导出（IFC-R28-001/002）
+from .ports import SearchProvider, WebGovernanceStore  # noqa: E402
+from .types import (  # noqa: E402
+    ADVISOR_EXPERT_ID,
+    DEEPSEEK_API_HOST,
+    WEB_BYTES_HARD_MAX,
+    WEB_CALLS_HARD_MAX,
+    WEB_SECONDS_HARD_MAX,
+    SearchErrorKind,
+    SearchHit,
+    SearchOutcome,
+    SearchQuery,
+    WebGovernance,
+    is_advisor_expert,
+)
+
+__all__ += [
+    "ADVISOR_EXPERT_ID",
+    "DEEPSEEK_API_HOST",
+    "is_advisor_expert",
+    "SearchErrorKind",
+    "SearchQuery",
+    "SearchHit",
+    "SearchOutcome",
+    "WEB_CALLS_HARD_MAX",
+    "WEB_BYTES_HARD_MAX",
+    "WEB_SECONDS_HARD_MAX",
+    "WebGovernance",
+    "SearchProvider",
+    "WebGovernanceStore",
+]

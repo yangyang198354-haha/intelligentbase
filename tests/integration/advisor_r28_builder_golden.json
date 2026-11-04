@@ -1,0 +1,141 @@
+{
+ "payloads": [
+  {
+   "kind": "generate",
+   "project": {
+    "agents": [
+     {
+      "cn_label": "知识库助手",
+      "exemplars": [],
+      "keywords": [
+       "知识库",
+       "资料",
+       "文档",
+       "检索",
+       "问答",
+       "知识",
+       "查资料"
+      ],
+      "name": "kb-agent"
+     }
+    ],
+    "constraints": {
+     "blocked_terms": [
+      "freeark",
+      "自由方舟",
+      "三恒"
+     ],
+     "grounding_clauses": [
+      [
+       "citation",
+       [
+        "引用",
+        "来源",
+        "出处"
+       ]
+      ],
+      [
+       "honest_no_hit",
+       [
+        "没有找到",
+        "未找到",
+        "无命中",
+        "如实",
+        "不得编造",
+        "不要编造",
+        "不编造",
+        "无法确认"
+       ]
+      ],
+      [
+       "tool_contract",
+       [
+        "工具",
+        "检索",
+        "search_knowledge",
+        "调用"
+       ]
+      ]
+     ],
+     "max_steps_default": 4,
+     "max_steps_range": [
+      1,
+      8
+     ],
+     "prompt_max_chars": 20000,
+     "reserved_names": [
+      "general",
+      "start",
+      "end"
+     ]
+    },
+    "folders": [],
+    "tools": [
+     {
+      "description": "在企业知识库中检索与问题相关的资料片段，返回文件名与位置",
+      "is_retrieval": true,
+      "name": "search_knowledge",
+      "params": [
+       {
+        "choices": [],
+        "default": null,
+        "maximum": null,
+        "minimum": null,
+        "name": "search_knowledge.query",
+        "type": "str"
+       },
+       {
+        "choices": [],
+        "default": null,
+        "maximum": 50.0,
+        "minimum": 1.0,
+        "name": "search_knowledge.top_k",
+        "type": "int"
+       },
+       {
+        "choices": [],
+        "default": null,
+        "maximum": 1.0,
+        "minimum": 0.0,
+        "name": "search_knowledge.score_threshold",
+        "type": "float"
+       }
+      ]
+     }
+    ]
+   },
+   "requirement": "做一个回答产品手册问题的客服助手，只能检索产品手册"
+  },
+  {
+   "agent": {
+    "cn_label": "常见问题助手",
+    "exemplars": [
+     "这个怎么用",
+     "手册里怎么说"
+    ],
+    "fallback_prompt": "暂时无法回答，请稍后再试。",
+    "is_data_expert": false,
+    "is_delegating": false,
+    "keywords": [
+     "常见问题"
+    ],
+    "knowledge_folder_ids": [],
+    "main_prompt": "你是常见问题助手，引用来源，未找到时如实告知，通过检索工具作答。",
+    "max_steps": 4,
+    "name": "faq-agent",
+    "source": "generated",
+    "tool_names": [
+     "search_knowledge"
+    ],
+    "tool_params": []
+   },
+   "kind": "judge",
+   "rubric_items": [
+    "prompt_role_consistent",
+    "prompt_no_contradiction",
+    "prompt_no_guardrail_conflict"
+   ]
+  }
+ ],
+ "status": 200
+}

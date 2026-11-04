@@ -12,7 +12,8 @@ from __future__ import annotations
 import hashlib
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Callable, Literal
+from contextlib import AbstractContextManager
+from typing import Any, Callable, Literal, Mapping
 
 from ib.core import (
     AgentRuntime,
@@ -23,6 +24,8 @@ from ib.core import (
     ProjectRuntimeView,
     PromptLayers,
     Scope,
+    ADVISOR_EXPERT_ID,
+    is_advisor_expert,
 )
 
 __all__ = [
@@ -78,6 +81,9 @@ class RuntimeDeps:
     exemplar_seed: Callable[[str], dict[str, list[str]]] | None = None
     #: 项目 → 含 confirm 节点的图所需的进程内检查点（跨版本共享，使挂起会话可按原版本恢复；重启即丢 = fail-closed）。
     checkpointer_for: Callable[[str], Any] | None = None
+    #: REV-28（IFC-R28-020）：顾问节点作答期间进入的回合作用域（组合根注入 bind_web_turn 适配；缺省 None）与全局联网上限存储。
+    web_turn_scope: Callable[[Mapping[str, Any]], AbstractContextManager[Any]] | None = None
+    web_governance: Any = None
 
 
 @dataclass(frozen=True)
@@ -168,6 +174,11 @@ def compile_project_config(
             input_mode=node_mode.get(e.name, "query_only"),
         )
 
+    # REV-28：顾问模式判定（专家 `advisor` 存在 ∧ is_delegating ∧ 启用）；否则以下新增逻辑全部不生效（与现状逐位一致）。
+    advisor_active = any(
+        is_advisor_expert(e.name, is_delegating=e.is_delegating, status=getattr(e, "status", "active"))
+        for e in doc.experts
+    )
     view = ProjectRuntimeView(
         version=int(version),
         experts=specs,
@@ -178,6 +189,7 @@ def compile_project_config(
         agents=agents,
         graph=graph,
         max_expert_steps=int(doc.route.max_expert_steps),
+        advisor_id=ADVISOR_EXPERT_ID if advisor_active else None,
     )
 
     # 语义路由（L1）：示例句以定义文档为准（F-6）；全无示例句时回落到旧种子文件
@@ -218,7 +230,14 @@ def compile_project_config(
 
                 checkpointer = MemorySaver()
         dag = compile_dag(graph, view=view, router=router, llm=deps.llm, config=config, scope=scope,
-                          checkpointer=checkpointer)
+                          checkpointer=checkpointer,
+                          turn_scope=deps.web_turn_scope if advisor_active else None)
+
+    understander = None
+    if advisor_active:
+        from ib.advisor import TurnUnderstander
+
+        understander = TurnUnderstander(llm=deps.llm)
 
     orchestrator = build_graph(
         llm=deps.llm,
@@ -232,6 +251,7 @@ def compile_project_config(
         related_images_provider=deps.related_images_provider_factory(scope),
         view=view,
         dag=dag,
+        turn_understander=understander,
     )
     return CompiledProjectConfig(
         project_id=project_id,

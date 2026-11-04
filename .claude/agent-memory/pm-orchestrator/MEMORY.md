@@ -24,3 +24,4 @@
 - [P-PM-001] 缺陷修复改了被多处复用的判定函数（如 rebuild `_target_of`）时，门控须 grep 全部调用方评估副作用：扩大重定向状态集同时让 start_rebuild 在 succeeded 未激活时拒绝新重建 — 自记 2026-10-24 · 证据 GR-C-002-F01
 - [P-PM-002] 新轮次（REV-NN）的调用号须带修订号前缀（intelligentbase-R26-GROUP_A-001），否则与上一轮收件箱 id 撞号、hook 记录无法区分 — 自记 2026-10-27 · 证据 GR-A-001/GR-A-002(REV-26)
 - [P-PM-003] special_instructions 中把用户原话与 PM 转述分开标注；门控核对子代理标"用户原话"的引号内容确实出自用户消息 — 自记 2026-10-27 · 证据 GR-A-002-F01(REV-26)
+- [P-PM-004] 大文档必读（P10 旧基线设计、FlowCanvas.vue、上游 spec/ci.yml）在 B/C/D 连续被跳读，点名补读也未执行；调用时应把必读缩到具体章节/行号范围，并在门控核对 notes — 自记 2026-11-02 · 证据 GR-B-001-F01 / GR-C-001-F04 / GR-D-001-F01(REV-28)

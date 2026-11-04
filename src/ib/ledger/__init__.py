@@ -85,6 +85,10 @@ __all__ = [
     "SqliteLlmKeyStore",
     "MemoryLlmKeyStore",
     "build_llm_key_store",
+    # REV-28（IFC-R28-008）：联网全局用量上限存储
+    "SqliteWebGovernanceStore",
+    "MemoryWebGovernanceStore",
+    "build_web_governance_store",
     # 资料库目录（MOD-002 / MOD-003）：惰性导出
     "SqliteEntryTree",
     "MemoryEntryTree",
@@ -812,6 +816,14 @@ def __getattr__(name: str) -> Any:
         from ib.ledger import config_versions as _config_versions
 
         return getattr(_config_versions, name)
+    if name in {
+        "SqliteWebGovernanceStore",
+        "MemoryWebGovernanceStore",
+        "build_web_governance_store",
+    }:
+        from ib.ledger import web_governance as _web_governance
+
+        return getattr(_web_governance, name)
     if name in {"SqliteUploadBatchStore", "MemoryUploadBatchStore", "build_upload_batch_store"}:
         from ib.ledger import upload_batches as _upload_batches
 

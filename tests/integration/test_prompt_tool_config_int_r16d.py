@@ -120,14 +120,21 @@ def test_TC_INT_135_fallback_visible_when_main_missing(http_app):
 def test_TC_INT_136_single_registration_point_tools_and_params(http_app):
     from ibweb.composition import known_tool_names, known_tool_param_specs
 
-    assert known_tool_names() == ("search_knowledge",)
+    # REV-28（AQ3=A / AC-017-05）：工具目录恰好多出 web_search、web_fetch 2 项（其余项与顺序不变）
+    assert known_tool_names() == ("search_knowledge", "web_fetch", "web_search")
     specs = known_tool_param_specs()
-    # **REV-23**：参数面含检索条数 / 相似度阈值（可选，随 schema 派生 → 配置页可见）
-    assert [s.name for s in specs] == [
+    # **REV-23**：参数面含检索条数 / 相似度阈值（可选，随 schema 派生 → 配置页可见）；search_knowledge 的规格与顺序不变
+    assert [s.name for s in specs if s.name.startswith("search_knowledge.")] == [
         "search_knowledge.query",
         "search_knowledge.top_k",
         "search_knowledge.score_threshold",
     ]
+    assert [s.name for s in specs][:3] == [
+        "search_knowledge.query",
+        "search_knowledge.top_k",
+        "search_knowledge.score_threshold",
+    ]
+    assert {s.name.split(".")[0] for s in specs} == {"search_knowledge", "web_search", "web_fetch"}
 
     deps, Client = http_app
     payload = json.loads(Client().get(LIST, **AUTH).content)

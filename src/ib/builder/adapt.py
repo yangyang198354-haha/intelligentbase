@@ -15,7 +15,9 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Any, Literal, Mapping
 
-from .types import AdaptationNote, AgentDraft, BuilderUnavailable, ParamDigest, ProjectContext
+from ib.core import is_advisor_expert
+
+from .types import AdaptationNote, AgentDraft, BuilderUnavailable, ParamDigest, ProjectContext, clauses_for
 
 __all__ = ["RawDraft", "parse_raw_draft", "adapt_draft", "draft_to_fields"]
 
@@ -203,10 +205,14 @@ def adapt_draft(
         steps = steps_raw
 
     # ---- 检索类条款 / 业务专有词 ----
-    if any(tool_by_name[t].is_retrieval for t in tools):
-        for clause_id, alts in c.grounding_clauses:
-            if not any(a in main for a in alts):
-                note("clause_missing", "main_prompt", f"检索类 agent 的主提示词缺少条款：{clause_id}")
+    # REV-28（IFC-R28-018）：条款集按 agent 画像选取；非顾问画像与现状逐位一致。
+    for clause_id, alts in clauses_for(
+        name=name, is_delegating=bool(f.get("is_delegating", False)), tool_names=tools,
+        tools=tuple(tool_by_name.values()), constraints=c,
+    ):
+        if not any(a in main for a in alts):
+            who = "顾问" if is_advisor_expert(name, is_delegating=bool(f.get("is_delegating", False))) else "检索类 agent"
+            note("clause_missing", "main_prompt", f"{who}的主提示词缺少条款：{clause_id}")
     blob = _norm("\n".join([main, fb, label, *kws, *exs]))
     for term in c.blocked_terms:
         if _norm(term) in blob:

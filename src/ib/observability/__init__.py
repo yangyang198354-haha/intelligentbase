@@ -81,6 +81,18 @@ LOG_FIELDS: frozenset[str] = frozenset(
         # 沿用下方先例：只新增**精确键名**，值为短标签 / 整数，不引入任何正文通道。
         "node_id",
         "config_version",
+        # --- REV-28 顾问回合 / 联网出站日志（IFC-R28-020）：只新增精确键名，值为短标签 / 整数 / 主机名 ---
+        "intents",
+        "topic",
+        "delegated",
+        "web_hosts",
+        "tool_events",
+        "cited_external",
+        "apology",
+        "history_trimmed",
+        "web_search_host",
+        "web_fetch_enabled",
+        "degraded",
         # --- 外发边界声明专用三键（IFC-IB-215 / NFR-08）---
         # 为什么必须新增：`EgressDescriptor` 要求「输出至启动日志与 /healthz/deps」，
         # 而白名单之外的一切键都会被**静默丢弃**。实测发现的失败形态：首个版本的启动钩子

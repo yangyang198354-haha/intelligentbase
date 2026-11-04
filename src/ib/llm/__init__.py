@@ -44,9 +44,13 @@ FreeArk 已有过一次生产漂移（见 CLAUDE.md 开发约定 7）。本模�
 
 from __future__ import annotations
 
+import contextvars
 import threading
+import time
 from collections import OrderedDict
-from typing import Any, Callable
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
+from typing import Any, Callable, Literal
 
 from ib.core import (
     EgressDescriptor,
@@ -60,6 +64,7 @@ __all__ = [
     "UnconfiguredLlmProvider",
     "FakeLlmProvider",
     "build_llm_provider",
+    "resolve_llm_api_key",
     "assert_langchain_openai_version",
     "REQUIRED_LANGCHAIN_OPENAI_SPEC",
     "DEFAULT_REMOTE_DATA_CATEGORIES",
@@ -428,6 +433,21 @@ class FakeLlmProvider:
         return _call
 
 
+def resolve_llm_api_key(cfg: Any, db_key: str | None) -> str | None:
+    """[IFC-R28-031] LLM 与联网搜索共用的 DeepSeek Key 解析点（纯函数，不触网）。
+
+    DB 来源（`LlmKeyStore.get().secret`）优先；为空时回退读 `cfg.llm.api_key_env`（历史兼容来源）；
+    两者皆空 ⇒ None。不记录、不返回长度 / 前缀 / 来源。
+    """
+    resolved = (db_key or "").strip()
+    if not resolved:
+        # 兼容回退：历史登记键（ADR-38 已把 DB 定为唯一写入口；此处只作过渡来源）。
+        from ib.config import read_secret
+
+        resolved = (read_secret(cfg.llm.api_key_env) or "").strip()
+    return resolved or None
+
+
 def build_llm_provider(cfg: Any, *, api_key: str | None = None) -> Any:
     """按配置构造 LLM provider（组合根单点调用）。
 
@@ -454,12 +474,7 @@ def build_llm_provider(cfg: Any, *, api_key: str | None = None) -> Any:
         from ib.core import StartupError
 
         raise StartupError(f"未知的 LLM 后端：{cfg.llm.backend!r}")
-    resolved = (api_key or "").strip()
-    if not resolved:
-        # 兼容回退：历史登记键（ADR-38 已把 DB 定为唯一写入口；此处只作过渡来源）。
-        from ib.config import read_secret
-
-        resolved = (read_secret(cfg.llm.api_key_env) or "").strip()
+    resolved = resolve_llm_api_key(cfg, api_key) or ""
     if not resolved:
         # **未配置态**（非致命）：服务正常启动，LLM 依赖路径调用期 fail-closed（ADR-39）。
         return UnconfiguredLlmProvider(base_url=cfg.llm.base_url)
@@ -534,6 +549,7 @@ class _PromptedClient:
         *,
         max_iterations: int = 4,
         on_unauthorized: Callable[[str], None] | None = None,
+        on_tool_event: "ToolEventCallback | None" = None,
     ) -> str:
         """专家作答的**工具调用循环**（function-calling），返回最终正文。
 
@@ -580,7 +596,10 @@ class _PromptedClient:
                     )
                     continue
                 followups.append(
-                    ToolMessage(content=_execute_tool(tool, args), tool_call_id=call_id or "unknown")
+                    ToolMessage(
+                        content=_execute_tool(tool, args, on_event=on_tool_event),
+                        tool_call_id=call_id or "unknown",
+                    )
                 )
             messages = messages + followups
             try:
@@ -621,15 +640,61 @@ def _tool_call_parts(call: Any) -> tuple[str, dict[str, Any], str]:
     )
 
 
-def _execute_tool(tool: Any, args: dict[str, Any]) -> str:
-    """执行一个 `BoundTool.callable`，返回可进上下文的文本；异常 → 可读占位。"""
+#: REV-28（IFC-R28-013）：工具事件回调 `(tool 名, 状态, 耗时 ms)`。
+ToolEventCallback = Callable[[str, Literal["ok", "error", "timeout"], int], None]
+
+#: 带超时看门狗的工具专用线程池（仅 `BoundTool.timeout_s` 非空的工具使用；现有工具不经过它）。
+_TOOL_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="ib-tool")
+
+
+def _emit(on_event: "ToolEventCallback | None", name: str, status: str, started: float) -> None:
+    if on_event is None:
+        return
     try:
-        result = tool.callable(**(args or {})) if args else tool.callable()
-    except Exception:  # noqa: BLE001 - 单个工具失败不中断循环
-        return "（工具执行失败）"
+        on_event(name, status, int((time.monotonic() - started) * 1000))  # type: ignore[arg-type]
+    except Exception:  # noqa: BLE001 - 事件上报失败不得影响问答
+        pass
+
+
+def _call_tool(tool: Any, args: dict[str, Any]) -> Any:
+    return tool.callable(**(args or {})) if args else tool.callable()
+
+
+def _execute_tool(tool: Any, args: dict[str, Any], *, on_event: "ToolEventCallback | None" = None) -> str:
+    """执行一个 `BoundTool.callable`，返回可进上下文的文本；异常 → 可读占位。
+
+    `timeout_s is None`（现有工具）⇒ 与既有行为完全一致的同步直调；非 None ⇒ 提交到模块级线程池，
+    `future.result(timeout=tool.timeout_s)`，超时返回「（工具执行超时）」。
+    """
+    name = str(getattr(tool, "name", "") or "")
+    started = time.monotonic()
+    timeout_s = getattr(tool, "timeout_s", None)
+    if timeout_s is None:
+        try:
+            result = _call_tool(tool, args)
+        except Exception:  # noqa: BLE001 - 单个工具失败不中断循环
+            _emit(on_event, name, "error", started)
+            return "（工具执行失败）"
+    else:
+        try:
+            # 复制当前上下文：回合作用域（contextvars）随调用进入看门狗线程
+            future = _TOOL_POOL.submit(contextvars.copy_context().run, _call_tool, tool, args)
+        except Exception:  # noqa: BLE001 - 线程池拒绝
+            _emit(on_event, name, "error", started)
+            return "（工具执行失败）"
+        try:
+            result = future.result(timeout=float(timeout_s))
+        except FutureTimeout:
+            future.cancel()
+            _emit(on_event, name, "timeout", started)
+            return "（工具执行超时）"
+        except Exception:  # noqa: BLE001
+            _emit(on_event, name, "error", started)
+            return "（工具执行失败）"
     content = getattr(result, "content", None)
     if content is None:
         content = str(result)
+    _emit(on_event, name, "ok", started)
     return str(content) or "（工具无输出）"
 
 

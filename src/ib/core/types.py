@@ -641,6 +641,11 @@ class ToolSpec:
     description: str
     needs_scope: bool = False
     parameters: dict[str, Any] | None = None
+    # REV-28 IFC-R28-001：以下追加字段均带默认值，现有构造调用不变
+    config_parameters: dict[str, Any] | None = None  # 平台限制类参数（LLM 不可见）
+    timeout_param: str | None = None  # config_parameters 中承载「超时秒数」的键名
+    route_visible: bool = True  # False ⇒ 不进入 build_capability_digest
+    external: bool = False  # True ⇒ 联网类工具
 
 
 @dataclass(frozen=True, slots=True)
@@ -664,6 +669,7 @@ class BoundTool:
     description: str
     callable: Any  # Callable[[], ToolResult] 或 Callable[[str], ToolResult]
     parameters: dict[str, Any] | None = None
+    timeout_s: float | None = None  # REV-28：None ⇒ 同步直调；非 None ⇒ _execute_tool 看门狗
 
 
 # --------------------------------------------------------------------------- #
@@ -1675,6 +1681,85 @@ class ProjectRuntimeView:
     agents: Mapping[str, AgentRuntime]
     graph: GraphSpec
     max_expert_steps: int
+    advisor_id: str | None = None  # REV-28：顾问模式 ⇒ "advisor"；否则 None
+
+
+# --------------------------------------------------------------------------- #
+# REV-28 顾问 / 联网类型（IFC-R28-001）
+# --------------------------------------------------------------------------- #
+
+ADVISOR_EXPERT_ID: Final[str] = "advisor"
+
+
+def is_advisor_expert(name: str, *, is_delegating: bool, status: str = "active") -> bool:
+    """顾问模式的唯一判据（ADR-R28-05）。"""
+    return name == ADVISOR_EXPERT_ID and bool(is_delegating) and status == "active"
+
+
+SearchErrorKind: TypeAlias = Literal[
+    "not_configured",
+    "timeout",
+    "unreachable",
+    "rate_limited",
+    "auth_failed",
+    "quota_exceeded",
+    "bad_response",
+    "rejected",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class SearchQuery:
+    """唯一外发载荷：无会话 / 资料 / 账号 / 提示词字段。"""
+
+    text: str  # 1..128 字符  [P11: docs/external_api/deepseek_search_fetch.md:§Search 请求]（2.1.0：原 1..200）
+    max_results: int  # 1..50  [P11: docs/external_api/deepseek_search_fetch.md:§Search 请求]（2.1.0：原 1..10）
+    lang: str | None
+    region: str | None
+    timeout_s: float  # >0
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.text, str) or not (1 <= len(self.text) <= 128):
+            raise ValueError("SearchQuery.text 须为 1..128 字符")
+        if not isinstance(self.max_results, int) or isinstance(self.max_results, bool) or not (
+            1 <= self.max_results <= 50
+        ):
+            raise ValueError("SearchQuery.max_results 须为 1..50")
+        if not (self.timeout_s > 0):
+            raise ValueError("SearchQuery.timeout_s 须 > 0")
+
+
+@dataclass(frozen=True, slots=True)
+class SearchHit:
+    title: str
+    snippet: str
+    url: str
+
+
+@dataclass(frozen=True, slots=True)
+class SearchOutcome:
+    hits: tuple[SearchHit, ...]
+    error: SearchErrorKind | None = None  # error 非 None ⇒ hits 为空
+    elapsed_ms: int = 0
+
+
+#: LLM 与搜索共用服务方的主机名常量（ib.config 校验与 ib.webtools.deepseek 共用）。
+#: [P11: docs/external_api/deepseek_search_fetch.md:§端点与鉴权]
+DEEPSEEK_API_HOST: Final[str] = "api.deepseek.com"
+WEB_CALLS_HARD_MAX: Final[int] = 20
+WEB_BYTES_HARD_MAX: Final[int] = 5_242_880
+WEB_SECONDS_HARD_MAX: Final[int] = 120
+
+
+@dataclass(frozen=True, slots=True)
+class WebGovernance:
+    """admin 全局联网上限；行缺失时读取返回默认值。"""
+
+    max_calls_per_turn: int = 5
+    max_fetch_bytes_per_turn: int = 1_048_576
+    max_seconds_per_turn: int = 30
+    updated_at: str = ""
+    updated_by: str = ""
 
 
 __all__ = [
@@ -1792,4 +1877,16 @@ __all__ = [
     "ProjectRegistryEntry",
     "LlmKeyStatus",
     "LlmKeyRecord",
+    # REV-28 顾问 / 联网（IFC-R28-001）
+    "ADVISOR_EXPERT_ID",
+    "is_advisor_expert",
+    "SearchErrorKind",
+    "SearchQuery",
+    "SearchHit",
+    "SearchOutcome",
+    "WEB_CALLS_HARD_MAX",
+    "WEB_BYTES_HARD_MAX",
+    "WEB_SECONDS_HARD_MAX",
+    "DEEPSEEK_API_HOST",
+    "WebGovernance",
 ]

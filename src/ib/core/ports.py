@@ -1143,4 +1143,49 @@ __all__ += [
     "DocScopeResolver",
     "BuilderEvalCache",
     "AccountConfigLevelStore",
+    "SearchProvider",
+    "WebGovernanceStore",
 ]
+
+
+# =========================================================================== #
+# MOD-R28-01 REV-28 增量端口（IFC-R28-002，第 20、21 个端口）
+# =========================================================================== #
+
+from .types import (  # noqa: E402
+    EgressDescriptor,
+    HealthStatus,
+    SearchOutcome,
+    SearchQuery,
+    WebGovernance,
+)
+
+
+class SearchProvider(Protocol):
+    """联网搜索提供方端口（IFC-R28-002）。"""
+
+    provider_id: str
+
+    def search(self, query: SearchQuery) -> SearchOutcome:
+        """永不抛；所有失败 → SearchOutcome(error=…)。"""
+        ...
+
+    def health(self) -> HealthStatus:
+        """detail 不含凭据。"""
+        ...
+
+    def describe_egress(self) -> EgressDescriptor:
+        """remote=True, endpoint_host=<主机名，不含路径>, data_categories=["web_search_query"]。"""
+        ...
+
+
+class WebGovernanceStore(Protocol):
+    """admin 全局联网上限存储端口（IFC-R28-002）。"""
+
+    def get(self) -> WebGovernance:
+        """行缺失 ⇒ 默认值。"""
+        ...
+
+    def set(self, caps: WebGovernance, *, actor: str) -> WebGovernance:
+        """越界 ⇒ ValueError；成功返回含 updated_at/by。"""
+        ...

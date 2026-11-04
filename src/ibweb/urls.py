@@ -147,4 +147,6 @@ urlpatterns = [
     ),
     # REV-18（IFC-IB-374）：LLM Key（GET / PUT / DELETE，**仅 admin**；唯一写入口）。
     path("api/llm-key", views.llm_key_endpoint, name="ib-llm-key"),
+    # REV-28（IFC-R28-023 / 024）：联网全局用量上限（仅 admin）
+    path("api/web-governance", views.web_governance_endpoint, name="ib-web-governance"),
 ]

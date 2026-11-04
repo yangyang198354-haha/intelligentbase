@@ -13,8 +13,10 @@ import json
 import re
 from typing import Final, Mapping, Sequence
 
+from ib.core import is_advisor_expert
+
 from .egress import contains_secret_pattern
-from .types import AdaptationNote, AgentDraft, Deduction, ProjectContext, RubricResult
+from .types import AdaptationNote, AgentDraft, Deduction, ProjectContext, RubricResult, clauses_for
 
 __all__ = ["RUBRIC_VERSION", "LLM_CHECK_IDS", "RULE_MAX", "evaluate_draft", "rubric_cache_key"]
 
@@ -122,11 +124,15 @@ def evaluate_draft(
         deduct("prompt", "prompt_min_length", "main_prompt", 4, f"主提示词仅 {len(draft.main_prompt.strip())} 字符（建议 >= 50）")
     if not any(r in low for r in _ROLE):
         deduct("prompt", "prompt_role_stated", "main_prompt", 3, "主提示词未说明角色（如“你是……”）")
-    retrieval = {t.name for t in ctx.tools if t.is_retrieval}
-    if retrieval & set(draft.tool_names):
-        for clause_id, alts in c.grounding_clauses:
-            if not any(a in draft.main_prompt for a in alts):
-                deduct("prompt", f"clause_{clause_id}", "main_prompt", 3, f"检索类 agent 的主提示词缺少条款 {clause_id}")
+    # REV-28（IFC-R28-018）：条款集按 agent 画像选取；非顾问画像与现状逐位一致。
+    advisor_profile = is_advisor_expert(draft.name, is_delegating=draft.is_delegating)
+    for clause_id, alts in clauses_for(
+        name=draft.name, is_delegating=draft.is_delegating, tool_names=draft.tool_names,
+        tools=ctx.tools, constraints=c,
+    ):
+        if not any(a in draft.main_prompt for a in alts):
+            who = "顾问" if advisor_profile else "检索类 agent"
+            deduct("prompt", f"clause_{clause_id}", "main_prompt", 3, f"{who}的主提示词缺少条款 {clause_id}")
     hit = next((p for p in _PLACEHOLDER if p in low), None)
     if hit is not None:
         deduct("prompt", "prompt_no_placeholder", "main_prompt", 3, f"主提示词含占位文本「{hit}」")

@@ -187,6 +187,12 @@ function onPrompt(layer: 'main' | 'fallback', text: string): void {
     <template v-else-if="node?.kind === 'agent' && expert()">
       <h4>{{ expert()?.cn_label }}（{{ expert()?.name }}）</h4>
       <p v-if="readonly" class="hint">当前为“查看”档：以下内容只读。</p>
+      <!-- REV-28：内置顾问的只读说明（联网参数由目录 tool_param_specs 自动渲染） -->
+      <div v-if="expert()?.name === 'advisor'" class="advisor-note">
+        <el-alert type="info" :closable="false" show-icon title="内置顾问：勾选联网工具前请先由管理员确认出网与上限；联网内容仅作只读参考；是否为答复出口取决于连线。" />
+        <el-checkbox :model-value="expert()?.is_delegating" :disabled="readonly" @change="(v: boolean) => patchExpert((e) => (e.is_delegating = v))">顾问模式（is_delegating）</el-checkbox>
+        <span class="hint">取消勾选将停用顾问模式</span>
+      </div>
       <el-form label-width="110px" size="small">
         <el-form-item label="中文标签"><el-input :model-value="expert()?.cn_label" :disabled="readonly" @update:model-value="(v: string) => patchExpert((e) => (e.cn_label = v))" /></el-form-item>
         <el-form-item label="关键词"><el-input :model-value="(expert()?.keywords ?? []).join(', ')" :disabled="readonly" placeholder="逗号分隔" @change="(v: string) => patchExpert((e) => (e.keywords = v.split(/[,，]/).map((s) => s.trim()).filter(Boolean)))" /></el-form-item>
@@ -198,8 +204,10 @@ function onPrompt(layer: 'main' | 'fallback', text: string): void {
               <div v-if="hasTool(t)" class="params">
                 <label v-for="s in paramsFor(t)" :key="s.name">
                   {{ s.name }}
-                  <el-input :model-value="paramValue(s.name)" size="small" :disabled="readonly" :placeholder="`默认 ${s.default}${s.minimum != null ? `，范围 ${s.minimum}~${s.maximum}` : ''}`" @change="(v: string) => setParam(s.name, v)" />
+                  <el-input :model-value="paramValue(s.name)" size="small" :disabled="readonly" :placeholder="s.name.endsWith('_domains') ? '逗号分隔域名' : s.name === 'web_search.region' ? '当前搜索提供方不使用该项' : s.name === 'web_search.lang' ? '如 zh 或 zh,en' : `默认 ${s.default}${s.minimum != null ? `，范围 ${s.minimum}~${s.maximum}` : ''}`" @change="(v: string) => setParam(s.name, v)" />
                 </label>
+                <span v-if="t === 'web_search'" class="hint">region（地域偏好）：当前搜索提供方不支持，已保存的值不会被使用</span>
+                <span v-if="t.startsWith('web_') && catalog?.web?.caps" class="hint">全局上限：每回合 {{ catalog.web.caps.max_calls_per_turn }} 次 / {{ catalog.web.caps.max_fetch_bytes_per_turn }} 字节 / {{ catalog.web.caps.max_seconds_per_turn }} 秒（运行期取较小值）</span>
               </div>
             </div>
           </div>
@@ -312,6 +320,12 @@ function onPrompt(layer: 'main' | 'fallback', text: string): void {
 }
 .gap {
   margin-top: 8px;
+}
+.advisor-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
 }
 .branch {
   margin-top: 6px;

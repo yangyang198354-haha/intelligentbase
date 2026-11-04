@@ -35,7 +35,8 @@ const loadError = ref('');
 
 const createVisible = ref(false);
 const createSubmitting = ref(false);
-const createForm = reactive({ project_id: '', name: '' });
+// REV-28（OQ-R28-05=A）：“启用顾问”默认不勾选
+const createForm = reactive({ project_id: '', name: '', enable_advisor: false });
 
 const editVisible = ref(false);
 const editSubmitting = ref(false);
@@ -68,6 +69,7 @@ async function load(): Promise<void> {
 function openCreate(): void {
   createForm.project_id = '';
   createForm.name = '';
+  createForm.enable_advisor = false;
   createVisible.value = true;
 }
 
@@ -78,7 +80,9 @@ async function submitCreate(): Promise<void> {
   }
   createSubmitting.value = true;
   try {
-    await client.createProject(createForm.project_id.trim(), createForm.name.trim());
+    await client.createProject(createForm.project_id.trim(), createForm.name.trim(), {
+      enableAdvisor: createForm.enable_advisor,
+    });
     createVisible.value = false;
     ElMessage.success('项目已创建（可继续为该项目创建运维账户）');
     await load();
@@ -202,6 +206,13 @@ onMounted(load);
         </el-form-item>
         <el-form-item label="项目名称">
           <el-input v-model="createForm.name" placeholder="例如 伽马项目" />
+        </el-form-item>
+        <el-form-item>
+          <el-checkbox v-model="createForm.enable_advisor">启用顾问</el-checkbox>
+          <p class="ib-muted form-hint advisor-hint">
+            顾问是面向客户的统一答复者：先理解意图与上下文，再经路由委托知识库检索，最后统一措辞作答。
+            默认不勾选；联网搜索 / 抓取须另在配置页为顾问授权，并由管理员确认出网与上限。
+          </p>
         </el-form-item>
         <p class="ib-muted form-hint">
           新建后，可在「账户管理」为该项目创建运维账户。项目标识用于 collection 前缀与

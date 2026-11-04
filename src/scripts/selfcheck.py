@@ -3914,11 +3914,14 @@ def r16_prompt_tool_endpoints() -> None:
 
     # **REV-23**：参数面扩到 top_k / score_threshold（检索条数 / 相似度阈值可**按专家**配置）；
     #   三者全部由既有 `SEARCH_TOOL_SPEC` 的 JSON Schema 派生（仍不新增工具本体）。
-    assert {s.name for s in known_tool_param_specs()} == {
+    #   REV-28（AQ3=A）：全局目录恰好多出 web_search / web_fetch 的规格；search_knowledge 的规格集不变。
+    _all_specs = {s.name for s in known_tool_param_specs()}
+    assert {n for n in _all_specs if n.startswith("search_knowledge.")} == {
         "search_knowledge.query",
         "search_knowledge.top_k",
         "search_knowledge.score_threshold",
     }
+    assert {n.split(".")[0] for n in _all_specs} == {"search_knowledge", "web_search", "web_fetch"}
     reg = register_builtin_tools(ToolRegistry())
     authorized = build_authorized_tools(
         (
@@ -3956,7 +3959,7 @@ def r16_prompt_tool_endpoints() -> None:
     assert listed.status_code == 200, listed.content
     payload = json.loads(listed.content)
     assert set(payload) == {"experts", "tool_param_specs", "available_tools", "layout", "config_key_names"}
-    assert payload["available_tools"] == ["search_knowledge"]
+    assert payload["available_tools"] == ["search_knowledge", "web_fetch", "web_search"]  # REV-28 AQ3=A
     assert {e["name"] for e in payload["experts"]} == {"kb-agent"}
     assert payload["config_key_names"] == ["IB_EXPERT_PROMPT_DIR", "IB_EXPERT_PROMPT_ENABLED"]
 
@@ -4474,6 +4477,526 @@ def builder_single_egress() -> None:
     }
 
 
+
+# --------------------------------------------------------------------------- #
+# REV-28：平台级内置顾问 agent / 联网工具（MOD-R28-16）
+# --------------------------------------------------------------------------- #
+
+
+def _py_imports(path: Any) -> set[str]:
+    """文件内所有 import 的点分模块名（含 `from x import y` 的 x，以及 `x.y`）。"""
+    import ast
+
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    mods: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                mods.add(a.name)
+        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            mods.add(node.module)
+            for a in node.names:
+                mods.add(f"{node.module}.{a.name}")
+    return mods
+
+
+@_case("web_egress_single_exit：网络导入仅在 fetch.py（抓取）/ deepseek.py（搜索）；ib.webtools 不越界；外发载荷字段集（REV-28 REQ-NFUNC-005）")
+def web_egress_single_exit() -> None:
+    import pathlib
+    from dataclasses import fields
+
+    root = pathlib.Path(_SRC) / "ib" / "webtools"
+    net = {"urllib.request", "http.client", "socket", "ssl"}
+    forbidden = (
+        "ib.retrieval", "ib.vectorstore", "ib.blob", "ib.streaming", "ib.context", "ib.ledger", "ib_embed",
+    )
+    for path in sorted(root.glob("*.py")):
+        mods = _py_imports(path)
+        # 2.1.0（ADR-R28-11 / 12）：允许名单由 fetch.py / search.py 改为 fetch.py / deepseek.py
+        #   （搜索侧网络代码移到 deepseek.py；search.py 与 deepseek_double.py 仍须无网络导入）
+        if path.name not in ("fetch.py", "deepseek.py"):
+            hit = {m for m in mods if m in net}
+            assert not hit, f"{path.name} 不得持有网络相关导入：{hit}"
+        for m in mods:
+            assert not any(m == f or m.startswith(f + ".") for f in forbidden), f"{path.name} 引用了 {m}"
+    # search.py（工厂 / 注册表 / Null / Fake）与离线替身不含任何网络导入
+    assert not (_py_imports(root / "search.py") & net), "search.py 不得含网络导入（网络代码只在 deepseek.py）"
+    assert not (_py_imports(root / "deepseek_double.py") & net), "deepseek_double.py 不得含网络导入"
+    # 反向边：编排层 / 顾问核心库不得 import ib.webtools
+    for rel in ("orchestration", "advisor"):
+        for path in sorted((pathlib.Path(_SRC) / "ib" / rel).glob("*.py")):
+            for m in _py_imports(path):
+                assert not (m == "ib.webtools" or m.startswith("ib.webtools.")), f"{rel}/{path.name} 引用了 {m}"
+    # ib.advisor / ib.webtools 不得 import ib_embed（C8）
+    for rel in ("webtools", "advisor"):
+        for path in sorted((pathlib.Path(_SRC) / "ib" / rel).glob("*.py")):
+            assert not any(m.startswith("ib_embed") for m in _py_imports(path)), f"{rel}/{path.name} 引用了 ib_embed"
+    from ib.core import SearchQuery
+    from ib.webtools.gate import WebCall
+
+    assert {f.name for f in fields(SearchQuery)} == {"text", "max_results", "lang", "region", "timeout_s"}
+    assert {f.name for f in fields(WebCall)} == {"tool", "host", "max_bytes"}
+
+
+@_case("web_ssrf_rejects：≥30 条地址拒绝用例（注入假解析器；含逐跳重定向重校验）（REV-28 REQ-NFUNC-004）")
+def web_ssrf_rejects() -> None:
+    import ipaddress
+    import time
+
+    from ib.webtools.fetch import RawResponse, SafeFetcher
+    from ib.webtools.netguard import DomainRules, UrlGuard, WebBlocked
+
+    table = {
+        "localhost": ("127.0.0.1",), "loopback.test": ("127.0.0.1",), "short.test": ("127.0.0.1",),
+        "dec.test": ("127.0.0.1",), "hex.test": ("127.0.0.1",), "oct.test": ("127.0.0.1",),
+        "a10.test": ("10.1.2.3",), "a172.test": ("172.16.5.4",), "a192.test": ("192.168.1.1",),
+        "meta.test": ("169.254.169.254",), "cgnat.test": ("100.64.0.1",), "bench.test": ("198.18.0.1",),
+        "zero.test": ("0.0.0.0",), "mcast.test": ("224.0.0.1",), "resv.test": ("240.0.0.1",),
+        "v6lo.test": ("::1",), "v6ula.test": ("fc00::1",), "v6ll.test": ("fe80::1",), "v6meta.test": ("fd00:ec2::254",),
+        "mapped.test": ("::ffff:127.0.0.1",), "mapped10.test": ("::ffff:10.0.0.1",), "nat64.test": ("64:ff9b::7f00:1",),
+        "mixed.test": ("93.184.216.34", "10.0.0.5"), "empty.test": (), "good.test": ("93.184.216.34",),
+        "zone.test": ("fe80::1%eth0",), "deny.good.test": ("93.184.216.34",), "other.test": ("93.184.216.34",),
+    }
+
+    def resolver(host: str, port: int, timeout: float) -> tuple[str, ...]:
+        if host == "boom.test":
+            raise OSError("resolver failure")
+        if host in table:
+            return table[host]
+        ipaddress.ip_address(host)  # 字面 IP 原样返回；其他主机名视为解析失败
+        return (host,)
+
+    rules = DomainRules(allow=(), deny=("deny.good.test",))
+    allow_rules = DomainRules(allow=("good.test",), deny=())
+    guard = UrlGuard(rules, resolver=resolver)
+    long_url = "http://good.test/" + "a" * 2100
+    cases = [
+        "ftp://good.test/", "file:///etc/passwd", "gopher://good.test/", "javascript:alert(1)", "data:text/html,x",
+        "http://user:pw@good.test/", "http://good.test:8080/", "http://good.test:22/", "https://good.test:8443/",
+        "http://localhost/", "http://loopback.test/", "http://127.0.0.1/", "http://short.test/", "http://dec.test/",
+        "http://hex.test/", "http://oct.test/", "http://a10.test/", "http://a172.test/", "http://a192.test/",
+        "http://meta.test/latest/meta-data", "http://169.254.169.254/", "http://[::1]/", "http://[fd00:ec2::254]/",
+        "http://[fe80::1]/", "http://[fc00::1]/", "http://cgnat.test/", "http://bench.test/", "http://zero.test/",
+        "http://mcast.test/", "http://resv.test/", "http://v6lo.test/", "http://v6ula.test/", "http://v6ll.test/",
+        "http://v6meta.test/", "http://mapped.test/", "http://mapped10.test/", "http://nat64.test/",
+        "http://[::ffff:127.0.0.1]/", "http://[::ffff:10.0.0.1]/", "http://mixed.test/", "http://empty.test/",
+        "http://boom.test/", "http://zone.test/", "http://deny.good.test/", "http:///nohost", "", long_url,
+        "http://good.test/\r\nHost: evil", "http://10.0.0.1/", "http://192.168.0.1/", "http://172.31.255.255/",
+        "http://100.100.100.100/", "http://0.0.0.0/",
+    ]
+    assert len(cases) >= 30
+    deadline = time.monotonic() + 5
+    for url in cases:
+        try:
+            guard.check(url, deadline=deadline)
+        except WebBlocked:
+            continue
+        raise AssertionError(f"应被拒绝却放行：{url!r}")
+    # 放行路径：公网地址钉定解析出的第一个地址
+    tgt = guard.check("https://good.test/a?b=1", deadline=deadline)
+    assert tgt.pinned_ip == "93.184.216.34" and tgt.port == 443 and tgt.path_query == "/a?b=1"
+    # 域名白名单：不在名单内 ⇒ 拒绝
+    try:
+        UrlGuard(allow_rules, resolver=resolver).check("http://other.test/", deadline=deadline)
+    except WebBlocked as exc:
+        assert exc.kind == "domain_not_allowed"
+    else:
+        raise AssertionError("白名单外域名应被拒绝")
+
+    # 逐跳重校验：公网 → 302 → 内网 ⇒ 被拦；跳数超限 ⇒ 被拦；全程不触达真实网络
+    class _Redirect:
+        def __init__(self, hops: dict[str, str]) -> None:
+            self.hops = hops
+            self.requested: list[str] = []
+
+        def request(self, target, *, headers, timeout_s):  # noqa: ANN001
+            self.requested.append(target.host)
+            loc = self.hops.get(target.host)
+            if loc is None:
+                return RawResponse(200, {"content-type": "text/plain"}, iter([b"ok"]))
+            return RawResponse(302, {"location": loc}, iter(()))
+
+    tr = _Redirect({"good.test": "http://a10.test/x"})
+    res = SafeFetcher(transport=tr, resolver=resolver).fetch(
+        "http://good.test/", rules=rules, timeout_s=3, max_bytes=1000, max_chars=100, allowed_types=("text/plain",)
+    )
+    assert not res.ok and res.error == "blocked" and res.blocked == "private_address", res
+    assert tr.requested == ["good.test"], tr.requested  # 内网跳未发出请求
+    loop = _Redirect({"good.test": "http://other.test/", "other.test": "http://good.test/"})
+    res2 = SafeFetcher(transport=loop, resolver=resolver, max_redirects=3).fetch(
+        "http://good.test/", rules=rules, timeout_s=3, max_bytes=1000, max_chars=100, allowed_types=("text/plain",)
+    )
+    assert not res2.ok and res2.blocked == "too_many_redirects", res2
+
+
+@_case("web_governance_schema_single_source：009 与 schema 生成器单源 / 幂等 / 无可执行 DROP（REV-28 MOD-R28-06）")
+def web_governance_schema_single_source() -> None:
+    import pathlib
+    import sqlite3
+
+    from ib.ledger import schema as S
+
+    deploy = pathlib.Path(_SRC) / "deploy" / "migrations"
+    sql = (deploy / "009_web_governance.sql").read_text(encoding="utf-8")
+    norm = lambda s: "".join(s.split())  # noqa: E731
+    assert norm(S.web_governance_ddl_script()) in norm(sql), "009_web_governance.sql 与 web_governance_ddl_script() 不一致（单源）"
+    for old in ("001_ledger_init", "002_chunk_image", "003_accounts", "004_config_audit", "005_projects",
+                "006_llm_key", "007_folder_tree", "008_config_versions"):
+        assert (deploy / f"{old}.sql").is_file(), f"既有迁移 {old}.sql 缺失（001~008 不得删改）"
+    assert "MANUAL_ROLLBACK_REQUIRED" in sql.split("CREATE TABLE")[0], "009 头注释缺回滚说明"
+    for line in sql.splitlines():
+        assert "DROP" not in line.split("--")[0].upper(), "009 含可执行的 DROP 语句"
+    con = sqlite3.connect(":memory:", isolation_level=None)
+    S.ensure_schema(con)
+    con.executescript(sql)
+    con.executescript(sql)  # 幂等重放
+    assert not S.missing_web_governance_columns(con)
+    # 单行约束：id != 1 被拒；范围 CHECK 生效
+    con.execute("INSERT INTO web_governance VALUES (1, 5, 1048576, 30, 't', 'u')")
+    for bad in ("INSERT INTO web_governance VALUES (2, 5, 1048576, 30, 't', 'u')",
+                "INSERT OR REPLACE INTO web_governance VALUES (1, 0, 1048576, 30, 't', 'u')"):
+        try:
+            con.execute(bad)
+        except sqlite3.IntegrityError:
+            continue
+        raise AssertionError(f"CHECK 约束未生效：{bad}")
+    # 老库形态（无 009）→ ensure_schema 两遍补齐
+    old = sqlite3.connect(":memory:", isolation_level=None)
+    for st in S.DDL_STATEMENTS:
+        old.execute(st)
+    S.ensure_schema(old)
+    S.ensure_schema(old)
+    assert not S.missing_web_governance_columns(old)
+
+
+@_case("advisor_graph_rules：顾问规范图合法；自委托 / 回边被拒；未启用项目图不变（REV-28 IFC-R28-009）")
+def advisor_graph_rules() -> None:
+    from dataclasses import replace
+
+    from ib.config.graph import canonical_graph_from_experts, canonical_graph_with_advisor, validate_graph
+    from ib.core import ELSE_BRANCH, ExpertSpecInput, GraphEdge, GraphSpec
+
+    def exp(name: str, delegating: bool = False, default: bool = False) -> ExpertSpecInput:
+        return ExpertSpecInput(name, name, (), (), False, delegating, default)
+
+    experts = (exp("kb-agent", default=True), exp("advisor", delegating=True))
+    graph = canonical_graph_with_advisor(experts, "kb-agent")
+    assert validate_graph(graph, experts=experts, default_expert="kb-agent") == ()
+    advisor_node = next(n for n in graph.nodes if n.id == "advisor")
+    assert advisor_node.input_mode == "with_upstream"
+    # 路由候选含顾问自身
+    bad_edges = tuple(
+        replace(e, branch_key="advisor") if e.id == "e-else" else e for e in graph.edges
+    )
+    codes = {i.code for i in validate_graph(GraphSpec(graph.nodes, bad_edges), experts=experts, default_expert="kb-agent")}
+    assert "advisor_self_delegation" in codes, codes
+    # 回边（顾问 → 路由）形成环
+    cyc = GraphSpec(graph.nodes, graph.edges + (GraphEdge("e-back", "advisor", "route-1"),))
+    codes = {i.code for i in validate_graph(cyc, experts=experts, default_expert="kb-agent")}
+    assert "graph_cycle" in codes, codes
+    # 指向顾问的 route 出边分支键必须是 __else__
+    other = tuple(
+        replace(e, branch_key="kb-agent") if (e.source == "route-1" and e.target == "advisor") else e
+        for e in graph.edges
+    )
+    codes = {i.code for i in validate_graph(GraphSpec(graph.nodes, other), experts=experts, default_expert="kb-agent")}
+    assert "advisor_branch_target_invalid" in codes or "graph_route_branch_target_invalid" in codes, codes
+    # 未启用顾问：同一输入的规范图与校验结果不变，且不产出顾问规则错误码
+    plain = (exp("kb-agent", default=True),)
+    g0 = canonical_graph_from_experts(plain, "kb-agent")
+    assert [n.id for n in g0.nodes] == ["start", "route-1", "kb-agent", "end"]
+    assert validate_graph(g0, experts=plain, default_expert="kb-agent") == ()
+    bad0 = GraphSpec(g0.nodes, tuple(replace(e, branch_key="advisor") if e.id == "e-else" else e for e in g0.edges))
+    codes0 = {i.code for i in validate_graph(bad0, experts=plain, default_expert="kb-agent")}
+    assert not {"advisor_self_delegation", "advisor_branch_target_invalid"} & codes0, codes0
+    assert ELSE_BRANCH == "__else__"
+
+
+@_case("advisor_seed_clean：顾问种子业务中立且含三项条款用语（REV-28 AC-001-02）")
+def advisor_seed_clean() -> None:
+    from ib.builder.types import ADVISOR_TOOL_CONTRACT_ALTS, BLOCKED_TERMS, GROUNDING_CLAUSES
+    from ib.config import advisor_seed_prompt
+
+    text = advisor_seed_prompt()
+    low = text.lower()
+    assert len(text.strip()) >= 50
+    for term in BLOCKED_TERMS:
+        assert term.lower() not in low, f"顾问种子含不允许的业务专有词：{term}"
+    alts = dict(GROUNDING_CLAUSES)
+    assert any(a in text for a in alts["citation"]), "缺少“引用来源”条款用语"
+    assert any(a in text for a in alts["honest_no_hit"]), "缺少“如实告知”条款用语"
+    assert any(a in text for a in ADVISOR_TOOL_CONTRACT_ALTS), "缺少“工具 / 委托”条款用语"
+    # kb-agent 种子仍是另一份资产，二者不混
+    from ib.config import kb_agent_seed_prompt
+
+    assert text != kb_agent_seed_prompt()
+
+
+@_case("search_port_conformance：Null / Fake 过同一端口一致性（REV-28 IFC-R28-005）")
+def search_port_conformance() -> None:
+    from ib.core import HealthStatus, SearchHit, SearchOutcome, SearchQuery
+    from ib.webtools.deepseek import DeepSeekSearchProvider
+    from ib.webtools.deepseek_double import FakeDeepSeekTransport, error_reply, ok_results, search_item
+    from ib.webtools.search import FakeSearchProvider, NullSearchProvider, WebSearchSettings, build_search_provider
+
+    q = SearchQuery(text="hello", max_results=3, lang=None, region=None, timeout_s=2.0)
+
+    def boom(_q: Any) -> Any:
+        raise RuntimeError("boom")
+
+    ds_ok = DeepSeekSearchProvider(
+        "TEST-KEY-NOT-REAL",
+        transport=FakeDeepSeekTransport(
+            [ok_results([search_item(title="t", url="https://e.test/", snippet="s", summary="m")])]
+        ),
+    )
+    ds_err = DeepSeekSearchProvider("TEST-KEY-NOT-REAL", transport=FakeDeepSeekTransport([error_reply(500)]))
+    providers = [
+        NullSearchProvider(),
+        FakeSearchProvider([SearchOutcome((SearchHit("t", "s", "https://e.test/"),), None, 1)]),
+        FakeSearchProvider([boom]),
+        ds_ok,  # 2.1.0：生产适配器（经离线替身传输）与 Null / Fake 过同一端口一致性
+        ds_err,
+    ]
+    for p in providers:
+        assert isinstance(p.provider_id, str) and p.provider_id
+        out = p.search(q)  # 永不抛
+        assert isinstance(out, SearchOutcome)
+        assert out.error is None or out.hits == ()  # error 非 None ⇒ hits 为空
+        assert isinstance(p.health(), HealthStatus)
+        d = p.describe_egress()
+        assert "key" not in d.endpoint_host.lower() and "/" not in d.endpoint_host  # 主机名，不含路径 / 凭据
+        assert "key" not in p.health().detail.lower()
+    assert providers[0].search(q).error == "not_configured" and providers[0].describe_egress().remote is False
+    assert providers[1].describe_egress().data_categories == ["web_search_query"]
+    assert FakeSearchProvider([boom]).search(q).error == "bad_response"  # 脚本步骤抛异常 ⇒ 折叠为 bad_response，不外抛
+    # 外发查询载荷的构造期校验
+    # 2.1.0：取值域按资料收紧——text 1..128、max_results 1..50（改前：201 字符 / 11 条为越界边界）
+    for bad in (dict(text="", max_results=3), dict(text="x" * 129, max_results=3), dict(text="x", max_results=0),
+                dict(text="x", max_results=51)):
+        try:
+            SearchQuery(lang=None, region=None, timeout_s=1.0, **bad)
+        except ValueError:
+            continue
+        raise AssertionError(f"SearchQuery 应拒绝：{bad}")
+    assert ds_ok.describe_egress().endpoint_host == "api.deepseek.com" and ds_ok.describe_egress().remote is True
+    assert "TEST-KEY" not in repr(ds_ok) and "TEST-KEY" not in ds_ok.health().detail
+    # 默认 none ⇒ Null；未登记 ⇒ ConfigError 只报键名
+    assert isinstance(build_search_provider(WebSearchSettings(), None, offline=True), NullSearchProvider)
+    from ib.core import ConfigError
+
+    try:
+        build_search_provider(WebSearchSettings(provider_id="nope"), "SECRET-VALUE", offline=False)
+    except ConfigError as exc:
+        assert exc.key == "IB_WEB_SEARCH_PROVIDER" and "SECRET-VALUE" not in str(exc)
+    else:
+        raise AssertionError("未登记的 provider 应 fail-fast")
+
+
+@_case("advisor_apology_text_safe：致歉常量满足文案约束（REV-28 AQ1=B / IFC-R28-015）")
+def advisor_apology_text_safe() -> None:
+    import re
+
+    from ib.advisor import ADVISOR_APOLOGY_TEXT, advisor_apology_text
+    from ib.experts import BUILTIN_ADVISOR, BUILTIN_DEFAULT_KB_AGENT
+
+    t = advisor_apology_text()
+    assert t == ADVISOR_APOLOGY_TEXT and t.strip()
+    assert "抱歉" in t
+    assert "稍后再试" in t or "换个问法" in t
+    forbidden = [
+        BUILTIN_DEFAULT_KB_AGENT.name, BUILTIN_ADVISOR.name, BUILTIN_DEFAULT_KB_AGENT.cn_label, BUILTIN_ADVISOR.cn_label,
+        "search_knowledge", "web_search", "web_fetch", "路由", "agent", "Agent", "工具", "委托", "专家",
+        "Traceback", "Exception", "异常", "堆栈", "状态码", "HTTP",
+    ]
+    for w in forbidden:
+        assert w not in t, f"致歉文案含不允许的字样：{w}"
+    assert not re.search(r"[0-9]", t), "致歉文案不得含阿拉伯数字"
+
+
+@_case("search_fake_rejected_in_production：非离线 + fake ⇒ 启动失败只报键名；离线可用且不构造真实传输（REV-28 AC-020-01/03）")
+def search_fake_rejected_in_production() -> None:
+    import ib.webtools.deepseek as ds_mod
+    import ib.webtools.search as search_mod
+    from ib.config import ConfigurationResolver, DictConfigurationSource
+    from ib.core import ConfigError
+
+    constructed = {"fake": 0, "transport": 0}
+    real_fake, real_transport = search_mod.FakeSearchProvider, ds_mod.UrllibPostTransport
+
+    class _CountingFake(real_fake):  # type: ignore[misc, valid-type]
+        def __init__(self, *a: Any, **kw: Any) -> None:
+            constructed["fake"] += 1
+            super().__init__(*a, **kw)
+
+    class _CountingTransport:
+        def __init__(self) -> None:
+            constructed["transport"] += 1
+
+    marker = "fake"
+    base = {
+        "vectorstore": {"backend": "memory"}, "embedding": {"backend": "fake"}, "llm": {"backend": "fake"},
+        "web_search_provider": marker,
+    }
+    search_mod.FakeSearchProvider, ds_mod.UrllibPostTransport = _CountingFake, _CountingTransport  # type: ignore[misc]
+    try:
+        # 1) 配置校验：非离线 + fake ⇒ ConfigError(key=IB_WEB_SEARCH_PROVIDER)，消息不含所配值
+        errs = ConfigurationResolver(DictConfigurationSource({**base, "offline_mode": False})).validate(env={})
+        hit = [e for e in errs if getattr(e, "key", "") == "IB_WEB_SEARCH_PROVIDER"]
+        assert hit, "非离线 + fake 应使配置校验失败"
+        assert all(marker not in str(e) for e in hit), f"错误消息回显了所配值：{hit}"
+        # 2) 工厂同样拒绝；Fake 不被构造
+        try:
+            search_mod.build_search_provider(search_mod.WebSearchSettings("fake"), "K", offline=False)
+        except ConfigError as exc:
+            assert exc.key == "IB_WEB_SEARCH_PROVIDER" and marker not in str(exc)
+        else:
+            raise AssertionError("非离线 + fake 工厂应抛 ConfigError")
+        assert constructed["fake"] == 0, "非离线路径不得构造 FakeSearchProvider"
+        # 3) 离线：fake / deepseek 均得 Fake，且不构造真实传输
+        for pid in ("fake", "deepseek"):
+            p = search_mod.build_search_provider(search_mod.WebSearchSettings(pid), "K", offline=True)
+            assert isinstance(p, real_fake) and p.describe_egress().endpoint_host == "fake.invalid"
+        assert constructed["transport"] == 0, "离线路径不得构造 UrllibPostTransport"
+        # 4) 缺省 none 恒通过
+        assert not [
+            e for e in ConfigurationResolver(DictConfigurationSource({**base, "web_search_provider": "none",
+                                                                      "offline_mode": False})).validate(env={})
+            if getattr(e, "key", "") == "IB_WEB_SEARCH_PROVIDER"
+        ]
+    finally:
+        search_mod.FakeSearchProvider, ds_mod.UrllibPostTransport = real_fake, real_transport  # type: ignore[misc]
+
+
+@_case("deepseek_adapter_contract：固定端点 / 请求体键集 / 状态码映射 / 单次尝试 / 源码纪律（REV-28 IFC-R28-029）")
+def deepseek_adapter_contract() -> None:
+    import pathlib
+
+    from ib.core import SearchQuery
+    from ib.webtools import deepseek as ds
+    from ib.webtools.deepseek_double import FakeDeepSeekTransport, error_reply
+
+    assert ds.DEEPSEEK_SEARCH_URL == "https://api.deepseek.com/v1/tools/search"
+    assert ds.DEEPSEEK_API_HOST == "api.deepseek.com"
+    import json
+
+    q = SearchQuery(text="天气" * 64, max_results=50, lang="zh,en", region="CN", timeout_s=3.0)
+    body = json.loads(ds.encode_search_request(q).decode("utf-8"))
+    assert set(body) == {"query", "count", "need_content"}, body
+    assert body["need_content"] is False and body["count"] == 50
+    assert len(body["query"]) <= 128 and body["query"].endswith(" lang:zh,en") and "CN" not in json.dumps(body)
+    bad_lang = json.loads(ds.encode_search_request(
+        SearchQuery(text="x", max_results=1, lang="zh site:evil.test", region=None, timeout_s=1.0)).decode("utf-8"))
+    assert bad_lang["query"] == "x", bad_lang  # 非法 lang 被忽略（防操作符注入）
+    # 状态码映射表（资料列出的每个状态码）
+    expect = {200: None, 400: "rejected", 401: "auth_failed", 402: "quota_exceeded", 403: "rejected", 404: "rejected",
+              408: "timeout", 413: "rejected", 429: "rate_limited", 500: "unreachable", 504: "timeout", 302: "bad_response"}
+    for status, kind in expect.items():
+        assert ds.map_search_status(status) == kind, (status, kind)
+    # 适配器端到端：单次尝试、不重试；错误体内容不影响映射
+    probe = SearchQuery(text="hello", max_results=3, lang=None, region=None, timeout_s=2.0)
+    for status in (401, 402, 429, 500, 504):
+        tr = FakeDeepSeekTransport([error_reply(status)])
+        out = ds.DeepSeekSearchProvider("TEST-KEY-NOT-REAL", transport=tr).search(probe)
+        assert out.error == expect[status] and out.hits == () and len(tr.requests) == 1, (status, out)
+    # 源码纪律：不含两个可选外发字段名；Bearer 头只在 deepseek.py 构造
+    root = pathlib.Path(_SRC) / "ib" / "webtools"
+    text = (root / "deepseek.py").read_text(encoding="utf-8")
+    assert "ori_question" not in text and "localization" not in text, "适配器源码不得含未使用的外发字段名"
+    assert "Bearer" in text
+    for path in sorted(root.glob("*.py")):
+        if path.name not in ("deepseek.py", "deepseek_double.py"):
+            assert "Bearer" not in path.read_text(encoding="utf-8"), f"{path.name} 不得构造 Authorization 头"
+    # 构造器强制传 transport（无默认真实传输）
+    try:
+        ds.DeepSeekSearchProvider("TEST-KEY-NOT-REAL")  # type: ignore[call-arg]
+    except TypeError:
+        pass
+    else:
+        raise AssertionError("DeepSeekSearchProvider 必须强制显式传入 transport")
+
+
+@_case("deepseek_double_covers_p11：替身覆盖资料列出的全部响应与错误码，对非法请求返回 400（REV-28 IFC-R28-030）")
+def deepseek_double_covers_p11() -> None:
+    import json
+
+    from ib.webtools.deepseek import DEEPSEEK_SEARCH_URL, TransportError
+    from ib.webtools.deepseek_double import (
+        DOUBLE_ERROR_STATUSES, DoubleReply, FakeDeepSeekTransport, empty_results, error_reply, ok_results, search_item,
+    )
+
+    assert set(DOUBLE_ERROR_STATUSES) == {400, 401, 402, 403, 404, 408, 413, 429, 500, 504}
+    key = "TEST-KEY-NOT-REAL"
+    good = json.dumps({"query": "hello", "count": 3, "need_content": False}).encode("utf-8")
+    hdr = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+
+    def call(tr: FakeDeepSeekTransport, body: bytes = good, headers: Any = hdr, timeout: float = 5.0) -> Any:
+        return tr.post_json(DEEPSEEK_SEARCH_URL, headers=headers, body=body, timeout_s=timeout, max_reply_bytes=1 << 20)
+
+    item = search_item(title="t", url="https://e.test/", snippet="s", summary="m")
+    assert {"rerank_score", "title", "url", "snippet", "summary", "content", "site_name", "site_icon", "date", "authority"} <= set(item)
+    tr = FakeDeepSeekTransport([ok_results([item]), empty_results(), *[error_reply(s) for s in DOUBLE_ERROR_STATUSES]])
+    seen = [call(tr).status for _ in range(2 + len(DOUBLE_ERROR_STATUSES))]
+    assert seen == [200, 200, *DOUBLE_ERROR_STATUSES], seen
+    assert tr.billable_calls == 1, "仅 200 且 results 非空计费"
+    assert call(tr).status == 200 and json.loads(call(tr).body) == {"results": []}  # 脚本耗尽 ⇒ 200 空结果
+    # 网络层：超时 / 不可达 / 慢响应
+    for reply, kind in ((DoubleReply(200, b"{}", network_error="timeout"), "timeout"),
+                        (DoubleReply(200, b"{}", network_error="unreachable"), "unreachable"),
+                        (DoubleReply(200, b"{}", delay_s=30.0), "timeout")):
+        try:
+            call(FakeDeepSeekTransport([reply]))
+        except TransportError as exc:
+            assert exc.kind == kind
+        else:
+            raise AssertionError(f"替身应抛 TransportError({kind})")
+    # 非法请求按资料返回与真实 API 同类的状态码
+    strict = FakeDeepSeekTransport()
+    assert call(strict, body=b"{not json").status == 400
+    assert call(strict, body=json.dumps({"query": "x" * 129}).encode()).status == 400
+    assert call(strict, body=json.dumps({"query": "x", "count": 0}).encode()).status == 400
+    assert call(strict, body=json.dumps({"query": "x", "count": 51}).encode()).status == 400
+    assert call(strict, body=json.dumps({"query": "   "}).encode()).status == 400
+    assert call(strict, headers={"Content-Type": "application/json"}).status == 401
+    assert call(strict, headers={"Authorization": "Bearer WRONG", "Content-Type": "application/json"}).status == 401
+    assert call(strict, headers={"Authorization": f"Bearer {key}", "Content-Type": "text/plain"}).status == 400
+    # 记录的请求不含 Key 值
+    assert key not in repr(strict.requests)
+
+
+@_case("web_key_reuse_no_new_credential：搜索复用 LLM 的 Key 解析点，不新增凭据键（REV-28 AC-018-05 / REQ-NFUNC-006）")
+def web_key_reuse_no_new_credential() -> None:
+    import dataclasses
+    import pathlib
+
+    from ib.config import GlobalConfig
+    from ib.llm import resolve_llm_api_key
+
+    removed = ("IB_WEB_SEARCH_" + "API_KEY", "IB_WEB_SEARCH_" + "BASE_URL")
+    for rel in ("deploy/env.example", "ib/config/__init__.py", "ibweb/composition.py"):
+        text = (pathlib.Path(_SRC) / rel).read_text(encoding="utf-8")
+        for name in removed:
+            assert name not in text, f"{rel} 不应再出现已删除的键 {name}"
+    assert "web_search_base_url" not in {f.name for f in dataclasses.fields(GlobalConfig)}
+    # api_key_env 的读取只经 resolve_llm_api_key（组合根不直接读）
+    assert "api_key_env" not in (pathlib.Path(_SRC) / "ibweb" / "composition.py").read_text(encoding="utf-8")
+    llm_src = (pathlib.Path(_SRC) / "ib" / "llm" / "__init__.py").read_text(encoding="utf-8")
+    assert llm_src.count("read_secret(cfg.llm.api_key_env)") == 1
+    # 行为：DB 优先 → 回退 IB_LLM_API_KEY → 皆无 ⇒ None
+    cfg = GlobalConfig()
+    old = os.environ.pop(cfg.llm.api_key_env, None)
+    try:
+        assert resolve_llm_api_key(cfg, "  db-key  ") == "db-key"
+        assert resolve_llm_api_key(cfg, None) is None and resolve_llm_api_key(cfg, "   ") is None
+        os.environ[cfg.llm.api_key_env] = "env-key"
+        assert resolve_llm_api_key(cfg, "db-key") == "db-key"
+        assert resolve_llm_api_key(cfg, "") == "env-key"
+    finally:
+        os.environ.pop(cfg.llm.api_key_env, None)
+        if old is not None:
+            os.environ[cfg.llm.api_key_env] = old
+
+
 def main() -> int:
     print("=" * 72)
     print("intelligentbase 离线自检（GROUP_C 自我验证；正式测试套件属 GROUP_D）")
@@ -4548,6 +5071,19 @@ def main() -> int:
         graph_validate_offline,
         builder_no_data_imports,
         builder_single_egress,
+        # ---- REV-28：顾问 agent / 联网工具 ----
+        web_egress_single_exit,
+        web_ssrf_rejects,
+        web_governance_schema_single_source,
+        advisor_graph_rules,
+        advisor_seed_clean,
+        search_port_conformance,
+        advisor_apology_text_safe,
+        # ---- REV-28 2.1.0：DeepSeek 搜索适配器 / 离线替身 / 生产禁用替身 / Key 复用 ----
+        search_fake_rejected_in_production,
+        deepseek_adapter_contract,
+        deepseek_double_covers_p11,
+        web_key_reuse_no_new_credential,
     ]
     for case in cases:
         case()

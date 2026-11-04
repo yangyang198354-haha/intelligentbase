@@ -8,7 +8,7 @@
  * 离开前可“另存为服务端草稿副本”。
  */
 import { computed, onMounted, ref } from 'vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 
 import {
   ApiClientError,
@@ -32,9 +32,11 @@ import NodePalette from '../components/config/NodePalette.vue';
 import PublishDialog from '../components/config/PublishDialog.vue';
 import TrialPanel from '../components/config/TrialPanel.vue';
 import VersionHistory from '../components/config/VersionHistory.vue';
+import { addAdvisor, hasAdvisor, removeAdvisor } from '../components/config/advisorPlan'; // MOD-R28-17
 import { KIND_LABEL, addNodeOfKind, type AgentInfo } from '../components/config/graphModel';
 import {
   deleteAgentDefinition,
+  dropPromptPatch,
   planConfirm,
   removalVerdict,
   removeFromCanvas,
@@ -166,6 +168,36 @@ function onUndo(): void {
     ElMessage.success('已撤销删除');
   }
 }
+// ---- 内置 agent：顾问（REV-28，MOD-R28-18）----
+const advisorAdded = computed(() => (store.document.value ? hasAdvisor(store.document.value) : false));
+const builtinAdvisor = computed(() => catalog.value?.builtin_agents?.find((a) => a.id === 'advisor') ?? null);
+function onAddAdvisor(): void {
+  const doc = store.document.value;
+  const builtin = builtinAdvisor.value;
+  if (!doc || !builtin || readonly.value) return;
+  const r = addAdvisor(doc, graph.value, builtin);
+  store.document.value = r.doc;
+  if (r.promptPatch) store.setPrompt(r.promptPatch.expert, 'main', r.promptPatch.main);
+  selectedId.value = 'advisor';
+  selectedEdgeId.value = null;
+  tab.value = 'detail';
+  if (r.wired) ElMessage.success(r.message);
+  else void ElMessageBox.alert(r.message, '请手工连线', { confirmButtonText: '知道了' });
+}
+function onRemoveAdvisor(): void {
+  const doc = store.document.value;
+  if (!doc || readonly.value) return;
+  const r = removeAdvisor(doc, graph.value);
+  if (r.doc.experts.length === doc.experts.length) {
+    ElMessage.info(r.message);
+    return;
+  }
+  if (!window.confirm('确认移除顾问？将删除其专家定义、工具授权与相关连线，并恢复各 agent 直连结束。保存并生效后其提示词文件将从项目目录移除；可在“版本历史”中回滚找回。')) return;
+  store.applyRemoval('顾问「advisor」', { document: r.doc, promptPatch: dropPromptPatch(store.promptPatch.value, 'advisor') });
+  selectedId.value = null;
+  tab.value = 'detail';
+  ElMessage.success(r.message);
+}
 function onBuilderAdd(d: AgentDraftDto): void {
   const doc = store.document.value;
   if (!doc) return;
@@ -285,6 +317,8 @@ onMounted(load);
       <el-button size="small" @click="reloadWithConfirm">重新载入</el-button>
       <el-button size="small" :disabled="!store.dirty.value" @click="discard">放弃改动</el-button>
       <el-button v-if="!readonly" size="small" @click="builderOpen = true">Agent Builder</el-button>
+      <el-button v-if="!readonly && !advisorAdded" size="small" :disabled="!builtinAdvisor" @click="onAddAdvisor">加入顾问</el-button>
+      <el-button v-if="!readonly && advisorAdded" size="small" @click="onRemoveAdvisor">移除顾问</el-button>
       <el-button v-if="!readonly" size="small" type="primary" :loading="busy" :disabled="!store.dirty.value" @click="startSave">保存并生效</el-button>
     </header>
 

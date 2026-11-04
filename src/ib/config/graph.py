@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Mapping
 
 from ib.core import (
+    ADVISOR_EXPERT_ID,
     ELSE_BRANCH,
     RELAY_PREFIX,
     ConditionBranch,
@@ -26,12 +27,14 @@ from ib.core import (
     GraphNode,
     GraphSpec,
     ValidationErrorItem,
+    is_advisor_expert,
 )
 from ib.core.graph import GRAPH_MAX_EDGES, GRAPH_MAX_NODES, NODE_ID_PATTERN, POSITION_ABS_MAX
 
 __all__ = [
     "validate_graph",
     "canonical_graph_from_experts",
+    "canonical_graph_with_advisor",
     "layerize_graph",
     "evaluate_condition",
     "RelayNode",
@@ -192,6 +195,10 @@ def validate_graph(
                         )
                     )
 
+    # ---- REV-28 顾问模式规则（仅存在启用的顾问专家时追加；其余项目输出不变）----
+    if any(is_advisor_expert(e.name, is_delegating=e.is_delegating, status=e.status) for e in experts):
+        errs.extend(_check_advisor_rules(ids, good_edges))
+
     # ---- 结构：环 / 可达 ----
     cyc = _cycle_nodes(list(ids), good_edges)
     if cyc:
@@ -224,6 +231,23 @@ def validate_graph(
             _err("graph", "graph_default_expert_unreachable", "默认专家从开始节点不可达")
         )
     return tuple(errs)
+
+
+def _check_advisor_rules(ids: Mapping[str, GraphNode], edges: list[GraphEdge]) -> list[ValidationErrorItem]:
+    """顾问模式（IFC-R28-009）：路由不得把顾问当作按名委托的候选；指向顾问的 route 出边只能是 `__else__`。"""
+    out: list[ValidationErrorItem] = []
+    for e in edges:
+        src = ids.get(e.source)
+        if src is None or src.kind != "route":
+            continue
+        ep = f"graph.edges[{e.id}]"
+        if e.branch_key == ADVISOR_EXPERT_ID:
+            out.append(_err(ep, "advisor_self_delegation", "路由候选不得包含顾问自身"))
+            continue
+        tgt = ids.get(e.target)
+        if tgt is not None and tgt.kind == "agent" and tgt.expert == ADVISOR_EXPERT_ID and e.branch_key != ELSE_BRANCH:
+            out.append(_err(ep, "advisor_branch_target_invalid", "指向顾问的路由出边分支键只能是 __else__"))
+    return out
 
 
 def _check_predicate(n: GraphNode, p: str) -> list[ValidationErrorItem]:
@@ -358,6 +382,52 @@ def canonical_graph_from_experts(
     edges.append(GraphEdge(id="e-else", source="route-1", target=else_target, branch_key=ELSE_BRANCH))
     for i, nm in enumerate(names):
         edges.append(GraphEdge(id=f"e-o{i + 1}", source=nm, target="end"))
+    return GraphSpec(nodes=tuple(nodes), edges=tuple(edges))
+
+
+def canonical_graph_with_advisor(
+    experts: tuple[ExpertSpecInput, ...],
+    default_expert: str,
+    *,
+    positions: Mapping[str, tuple[float, float]] | None = None,
+) -> GraphSpec:
+    """顾问模式规范图（IFC-R28-009）。
+
+    START → route-1 → [非顾问启用专家(agent, query_only)]；route-1 --__else__→ advisor；
+    各非顾问 agent → advisor；advisor(agent, with_upstream) → END。
+    要求 experts 含启用的 advisor；否则 ValueError（编程错误）。
+    """
+    active = [e for e in experts if e.status == "active"]
+    if not any(is_advisor_expert(e.name, is_delegating=e.is_delegating, status=e.status) for e in active):
+        raise ValueError("canonical_graph_with_advisor: experts 须包含启用的 advisor")
+    pos = positions or {}
+
+    def at(node_id: str, dx: float, dy: float) -> tuple[float, float]:
+        return pos.get(node_id, (dx, dy))
+
+    others = [e.name for e in active if e.name != ADVISOR_EXPERT_ID]
+    nodes: list[GraphNode] = []
+    sx, sy = at("start", 0.0, 0.0)
+    nodes.append(GraphNode(id="start", kind="start", x=sx, y=sy))
+    rx, ry = at("route-1", 220.0, 0.0)
+    nodes.append(GraphNode(id="route-1", kind="route", x=rx, y=ry))
+    for i, nm in enumerate(others):
+        ax, ay = at(nm, 460.0, 110.0 * i)
+        nodes.append(GraphNode(id=nm, kind="agent", x=ax, y=ay, expert=nm, input_mode="query_only"))
+    vx, vy = at(ADVISOR_EXPERT_ID, 700.0, 0.0)
+    nodes.append(
+        GraphNode(id=ADVISOR_EXPERT_ID, kind="agent", x=vx, y=vy, expert=ADVISOR_EXPERT_ID, input_mode="with_upstream")
+    )
+    ex, ey = at("end", 940.0, 0.0)
+    nodes.append(GraphNode(id="end", kind="end", x=ex, y=ey))
+
+    edges: list[GraphEdge] = [GraphEdge(id="e-start", source="start", target="route-1")]
+    for i, nm in enumerate(others):
+        edges.append(GraphEdge(id=f"e-r{i + 1}", source="route-1", target=nm, branch_key=nm))
+    edges.append(GraphEdge(id="e-else", source="route-1", target=ADVISOR_EXPERT_ID, branch_key=ELSE_BRANCH))
+    for i, nm in enumerate(others):
+        edges.append(GraphEdge(id=f"e-o{i + 1}", source=nm, target=ADVISOR_EXPERT_ID))
+    edges.append(GraphEdge(id="e-adv-end", source=ADVISOR_EXPERT_ID, target="end"))
     return GraphSpec(nodes=tuple(nodes), edges=tuple(edges))
 
 

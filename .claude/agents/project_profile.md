@@ -9,7 +9,7 @@
   <author_agent>pm-orchestrator(draft)</author_agent>
   <timestamp>2026-10-24T16:24:15+08:00</timestamp>
   <project_name>intelligentbase</project_name>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
   <status>APPROVED</status>
 </file_header>
 
@@ -144,8 +144,23 @@
 | test-engineer | tests/conftest.py、.github/workflows/ci.yml |
 | devops-engineer | .claude/skills/ib-prod-deploy/SKILL.md、docs/deployment_plan.md、src/deploy/checklists.txt、.github/workflows/ci.yml |
 
+## P11. 领域与外部依赖
+> 2026-11-03 由 pm-orchestrator 按用户裁决（REV-28 CP-003：「Q7 纳入」，经主会话转述）补入；画像 1.0.0 → 1.1.0。只记录资料位置与已确认事实，接口细节以资料原文为准。
+
+### P11-1. 硬件与测试能力
+无。
+
+### P11-2. 算法与数值验收
+无。
+
+### P11-3. 闭源 / 外部 API
+| API | 资料（仓库内） | 用途 | 凭据位置（不写值） | 测试替身 | 备注 |
+|---|---|---|---|---|---|
+| DeepSeek Search API / Fetch API | `docs/external_api/deepseek_search_fetch.md`（主会话据官方页面 https://api-docs.deepseek.com/guides/search 整理，摘录 2026-11-02；PM 未直接核对原页面） | 顾问 agent 的 `web_search`（REV-28）；`web_fetch` 是否使用由架构 ADR 决定 | 复用现有 DeepSeek API Key（目标机 `/etc/intelligentbase/ib-web.env` 或现有 LLM Key 存储，以架构设计为准） | **无官方沙箱**；只用项目离线替身（按资料字段与错误码构造），自动化测试**禁止**调用真实端点 | 有 QPS 限制与按次计费（见资料"限流与计费"）；资料未给出超时数值 |
+
 ---
 
 ## 确认记录
 - 2026-10-24 用户确认：文档工作区 `docs/sdlc/intelligentbase/`（flat）；测试以 CI 的 pytest 命令为准；无 staging；回滚 = git revert 后重新部署；commit/push 由主会话在用户确认后执行；P8 禁用项成立；`.trae/` 保留不动、子代理不修改。画像状态改为 APPROVED。
 - 仍为未知（不阻塞流程）：origin/master 分支用途；开发机测试环境（缺 pytest）由谁准备——遇到时测试标 BLOCKED 并告知用户。
+- 2026-11-03 用户裁决（REV-28 CP-003「Q7 纳入」，经主会话转述）：接入 DeepSeek Search/Fetch API，资料 `docs/external_api/deepseek_search_fetch.md` 作为 P11-3 依据；画像升 1.1.0（新增 P11，P11-1/P11-2 为"无"）。
