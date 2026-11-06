@@ -39,6 +39,7 @@ import functools
 from typing import Any, Callable, Sequence
 
 from ib.core import (
+    EXTERNAL_TOOL_PREFIX,
     BoundTool,
     RegisteredTool,
     Scope,
@@ -52,6 +53,8 @@ from ib.core import (
 
 __all__ = [
     "ToolRegistry",
+    "ReservedToolNameError",
+    "ToolNameConflictError",
     "build_capability_digest",
     "register_tool",
     "bind_scope",
@@ -66,6 +69,14 @@ __all__ = [
 
 #: 摘要中每个工具的简述长度上限（防止超长 description 挤占提示预算）。
 _MAX_DESC_CHARS = 200
+
+
+class ReservedToolNameError(ValueError):
+    """内置注册路径不得使用 MCP 保留前缀（IFC-R29-040）。"""
+
+
+class ToolNameConflictError(ValueError):
+    """外部工具注册不覆盖既有同名条目（IFC-R29-040）。"""
 
 
 class ToolRegistry:
@@ -86,6 +97,18 @@ class ToolRegistry:
             raise ValueError("工具 name 不得为空")
         if not callable(fn):
             raise TypeError(f"工具 {spec.name!r} 的实现不可调用")
+        if spec.name.startswith(EXTERNAL_TOOL_PREFIX):  # IFC-R29-040：保留前缀只经 register_external
+            raise ReservedToolNameError("工具名使用了保留前缀")
+        self._tools[spec.name] = RegisteredTool(spec=spec, fn=fn)
+
+    def register_external(self, spec: ToolSpec, fn: Callable[..., ToolResult]) -> None:
+        """[IFC-R29-040] 登记外部（MCP）工具：name 必须以保留前缀开头；已存在即拒绝（无覆盖语义）。"""
+        if not spec.name or not spec.name.startswith(EXTERNAL_TOOL_PREFIX):
+            raise ValueError("外部工具名必须以保留前缀开头")
+        if not callable(fn):
+            raise TypeError("外部工具实现不可调用")
+        if spec.name in self._tools:
+            raise ToolNameConflictError("同名工具已存在，拒绝覆盖")
         self._tools[spec.name] = RegisteredTool(spec=spec, fn=fn)
 
     def registered(self) -> list[RegisteredTool]:
@@ -349,6 +372,8 @@ def validate_grants(
     known = set(registry.names())
     for grant in grants:
         for tool in grant.tool_names:
+            if tool.startswith(EXTERNAL_TOOL_PREFIX):  # IFC-R29-041：保留前缀改由 ib.mcp.grants 校验
+                continue
             if tool not in known:
                 errors.append(
                     ValidationErrorItem(
@@ -359,7 +384,7 @@ def validate_grants(
                 )
         for pv in grant.param_values:
             owner = _owner_tool(pv.name)
-            if owner is not None and owner not in known:
+            if owner is not None and owner not in known and not owner.startswith(EXTERNAL_TOOL_PREFIX):
                 errors.append(
                     ValidationErrorItem(
                         path=f"tool_grants[{grant.expert_name}].param_values[{pv.name}]",

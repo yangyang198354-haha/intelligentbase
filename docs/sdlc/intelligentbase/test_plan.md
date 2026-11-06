@@ -1,8 +1,8 @@
 <file_header>
   <author_agent>test-engineer</author_agent>
-  <timestamp>2026-11-04T14:37:52+08:00</timestamp>
+  <timestamp>2026-11-06T21:28:39+08:00</timestamp>
   <project_name>intelligentbase</project_name>
-  <version>3.0.0</version>
+  <version>2.0.0</version>
   <input_files>
     <file>docs/sdlc/intelligentbase/requirements_spec.md</file>
     <file>docs/sdlc/intelligentbase/user_stories.md</file>
@@ -10,271 +10,224 @@
     <file>docs/sdlc/intelligentbase/module_design.md</file>
     <file>docs/sdlc/intelligentbase/implementation_plan.md</file>
     <file>docs/sdlc/intelligentbase/code_review_report.md</file>
-    <file>docs/external_api/deepseek_search_fetch.md</file>
   </input_files>
   <phase>PHASE_07,PHASE_08,PHASE_09</phase>
   <status>APPROVED</status>
 </file_header>
 
-# 测试计划（REV-28：平台级内置「顾问 agent」）
+# 测试计划（REV-29：agent 工具调用的 MCP 适配）
 
-> 修订记录：2.1.0（2026-11-04T14:37:52+08:00）——GROUP_D-005（用户裁决 CL-006 Q1=A：DEF-003 不是缺陷，理解步骤 fail-open 为设计行为，user_stories 5.0.0 AC-010-10）：TC-INT-R28-418[intent] 的缺陷冻结断言（含全部 DEF-003-GUARD 守卫串）移除，改为对 AC-010-10 的正向断言（拆为 TC-INT-R28-425）；418 只保留 [prepare] / [orchestrate]（AC-010-08）；新增 TC-INT-R28-425[intent|resolve]、426[intent|resolve]（AC-010-10）；只改测试与文档，未改产品代码；AC 映射把 AC-010-08 拆分并新增 AC-010-10；全量 1358 passed（805 + 472 + 66 + 15）；1.2.0（2026-11-03T18:44:32+08:00）——GROUP_D-004（缺陷回流 2/2 复测）：DEF-002/004/005/006 FIXED/VERIFIED；DEF-003 OPEN（待用户裁决），TC-INT-R28-418[intent] 改为缺陷冻结（守卫串 DEF-003-GUARD）；TC-INT-R28-344 改 `.get`（CR-022）；新增 E2E 旅程 TC-E2E-R28-013~015（新文件 `tests/e2e/test_advisor_deepseek_journeys_r28.py`，3 项）补齐 US-020 / DeepSeek 搜索 / 抓取三种失败短语；critical path 覆盖 18/19 → 19/19；新写总数 318+120=438 → 441；1.1.0（2026-11-03T18:27:49+08:00）——GROUP_D-003（requirements_spec / user_stories 4.0.0、module_design 3.0.0、implementation_plan 3.0.0、画像 1.1.0 P11-3）：新增“1.1.0 增量”——3.1.0 新增 / 改写 AC 的映射、DeepSeek 适配器经 `FakeDeepSeekTransport` 的测试策略、Key / 替身生产禁用 / Builder 摘要 / 致歉 / 抓取失败的用例；AC-014-06 由“延至下一轮”改为“自动化只用替身 + 真实效果人工验证”；新增 AC-020-02 N/A；不可测项与 MV 清单更新；0.2.0（2026-11-02T23:35:17+08:00）——DEF-001 回流复测：AC-016-07 映射追加 TC-UNIT-R28-085（翻转）/ 088（新写正例）；新写总数 317→318（unit 208）；DEF-001 FIXED/VERIFIED；0.1.0——初稿。
-
-REV-27 APPROVED 版本已归档于 `archive/rev27/test_plan.md`（只读）；本文件按 REV-28 整体重写。
+> 本文件 1.1.0 DRAFT（缺陷回流第 3 轮复测，用户经 CP-002 额外授权；见文末“回流第 3 轮”）。历史说明：0.3.0 DRAFT（缺陷回流第 2 轮复测，最后一轮）：GROUP_C 已修 DEF-R29-006 / 007（仅 `src/ib/mcp/transport.py`），TC-INT-R29-720 / 721 已翻转为 AC 原口径（close-delimited 与 chunked 两种参数均保留），当前**冻结用例 0 条**；A13（HTTPS 路径）列入人工验证清单 MV-09。上一版 0.2.0（缺陷回流第 1 轮复测）：7 条缺陷冻结用例中的 6 条翻转为 AC 原口径的正向断言（DEF-R29-002/003/004/005 已修复已验证），新增真实 socket 监听流用例 TC-INT-R29-720 / 721（A12），其验证结果登记新缺陷 DEF-R29-006 / 007。基础版本为 REV-29 的 0.1.0。REV-28 的 APPROVED 版本已归档于 `docs/sdlc/intelligentbase/archive/rev28/`（只读）。
+> 用例 ID 沿用 `TC-UNIT|INT|E2E-R29-NNN`（修订号中缀，同既往轮次惯例）；前端用例 `TC-FE-R29-NNN`。
 
 ## 测试策略
 
-- **被测改动**：MOD-R28-01~18（`implementation_plan.md` 改动清单）——核心类型 / 端口、`ib/webtools/`（地址防护、安全抓取、搜索端口适配、出站闸与预算、联网工具）、`ib/advisor/`（理解 / 历史裁剪 / 保真守卫 / 致歉 / 评测指标）、`ib/ledger/web_governance.py` + 迁移 009、配置域（顾问规范图与规则、种子）、工具参数“配置胜出”与看门狗、编排运行期（`dag.py` 顾问节点、`Orchestrator` 理解步骤）、运行时编译、组合根、HTTP 视图（`enable_advisor`、`/api/web-governance`、目录追加键）、selfcheck、`advisor_eval.py`、前端 `advisorPlan.ts` / `client.ts` / 页面。
-- **范围（in）**：REQ-FUNC-001~018、REQ-NFUNC-001~011 中可离线验证的部分；US-001~019 的全部 AC（Must 18 个故事、Should 1 个）。
-- **范围（out / 不可离线验证）**：真实 DeepSeek 端点效果 / 真实 TLS·超时·代理 / 真实计费（AC-014-06，1.1.0 起改为目标机人工验证）；真实 LLM 的意图 / 上下文精准度与评测集确认（AC-019-01 / 02 / 04）；真实 LLM 对注入指令的“顺从度”（只能验证平台侧强制手段）；真实 TLS 钉 IP 连接 / 真实外网 DNS；目标机时延；浏览器内真实交互（复选框点击、画布拖拽连线、弹窗、联网上限表单）。这些 **不记 PASS**，列入 `e2e_test_report.md` 的人工验证清单。
-- **环境**：`/root/.venvs/intelligentbase/bin/python`（仓库根；`PYTHONUTF8=1 IB_OFFLINE_MODE=1 IB_CONFIG_SOURCE=dict IB_LOG_LEVEL=ERROR DJANGO_SETTINGS_MODULE=ibweb.settings`）；Node v22 + `src/frontend`（`npm run build && npm test`）。全部离线：LLM = 脚本化替身、搜索 = `FakeSearchProvider`、抓取传输 = 假传输（`FakeTransport`）、DNS = 假解析器（另有一组用真实 `getaddrinfo` 只解析本机 / 数字地址）。不连生产、不装依赖、不引入容器。
-- **判定模式**：INCREMENTAL / `gate_mode=baseline`——每层相对基线零新增失败且新写用例全部通过才进入下一层；critical path（Must 故事的 E2E 级用例）通过率 1.00。
-- **基线（PM 实跑，HEAD 8d6fd4b 改动前）**：`pytest tests` 914 passed；selfcheck 57 PASS / 1 FAIL（`core_framework_free`：sitecustomize，环境性既有失败）；前端 141/141。GROUP_C 后 PM 复跑：pytest 914 passed；selfcheck 64/65（同一既有失败）；前端 build rc=0、141/141。各层基线条数由本人用 `--collect-only --ignore-glob='*_r28.py'` 独立实测：unit 515 / integration 333 / e2e 51（其余 15 例在 `tests/agents`）。
-- **用例口径**：“用例”= pytest 项（参数化每个参数一例）；`TC-…` 是用例组（一个测试函数），报告里逐组列出并注明项数。前端用例 ID 为 `TC-FE-R28-*`，在 Python 三层之外独立计数（沿用 R26 / R27 口径）。
+**被测改动**：REV-29 新增 `src/ib/mcp/`（规则 / 线协议 / 客户端 / 传输 / 运行时 / 目录 / 管理 / 授权 / 绑定 / supervisor / 替身）、`src/ib/ledger/mcp_store.py` + 迁移 010、`src/ibweb/mcp_views.py` 及对 `composition.py` / `config_views.py` / `views.py` / `orchestration/dag.py` / `runtime/compile.py` / `webtools/netguard.py` 的加成式改动；前端 `McpServersPage.vue` / `utils/mcpLabels.ts` / `utils/externalGrants.ts` / `client.ts` / 路由与导航 / `AgentDetailPanel.vue` 外部工具区。
 
-### 测试替身与测试数据来源（均为替身，不改产品代码）
+**范围（in scope）**：user_stories 3.0.0 的 25 个有效故事、113 条有效 AC（Must 23 个故事；3.0.0 仅按 CP-002 Q2/Q3 改写 AC-027-01 与 6 条访问控制 AC 的措辞，AC 数不变）；REQ-NFUNC-001（无 Server 时与基线一致）的“同输入逐字相同”回归；GR-C-003 的 5 条门控条件。
+**范围外（out of scope）**：stdio / HITL（OOS-R29-11 / 12，已移出）；真实 MCP Server 互通；真实 `cryptography` 的 Fernet 执行（本机未安装，见下）；浏览器内交互；真实 LLM 的抗注入能力；目标机启动耗时校准。
 
-| 替身 | 位置 | 说明 |
-|---|---|---|
-| `ScriptedLlm` | `tests/advisor_r28_support.py` | 在已装配的 `deps.llm` 实例上替换 `build_expert` / `build_router`（同 R26 `ExpertRecorder` 手法）：按 agent 名脚本化作答；工具调用走产品真实 `ib.llm._execute_tool`（真实看门狗线程池 + contextvars）；理解步骤 / 路由 L2 输出可脚本化；“被注入后顺从的 LLM”也由脚本模拟——被测对象是平台侧的强制手段 |
-| `FakeSearchProvider` | 产品内置 | 离线搜索提供方（脚本化结果 / 延迟 / 错误） |
-| `FakeTransport` + `resolver_map` | `tests/advisor_r28_support.py` | 假抓取传输（记录每次出站 = “出站请求次数”）+ 假 DNS 解析器 |
-| 基线黄金文件 | `tests/integration/advisor_r28_baseline_golden.json` | 由**基线 commit 8d6fd4b 的 src 树**（`git archive 8d6fd4b src`）运行 `tests/advisor_r28_probe_support.py` 生成；期望值**不是**用被测代码生成；回归用例用当前 src 重跑探针并逐项比对 |
+**环境**：项目 venv `/root/.venvs/intelligentbase/bin/python`（Python 3.12.3，pytest 9.1.1）；环境变量 `PYTHONUTF8=1 IB_OFFLINE_MODE=1 IB_CONFIG_SOURCE=dict IB_LOG_LEVEL=ERROR DJANGO_SETTINGS_MODULE=ibweb.settings`；Node v22.23.3（`npm run build && npm test`，未执行 `npm install` / `pip install`）。**venv 未安装 `cryptography`**：Fernet 契约用例本机 SKIP（逐条原因见 unit_test_report），不计 PASS；凭证主密钥在离线装配下由产品的 `make_secret_cipher(offline=True)` 回落 `ReversibleTestCipher`（报告记账 `cipher=test`）。测试数据库：SQLite 内存 / `tmp_path` 文件；不连 Qdrant / DeepSeek / ib-embed / 真实 MCP Server / 互联网。
 
-### 层间口径（各处一致）
+**判定模式**：INCREMENTAL / `gate_mode=baseline`——每层相对基线零新增失败且新写用例全部通过才进入下一层；critical path（Must Have 故事的 E2E 用例）通过率 ≥ 1.00。
+**基线来源**（PM 实跑，改动前 HEAD b4fa3a3）：`pytest tests` 1358 passed；selfcheck 68/69（`core_framework_free` 既有 FAIL）；前端 160/160（其中 `advisor_r28.test.js:260-261` 为本轮契约变更，GR-C-001 已授权，本轮核对其严格性：断言为 `const SYSTEM_ORDER = [...五项含 'mcp'];` 的整行精确匹配，无可选组 / 宽松正则，且单独断言前三项相对顺序不变——合格，未再改动）。改动后 PM 复跑口径：1358 passed、selfcheck 76/77、前端 160/160。
+**分层机制**（画像 P4）：按目录分层（`tests/unit` / `tests/integration` / `tests/e2e`），前端为独立的 `node:test` 层，selfcheck 为独立层，二者不并入 Python 三层的算术（M-TE-001）。分层用例数用 `pytest tests/<层> --collect-only -q | grep -cE '::'` 独立实测。
 
-| 层 | 内容 | 位置 |
-|---|---|---|
-| unit | 单模块纯函数 / 注入式替身：地址防护、域名名单、策略、安全抓取、出站闸、联网工具、搜索适配、上限存储与迁移、理解 / 历史裁剪 / 保真 / 致歉 / 指标 / 评测脚本、配置域规则与种子、Builder 评审口径、配置胜出与看门狗 | `tests/unit/test_webtools_netguard_unit_r28.py`、`test_webtools_fetch_gate_unit_r28.py`、`test_webtools_tools_unit_r28.py`、`test_advisor_core_unit_r28.py`（DEF-001 复测：085 由冻结翻转为正向，新增 088 正例） |
-| integration | 跨模块：真实装配 + 发布协议 + 运行时编译 + LangGraph DAG + 编排器 + 工具循环 + 出站闸 + HTTP 视图（边界：HTTP ↔ composition ↔ confsvc / ledger / builder；编排器 ↔ 顾问核心 ↔ 联网闸） | `tests/integration/test_advisor_orchestration_int_r28.py`、`test_advisor_regression_int_r28.py`、`test_advisor_web_int_r28.py`、`test_advisor_http_int_r28.py` |
-| e2e（替代口径） | 多步 HTTP / SSE 用户旅程（真实账户鉴权 + 发布 + 运行时 + SSE 流）；**非真实浏览器** | `tests/e2e/test_advisor_journeys_r28.py` |
-| 前端（独立计数） | unit：`advisorPlan.ts` / `client.ts` 真实执行；integration：源码结构契约；e2e（替代）：纯函数 + 请求形状串联 | `src/frontend/tests/advisor_r28.test.js` |
+**critical path 口径**：替代——项目无浏览器 E2E 框架，用最高层可执行的端到端级用例（真实账户鉴权 + 真实管理端点 + 真实发布协议 + 真实运行时 + 真实 SSE 流式问答的多步 HTTP/SSE 旅程；MCP Server / DNS / LLM 为替身）。
 
-> 分层标记：Python 以目录为层（pytest 目录分层，无 marker 机制，画像 P3/P4）；前端以 `describe` 分组 + ID 前缀。新文件基名全局唯一并带 `r28` 标记；未新增 `conftest.py`、未新增 `__init__.py`。
+**测试替身与边界**（均为替身，不改产品代码，不 monkeypatch 被测模块自身判定）：产品自带 `FakeMcpServer` / `FakeMcpTransport` / `FakeResolver` / `ReversibleTestCipher`；脚本化 LLM（`ScriptedLlm`，仅替换 `deps.llm` 实例上的 `build_expert` / `build_router`）；`ListenTransport`（`FakeMcpTransport` 子类，补 `subscriptions/listen` 的阻塞 SSE 流）；回环 `ThreadingHTTPServer`（仅 127.0.0.1 随机端口，测试内启停，不出网）。
 
-### GR-C-001 条件 → 覆盖落点
+**GR-C-003 条件落实**（编号与 invocation special_instructions 第 5 条一致）：
 
-| 条件 | 覆盖 |
+| 条件 | 落实 |
 |---|---|
-| 1 全部 Must 故事各 ≥1 个真实执行用例；AC→TC 追溯矩阵 | 下方“AC 映射”+ “Must 故事追溯汇总” |
-| 2 未启用顾问项目“同输入逐字相同”回归集 | TC-INT-R28-100~107（33 条问句 × {答复、事件序列、路由、外发载荷}、healthz/deps、种子/授权/定义文档/默认图/校验、可授权工具列表恰多 2 项、30 条问句联网工具调用 0）；TC-INT-R28-311（建项目种子）；TC-E2E-R28-010（SSE 旅程对黄金逐项比对） |
-| 3 AQ1=B 致歉路径 + 正例 | TC-INT-R28-010~014、015（反例）与 013 / E2E-008（首次不过、第二次通过 ⇒ 正常答复无致歉）；TC-UNIT-R28-140 |
-| 4 抓取总开关缺省关闭 | TC-UNIT-R28-080/081、TC-INT-R28-210/211、TC-E2E-R28-006（关闭 ⇒ 出站 0 + 如实告知；开启 ⇒ 可抓取；开启未授权 ⇒ 不可调用） |
-| 5 安全集：SSRF ≥30 放行 0 / 注入 ≥20 / canary ≥30 | SSRF 拒绝集 **56 条**（TC-UNIT-R28-001，含 DNS→私有、重定向→私有、IPv6、IPv4-mapped、169.254.169.254、100.64/10）+ 重定向 9 条（TC-UNIT-R28-032）+ 真实解析器本机写法 10 条（TC-UNIT-R28-008）；注入集 **22 条**（TC-INT-R28-220）；canary **30 段会话（60 轮）**（TC-INT-R28-222） |
-| 6 fail-open / 降级与 happy-path 成对 | CR-008：TC-UNIT-R28-110（成功）↔ 111/112（降级）、TC-INT-R28-058（三种理解失败 ↔ 成功答复一致）；联网：TC-INT-R28-202（超时降级 ↔ 成功有来源）、204 ↔ 200（未配置 ↔ 已配置）；kb 失败 TC-INT-R28-004 ↔ 001；致歉 010~014 ↔ 013 正例；抓取 080 ↔ 081；重定向拦截 032 ↔ 033 |
-| 7 历史裁剪 | TC-UNIT-R28-120~124、TC-INT-R28-051/052 |
-| 8 不可测项 → NOT_TESTABLE + 人工验证清单 | 见下“不可测项”与 `e2e_test_report.md` |
+| (1) Fernet 契约 + `IB_REQUIRE_CRYPTO` | `tests/unit/test_mcp_crypto_fernet_r29.py`（TC-UNIT-R29-220~225）：契约用例经 fixture 探测 `cryptography.fernet`，缺包且 `IB_REQUIRE_CRYPTO=1` ⇒ `pytest.fail`（守卫 + 5 条契约 ERROR），否则 SKIP（6 条如实计 SKIP，不冒充 PASS）。核对 CR-001：`ci.yml:54` 作业级 `env.IB_REQUIRE_CRYPTO: "1"`，所有 pytest 步骤继承；`requirements-offline.txt:35` 含 `cryptography>=42,<51`（CI 安装步骤自动覆盖）。本机演示（缺包 + `IB_REQUIRE_CRYPTO=1`）：`1 failed, 5 errors`，见 unit_test_report |
+| (2) `HttpMcpTransport` 回环契约 | `tests/integration/test_mcp_http_transport_r29.py`（20 例，仅 127.0.0.1 临时端口）：modern / legacy 两形态、302 不跟随、公网明文 http 先于 DNS 拒绝、钉 IP + 每次重解析、读取上限、真实时钟超时、鉴权头仅传输层展开 |
+| (3) supervisor 监听线程（CR-008） | `tests/unit/test_mcp_supervisor_r29.py`（11 例，真实线程 + 阻塞 SSE 流替身）：listen 流 → 去抖 → 复审态、健康探测、周期复核、start/stop 生命周期；DEF-R29-003 已修复，609 / 610 已翻转为正向断言；真实 socket 口径见 DEF-R29-006 / 007（TC-INT-R29-720 / 721） |
+| (4) 前端管理页冒烟（CR-009） | `src/frontend/tests/mcp_r29.test.js`（20 例，TC-FE-R29-001~033）：词表 / 外部授权纯函数 / client 方法 / 页面源码结构（password 输入、二次确认、无 stdio、无 HITL）/ 路由与导航；真实浏览器交互 NOT_TESTABLE，列入 e2e_test_report「人工验证清单」 |
+| (5) 接管 `advisor_r28.test.js:260-261` | 见下「现有测试调整」：登记为 test-engineer 接管，不放宽 |
+| (6) fail-closed / fail-open 与正例成对 | 每个拒绝分支断言“替身 `tools/call` 数 = 0”并有放行正例（例：TC-UNIT-R29-300 正例 ↔ 301~309 各拒绝分支；TC-UNIT-R29-341 恢复 ↔ 340 熔断；TC-INT-R29-1000 授权后可调用 ↔ 越权被拒；TC-INT-R29-817 无主密钥拒绝 ↔ `auth_kind=none` 登记成功；TC-INT-R29-815 公网明文拒绝 ↔ https / 名单内 http 通过；TC-INT-R29-1005 失效 ↔ 复审后恢复）；永不抛 / 降级契约（TC-UNIT-R29-321、361）有失败分支用例，且 TC-E2E-R29-001 / 004 / 005 / 009 配“未降级且确有结果”的正例 |
+
+**兼容性零变化（REQ-NFUNC-001）与黄金数据来源**：`tests/integration/mcp_r29_baseline_golden.json` 由基线 commit b4fa3a3 的 src 树生成（`git archive b4fa3a3 src` 解出，`IB_SRC` 指向，运行 `tests/advisor_r28_probe_support.py`），**不是**被测改动后代码自生成。本次 GROUP_D-002 在 scratchpad 独立重新生成（不 stash / checkout / reset），与入库黄金 `a == b` 为 True，逐键一致；回归用例以当前 src 重跑同一探针逐键比对，无白名单。module_design 兼容性回归点 #1~#12 的落点：#1/#2/#3/#4 → TC-INT-R29-900/901（答复、事件、路由哈希、LLM 载荷、定义文档逐项一致）+ 既有 `test_langgraph_contract_r26.py`；#5/#6/#10 → TC-INT-R29-901（可授权工具 / 参数规格 / 定义文档）+ selfcheck `mcp_namespace_guard`；#7 → 既有 R28 SSRF 用例 + TC-UNIT-R29（默认 80/443 回归）；#8/#9 → TC-INT-R29-902/903；#11 → TC-UNIT-R29（迁移 010 单源 / 幂等 / 无 DROP）；#12 → TC-INT-R29-907（关机无线程残留）。
+
+**缺陷冻结纪律**（M-TE-007）：已发现但本轮不修的产品缺陷，用例断言“当前行为 + 守卫串”（修复后会响亮失败），同时登记 DEF；不 skip、不放宽断言。0.1.0 的 7 条冻结用例（`TC-UNIT-R29-324/325/370/609/610`、`TC-INT-R29-1010`、`TC-E2E-R29-008` 第③段）已在本轮翻转为正向断言（用例名去掉 `current_behavior_frozen`，守卫串删除，TC 编号不变，翻转强度不低于缺陷原描述，详见 unit / e2e 报告“翻转用例”）。当前冻结用例：**0 条**。`TC-INT-R29-720 / 721`（真实 socket，DEF-R29-006 / 007，各 2 个参数化实例）已在第 2 轮翻转：720 = stop 后 3 s 内监听线程 `is_alive()==False`、服务端观察到客户端断开、errors 为空（并含 stop 之前仍阻塞/仍连着的正例）；721 = 流保持打开时 list_changed 在 2 s 内回调恰好一次（流开着期间不重复）、服务端关闭后线程退出且 errors 为空。用例名去掉 `frozen` 字样，守卫串删除，TC 编号不变。
 
 ## AC 映射
 
-图例：U = 单元，I = 集成，E = E2E 级（替代口径），F = 前端；全部“新写”（既有回归另列）；运行方式均为离线真实执行（P11 为“无”，不适用 sim/hil/manual 分类）。位置缩写：`NG`=`tests/unit/test_webtools_netguard_unit_r28.py`，`FG`=`…test_webtools_fetch_gate_unit_r28.py`，`TL`=`…test_webtools_tools_unit_r28.py`，`CO`=`…test_advisor_core_unit_r28.py`，`OR`=`tests/integration/test_advisor_orchestration_int_r28.py`，`RG`=`…test_advisor_regression_int_r28.py`，`WB`=`…test_advisor_web_int_r28.py`，`HT`=`…test_advisor_http_int_r28.py`，`EJ`=`tests/e2e/test_advisor_journeys_r28.py`，`FE`=`src/frontend/tests/advisor_r28.test.js`。
+说明：硬件类“运行方式”列不适用（画像 P11-1 / P11-2 为“无”，P11-3 的 DeepSeek 与本轮 MCP 无关），统一记 `—`；“前置 → 动作 → 预期”为 G/W/T 摘要，断言均有明确期望值。全部为**新写**（本轮 MCP 为全新子系统，无既有用例可复用；回归用既有用例单列于“回归”小节）。位置路径省略 `tests/` 前缀；ID 省略 `R29-` 中缀（如 `U-410` = `TC-UNIT-R29-410`，`I-810` = `TC-INT-R29-810`，`E-001` = `TC-E2E-R29-001`，`F-021` = `TC-FE-R29-021`）。
 
-| AC | 用例 ID（级别） | 位置 | 预期要点 |
-|---|---|---|---|
-| AC-001-01 | TC-INT-R28-300 (I)、TC-E2E-R28-001 (E) | HT、EJ | 目录同时含 kb-agent 与“顾问”；标签 / 职责 / 默认授权为空 / 默认未加入 |
-| AC-001-02 | TC-UNIT-R28-165 (U)、TC-INT-R28-300 (I) | CO、HT | 种子声明面向客户 / 礼貌专业 / 同语言 / 不暴露内部分工 / 如实；BLOCKED_TERMS 0 命中 |
-| AC-001-03 | TC-INT-R28-107、TC-INT-R28-300 (I) | RG、HT | 未启用项目专家集合 / 授权不变，顾问不出现在专家列表 |
-| AC-002-01 | TC-INT-R28-310 (I)、TC-E2E-R28-003 (E)、TC-FE-R28-011/020 (F) | HT、EJ、FE | 创建成功；两专家 + 规范图（通过校验）+ 种子逐字落盘；请求带 enable_advisor |
-| AC-002-02 | TC-INT-R28-311 (I)、TC-FE-R28-010/020 (F) | HT、FE | 不勾选 ⇒ 与基线（黄金）种子逐项相同；默认不勾选；请求体不带键 |
-| AC-002-03 | TC-INT-R28-312 (I)、TC-E2E-R28-003 (E) | HT、EJ | 非 admin 403 不创建；非 bool 400 先于创建 |
-| AC-002-04 | TC-INT-R28-313 (I) | HT | 种子失败整体回滚，无半成品，明确错误 |
-| AC-003-01 | TC-INT-R28-320 (I)、TC-E2E-R28-001 (E) | HT、EJ | 预检差异含“新增 agent：顾问”；生效后专家集合含顾问 |
-| AC-003-02 | TC-INT-R28-321 (I)、TC-FE-R28-005 (F) | HT、FE | 移除后回到未启用行为；审计保留 |
-| AC-003-03 | TC-INT-R28-322 (I)、TC-E2E-R28-001 (E) | HT、EJ | 查看档 403，版本不变 |
-| AC-003-04 | TC-INT-R28-323、TC-INT-R28-102 (I) | HT、RG | 升级后未操作项目定义文档与基线逐字节相同 |
-| AC-004-01 | TC-INT-R28-340 (I)、TC-E2E-R28-001 (E) | HT、EJ | 返回草稿 + 三项条款逐项通过；服务端不写 |
-| AC-004-02 | TC-UNIT-R28-170/171 (U)、TC-INT-R28-341 (I) | CO、HT | 顾问口径通过；同文本 kb-agent 口径与基线一致（未通过） |
-| AC-004-03 | TC-UNIT-R28-172 (U)、TC-INT-R28-342 (I) | CO、HT | 禁用词判未通过且不回显 |
-| AC-004-04 | TC-INT-R28-343 (I) | HT | 查看档 Builder 写入 403，云端出站 0 |
-| AC-005-01 | TC-E2E-R28-002 (E) | EJ | START→顾问(query_only)→A(with_upstream)→END 通过；A 的输入含顾问产出的上游材料段 |
-| AC-005-02 | TC-UNIT-R28-164 (U)、TC-E2E-R28-001 (E) | CO、EJ | 顾问不可达 ⇒ graph_unreachable_from_start，无特例 |
-| AC-005-03 | TC-E2E-R28-001 (E)、TC-FE-R28-022 (F) | EJ、FE | 顾问提示词 / 授权 / 参数可读（数据面）；面板结构契约；浏览器点击为人工项 MV-02 |
-| AC-005-04 | TC-UNIT-R28-163 (U)、TC-E2E-R28-001 (E) | CO、EJ | 回边成环 ⇒ graph_cycle，无“忽略并继续”；无顾问项目同类校验与基线一致 |
-| AC-006-01 | TC-INT-R28-001 (I) | OR | kb-agent 被调用 1 次且入参含“退货期限”；唯一答复含“7 天”与引用，无内部名称 |
-| AC-006-02 | TC-INT-R28-002 (I) | OR | 无资料 ⇒ “知识库中未找到相关资料”+ 下一步建议 |
-| AC-006-03 | TC-INT-R28-003 (I) | OR | 直达与经顾问委托检索片段逐项相同 |
-| AC-006-05 | TC-INT-R28-004 (I) | OR | kb-agent 失败 ⇒ 正常答复 + “暂时无法查询”，无 error 事件 |
-| AC-006-06 | TC-INT-R28-001/015 (I)、TC-UNIT-R28-131/132 (U) | OR、CO | 数字与引用位置原样保留，措辞可变；缺失 0 |
-| AC-006-07 | TC-INT-R28-010/011/012/014 (I)、TC-E2E-R28-008 (E) | OR、EJ | 汇总失败 ⇒ 统一致歉；答复不含原答特征串 / 内部名 / 异常；HTTP 200 |
-| AC-007-01 | TC-INT-R28-200 (I) | WB | 联网成功：来源标题 + 网址 + “来自互联网”；审计先行（无查询原文） |
-| AC-007-02 | TC-INT-R28-201 (I) | WB | 未授权 ⇒ 不联网（出站 0），如实说明；越权调用被拒 |
-| AC-007-03 | TC-INT-R28-202 (I)、TC-UNIT-R28-072 (U) | WB、TL | 超时降级 ↔ 成功有来源（成对） |
-| AC-007-04 | TC-INT-R28-021 (I) | OR | 同一答复分别标明知识库 / 互联网来源 |
-| AC-008-01 | TC-INT-R28-020 (I) | OR | 五类问句依次：无工具无委托 / 委托 kb / 自身联网 / 委托合同 agent / 拒答 |
-| AC-008-02 | TC-INT-R28-021 (I) | OR | 双意图同一答复含两部分各自标注来源 |
-| AC-008-03 | TC-INT-R28-023 (I) | OR | 路由收到消解后问句；结果与基线相同；路由提示词不含历史 |
-| AC-008-04 | TC-UNIT-R28-113 (U)、TC-INT-R28-022 (I) | CO、OR | 空白 / 纯符号 ⇒ 澄清，不调用工具 |
-| AC-009-01 | TC-INT-R28-030 (I)、TC-E2E-R28-007 (E) | OR、EJ | 委托 contract-agent 1 次，结果回顾问，唯一答复 |
-| AC-009-02 | TC-INT-R28-031 (I)、TC-E2E-R28-007 (E) | OR、EJ | 候选外 agent 调用 0 |
-| AC-009-03 | TC-INT-R28-033 (I)、TC-UNIT-R28-162/163 (U) | OR、CO | 成环 / 路由候选含顾问 ⇒ 保存被拒；运行期被委托 agent 不再委托 |
-| AC-009-04 | TC-INT-R28-032 (I)、TC-E2E-R28-007 (E) | OR、EJ | 被委托 agent 超时 ⇒ 如实说明，整轮正常 |
-| AC-009-05 | TC-INT-R28-034 (I) | OR | 停用 agent：保存给出逐条错误；运行期不被委托 |
-| AC-010-01 | TC-INT-R28-040 (I) | OR | 三路结果合并为一条，保留结论与来源，无“根据 xx agent” |
-| AC-010-02 | TC-INT-R28-042 (I) | OR | 矛盾 ⇒ 指出分歧并分别标注 |
-| AC-010-03 | TC-INT-R28-001/015 (I)、TC-UNIT-R28-131 (U) | OR、CO | 单路结果仍统一措辞，事实不增删 |
-| AC-010-04 | TC-INT-R28-041 (I)、TC-E2E-R28-007 (E) | OR、EJ | 并行两路 ⇒ 1 条答复，原始答复独立出现 0 次 |
-| AC-010-05 | TC-INT-R28-043 (I) | OR | 未启用项目多专家并行汇总沿用基线 |
-| AC-010-06 | TC-INT-R28-010/011/012 (I)、TC-UNIT-R28-140 (U)、TC-E2E-R28-008 (E) | OR、CO、EJ | 统一致歉：含“抱歉”+ 下一步建议；原答 / agent 名 / 工具名 / 路由词 / 异常 / 状态码 0；答复数 1 |
-| AC-010-07 | TC-INT-R28-013 (I)、TC-E2E-R28-008 (E) | OR、EJ | 保真两次不过 ⇒ 致歉；第二次通过 ⇒ 正常答复无致歉（成对） |
-| AC-011-01 | TC-INT-R28-050 (I)、TC-E2E-R28-004 (E) | OR、EJ | 第 11 轮能解析第 1 轮的产品 |
-| AC-011-02 | TC-INT-R28-053 (I)、TC-E2E-R28-004 (E) | OR、EJ | 另一会话 / 操作者看不到特征串 |
-| AC-011-03 | TC-INT-R28-054 (I) | OR | 空闲 >24h ⇒ 新会话不报错 |
-| AC-011-04 | TC-INT-R28-051 (I) | OR | 窗口外消息不进入顾问 / 理解步骤 |
-| AC-011-05 | TC-UNIT-R28-120~124 (U)、TC-INT-R28-052 (I) | CO、OR | 超预算最旧优先裁剪、最近一条始终保留、≤20 条原样、窗口外不提供 |
-| AC-012-01 | TC-INT-R28-056 (I)、TC-INT-R28-050 (I) | OR | 委托问题 / 联网查询词含消解后的“产品 X” |
-| AC-012-02 | TC-INT-R28-055 (I) | OR | 指代不明 ⇒ 澄清，不检索 |
-| AC-012-03 | TC-INT-R28-056 (I)、TC-E2E-R28-004 (E) | OR、EJ | 委托含完整问题 |
-| AC-012-04 | TC-INT-R28-055 (I) | OR | 首轮残缺追问 ⇒ 澄清，不检索 |
-| AC-013-01~04 | TC-INT-R28-057 (I)、TC-UNIT-R28-117 (U)、TC-E2E-R28-004 (E) | OR、CO、EJ | 切换不带旧实体、不检索 kb；回归接回；延续沿用实体；无需显式声明 |
-| AC-014-01 | TC-INT-R28-203 (I)、TC-INT-R28-333 (I) | WB、HT | 勾选 + 条数 5 / 超时 10 保存并回显 |
-| AC-014-02 | TC-INT-R28-201 (I)、TC-INT-R28-333 (I)、TC-UNIT-R28-181 (U) | WB、HT、CO | 未授权 agent 工具列表不含联网工具，调用 0 |
-| AC-014-03 | TC-UNIT-R28-075/180 (U)、TC-INT-R28-203 (I) | TL、CO、WB | LLM 传 100 / 99 ⇒ 配置胜出（5 / 10 秒） |
-| AC-014-04 | TC-UNIT-R28-071 (U)、TC-INT-R28-204 (I) | TL、WB | 未配置 ⇒ “联网服务未配置”，其余意图不受影响 |
-| AC-014-05 | TC-UNIT-R28-090 (U) | TL | 两个提供方替身返回结构一致 |
-| AC-014-06 | **NOT_TESTABLE**（TC-UNIT-R28-092 仅守卫“本轮无厂商端点 / 网络导入”） | TL | 真实厂商结果下一轮 / 人工 |
-| AC-015-01 | TC-UNIT-R28-030/081 (U) | FG、TL | 标题 + 最终网址 + 正文 ≤ 上限，剔除 script/style/nav |
-| AC-015-02 | TC-UNIT-R28-001/008/032/082 (U) | NG、FG、TL | 内网 / 元数据 / DNS 私有 / 重定向私有全部被拒；出站仅首跳 |
-| AC-015-03 | TC-UNIT-R28-004/082 (U) | NG、TL | file:// ftp:// ⇒ scheme_not_allowed |
-| AC-015-04 | TC-UNIT-R28-036/037/084 (U) | FG、TL | 二进制 / 超限 ⇒ 明确原因 |
-| AC-015-05 | TC-UNIT-R28-080 (U)、TC-INT-R28-210 (I)、TC-E2E-R28-006 (E) | TL、WB、EJ | 总开关关闭 ⇒ 出站 0 + “当前未开启网页抓取”，其余能力照常 |
-| AC-015-06 | TC-INT-R28-210/211 (I)、TC-E2E-R28-006 (E)、TC-UNIT-R28-081 (U) | WB、EJ、TL | 缺省关闭；打开后可抓取；打开未授权仍不可调用 |
-| AC-016-01 | TC-UNIT-R28-010/083 (U)、TC-INT-R28-212 (I)、TC-E2E-R28-005 (E) | NG、TL、WB、EJ | 白名单放行 / 外部被拒 |
-| AC-016-02 | TC-UNIT-R28-011/083 (U)、TC-INT-R28-212 (I) | NG、TL、WB | 黑名单优先 |
-| AC-016-03 | TC-UNIT-R28-063/073/074 (U)、TC-INT-R28-213 (I) | FG、TL、WB | 第 6 次不发生（提供方调用 5） |
-| AC-016-04 | TC-UNIT-R28-012/022 (U)、TC-INT-R28-332 (I) | NG、HT | 非法域名保存被拒，指出第几项 |
-| AC-016-05 | TC-INT-R28-201 (I)、TC-E2E-R28-005 (E) | WB、EJ | 取消授权 ⇒ 新会话联网 0 + 降级 |
-| AC-016-06 | TC-INT-R28-214/215 (I)、TC-UNIT-R28-182 (U) | WB、CO | 提供方遵从超时：10 ±1 秒（真实时长）；看门狗终止忽略超时者 |
-| AC-016-07 | TC-UNIT-R28-020/021/085/088/100 (U)、TC-INT-R28-330/331 (I)、TC-E2E-R28-012 (E)、TC-FE-R28-012/E02 (F) | NG、TL、HT、EJ、FE | 3 次 / 500KB 成功；8 次被拒“超出全局上限（5 次）”；非 admin 403；运行期 min(参数, 全局) |
-| AC-016-08 | TC-INT-R28-210 (I)、TC-E2E-R28-006 (E) | WB、EJ | 授权保存成功，但总开关关闭 ⇒ 出站 0 + 如实告知；开关与授权各自独立 |
-| AC-017-01 | TC-INT-R28-100 (I)、TC-E2E-R28-010 (E)、全量回归 | RG、EJ | 33 条问句答复 / 事件 / 路由 / 外发载荷与基线逐项一致；全量零新增失败 |
-| AC-017-02 | TC-INT-R28-101/350 (I) | RG、HT | healthz/deps 与基线一致，无搜索主机；配置后才追加 |
-| AC-017-03 | TC-INT-R28-102 (I) | RG | kb 种子 / 授权 / 参数 / 定义文档 / 默认图 / 校验与基线一致 |
-| AC-017-04 | TC-INT-R28-106 (I) | RG | 启用顾问不影响 kb-agent 路径（提示词 / 工具 / 步数 / 收到的问题） |
-| AC-017-05 | TC-INT-R28-103/104/105 (I) | RG | 可授权工具列表恰多 2 项；30 条问句联网调用 0、未授权 agent 工具列表不含 |
-| AC-018-01 | TC-INT-R28-220/221 (I)、TC-E2E-R28-009 (E)、TC-UNIT-R28-053/078 (U) | WB、EJ、FG、TL | 注入集 22 条：围栏 / 越权被拒 / 危险抓取不出站 / 合同 agent 调用 0 |
-| AC-018-02 | TC-INT-R28-222 (I)、TC-E2E-R28-009 (E)、TC-UNIT-R28-050/051/076/086 (U) | WB、EJ、FG、TL | canary 30 段会话出站命中 0，正常检索仍出站 |
-| AC-018-03 | TC-INT-R28-223/225/350 (I) | WB、HT | 启动日志 / healthz 列出搜索主机与类别；密钥哨兵 0 次出现 |
-| AC-018-04 | TC-INT-R28-224 (I)、TC-UNIT-R28-135 (U) | WB、CO | ≥200 字符整段复制 ⇒ 重试要求概括；两次都复制 ⇒ 致歉 |
-| AC-019-01 | **NOT_TESTABLE**（真实 LLM + 用户评测集，目标机） | — | 人工验证清单 MV-06 |
-| AC-019-02 | **NOT_TESTABLE**（同上） | — | 人工验证清单 MV-06 |
-| AC-019-03 | TC-UNIT-R28-150/151/152 (U)、TC-E2E-R28-011 (E) | CO、EJ | 指标手算值一致；评测 CLI 判定逻辑（替身）；标注真实精准度需人工 |
-| AC-019-04 | **NOT_TESTABLE**（流程性：评测集来源确认） | — | 人工验证清单 MV-07 |
+| AC | 用例 ID | 级别 | 位置（文件） | 前置 → 动作 → 预期 | 测试数据 |
+|---|---|---|---|---|---|
+| AC-001-01 | I-810, E-001 | INT, E2E | integration/test_mcp_admin_api_r29.py; e2e/test_mcp_e2e_r29.py | admin 登记 → 201、状态 registered、工具数 0、令牌只显示“已设置”、审计一条且不含令牌 | CANARY_TOKEN |
+| AC-001-02 | I-811 | INT | integration/test_mcp_admin_api_r29.py | 已有 crm → 再登记 crm → 400 server_id_exists，原 Server 不变 | — |
+| AC-001-03 | I-800, E-011 | INT, E2E | 同上; e2e | 20 个 admin 端点 × 匿名 / view / edit / manage → 匿名 401、view / edit 档越权 403（3.0.0 口径），快照零变化 | — |
+| AC-001-04 | I-811, U-005, U-006 | INT, UNIT | 同上; unit/test_mcp_rules_r29.py | 标识名含空格 / 空 URL 等 → 400 并指出字段码，不落库（逐条列全部字段错误见 OBS-01） | — |
+| AC-001-05 | I-860, I-1002 | INT | integration/test_mcp_admin_api_r29.py; test_mcp_compile_hotpath_r29.py | Server 停用 / 未启用 → 配置目录不列其工具；提交授权 → 400 mcp_server_unavailable | — |
+| AC-001-06 | I-812, U-521, F-003, F-020 | INT, UNIT, FE | 同上; unit/test_mcp_store_r29.py; frontend | stdio / sse / http / 空等 6 种传输 → 400 transport_not_supported，Popen 计数 0，库层 CHECK 兜底，下拉仅 streamable_http | — |
+| AC-002-01 | I-820, U-400, I-700, I-701, E-001 | INT, UNIT, E2E | 同上 | 测试连接 → ok + 协议版本 / 时代 / listChanged / 工具能力，记录验证时间；modern 与 legacy 均通过 | — |
+| AC-002-02 | I-821, U-401, U-402, U-403, I-707 | INT, UNIT | 同上 | 不可达 / 超时 / 401 / 协议不兼容 / 无工具能力 → 对应类别；响应无凭证 / 主机 / 堆栈；启用 409 | — |
+| AC-002-03 | I-822, U-404, E-010 | INT, UNIT, E2E | 同上 | 目标 169.254.169.254 → address_blocked，替身请求 0 | — |
+| AC-003-01 | I-860, I-810 | INT | integration/test_mcp_admin_api_r29.py | 列表 / 详情字段齐全（状态、验证、分状态工具数、引用项目 / agent 数 = 1 / 1），无凭证明文 | — |
+| AC-003-02 | I-842, E-009 | INT, E2E | 同上 | 仅开放 crm 的项目只见 crm；他 Server 详情 404 | — |
+| AC-003-03 | I-801, I-800, I-842 | INT | 同上 | 匿名读 Server 列表 401；view / edit 档管理动作 403（I-800，Server 数据零变化）；view / edit 档读取仅见开放给本项目的 Server（I-842）。**已裁决**（CP-002 Q3=A，3.0.0）：原 OBS-03 待裁决说明作废 | — |
+| AC-004-01 | I-823 | INT | 同上 | 只改说明与超时 → 工具仍 enabled，审计有 server.update；旧 expected_updated_at ⇒ 409 | — |
+| AC-004-02 | I-824, E-003 | INT, E2E | 同上 | 改连接目标 → registered、4 工具全 needs_rereview、调用 0 次出站 | — |
+| AC-004-03 | I-824, E-010 | INT, E2E | 同上 | 改为 10.0.0.5 → 400，原目标与工具状态不变 | — |
+| AC-004-04 | I-800 | INT | 同上 | 配置者 PATCH → 403 | — |
+| AC-004-05 | I-825 | INT | 同上 | 轮换凭证 → 详情只显示 configured 与新时间；审计与响应无旧 / 新值 | 两个测试令牌 |
+| AC-005-01 | U-301, I-828 | UNIT, INT | unit/test_mcp_runtime_r29.py; integration | 停用 → 下一次调用被拒，出站 0；授权记录仍在 | — |
+| AC-005-02 | I-828 | INT | 同上 | 启用先验证；验证失败保持不可用 | — |
+| AC-005-03 | I-829 | INT | 同上 | 被引用时默认删除 → 409 server_in_use 列引用；一切不变 | — |
+| AC-005-04 | I-829, I-830, E-003 | INT, E2E | 同上 | 强制删除 → 凭证清除、授权清理、定义文档 +1 版、仍可保存；清理失败 → 409 且已停用未删除 | — |
+| AC-005-05 | I-829, U-302 | INT, UNIT | 同上 | 删除后调用 → 降级（短语为“外部工具不存在”，见 OBS-05），出站 0 | — |
+| AC-005-06 | I-829 | INT | 同上 | 缺 confirm / 不一致 → 400 confirm_mismatch，不删除 | — |
+| AC-006-01 | E-001, U-503, U-523, U-201, I-810 | E2E, UNIT | e2e; unit/test_mcp_store_r29.py; test_mcp_crypto_r29.py | canary 令牌全流程（响应 / 日志 / 审计 / 定义文档 / LLM 载荷 / 台账文件字节）命中 0；密文不含明文；主密钥不在台账字节中。真实 Fernet 见 U-221~225（本机 SKIP） | CANARY_TOKEN, SECRET_KEY |
+| AC-006-02 | I-827, U-308, E-009 | INT, UNIT, E2E | 同上 | 项目专属凭证：A 设置、B 未设置 → B 得“凭证缺失”，出站 0 | — |
+| AC-006-03 | I-825, U-203 | INT, UNIT | 同上 | 轮换后服务方收到新凭证；旧凭证被拒 | — |
+| AC-006-04 | I-826, F-021, F-033 | INT, FE | 同上; frontend | 任何读取接口不含值；凭证输入校验；输入框 password、提交即清空。selfcheck `deploy_templates_have_no_secrets` 零命中见 e2e 报告 | — |
+| AC-006-05 | E-007, U-321 | E2E, UNIT | 同上 | 401 → 降级文案不含状态码 / 服务方原文 / 凭证片段；审计类别 failed | — |
+| AC-006-06 | I-817, U-204, U-212 | INT, UNIT | 同上 | 主密钥缺失登记带凭证 Server → 409 secret_key_missing，无明文落盘；不带凭证 Server 不受影响 | — |
+| AC-007-01 | I-852, I-842 | INT | 同上 | 新登记未开放 → 项目看不到 | — |
+| AC-007-02 | I-852, E-009, U-303 | INT, E2E, UNIT | 同上 | 开放给 A → A 可见 B 不可见；B 直接调用成功 0（含运行期新建项目 N=1） | — |
+| AC-007-03 | I-853, E-009 | INT, E2E | 同上 | 项目专属 erp：B 查询 404、授权被拒、调用被拒，无信息泄露 | — |
+| AC-007-04 | I-852, E-003, U-303 | INT, E2E, UNIT | 同上 | 取消开放 → 调用立即不生效，配置页标注“未对本项目开放”，保存不失败 | — |
+| AC-007-05 | I-904 | INT | integration/test_mcp_regression_r29.py | 运行期新建项目（含顾问）→ 未开放任何 Server、外部授权数 0 | — |
+| AC-008-01 | I-700, U-300 | INT, UNIT | integration/test_mcp_http_transport_r29.py | 真实 socket：Authorization: Bearer，令牌不在 URL | CANARY_TOKEN |
+| AC-008-02 | I-814, I-705 | INT | 同上 | userinfo / file / ftp / javascript / 十六进制 IP 等 → 拒绝，回环服务端命中 0 | — |
+| AC-008-03 | I-703 | INT | 同上 | 302 → 私有侧：不跟随、不读 Location，私有侧请求 0 | — |
+| AC-008-04 | I-813 | INT | integration/test_mcp_admin_api_r29.py | oauth / basic 等 → 400 auth_kind_invalid | — |
+| AC-008-05 | I-815, I-704, U-114 | INT, UNIT | 同上 | 公网明文 http → 400 且 DNS 解析 0 次；https 通过；名单内精确主机 + 端口的 http 通过 | — |
+| AC-010-01 | I-820, U-410, I-702, U-001 | INT, UNIT | 同上 | 分页 3 工具 → 注册名 mcp__crm__*、展示名 mcp.crm.*、pending_review、含指纹 / schema | — |
+| AC-010-02 | U-413, U-002 | UNIT | unit | 两 Server 同名 search 并存；search_knowledge 外部工具带前缀 | — |
+| AC-010-03 | U-003 | UNIT | unit/test_mcp_rules_r29.py | 服务方自报内置名 → 注册名仍带登记标识名前缀 | — |
+| AC-010-04 | U-411, U-010 | UNIT | unit | 非法名被排除（带原因），9 个合规保留 | — |
+| AC-011-01 | I-842 | INT | integration | 按 state 筛选；详情含并列 observed / approved、注解标“服务方自报，未经核实” | — |
+| AC-011-02 | I-842 | INT | 同上 | N=3 未开放 Server：项目侧泄露条数 0 | — |
+| AC-011-03 | I-801, I-800, I-842 | INT | 同上 | 匿名读工具目录 401；view / edit 档审核 / 启用 / 风险裁定等管理动作 403、工具状态零变化；读取仅见开放项。**已裁决**（CP-002 Q3=A） | — |
+| AC-012-01 | I-840 | INT | 同上 | 自称只读不预设只读（unknown）；审核审计含裁定人 / 级别 / 指纹 | — |
+| AC-012-02 | I-840 | INT | 同上 | destructiveHint → side_effect | — |
+| AC-012-03 | I-841, E-005 | INT, E2E | 同上 | 待审核工具：配置者启用 403；授权 400 mcp_tool_not_enabled | — |
+| AC-012-04 | I-841 | INT | 同上 | 禁用后调用被拒，出站 0 | — |
+| AC-013-01 | U-420, E-002, U-603, U-610, I-721 | UNIT, E2E, INT | unit; e2e; integration/test_mcp_listen_realsocket_r29.py | 描述变更（含新指令）→ needs_rereview；调用出站 0；差异可查；listen 通知 → 去抖 → 复审态；启用后保持协商值并启动监听（610，已翻转）；真实 socket 上 2 s 内恰好回调一次（721，已翻转，DEF-R29-007 已修复已验证） | — |
+| AC-013-02 | U-422, U-601, I-851 | UNIT, INT | 同上 | 不支持通知：手动刷新 / 周期复核同样检出 | — |
+| AC-013-03 | U-421 | UNIT | unit/test_mcp_catalog_r29.py | 仅注解变化也失效 | — |
+| AC-013-04 | U-426, E-002 | UNIT, E2E | 同上 | 复审通过 → 自动恢复（新装配绑定新指纹）；驳回 → 保持失效 | — |
+| AC-013-05 | E-002, U-305 | E2E, UNIT | e2e | 检测后 N=20 并发尝试放行 0；旧指纹绑定被拒 | — |
+| AC-013-06 | U-424 | UNIT | unit | 新增工具 pending_review，无授权 | — |
+| AC-013-07 | U-412, U-011 | UNIT | unit | 1000 工具 + 10 万字符描述 + 深嵌套：无崩溃，超限项排除，合规项保留 | — |
+| AC-014-01 | U-425, E-002 | UNIT, E2E | unit; e2e | 撤下 → offline（含时间与原因），调用被拒；记录可查 | — |
+| AC-014-02 | U-425, E-002 | UNIT, E2E | 同上 | 重现且指纹相同 → needs_rereview，不自动恢复 | — |
+| AC-015-01 | U-311, U-313, I-1009, E-001 | UNIT, INT, E2E | unit/test_mcp_runtime_r29.py; integration | 固定 / 屏蔽参数不在 LLM 可见 schema；发出值 = 固定值 | — |
+| AC-015-02 | U-311 | UNIT | unit | 30 个诱导值：生效次数 0 | — |
+| AC-015-03 | U-312, E-009 | UNIT, E2E | 同上 | 两项目各自固定值互不串用 | — |
+| AC-015-04 | I-844, E-005, U-427 | INT, E2E, UNIT | integration | 疑似租户参数未确认 → 400；确认后启用并审计 tenant_ack=1 | — |
+| AC-015-05 | I-843, E-005 | INT, E2E | 同上 | 配置者改固定值 403；响应只回显键名 | — |
+| AC-016-01 | I-1000, I-1001 | INT | integration/test_mcp_compile_hotpath_r29.py | 勾选授权 → 仅 kb-agent 的工具列表含外部工具；热生效 | — |
+| AC-016-02 | I-1002 | INT | 同上 | 不存在 / 待复审 / 已下线 / 停用 / 未开放 / 禁用 → 逐条错误，整份不保存 | — |
+| AC-016-03 | I-1003, E-009 | INT, E2E | 同上 | 跨项目授权被拒，错误不泄露描述 / schema | — |
+| AC-016-04 | I-1000, I-1010 | INT | 同上 | 顾问未授权：越权调用被拒，出站 0；顾问被授权：调用成功且按回合计 5 次上限（I-1010，DEF-R29-005 已修复，已翻转，含未授权成对） | — |
+| AC-016-05 | I-861, I-1110 | INT | integration/test_mcp_admin_api_r29.py; integration/test_mcp_access_levels_r29c.py | 匿名保存授权 401（I-1110，本轮新写）；view 档 403（I-861 / I-1110），两种情形配置版本与工具授权状态零变化；edit 档保存成功（正例） | — |
+| AC-017-01 | I-1005, E-003 | INT, E2E | integration; e2e | 配置页标注失效原因；旧装配调用被拒 | — |
+| AC-017-02 | I-1005 | INT | 同上 | 存在失效授权时保存无关配置成功，授权记录保留 | — |
+| AC-017-03 | I-1005, E-002 | INT, E2E | 同上 | 复审通过后授权自动恢复；Server 删除则不恢复 | — |
+| AC-017-04 | I-1005, U-305 | INT, UNIT | 同上 | 旧装配在失效后调用同样被拒（不依赖重启） | — |
+| AC-018-01 | I-901, I-904 | INT | integration/test_mcp_regression_r29.py | 既有项目定义文档逐字不变 | — |
+| AC-018-02 | I-904 | INT | 同上 | 新建项目（含顾问）：kb-agent 仅 search_knowledge，顾问空 | — |
+| AC-018-03 | I-904, E-001 | INT, E2E | 同上 | 新发现 5 工具 + 已启用只读工具，无人操作 → 授权数不变 | — |
+| AC-019-01 | U-300, E-001, I-1000 | UNIT, E2E | unit; e2e | 服务方收到原始工具名 + 校验后入参；答复引用结果；审计一条 | — |
+| AC-019-02 | U-310 | UNIT | unit | 缺必填 / 类型错 → 不出站，可重试 | — |
+| AC-019-03 | U-320, E-007 | UNIT, E2E | 同上 | isError → 围栏失败结果，整轮 200 | — |
+| AC-019-04 | U-321, E-007 | UNIT, E2E | 同上 | 4 类故障各 5 次：降级短语固定，无状态码 / 原文 / 凭证，整轮 200 | — |
+| AC-019-05 | U-323, U-050, E-007 | UNIT, E2E | 同上 | 文本 + 图片 + 资源链接 → 只采纳文本并标“已忽略 2 项” | — |
+| AC-019-06 | U-051, U-323, U-324, U-325, I-708 | UNIT, INT | 同上 | 多字节正例；100 KB 与 60 KB ASCII：ok、正文+标注 ≤ 32768 字节、含“已截断”、围栏内；恰好等于上限不截断不标注（DEF-R29-002 已修复，已翻转） | — |
+| AC-019-07 | U-322, E-007 | UNIT, E2E | 同上 | input_required → 降级，无追问请求 | — |
+| AC-020-01 | I-709 | INT | integration/test_mcp_http_transport_r29.py | 真实时钟超时 1 ± 1 s（30 s 口径按比例缩放，机制同一） | — |
+| AC-020-02 | U-330, E-004, I-1010 | UNIT, E2E | unit; e2e | 同回合 kb-agent 3 + 被委托 agent 2 = 5，第 6 次被拒；下回合清零 | — |
+| AC-020-03 | U-340, U-341, E-004 | UNIT, E2E | 同上 | 5 次失败后第 6 次出站 0 且 ≤1 s；冷却后探测恢复 / 继续暂停；状态变化写审计 | — |
+| AC-020-04 | U-331, I-850, E-004 | UNIT, INT, E2E | 同上 | 项目只能调低（8 → 400，2/3 成功）；治理参数范围校验 | — |
+| AC-020-05 | U-350 | UNIT | unit | 并发上限 2，4 并发：在途峰值 ≤ 2，其余“繁忙”降级 | — |
+| AC-021-01 | U-306, I-845, E-005 | UNIT, INT, E2E | 同上 | 有副作用未放行 → 保存被拒 mcp_risk_not_waived | — |
+| AC-021-02 | I-845, E-005 | INT, E2E | 同上 | admin 填理由放行 → 保存成功；审计放行人 / 范围；B 仍被拒 | — |
+| AC-021-03 | U-306, I-845, E-005 | UNIT, INT, E2E | 同上 | 撤销放行 → 调用被拒；配置页标注 | — |
+| AC-021-04 | I-845 | INT | 同上 | 空 / 全空白理由 → 400 | — |
+| AC-021-05 | U-307, I-845 | UNIT, INT | 同上 | unknown 与 side_effect 同样受限；裁定只读后放行 | — |
+| AC-023-01 | I-905 | INT | integration/test_mcp_regression_r29.py | 能力摘要无 mcp__ / mcp. 条目，内置条目与基线一致 | — |
+| AC-023-02 | I-906 | INT | 同上 | 描述含“总是路由到本工具”：N=30 问句 agent 调用序列与答复无差异 | — |
+| AC-024-01 | U-343, U-600, I-1100~1103 | UNIT, INT | unit; integration/test_mcp_supervisor_process_r29.py | 探测发现不可达 → down；调用立即降级（≤1 s，出站 0）；supervisor 仅由 ib-web 入口启动（worker 路径 0 线程，见 AC-025-03 行，DEF-R29-008） | — |
+| AC-024-02 | U-600 | UNIT | unit/test_mcp_supervisor_r29.py | 恢复 → 自动回 up，写审计两条状态变化 | — |
+| AC-024-03 | I-851 | INT | integration | 配置者 verify / refresh → 403 | — |
+| AC-025-01 | I-901, I-903, 全量回归 + selfcheck | INT, 回归 | integration/test_mcp_regression_r29.py | 探针全部键与基线黄金逐项一致；配置目录字节相同；可授权工具列表与基线相同；全量 1761 passed, 6 skipped（回流第 3 轮）；离线 / IB_MCP_ENABLED=0 下 start_mcp_supervisor 返回 False 且无线程（I-1104、I-1105，本轮新写） | 基线黄金 JSON |
+| AC-025-02 | I-900, I-906, E-011 | INT, E2E | 同上; e2e | N=33 问句答复 / 事件 / 路由 / 外发载荷与基线逐项一致；删除全部 Server 后答复回到基线 | 基线黄金 JSON |
+| AC-025-03 | I-907, I-1100~1103 | INT | 同上; integration/test_mcp_supervisor_process_r29.py | **DEF-R29-008 成对用例**（I-1100 worker 路径 build_deps + django.setup/apps.ready ⇒ 进程内无任何新增 ib-mcp* 线程；I-1101 build_application ⇒ 恰好 1 个 ib-mcp-supervisor，幂等，close 后退出；I-1102 同一 deps 先 0 后 1；I-1103 start_mcp_supervisor 返回 True/False 契约）。非离线装配 + 3 个不可达 Server 重启：启动有界、网络尝试 0、N=20 对话 20/20、关机无线程残留。**启动耗时增量待目标机校准（标“未验收”）** | — |
+| AC-025-04 | I-800, E-011 | INT, E2E | 同上 | 管理动作全集 × 4 类身份：未授权成功 0，匿名 401、view / edit 档越权 403（3.0.0 口径） | — |
+| AC-026-01 | U-362, E-001 | UNIT, E2E | unit; e2e | N≥30 次调用：审计字段齐全率 100%，凭证与入参原文 0 命中 | — |
+| AC-026-02 | I-862, E-003 | INT, E2E | integration; e2e | 按 Server + 时间范围过滤；Server 删除后历史可查 | — |
+| AC-026-03 | I-802, I-1111, U-506 | INT, UNIT | 同上; integration/test_mcp_access_levels_r29c.py | **正例按项目 manage 档（read_audit）口径**：manage 档账户查询只得本项目记录（强制覆盖 project_id，他项目 0 条）；**edit 档 → 403、view 档 → 403**（I-802、I-1111 均有）；匿名 401。注：AC 原文“项目配置者”在此指 manage 档——`src/ibweb/mcp_views.py:722` `require_level(request, "read_audit")`，档位表 `REQUIRED_LEVEL["read_audit"]=="manage"`（`tests/unit/test_config_access_r26.py` TC-UNIT-R26-050 锁定，改动即失败）；edit 档项目配置者**没有**审计读取权。已裁决（CP-002 Q3=A；GR-A-003 条件） | — |
+| AC-026-04 | I-902, I-901 | INT | integration/test_mcp_regression_r29.py | 已启用 Server → /healthz/deps 列主机与数据类别；未登记 / 仅登记 / 停用后与基线逐字节相同 | — |
+| AC-027-01 | U-053, U-052, U-042, U-700~706, E-006 | UNIT, E2E | unit/test_mcp_rules_r29.py; unit/test_mcp_desc_channels_r29c.py; e2e | **3.0.0 分通道口径（ADR-R29-11）**。返回内容通道：注入集 N=23 的返回 / 错误文本围栏，围栏被提前闭合次数 0（含用零宽 / 方向字符拆分标记、多 text 项伪造闭合、超限截断边界，U-052/053/704/705/706）。描述通道：工具描述 ≤ 1000、参数描述 ≤ 300（边界对 299/300/301、999/1000/1001，含嵌套属性，U-701/702）；注入集 N=23 的描述无控制 / 零宽字符、不超上限、产品不追加围栏（U-703）；合规短描述原样不被围栏包裹（U-700 正例）；提示词 / 工具集 / 委托序列不变（E-006） | 23 条注入样例 |
+| AC-027-02 | U-120, U-121, U-122, E-010, I-705 | UNIT, INT, E2E | unit/test_mcp_netguard_r29.py; e2e | 单元 38 条 + E2E 33 条地址拒绝集；先公后私重绑；放行 0；名单空时内网放行 0 | — |
+| AC-027-03 | U-123, U-124, I-815, E-010 | UNIT, INT, E2E | 同上 | 10.0.0.8:9000 精确放行；别端口 / 别主机仍拒；回环 / CGNAT / ULA 经名单可登记 | — |
+| AC-027-04 | E-008, U-370 | E2E, UNIT | e2e; unit | N=30 会话 canary 外发命中 0（仅声明参数）；LLM 添加的未声明键外发 0 次，fixed_args 覆盖、hidden 不外发，schema 无 properties 时 LLM 入参全丢（DEF-R29-004 已修复，已翻转） | 4 个 canary 串 |
+| AC-027-05 | E-009 | E2E | e2e | 双项目 + 运行期新建项目：B 指向 A 的 Server / 凭证 / 固定入参成功 0；A 数据在 B 响应 0 | — |
+| AC-027-06 | E-002, U-305 | E2E, UNIT | 同上 | 待复审 / 禁用 / 删除后 N=20 并发放行 0；指纹不符被拒 | — |
+| AC-027-07 | U-125, I-816, E-010 | UNIT, INT, E2E | 同上 | 元数据 / 链路本地即使在名单内：effective=false，登记 / 测试连接 / 传输均拒，请求 0 | — |
 
-**非功能需求落点**：REQ-NFUNC-001 → TC-INT-R28-100~107；003 → TC-INT-R28-220/221；004 → TC-UNIT-R28-001~008/032；005 → TC-INT-R28-222；006 → TC-INT-R28-223；007 → TC-UNIT-R28-072、TC-INT-R28-202/214/215；008 → TC-UNIT-R28-150~152、TC-E2E-R28-011（真实精准度人工）；009 → TC-UNIT-R28-120~124、TC-INT-R28-051/052；010（审计 / 日志）→ TC-INT-R28-200/225、TC-UNIT-R28-060/183。
+**覆盖统计**：113/113 条有效 AC 均有至少一条用例映射；其中 AC-006-01（真实 Fernet 部分，本机 SKIP）、AC-020-01（按比例缩放）、AC-025-03（启动耗时待目标机校准）、AC-027-01（3.0.0 已按 ADR-R29-11 修订，描述通道与返回通道均有可测项覆盖，不再有“部分满足”）、AC-013-01（真实 socket 通知通道已由 TC-INT-R29-721 翻转验证，回环明文；HTTPS 未验证，见 MV-09）存在“部分满足”说明，已在各层报告逐条列出。
 
-**既有测试（回归用）**：AQ3=A 调整过的 3 个文件 4 处断言——`tests/integration/test_prompt_config_r16.py::test_TC_INT_R16_prompt_list_contract`、`tests/integration/test_prompt_tool_config_int_r16d.py::test_TC_INT_136_single_registration_point_tools_and_params`、`tests/unit/test_prompt_tool_config_unit_r16d.py::test_TC_UNIT_123_search_tool_spec_exposes_optional_retrieval_param_specs`。本人复核：仅放行“其余项恰为 web_search / web_fetch”，`search_knowledge` 的精确断言保留，未放宽无关断言；其“恰多 2 项”口径另由 TC-INT-R28-103 以基线黄金独立背书。
-
-### Must 故事追溯汇总（每个 Must 故事至少 1 个真实执行用例）
-
-| 故事 | 用例组 |
-|---|---|
-| US-001 | INT-300、INT-107、UNIT-165、E2E-001 |
-| US-002 | INT-310/311/312/313、E2E-003、FE-010/011/020 |
-| US-004 | INT-340~343、UNIT-170~172、E2E-001 |
-| US-005 | E2E-002、E2E-001、UNIT-161~164、FE-022 |
-| US-006 | INT-001~004、010~015、UNIT-130~135、E2E-004/008 |
-| US-007 | INT-200~202、021、UNIT-070~078 |
-| US-008 | INT-020~023、UNIT-110~117 |
-| US-009 | INT-030~034、E2E-007 |
-| US-010 | INT-040~043、010~015、E2E-007/008 |
-| US-011 | INT-050~054、UNIT-120~124 |
-| US-012 | INT-050/055/056 |
-| US-013 | INT-057、E2E-004 |
-| US-014 | UNIT-070~075/090、INT-203/204/333 |
-| US-015 | UNIT-030~041/080~084、INT-210/211、E2E-006 |
-| US-016 | UNIT-010~022/063/073~074/100、INT-212~215/330~332、E2E-005/012 |
-| US-017 | INT-100~107、350、E2E-010 |
-| US-018 | UNIT-050~053/060~065、INT-220~225、E2E-009 |
-| US-019 | UNIT-150~152、E2E-011（AC-019-03；AC-019-01/02/04 为 NOT_TESTABLE） |
-| US-020（1.1.0 新增 Must） | UNIT-227~229、INT-413/415、**E2E-014**（1.2.0）；AC-020-02 为 N/A |
-| US-003（Should） | INT-320~323 |
-
-## 1.1.0 增量：DeepSeek 联网搜索（CP-003 Q7 纳入）与 3.1.0 新增 / 改写 AC
-
-### 增量测试策略
-
-- **被测改动**：MOD-R28-03（`deepseek.py` 适配器与 `HttpPostTransport` 缝、`deepseek_double.py` 替身、`search.py` 工厂的离线 / 生产闸）、IFC-R28-031（`resolve_llm_api_key`）、IFC-R28-032（`validate_required` 值域与 LLM 主机校验）、`tools.py` 的 128 / 50 边界、顾问致歉 / 其他未预期异常（Q4=A）、保真范围（Q1=A）、Builder 摘要（Q2=A）。
-- **闭源 API 纪律（画像 P11-3）**：无官方沙箱，**只用项目离线替身** `FakeDeepSeekTransport`（按资料字段与错误码构造）；每个 DeepSeek 用例文件带 autouse 夹具，把 `socket.socket.connect` / `socket.create_connection` / `socket.getaddrinfo` 置为“调用即失败”并在 teardown 断言尝试数为 0 ⇒ **发往真实端点 / 任何外网的请求数 = 0**（AC-014-06）。真实 `UrllibPostTransport` 只经打桩 opener 验证（方法 / 头 / 错误映射 / 超时 / 不跟随重定向），真实 TLS、超时与代理行为列入人工清单（MV-14）。
-- **期望值出处**：端点 / 头 / 字段 / 范围 / 状态码来自 `docs/external_api/deepseek_search_fetch.md`（用例内以字面量复述，不引用被测常量作期望）；降级类别来自 module_design IFC-R28-029 状态码映射表；AC-017-06 的期望值来自**基线 commit 8d6fd4b 的 src 树**运行探针所得黄金文件（`tests/advisor_r28_builder_probe_support.py` → `tests/integration/advisor_r28_builder_golden.json`）；不取自被测代码输出。资料未给的超时数值不断言具体秒数（只断言 `query.timeout_s` 原样传给传输缝）。
-- **哨兵 Key**：测试占位串（非真实凭据）；断言口径 = 只出现在替身记录的 Authorization 请求头，在日志·异常·repr·健康检查·外发声明·答复·审计·定义文档·配置目录中出现 0 次（补回 CR-016 缩小的覆盖）。
-- **配对原则**：每个降级用例配 happy path 正例（见各用例描述）。
-- **最坏 LLM**：脚本化顾问把工具输出原样回显进答复，以证明状态码 / 错误原文 / Key 不在工具输出里（被测对象是平台侧映射与围栏，不是 LLM 自觉）。
-- **新文件**：`tests/unit/test_deepseek_search_unit_r28.py`（82 项）、`tests/integration/test_deepseek_search_int_r28.py`（38 项）、`tests/advisor_r28_builder_probe_support.py` + `tests/integration/advisor_r28_builder_golden.json`；未新增 `conftest.py` / `__init__.py`；基名全局唯一并带 `r28`。
-- **基线（PM 复跑，GROUP_C-003 后）**：pytest 1232 passed（unit 723 / integration 431 / e2e 63 / agents 15，本人 `--collect-only` 实测同）；selfcheck 68/69（`core_framework_free` 既有环境性）；前端 160/160。原始基线（8d6fd4b）914 / 57+1 / 141。
-- **门控结论（1.1.0 时点，历史）**：unit PASSED（82/82）→ integration FAILED（33/38，5 项产品缺陷 DEF-002~006）⇒ E2E 层未执行。
-- **门控结论（1.2.0，GROUP_D-004）**：unit PASSED（805/805）→ integration PASSED（469 passed；新写 38/38，含 1 项缺陷冻结）→ e2e PASSED（66 passed；critical path 15/15，覆盖 19/19）；全量 1355 passed；selfcheck 68/69（既有 `core_framework_free`）；前端 160/160。
-
-### 3.1.0 新增 / 改写 AC → 用例映射（全部“新写”；位置缩写：`DU`=`tests/unit/test_deepseek_search_unit_r28.py`，`DI`=`tests/integration/test_deepseek_search_int_r28.py`，`EN`=`tests/e2e/test_advisor_deepseek_journeys_r28.py`）
-
-| AC | 用例 ID（级别） | 位置 | 预期要点 | 本轮结果 |
-|---|---|---|---|---|
-| AC-001-04 | TC-INT-R28-417 (I)、TC-UNIT-R28-234 (U) | DI、DU | 汇总失败：中文 / 英文提问的致歉文本逐字相同、中文、英文字母占比 0、非 5xx；无失败时英文提问英文答复（成对） | PASS |
-| AC-010-08 | TC-INT-R28-418[orchestrate\|prepare] (I)、TC-INT-R28-419 (I) | DI | （5.0.0 订正范围）委托编排 / 回合准备两环节异常 ⇒ 同一致歉（HTTP 200、无内部信息）；已有降级情形不混用致歉 | 418[orchestrate] PASS；418[prepare] PASS（DEF-002 FIXED / VERIFIED）；419 PASS |
-| AC-010-10 | TC-INT-R28-425[intent\|resolve] (I)、TC-INT-R28-426[intent\|resolve] (I) | DI | 意图识别 / 问题消解异常 ⇒ fail-open 按原问句正常答复（含 kb 结论与引用；无致歉文字、无异常信息 / 堆栈 / 状态码 / agent 名 / 工具名；200 非 5xx）；指代问句“那它呢”同环节异常 ⇒ 仍 200、无致歉 | 全部 PASS（2.1.0；取代 1.2.0 的 418[intent] 缺陷冻结） |
-| AC-010-09 | TC-INT-R28-420 (I) | DI | 联网数字改写不触发致歉（顾问仅调用 1 次）；反例：被委托 agent 数字被改 ⇒ 重试 + 致歉 | PASS |
-| AC-014-05（改写） | TC-UNIT-R28-219 (U)、TC-INT-R28-416 (I) | DU、DI | 端口级 Fake 与 DeepSeek 适配器同一组结果 ⇒ 工具输出逐字相同 | PASS |
-| AC-014-06（改写） | TC-UNIT-R28-200 / 218 / 223 / 225 / 226 (U)、TC-INT-R28-400 (I)、两文件 autouse 零网络夹具 | DU、DI | 自动化只用替身，真实端点 / 外网连接尝试 = 0；替身按资料校验请求；真实效果列人工清单（MV-05 / MV-14） | PASS（真实效果为人工项） |
-| AC-014-07 | TC-UNIT-R28-206 / 219 (U)、TC-INT-R28-400 (I) | DU、DI | 每条结果含非空标题 / 网址 / 摘要；答复列出标题与网址 | PASS |
-| AC-014-08 | TC-UNIT-R28-208~213 / 221 / 224 / 225 (U)、TC-INT-R28-401 / 402 (I) | DU、DI | 资料 10 个状态码 + 超时 / 不可达 ⇒ 降级说明、非 5xx、答复中状态码·错误原文·Key 0 次；五状态依次；其余意图不受影响 | PASS |
-| AC-014-09 | TC-UNIT-R28-202~205 / 220 (U)、TC-INT-R28-404 / 405 / 406 (I) | DU、DI | 保存 0 / 51 被拒（指出 1–50）、50 通过；200 字符检索词 ⇒ ≤128；全空白不出站 | PASS |
-| AC-014-10 | TC-UNIT-R28-207 (U)、TC-INT-R28-403 (I) | DU、DI | 200 空数组 ⇒ 如实说明、不虚构来源（答复网址 ⊆ 替身返回） | PASS |
-| AC-015-02（改写） | 沿用 1.0.0 的 TC-UNIT-R28-001 / 008 / 032 / 082；本轮补：TC-INT-R28-409 目的地仅 api.deepseek.com | NG、FG、TL、DI | 内网·元数据·重定向被拒；DeepSeek 出站目的地仅搜索端点 | PASS |
-| AC-015-07 | TC-INT-R28-422 / 423 / 424 (I) | DI | 403 / 404 / 无正文 ⇒ 明确失败原因、可区分、不返回空正文、答复无状态码与错误原文；ADR-R28-12 保留本地抓取，故用 `SafeFetcher` + 假传输模拟 | 422 / 423 / 424 PASS（DEF-005 / DEF-006 FIXED / VERIFIED）；E2E 旅程 TC-E2E-R28-015 复验 |
-| AC-016-09 | TC-UNIT-R28-214 / 222 (U)、TC-INT-R28-408 (I) | DU、DI | 一轮 8 次、上限 5 ⇒ 请求 ≤5；429 也计入；不重试 | PASS |
-| AC-017-06 | TC-INT-R28-421 (I) | DI | Builder 摘要与基线黄金逐字比对：差异仅两个联网工具条目 | PASS（DEF-004 FIXED / VERIFIED；同源 TC-INT-R28-344 改 `.get`，CR-022） |
-| AC-018-03（改写） | TC-UNIT-R28-217 (U)、TC-INT-R28-409 / 410 (I) | DU、DI | 外发声明含 api.deepseek.com（独立条目，类别 web_search_query）；凭据 0 次 | PASS |
-| AC-018-05 | TC-UNIT-R28-216 / 228 / 230 / 231 / 232 (U)、TC-INT-R28-410 / 411 / 412 / 414 (I) | DU、DI | Key 与 LLM 同源（存储优先、环境回退）；新增凭据配置项 0；Key 只在请求头；删除 Key ⇒ 明确降级；LLM 主机非 DeepSeek ⇒ 启动失败只报键名 | PASS |
-| AC-018-06 | TC-UNIT-R28-200 / 201 / 233 (U)、TC-INT-R28-407 / 409 (I) | DU、DI | 请求体键集恰三键；canary ×30 命中 0；目的地仅 DeepSeek 端点；region 被忽略（AQ6） | PASS |
-| AC-020-01 | TC-UNIT-R28-227 / 229 (U)、TC-INT-R28-413 (I) | DU、DI | 非离线 + fake ⇒ 启动失败，错误含键名、不含值；Fake 构造 / 调用 0；不静默回退 | PASS |
-| AC-020-02 | **N/A（NOT_TESTABLE：设计未选该形态）** | — | 架构 ADR-R28-13 选择“启动失败”形态，不存在“提供方不可用”的运行形态；其用户可见语义（联网按未配置降级、非 5xx、其余能力正常）由 AC-014-04（TC-UNIT-R28-071、TC-INT-R28-204）与 AC-018-05 删除 Key 用例（TC-INT-R28-412）等价覆盖 | 不计入分母 |
-| AC-020-03 | TC-UNIT-R28-227 / 228 / 229 (U)、TC-INT-R28-415 (I) | DU、DI | 离线 + 替身可用（AC-014-05~10 用例即在此下执行）；非离线替身被调用 0 次 | PASS |
-| **1.2.0 补充（E2E 级）** AC-014-07~10、016-09、018-05 / 06 | TC-E2E-R28-013 (E) | EN | 编辑者发布授权 ⇒ SSE 提问：成功有来源 → 401/402/429/500/504 依次降级（kb 不受影响）→ 空结果 → 一轮 5 次检索上限 3 → canary 检索词被拒 → 审计无查询原文 → 恢复成功 | PASS |
-| **1.2.0 补充（E2E 级）** AC-020-01 / 020-03、AC-018-05 | TC-E2E-R28-014 (E) | EN | 离线 + 替身提供方 SSE 联网可用；非离线 + fake ⇒ StartupError（含键名不含值，Fake 构造 0）；非离线 deepseek：环境 Key → 存储优先 → 删除 ⇒ 降级，kb 正常 | PASS |
-| **1.2.0 补充（E2E 级）** AC-015-07 | TC-E2E-R28-015 (E) | EN | 经 SSE：403 ⇒ “目标网站拒绝了访问”、404 / 不支持类型 ⇒ “该网页无可用内容”、200 空白页 ⇒ 失败短语（非空正文围栏）；三者可区分、不含状态码 / 错误原文；正常页返回正文 | PASS |
-| AC-006-06（措辞）/ AC-014-04 / AC-017-01（provider=none 缺省行为不变） | 沿用 1.0.0 回归集 TC-INT-R28-100~107、204、311、323；本轮 TC-UNIT-R28-228（none ⇒ Null）、TC-INT-R28-413（none 可启动且为 Null） | RG、WB、DU、DI | 缺省行为与上一轮一致；未启用顾问项目回归黄金集逐字一致 | PASS |
-
-**非功能落点（1.1.0）**：REQ-NFUNC-005 → TC-UNIT-R28-200 / 201 / 233、TC-INT-R28-407 / 409；006 → TC-UNIT-R28-216 / 231 / 232、TC-INT-R28-410 / 411；011 → TC-UNIT-R28-208~213 / 221、TC-INT-R28-401 / 402。
-
-### 1.1.0 测试数据需求
-
-- 全部脚本内合成；哨兵 Key 为占位串；AC-017-06 黄金文件为唯一新增持久夹具（来源：基线 src 树探针，生成命令见 `integration_test_report.md`）。
-- `[DATA_REQUIRED]`：无新增（真实 DeepSeek 响应样本需目标机人工验证，见 MV-05 / MV-14 / MV-15 / MV-16）。
-
-## 1.2.0 增量（GROUP_D-004，缺陷回流 2/2 复测）
-
-- **范围**：复测 DEF-002/004/005/006（已修）；冻结 DEF-003（待用户裁决）；修 CR-022（测试 344）；补 E2E 层 TC-E2E-R28-013~015，使 Must Have 故事 19/19 有 E2E 级用例。**不改产品代码**。
-- **E2E 旅程编号调整**：1.1.0 计划的 TC-E2E-R28-015（致歉三环节）改由集成层 TC-INT-R28-417 / 418 / 419 / 420 覆盖（含 HTTP SSE，且 418[intent] 待 DEF-003 裁决），E2E 层 015 改为 US-015 抓取三种失败短语（invocation 指定）；TC-E2E-R28-008 仍覆盖致歉旅程。
-- **新文件**：`tests/e2e/test_advisor_deepseek_journeys_r28.py`（3 项；基名全局唯一，带 `r28`；未新增 `conftest.py` / `__init__.py`）；autouse 零真实网络夹具（`socket.connect` / `create_connection` / `getaddrinfo` 调用即失败，teardown 断言尝试数 = 0）。
-- **缺陷冻结用例**：TC-INT-R28-418[intent]，守卫串 `DEF-003-GUARD`；原期望（致歉）保留在用例注释与集成报告，裁决后翻转。
-- **基线（PM 复跑，C-004 后）**：pytest 2 failed / 1350 passed（418[intent]、344）；selfcheck 68/69；前端 160/160。本人最后一次全量：1355 passed（805 unit + 469 integration + 66 e2e + 15 agents）。
-- **不可测项（1.2.0）**：沿用 1.1.0；MV 清单仍 16 项（US-020 的真实装配 / 目标机 Key 来源验证已含于 MV-16；真实 TLS 等含于 MV-14）。
-
-## 2.1.0 增量（GROUP_D-005，DEF-003 裁决）
-
-- **依据**：用户裁决 CL-006 Q1=A（经主会话转述）：DEF-003 不是缺陷，理解步骤（意图识别、问题消解）未预期异常 fail-open 照常作答；user_stories 5.0.0 修订 AC-010-08（只覆盖委托编排与回合准备）并新增 AC-010-10。
-- **范围**：仅改测试与测试文档，**未改产品代码**，不联网。418[intent] 的缺陷冻结（守卫串 `DEF-003-GUARD`）移除；新增 TC-INT-R28-425 / 426（各 `intent|resolve` 两项，共 4 项）；AC 映射表已把 AC-010-08 与 AC-010-10 分行。其余 1.2.0 增量节中关于 DEF-003 “冻结 / 待裁决”的描述为历史记录。
-- **注入点**：intent = 替换 `TurnUnderstander.understand` 抛错；resolve = 替换 `ib.advisor.understand._parse` 抛错（消解结果解析 / 校验环节）；prepare = `build_history_digest`；orchestrate = `run_dag`。
-- **门控结论（2.1.0）**：unit PASSED（805/805）→ integration PASSED（472 passed；新写 4/4）→ e2e PASSED（66 passed；critical path 15/15，覆盖 19/19）；全量 1358 passed（805 + 472 + 66 + 15）；selfcheck 68/69（既有 `core_framework_free`）；前端 160/160。DEF-003 CLOSED（设计行为）；无 OPEN 缺陷。
-- **不可测项 / 测试数据**：无变化。
+**A12（GR-C-004 条件）真实 socket 阻塞 SSE 流**：可行，已落实为 `tests/integration/test_mcp_listen_realsocket_r29.py`（TC-INT-R29-720 / 721，close-delimited 与 chunked 两种形态参数化，仅 127.0.0.1）。第 1 轮结论：A12 假设被证伪，登记 DEF-R29-006 / 007。第 2 轮：GROUP_C 修复（`read1` + 关闭前 `shutdown(SHUT_RDWR)`），720 / 721 翻转后 4 实例全部 PASS（连跑 3 次稳定）。仍未覆盖：A13 的 HTTPS 路径（`SSLSocket` 上的 `read1` / `shutdown`；离线、仅回环明文）——GR-C-005 条件，列入 e2e 报告人工验证清单 MV-09；目标机真实长连接复验见 MV-08。
 
 ## 测试数据需求
 
-- 全部为脚本内合成数据，无外部数据文件依赖；唯一持久化夹具为基线黄金 `tests/integration/advisor_r28_baseline_golden.json`（来源：基线 src 树运行探针，见上）。
-- 会写入持久存储的数据：HTTP 旅程中创建的项目 / 用户均走每用例独立的内存装配（`build_deps(force=True)`）或 `tmp_path`；不写仓库目录；无需唯一化。
-- 凭据：无真实凭据；`TC-INT-R28-223` 用哨兵串（非真实密钥）验证“密钥 0 次出现”。
-- `[DATA_REQUIRED]`：真实评测集（意图 ≥150 条、上下文 ≥40 段）由用户提供，**标 `[DATA_REQUIRED: 用户提供的评测集，OQ-R28-12]`**，对应 AC-019-01 / 02 / 04（见不可测项）。
+| 数据 | 来源 | 说明 |
+|---|---|---|
+| 主密钥 `SECRET_KEY` | 测试内生成的 Fernet 形态常量（32 个 `k` 的 urlsafe-base64） | 非真实密钥；`mcp_r29_support.py` |
+| 凭证 canary `CANARY_TOKEN` 等 | 测试内常量 | 非真实凭证；用于“命中数 = 0”断言 |
+| 基线黄金 `integration/mcp_r29_baseline_golden.json` | 由基线 commit b4fa3a3 的 src 树（`git archive b4fa3a3 src`）运行 `tests/advisor_r28_probe_support.py` 生成（P-TE-011 手法） | 期望值不取自被测代码；24 669 字节 |
+| 注入集 23 条 / SSRF 目标 38 + 33 条 | 测试内常量 | 见 unit_test_report / e2e_test_report |
+| [DATA_REQUIRED] 真实 `cryptography` 环境 | 目标机 / CI | 真实 Fernet 契约（U-221~225）需 `cryptography>=42,<51`；本机无，见人工验证清单 |
 
 ## 不可测项
 
-| AC / 项 | 原因 | 去向 |
-|---|---|---|
-| AC-014-06（1.1.0 改写） | 自动化部分已测（只用离线替身，外网请求 0）；**真实 DeepSeek 端点效果 / 真实 TLS·超时·代理 / 真实计费不可离线验证**（画像 P11-3：无官方沙箱；禁止调用真实端点） | 人工验证 MV-05、MV-14、MV-15 |
-| AC-020-02 | N/A：设计选择“启动失败”形态，“提供方不可用”形态不存在；等价语义由 AC-014-04 / AC-018-05 用例覆盖 | 不计入分母；无人工项 |
-| AC-019-01 | 真实 LLM 的意图 top-1 ≥ 0.90 需目标机 + 用户评测集 `[DATA_REQUIRED]` | MV-06 |
-| AC-019-02 | 指代消解 ≥ 0.85、话题 F1 ≥ 0.85、误判 ≤ 0.02 需真实 LLM + 评测集 `[DATA_REQUIRED]` | MV-06 |
-| AC-019-04 | 评测集来源确认属流程项，非离线可执行 | MV-07 |
-| AC-005-03 的浏览器交互部分、AC-001-01 / 002-02 的“复选框默认不勾选的渲染” | 无组件挂载环境 / 无头浏览器（数据面与源码结构契约已测） | MV-01 ~ MV-04 |
-| 真实 LLM 对注入指令的顺从度（AC-018-01 的“角色与语气不变”真实表现）、真实 TLS 钉 IP 连接、真实外网 DNS、目标机时延 | 不得联网 / 真实 LLM；平台侧强制手段已测 | MV-08 ~ MV-11 |
-| 浏览器端到端旅程（US-006 全旅程）；联网事实不在保真守卫保护片段内（CR-007 / Q-2）的真实影响 | 无浏览器；需用户裁决 + 真实 LLM | MV-12、MV-13 |
+| AC / 项 | 原因 |
+|---|---|
+| AC-025-03 启动耗时增量 | `[NOT_TESTABLE: 需目标机实测校准]`——自动化只验证“不触网 + 有界 + 对话 100%”，耗时数字标“未验收” |
+| 真实 MCP Server 互通 / 真实 TLS CA 链 | `[NOT_TESTABLE: 无真实 Server，禁止出网]`——人工验证清单 |
+| 真实 Fernet 执行（本机） | 本机 SKIP（`cryptography` 未安装，且不得 pip install）；CI 以 `IB_REQUIRE_CRYPTO=1` 强制运行 |
+| DeepSeek 函数名字符集（A-R29-2） | `[NOT_TESTABLE: 禁止调用真实 DeepSeek]`——仅断言注册名匹配 `[A-Za-z0-9_-]{1,64}` 假设；目标机探针见人工验证清单 |
+| 浏览器内交互 | `[NOT_TESTABLE: 无浏览器 E2E 框架]`——人工验证清单 |
+| 真实模型抗注入能力 | `[NOT_TESTABLE: LLM 为脚本化替身]`——本轮验证管线隔离与围栏，不评估模型本身 |
+| ~~AC-003-03 / 011-03 / 026-03 的“终端提问用户”~~ | **已裁决，移出不可测项**（CP-002 Q3=A，user_stories 3.0.0）：AC 措辞已改为“匿名 401；view / edit 档越权 403”，计入通过率分母 |
 
-> 以上不可测项不计入通过率分母，在 `e2e_test_report.md` 中单独计数为“待人工验证”（1.1.0：MV-01~MV-16，共 16 项）。
+## 现有测试调整
+
+| 文件:行 | 原断言 → 调整 | 责任与结论 |
+|---|---|---|
+| `src/frontend/tests/advisor_r28.test.js:260-261`（TC-FE-R28-023） | `SYSTEM_ORDER = [... 'web-governance']`（四项）→ `/const SYSTEM_ORDER = \['accounts', 'projects', 'llm-key', 'web-governance', 'mcp'\];/`（五项整行精确匹配） | GR-C-001 授权的契约变更（MOD-R29-22 要求 `SYSTEM_ORDER` 末尾追加 `'mcp'`），**由 test-engineer 接管**。本次核对：无可选组、无宽松正则；其后 `order.slice(0,3)` 既有三项相对顺序断言原样未动；`ConsoleLayout.vue` 为五项字面；新增 TC-FE-R29-031 另行断言“严格五项且 mcp 在末尾”。未放宽 |
+| `tests/integration/test_mcp_http_transport_r29.py`（本轮新写文件内） | 回环服务增加 `handle_error` 静默 | 仅测试辅助，消除客户端提前断开（读取上限 / 超时用例）时 socketserver 线程向 stderr 打印的回溯；断言未改 |
+
+其余既有测试零改动。
+
+## 缺陷登记（产品缺陷，不改产品代码）
+
+| DEF | 级别 | 位置 | 状态 / 对应用例 |
+|---|---|---|---|
+| DEF-R29-001 | MINOR | `src/ib/mcp/schema_lite.py:253-262`、`src/ib/mcp/binding.py:53-54`（工具 / 参数描述仅净化 + 截断；原 AC-027-01 字面要求围栏形式） | **CLOSED（依据：需求修订，非代码修复）**——用户 CP-002 Q2=A，AC-027-01 已按 ADR-R29-11 修订（user_stories 3.0.0）；TC-UNIT-R29-042 及本轮 TC-UNIT-R29-700~706 与新 AC 措辞一致 |
+| DEF-R29-002 | MAJOR | `src/ib/mcp/result.py`、`src/ib/mcp/client.py` | **已修复已验证**：翻转用例 TC-UNIT-R29-324 / 325 |
+| DEF-R29-003 | MAJOR | `src/ib/mcp/client.py`、`src/ib/mcp/supervisor.py`、`catalog.py` | **已修复已验证**：翻转用例 TC-UNIT-R29-609 / 610（离线替身口径；真实 socket 残留见 DEF-R29-006） |
+| DEF-R29-004 | MAJOR | `src/ib/mcp/runtime.py` | **已修复已验证**：翻转用例 TC-UNIT-R29-370、TC-E2E-R29-008 |
+| DEF-R29-005 | MINOR | `src/ib/orchestration/dag.py` | **已修复已验证**：翻转用例 TC-INT-R29-1010 |
+| DEF-R29-006（新增） | MAJOR | `src/ib/mcp/transport.py:139`、`:121-135`；`src/ib/mcp/client.py:436-445`（真实 socket：`resp.close()` 不能唤醒阻塞读取，stop 后监听线程残留） | **已修复已验证**（回环明文，close-delimited 与 chunked）：翻转用例 TC-INT-R29-720；HTTPS 路径未验证，见 MV-09 |
+| DEF-R29-007（新增） | MAJOR | `src/ib/mcp/transport.py:129`（`resp.read(8192)` 阻塞到凑满块或连接关闭，list_changed 事件滞留） | **已修复已验证**（回环明文，close-delimited 与 chunked）：翻转用例 TC-INT-R29-721；HTTPS 路径未验证，见 MV-09 |
+
+| DEF-R29-008（回流第 3 轮） | MAJOR | `src/ibweb/composition.py` `_assemble`（ib-web 与 ib-worker 共用装配体）曾启动 MCP supervisor；ib-worker 进程出现 `ib-mcp-supervisor` 线程，违反 module_design.md:866 | **已修复已验证**（GROUP_C-006：启动点移到 `build_application`:893-895，新函数 `start_mcp_supervisor` :1640）；成对用例 TC-INT-R29-1100~1105（`tests/integration/test_mcp_supervisor_process_r29.py`） |
+
+## 回流第 3 轮（缺陷回流第 3 轮复测；用户经 CP-002 额外授权，原话“全部按推荐”，经主会话转述）
+
+1. **DEF-R29-008 成对用例**（M-PM-001 / M-PM-002）：新文件 `tests/integration/test_mcp_supervisor_process_r29.py`（基名全局唯一），夹具 = 非离线真实装配（持久化 SQLite 台账 + 真实 `HttpMcpTransport` + 真实 supervisor，台账内预置一个不可达已启用 Server 使 supervisor “有活可干”），套接字 connect / getaddrinfo / create_connection 打桩（尝试数 0），不 monkeypatch 被测函数。负例强度 ≥ 缺陷原描述：断言整个进程内新增 `ib-mcp*` 线程数 = 0（不仅是名为 `ib-mcp-supervisor` 的线程），且 `supervisor._thread is None`；worker 路径 = `build_deps` + `ibweb.worker._setup_django()` + `IbWebConfig.ready()`。正例 = `build_application` 恰好 1 个存活 daemon 线程，二次调用仍 1，`close()` 后无残留。边界 = 离线、`mcp_enabled=False`（dict 配置源下的 IB_MCP_ENABLED=0）返回 False 且无线程；`mcp_enabled` 打开的同夹具才有线程（防假通过）。限制：未起真实 ib-worker 子进程；`apps.ready()` 在“未装配”分支（自行 `build_deps()`）依赖外部配置源，离线测试环境无法覆盖非离线配置，故以“已装配后调用 ready / _setup_django”等价路径代替（目标机验证见 e2e 报告 MV-10）。
+2. **DEF-R29-001 关闭**（需求修订）：见缺陷表。TC-UNIT-R29-042 原断言（参数描述 ≤ 300、无控制 / 零宽字符）与新 AC 措辞一致，无需改；原 AC 未覆盖的可测项由 `tests/unit/test_mcp_desc_channels_r29c.py`（U-700~706，35 个收集项）补齐：工具描述 ≤ 1000（含边界对）、参数描述 ≤ 300（含嵌套）、注入集 N=23 描述净化与“不加围栏”、返回围栏不可被零宽 / 方向字符拆分的标记提前闭合。期望值来自 ADR-R29-11 常量与围栏常量，不取自被测输出。说明：描述通道不要求置换描述里的围栏标记（AC 未要求；该通道不是围栏内容），本轮测试据此不作该断言（首跑曾多断言，属测试写错，已按 AC 文本修正）。
+3. **AC 口径同步**（CP-002 Q3=A）：AC-001-03 / 003-03 / 011-03 / 016-05 / 025-04 / 026-03 映射已更新（见上表）；原 OBS-03 待裁决说明改为已裁决。新增 `tests/integration/test_mcp_access_levels_r29c.py`：I-1110（AC-016-05 匿名保存授权 401 / view 403 / edit 200，零变化）、I-1111（AC-026-03 manage 档 200 只见本项目、edit / view 档 403、匿名 401）。AC-026-03 的 edit 档 403 另有既有 I-802。
+4. 新写用例：单元 +35（U-700~706，含参数化实例）、集成 +8（I-1100~1105 其中 1105 为单实例，共 6 + I-1110~1111 共 2）、E2E +0。
+
+## 回归（既有用例，单列）
+
+全量 `pytest tests` 中 1358 条既有用例作为回归，见 e2e_test_report“全量回归”（回流第 3 轮：1761 passed, 6 skipped，收集 1767，相对基线（1718 passed / 6 skipped / 收集 1724）新增失败 0；新增 43 例全部 PASS）；selfcheck 76/77（既有 FAIL `core_framework_free`）与前端 180/180。

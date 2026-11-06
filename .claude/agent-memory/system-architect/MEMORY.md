@@ -19,6 +19,12 @@
 - [M-SA-015] 已批准需求的前置条件尚未落地时，默认判"可登记前置条件，本轮继续"：写进架构假设表 + 开放问题 + "施工前置条件 ≠ 覆盖缺口"声明；只有需求明写阻塞才 BLOCKED — conf 0.6 · 证据 ARCH-ASSUMPTION-A7 · 首见 2026-09-27 · 命中 1
 - [M-SA-017] 裁决让既有事实陈述变假时，即使无新依赖也做最小订正（只改那一句及直接衍生句），tech_stack 取补丁位（如 1.4.0→1.4.1） — conf 0.6 · 证据 R18 tech_stack 1.4.1 · 首见 2026-10-07 · 命中 1
 - [M-SA-018] 运行期新建项目不在 cfg.projects（ADR-37 之后项目取自注册表）：涉及项目维度的设计要以台账/注册表为准、config 仅回退，并保证"创建即可用"（ADR-45） — conf 0.8 · 证据 commit 8b5755f / 23a7470 · 首见 2026-10-17 · 命中 2
+- [M-SA-019] 外部工具与热生效编译快照的衔接：快照只决定"LLM 看得到什么"，"能不能调"每次调用读台账准入（无缓存）；复审通过后 `runtime_cache.refresh_async` 刷新可见内容；悬空授权在 compile 前剔除，避免失效授权使发布失败 — conf 0.8 · 证据 ADR-R29-09 / GR-B-001 / composition.py:691 · 首见 2026-11-05 · 命中 2
+- [M-SA-020] 新增工具命名先查"首个点切分"类解析点（`_owner_tool`、selfcheck `split(".")[0]`）：外部工具用无点保留前缀名（`mcp__x__y`）作注册名、点号仅作展示别名，外部规格排除在全局 `known_tool_param_specs()` 之外，既有断言不改 — conf 0.8 · 证据 ADR-R29-02 / GR-B-001 / mcp/rules.py:55 · 首见 2026-11-05 · 命中 2
+- [M-SA-021] 评估"引入第三方协议 SDK"先看三点：同步/异步模型、HTTP 层能否注入钉 IP 连接（SSRF）、传递依赖体量；MCP 官方 `mcp` 2.x 以 asyncio 为主且依赖面大，故选自写最小同步客户端 + 端口隔离 — conf 0.6 · 证据 ADR-R29-03/06、GR-B-001/002 · 首见 2026-11-05 · 命中 2
+- [M-SA-022] "已是传递依赖"只对声明它的环境成立：用 `pypi.org/pypi/<包>/<版本>/json` 取固定区间两端核依赖链，并注明开发 venv / requirements-offline.txt 可能没有（cryptography 经 pdfminer.six 只在生产 venv 是传递依赖，对其余环境是新增） — conf 0.8 · 证据 GR-B-001-F02→GR-B-002 SATISFIED / A-R29-3 · 首见 2026-11-05 · 命中 2
+- [M-SA-023] 生产有、开发机缺的可选依赖：库内延迟导入 + 仅离线可构造的端口替身（工厂放组合根以免成环）+ 真实实现契约测试用 importorskip + CI 作业级 `IB_REQUIRE_CRYPTO=1` 使缺包即失败而非 skip — conf 0.8 · 证据 ADR-R29-17 / ci.yml:54 / GR-C-003 条件(1) / GR-D-003-F03（本机 6 SKIP） · 首见 2026-11-05 · 命中 2
+- [M-SA-024] 官方规范 schema 页超过 WebFetch 单次窗口，字段定义常在后半段，需 offset 续取并逐字引用；MCP ToolAnnotations 缺省 destructiveHint=true、readOnlyHint=false，故仅显式 destructiveHint=true 推定 side_effect、永不推定 read_only（mcp/rules.py:178） — conf 0.6 · 证据 GR-B-002 / IFC-R29-013 · 首见 2026-11-05 · 命中 1
 
 ## 用户偏好与禁止项
 

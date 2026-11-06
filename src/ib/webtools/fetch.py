@@ -144,6 +144,11 @@ class _PinnedHTTPS(http.client.HTTPSConnection):
             raise
 
 
+# IFC-R29-031：公开别名（供 ib.mcp.transport 复用钉 IP 连接；不改行为）
+PinnedHTTPConnection = _PinnedHTTP
+PinnedHTTPSConnection = _PinnedHTTPS
+
+
 class PinnedTransport:
     """仅 GET；固定头；不带 Cookie / Authorization / Referer；不读环境代理（直连钉定 IP）。"""
 

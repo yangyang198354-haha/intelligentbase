@@ -1189,3 +1189,155 @@ class WebGovernanceStore(Protocol):
     def set(self, caps: WebGovernance, *, actor: str) -> WebGovernance:
         """越界 ⇒ ValueError；成功返回含 updated_at/by。"""
         ...
+
+
+# =========================================================================== #
+# MOD-R29-01 REV-29 增量端口（IFC-R29-002）：MCP 外部工具
+# 每个端口一个 Memory 替身 + 一个 Sqlite 实现（ib.ledger.mcp_store），过同一套端口一致性测试。
+# =========================================================================== #
+
+from dataclasses import dataclass as _dataclass  # noqa: E402
+from typing import Any as _Any, Mapping as _Mapping  # noqa: E402
+
+from .types import (  # noqa: E402
+    McpAdmission,
+    McpAdminState,
+    McpAuditRecord,
+    McpCredentialStatus,
+    McpDiscovery,
+    McpDiscoveryDiff,
+    McpGovernance,
+    McpHealth,
+    McpInternalAllow,
+    McpNegotiated,
+    McpRisk,
+    McpServer,
+    McpToolRecord,
+    McpToolState,
+)
+
+
+class McpServerStore(Protocol):
+    def create(self, s: McpServer) -> McpServer: ...  # 重名 → ConflictError
+    def get(self, server_id: str) -> McpServer | None: ...
+    def list_all(self) -> tuple[McpServer, ...]: ...  # 稳定升序
+    def update(self, s: McpServer, *, expected_updated_at: str) -> McpServer: ...  # 乐观并发 → ConflictError
+    def set_admin_state(self, server_id: str, state: McpAdminState, *, actor: str, now: str) -> McpServer: ...
+    def record_probe(
+        self,
+        server_id: str,
+        *,
+        health: McpHealth,
+        checked_at: str,
+        verify_result: str | None = None,
+        negotiated: McpNegotiated | None = None,
+    ) -> None: ...
+    def set_open(self, server_id: str, *, open_all: bool, project_ids: tuple[str, ...], actor: str, now: str) -> None: ...
+    def open_projects(self, server_id: str) -> tuple[str, ...]: ...
+    def delete_cascade(self, server_id: str) -> None: ...  # 同事务删 tools/bindings/waivers/open/credentials
+    def list_internal_allow(self) -> tuple[McpInternalAllow, ...]: ...
+    def add_internal_allow(self, host: str, port: int, *, actor: str, now: str) -> None: ...
+    def remove_internal_allow(self, host: str, port: int) -> bool: ...
+
+
+class McpToolStore(Protocol):
+    def apply_discovery(self, server_id: str, d: McpDiscovery, *, now: str) -> McpDiscoveryDiff: ...  # 单事务 + CAS，幂等
+    def get(self, tool_id: int) -> McpToolRecord | None: ...
+    def get_by_local_name(self, local_name: str) -> McpToolRecord | None: ...
+    def list(
+        self, *, server_id: str | None = None, state: McpToolState | None = None, risk: McpRisk | None = None
+    ) -> tuple[McpToolRecord, ...]: ...
+    def approve(
+        self,
+        tool_id: int,
+        *,
+        expected_fingerprint: str,
+        risk: McpRisk,
+        hidden_params: tuple[str, ...],
+        llm_description: str | None,
+        actor: str,
+        now: str,
+    ) -> McpToolRecord: ...  # 指纹不符 → ConflictError
+    def reject(self, tool_id: int, *, actor: str, now: str) -> McpToolRecord: ...
+    def set_enabled(self, tool_id: int, enabled: bool, *, actor: str, now: str) -> McpToolRecord: ...
+    def mark_identity_changed(self, server_id: str, *, now: str) -> int: ...
+    def put_binding(self, tool_id: int, project_id: str, fixed_args: _Mapping[str, _Any], *, actor: str, now: str) -> None: ...
+    def get_binding(self, tool_id: int, project_id: str) -> _Mapping[str, _Any]: ...
+    def grant_waiver(self, tool_id: int, project_id: str, *, reason: str, actor: str, now: str) -> None: ...
+    def revoke_waiver(self, tool_id: int, project_id: str, *, actor: str, now: str) -> bool: ...
+    def read_admission(self, project_id: str, local_name: str) -> McpAdmission | None: ...  # 热路径：一次读取，无缓存
+
+
+class McpCredentialStore(Protocol):
+    """只存密文。"""
+
+    def put(self, server_id: str, scope_key: str, ciphertext: bytes, key_id: str, *, actor: str, now: str) -> None: ...
+    def get_ciphertext(self, server_id: str, scope_key: str) -> tuple[bytes, str] | None: ...
+    def status(self, server_id: str) -> tuple[McpCredentialStatus, ...]: ...
+    def delete(self, server_id: str, scope_key: str) -> bool: ...
+
+
+class McpGovernanceStore(Protocol):
+    def get(self) -> McpGovernance: ...  # 行缺失 → MCP_DEFAULTS
+    def set(self, g: McpGovernance, *, actor: str) -> McpGovernance: ...  # 越界 → ValueError
+
+
+class McpAuditStore(Protocol):
+    """追加型：begin_call 写入、finish_call 回填一次。"""
+
+    def begin_call(self, r: McpAuditRecord) -> None: ...  # 失败 → 抛异常（调用方据此不发送）
+    def finish_call(self, call_id: str, *, outcome: str, reason: str, duration_ms: int) -> None: ...
+    def record(self, r: McpAuditRecord) -> None: ...
+    def query(
+        self,
+        *,
+        server_id: str | None = None,
+        tool_name: str | None = None,
+        project_id: str | None = None,
+        kind: str | None = None,
+        ts_from: str | None = None,
+        ts_to: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[McpAuditRecord, ...]: ...
+    def count(
+        self,
+        *,
+        server_id: str | None = None,
+        tool_name: str | None = None,
+        project_id: str | None = None,
+        kind: str | None = None,
+        ts_from: str | None = None,
+        ts_to: str | None = None,
+    ) -> int: ...
+
+
+class SecretCipher(Protocol):
+    def encrypt(self, plain: "Secret") -> tuple[bytes, str]: ...  # (密文, key_id)
+    def decrypt(self, token: bytes) -> "Secret": ...  # 失败 → SecretKeyError（不含值）
+
+    @property
+    def configured(self) -> bool: ...
+
+
+class McpTransport(Protocol):
+    """单次 HTTP POST；实现：HttpMcpTransport / FakeMcpTransport。"""
+
+    def post(self, req: "McpHttpRequest", *, deadline: float) -> "McpHttpResponse": ...
+
+
+@_dataclass(frozen=True, slots=True)
+class McpStores:
+    """IFC-R29-220：五个存储端口的聚合（组合根装配）。"""
+
+    servers: McpServerStore
+    tools: McpToolStore
+    credentials: McpCredentialStore
+    governance: McpGovernanceStore
+    audit: McpAuditStore
+
+
+__all__ += [
+    "McpServerStore", "McpToolStore", "McpCredentialStore", "McpGovernanceStore", "McpAuditStore",
+    "SecretCipher", "McpTransport", "McpStores",
+]

@@ -10,6 +10,12 @@
 - [M-TE-006] DDL 按业务域分常量：users/accounts 在 `ACCOUNT_DDL_STATEMENTS`（`DDL_STATEMENTS` 不含 users，`next(...)` 会 StopIteration）；项目表用 `project_registry_ddl_script()`，LLM Key 用 `llm_key_ddl_script()`；迁移幂等验证 = 对 schema 连续 executescript 两次、快照一致 — conf 0.8 · 证据 TC-UNIT-R18-008 · 首见 2026-10-07 · 命中 2
 - [M-TE-007] 已知但本轮不修的缺陷用"缺陷冻结"：断言当前坏行为 + 守卫串（修复后会响亮失败），同时登记缺陷；不要 skip、不要放宽断言 — conf 0.6 · 证据 FND-GROUP-D-01（TC-INT-009/041/061） · 首见 2026-09-26 · 命中 1
 - [M-TE-009] 运行期新建项目（POST /api/projects）现在应"创建即可用"（ADR-45）：上传与检索都必须成功；旧口径"新建项目上传 403 属交付边界"已被 23a7470 推翻，TC-INT-161 已改 — conf 0.6 · 证据 commit 23a7470 / TC-INT-R19-012 · 首见 2026-10-17 · 命中 1
+- [M-TE-010] 断点恢复接手遗留测试：先逐文件审计（语法/TODO/空用例/对被测模块自身 monkeypatch），再独立重生成黄金（`git archive <基线> src` 到 scratchpad、`IB_SRC` 指向，与入库 JSON 比 `==`），报告数字只取本次实跑 — conf 0.6 · 证据 GR-D-001 criterion（基线 b4fa3a3 重生成一致） · 首见 2026-11-05 · 命中 1
+- [M-TE-011] 回环 `ThreadingHTTPServer` 测试服务在客户端提前断开时会向 stderr 打线程回溯（pytest 仍绿）；子类覆盖 `handle_error` 静默，勿改断言 — conf 0.6 · 证据 test_mcp_http_transport_r29.py `_QuietServer` · 首见 2026-11-05 · 命中 1
+- [M-TE-012] 流式传输必须真实 socket 验证：内存替身整块投递会掩盖 `read(N)` 阻塞凑满 N 与跨线程 `close()` 不唤醒阻塞读；回环服务器参数化 close-delimited 与 chunked（须发终止块 `0\r\n\r\n`），结尾释放服务端。翻转此类缺陷冻结用例时，把"修复前阻塞"守卫换成带超时的轮询正向断言（2 s 内轮询、join 后断言 is_alive），并保留 stop 之前的"仍阻塞"正例 — conf 0.8 · 证据 DEF-R29-006/007 / GR-D-002 / GR-D-003 / test_mcp_listen_realsocket_r29.py · 首见 2026-11-05 · 命中 2
+- [M-TE-013] 翻转缺陷冻结用例后，把"恰好等于上限不截断 / 上限+1 截断"的边界对与"授权 / 未授权"对写进同一用例，防止修复被过度放宽 — conf 0.6 · 证据 test_mcp_runtime_r29.py(TC-UNIT-R29-324) / test_mcp_compile_hotpath_r29.py(TC-INT-R29-1010) / GR-D-003 · 首见 2026-11-05 · 命中 1
+- [M-TE-014] 测"进程入口是否启动后台线程"：用线程标识差集（非名称计数）、非离线真实装配 + 预置不可达 Server 让线程有活可干；负例断言整个进程新增目标线程为 0，并与同夹具正例（恰好 1 个、幂等、close 后无残留）成对；dict 配置源下总开关用 raw 键 — conf 0.8 · 证据 test_mcp_supervisor_process_r29.py / GR-D-004 / DEF-R29-008 · 首见 2026-11-06 · 命中 2
+- [M-TE-015] 需求修订后复写断言以新 AC 文本为界：描述通道（函数 schema）只要求"净化 + 长度上限 + 不加围栏"，别多断言"围栏标记被置换"；比较"是否追加围栏"用"输出标记数 ≤ 输入标记数" — conf 0.8 · 证据 test_mcp_desc_channels_r29c.py(TC-UNIT-R29-703) / GR-D-004 / GR-A-003 · 首见 2026-11-06 · 命中 2
 
 ## 用户偏好与禁止项
 

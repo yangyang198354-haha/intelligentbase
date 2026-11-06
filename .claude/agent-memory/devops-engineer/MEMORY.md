@@ -10,6 +10,9 @@
 - [M-DE-006] AVX2 / SIGILL 风险按有序决策树处理，目标机最小探针优先（独立进程里 import + 一次真实推理）；逐链路写挂掉时的症状（embedding 挂 → healthz 仍 200 但 model_loaded=false → 检索静默降级） — conf 0.6 · 证据 TBD-T18 · 首见 2026-09 · 命中 1
 - [M-DE-007] 文书订正一律追加式：原命令逐字保留并加"【订正前 · 不可运行】"前缀；写"等价"必须实测逐项比对（曾因缺 `backup=False` 多产出 root 属主 .bak）；只存在于 EnvironmentFile 的键（IB_LEDGER_PATH、IB_DEFINITION_DOC_PATH）在交互 shell 中为空，备份命令写字面路径 — conf 0.6 · 证据 GR-E-007 · 首见 2026-10 · 命中 1
 - [M-DE-008] checklists 新增 `[Bn]` 项时同步 selfcheck 签署行断言（B1–Bn），否则 selfcheck 少一项（REV-21 引入 B27 后 51/52） — conf 0.6 · 证据 commit 4f4ad5e · 首见 2026-10-17 · 命中 1
+- [M-DE-009] 判断"某服务是否需重启"不能只看 module_design：ib-worker 经 django.setup() → apps.py ready() → build_deps() 与 ib-web 共用组合根，组合根里的副作用（如 MCP supervisor.start()）在 worker 重启时同样触发；计划里把跨进程副作用列为开放问题 — conf 0.8 · 证据 GR-E1-001-F01 / DEF-R29-008 / apps.py:49 · 首见 2026-11-05 · 命中 3
+- [M-DE-010] 前端 lock 未变时部署只 `npm run build`，不照 checklists 的 `npm ci`（会删重建 node_modules，触碰画像 P7）；追加 env 密钥用 `printf '\nK=%s\n' "$V" | sudo tee -a file >/dev/null`，首个 `\n` 防文件末尾无换行造成拼接，核验只看行数/长度/键总数+1/stat — conf 0.6 · 证据 GR-E1-001-F02（checklists B30(3) 与 SKILL §5.2 冲突） · 首见 2026-11-05 · 命中 1
+- [M-DE-011] 目标机核对"某进程有无某命名 Python 线程"：CPython ≤3.13 的 `/proc/<pid>/task/*/comm` 不含 threading 线程名（且限 15 字节），改用线程数差分、Python ≥3.14 的 comm 或用户侧 py-spy；对未重启旧进程的核对是平凡成立，须如实标注 — conf 0.6 · 证据 GR-E1-002 / supervisor.py:78-88 / 本机实测 · 首见 2026-11-06 · 命中 1
 
 ## 用户偏好与禁止项
 

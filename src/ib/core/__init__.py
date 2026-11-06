@@ -464,3 +464,38 @@ __all__ += [
     "SearchProvider",
     "WebGovernanceStore",
 ]
+
+
+# REV-29 追加导出（IFC-R29-001/002）：MCP 外部工具
+from .ports import (  # noqa: E402
+    McpAuditStore,
+    McpCredentialStore,
+    McpGovernanceStore,
+    McpServerStore,
+    McpStores,
+    McpToolStore,
+    McpTransport,
+    SecretCipher,
+)
+from .types import (  # noqa: E402
+    EXTERNAL_TOOL_PREFIX,
+    MCP_DEFAULTS,
+    MCP_HARD_MAX,
+    McpAdmission,
+    McpAuditRecord,
+    McpCallRequest,
+    McpDiscovery,
+    McpGovernance,
+    McpRawCallResult,
+    McpServer,
+    McpToolRecord,
+    McpToolSnapshot,
+)
+
+__all__ += [
+    "EXTERNAL_TOOL_PREFIX", "MCP_DEFAULTS", "MCP_HARD_MAX",
+    "McpAdmission", "McpAuditRecord", "McpCallRequest", "McpDiscovery", "McpGovernance",
+    "McpRawCallResult", "McpServer", "McpToolRecord", "McpToolSnapshot",
+    "McpAuditStore", "McpCredentialStore", "McpGovernanceStore", "McpServerStore", "McpStores",
+    "McpToolStore", "McpTransport", "SecretCipher",
+]

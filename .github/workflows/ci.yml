@@ -50,6 +50,8 @@ jobs:
       IB_OFFLINE_TOKEN: ci-offline-token
       IB_LOG_LEVEL: ERROR
       DJANGO_SETTINGS_MODULE: ibweb.settings
+      # R29（ADR-R29-17）：CI 必装真实 cryptography 并必跑 Fernet 契约测试；缺包即失败而非 skip。
+      IB_REQUIRE_CRYPTO: "1"
 
     steps:
       # ---- 阶段 1：Source（git checkout / fetch）----
@@ -202,6 +204,37 @@ jobs:
           o9.executescript(sql9)
           assert S.missing_web_governance_columns(o9) == {}, S.missing_web_governance_columns(o9)
           print("PASS: 009_web_governance.sql syntax-ok / replay x2 idempotent / single-source / no executable DROP / old-db upgrade")
+
+          # R29（阶段2）：追加 010_mcp.sql —— 同 009 口径：单源（mcp_ddl_script()）/ 001~009 仍在 /
+          # 头注释含 MANUAL_ROLLBACK_REQUIRED 且无可执行 DROP / 新库重放两遍幂等 / 老库形态 ensure_schema 补齐 / 单行 CHECK 生效。
+          sql10 = pathlib.Path("src/deploy/migrations/010_mcp.sql").read_text(encoding="utf-8")
+          assert norm(S.mcp_ddl_script()) in norm(sql10), "010 snapshot != mcp_ddl_script()"
+          for old in ("001_ledger_init", "002_chunk_image", "003_accounts", "004_config_audit",
+                      "005_projects", "006_llm_key", "007_folder_tree", "008_config_versions", "009_web_governance"):
+              assert pathlib.Path(f"src/deploy/migrations/{old}.sql").is_file(), f"{old}.sql missing (001-009 must stay)"
+          assert "MANUAL_ROLLBACK_REQUIRED" in sql10.split("CREATE TABLE")[0], "010 header lacks rollback note"
+          for line in sql10.splitlines():
+              assert "DROP" not in line.split("--")[0].upper(), "010 contains an executable DROP"
+          f10 = sqlite3.connect(":memory:", isolation_level=None)
+          S.ensure_schema(f10)
+          f10.executescript(sql10)   # replay 1
+          f10.executescript(sql10)   # replay 2 (idempotent)
+          assert S.missing_mcp_tables(f10) == (), S.missing_mcp_tables(f10)
+          for bad in ("INSERT INTO mcp_governance VALUES (2,10,30,5,32768,5,60,2,3,200,4000,32768,10,8192,60,300,4,'t','u')",
+                      "INSERT INTO mcp_internal_allow VALUES ('h', 0, 't', 'u')"):
+              try:
+                  f10.execute(bad)
+              except sqlite3.IntegrityError:
+                  continue
+              raise AssertionError(f"010 CHECK constraint not enforced: {bad}")
+          o10 = sqlite3.connect(":memory:", isolation_level=None)
+          for st in S.DDL_STATEMENTS:
+              o10.execute(st)
+          S.ensure_schema(o10)
+          S.ensure_schema(o10)
+          o10.executescript(sql10)
+          assert S.missing_mcp_tables(o10) == (), S.missing_mcp_tables(o10)
+          print("PASS: 010_mcp.sql syntax-ok / replay x2 idempotent / single-source / no executable DROP / old-db upgrade")
           PY
 
       # ---- 阶段 3：Unit（基线 95/95，R13）----

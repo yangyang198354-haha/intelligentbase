@@ -16,6 +16,7 @@
 - [M-PM-012] "需求补充调研"类任务归 GROUP_A 增量：新建调研文档、不改 APPROVED 需求；对本项目只出"候选点"，用户裁决后再由 requirement-analyst 定向修订落为正式需求；"无对应 REQ"是需求级缺口，交用户裁决 — conf 0.6 · 证据 GR-A-002 · 首见 2026-09-27 · 命中 1
 - [M-PM-013] selfcheck 的 stderr 里出现 `code=internal_error` / `Service Unavailable` 不一定是失败（被测代码故意走坏路径的设计内日志）；`2>/dev/null` 复跑后 PASS 行与总计不变即非失败 — conf 0.6 · 证据 GR-C-002 · 首见 2026-09-26 · 命中 1
 - [M-PM-014] UI 可见改动部署后，以用户 UI 复核确认作为 E2 条件闭合依据（PASS_WITH_CONDITIONS → PASS） — conf 0.6 · 证据 GR-E-010 · 首见 2026-10-17 · 命中 1
+- [M-PM-015] 设计写"仅在 ib-web 进程内"的组件（supervisor/后台线程）时，B/C 门控要 grep 组合根 build_deps 的全部入口（ib-worker 经 django.setup→apps.ready 同样装配）；REV-29 该缺陷漏过 B/C/D 到 E1 才发现 — conf 0.8 · 证据 GR-E1-001-F01 / DEF-R29-008 / GR-C-006 · 首见 2026-11-05 · 命中 3
 
 ## 用户偏好与禁止项
 - [M-PM-101] 需求定稿 8 项决策（Qdrant、bge-m3、禁 Docker 全裸装、保留云端 DeepSeek、单实例多项目、支持索引重建、v1 含 OCR、PyMuPDF 不得以"内部使用"豁免）与 REV-06"UI 可视化配置纳入 v1"均已由用户拍板，不要重复询问；"禁 Docker"推翻了分析师的折中推荐 — 来源：用户裁决 2026-09-25 / 2026-09-27（docs/requirements_spec.md 决策记录）

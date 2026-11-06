@@ -653,6 +653,193 @@ export interface WebGovernanceDto {
   updated_at: string;
   updated_by: string;
 }
+// ---------------------------------------------------------------------------
+// REV-29（MOD-R29-21 / IFC-R29-200 ~ 219）：MCP 外部工具（管理端点族，仅 admin；配置页外部工具区）
+// ---------------------------------------------------------------------------
+export type McpAdminState = 'registered' | 'enabled' | 'disabled';
+export type McpToolState = 'pending_review' | 'enabled' | 'disabled' | 'needs_rereview' | 'offline' | 'excluded';
+export type McpRisk = 'read_only' | 'side_effect' | 'unknown';
+export type McpAuthKind = 'none' | 'bearer' | 'header';
+export type McpDataCategory = 'query_text' | 'structured_args' | 'business_ids' | 'other';
+export interface McpServerLimits {
+  call_timeout_s: number | null;
+  max_calls_per_turn: number | null;
+  max_result_bytes: number | null;
+  max_concurrency: number | null;
+  breaker_threshold: number | null;
+  breaker_cooldown_s: number | null;
+  discover_timeout_s: number | null;
+}
+export interface McpCredentialStatusDto {
+  shared: { configured: boolean; updated_at: string | null };
+  discovery: { configured: boolean; updated_at: string | null };
+  projects: { project_id: string; configured: boolean; updated_at: string }[];
+}
+/** 不含任何凭证值（类型层无该字段）。 */
+export interface McpServerDto {
+  server_id: string;
+  description: string;
+  transport: string;
+  endpoint_url: string;
+  auth_kind: McpAuthKind;
+  auth_header_name: string | null;
+  credential_scope: 'shared' | 'project';
+  scope_kind: 'platform' | 'project';
+  owner_project: string | null;
+  open_all: boolean;
+  data_categories: McpDataCategory[];
+  admin_state: McpAdminState;
+  health: 'unknown' | 'up' | 'down';
+  status_label: string;
+  protocol_era: 'modern' | 'legacy' | null;
+  protocol_version: string | null;
+  supports_list_changed: boolean;
+  last_verify_at: string | null;
+  last_verify_result: string | null;
+  tool_counts: Record<McpToolState, number>;
+  credential: McpCredentialStatusDto;
+  limits: McpServerLimits;
+  updated_at: string;
+  open_projects?: string[];
+  references_count?: { projects: number; agents: number } | null;
+  references?: Record<string, { project_id: string; expert_name: string }[]>;
+}
+export interface McpToolSnapshotDto {
+  title: string | null;
+  description: string;
+  input_schema: Record<string, unknown>;
+  output_schema: Record<string, unknown> | null;
+  annotations: Record<string, unknown>;
+  fingerprint: string;
+}
+export interface McpToolDto {
+  tool_id: number;
+  server_id: string;
+  remote_name: string;
+  local_name: string;
+  display_name: string;
+  state: McpToolState;
+  risk: McpRisk;
+  exclusion_reason: string | null;
+  description: string;
+  annotations: Record<string, unknown>;
+  annotations_note: string;
+  observed_fingerprint: string | null;
+  approved_fingerprint: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
+  hidden_params: string[];
+  llm_description: string | null;
+  offline_at: string | null;
+  offline_reason: string | null;
+  grants: { project_id: string; expert_name: string }[];
+  recent_calls: Record<string, number>;
+}
+export interface McpToolDetailDto extends McpToolDto {
+  observed: McpToolSnapshotDto | null;
+  approved: McpToolSnapshotDto | null;
+  diff: string[];
+  suspect_tenant_params: string[];
+  bindings?: Record<string, Record<string, unknown>>;
+  waivers?: string[];
+}
+export interface McpGovernanceDto {
+  discover_timeout_s: number;
+  call_timeout_s: number;
+  max_calls_per_turn: number;
+  max_result_bytes: number;
+  breaker_threshold: number;
+  breaker_cooldown_s: number;
+  max_concurrency_per_server: number;
+  max_inflight_global: number;
+  max_tools_per_server: number;
+  max_description_chars: number;
+  max_schema_bytes: number;
+  max_schema_depth: number;
+  max_arg_bytes: number;
+  health_interval_s: number;
+  revalidate_interval_s: number;
+  listener_max: number;
+  hard_max: Record<string, { min: number; max: number }>;
+  updated_at: string;
+  updated_by: string;
+}
+export interface McpInternalAllowDto {
+  host: string;
+  port: number;
+  effective: boolean;
+  created_at?: string;
+  created_by?: string;
+}
+export interface McpAuditDto {
+  call_id: string;
+  ts: string;
+  kind: 'admin' | 'call' | 'system';
+  action: string;
+  actor: string;
+  project_id: string;
+  server_id: string;
+  tool_name: string;
+  display_name: string;
+  outcome: string;
+  reason: string;
+  duration_ms: number | null;
+  args_digest: string;
+  args_summary: string;
+  fingerprint: string;
+  confirm: boolean;
+  trial: boolean;
+}
+export interface McpServerCreateBody {
+  server_id: string;
+  description: string;
+  transport: 'streamable_http';
+  endpoint_url: string;
+  auth_kind: McpAuthKind;
+  auth_header_name?: string | null;
+  credential_scope: 'shared' | 'project';
+  scope_kind: 'platform' | 'project';
+  owner_project?: string | null;
+  data_categories: McpDataCategory[];
+}
+export interface McpVerifyResult {
+  ok: boolean;
+  category: string;
+  protocol_version?: string;
+  era?: 'modern' | 'legacy';
+  supports_list_changed?: boolean;
+  tools_capability?: boolean;
+}
+export interface McpDiffDto {
+  added: string[];
+  changed: string[];
+  offline: string[];
+  reappeared: string[];
+  excluded: string[];
+  unchanged: number;
+}
+/** 配置页外部工具区（`GET /api/config/catalog` 追加键；无可见外部工具时缺省）。 */
+export interface ExternalToolDto {
+  local_name: string;
+  display_name: string;
+  server_id: string;
+  risk: McpRisk;
+  grantable: boolean;
+  invalid_reason: string | null;
+  description: string;
+  param_specs: ToolParamSpec[];
+}
+export interface McpGrantStatusDto {
+  local_name: string;
+  expert_name: string;
+  valid: boolean;
+  reason: string | null;
+}
+export interface McpCatalogDto {
+  caps: { max_calls_per_turn: number; call_timeout_s: number; max_result_bytes: number };
+  grant_status: McpGrantStatusDto[];
+}
+
 export interface ConfigCatalogDto {
   available_tools: string[];
   tool_param_specs: ToolParamSpec[];
@@ -669,6 +856,9 @@ export interface ConfigCatalogDto {
   /** REV-28：内置 agent 清单（顾问）；旧后端可能缺省。 */
   builtin_agents?: BuiltinAgentDto[];
   web?: WebCatalogDto;
+  /** REV-29：外部（MCP）工具；仅当本项目存在可见外部工具或已有外部授权时出现。 */
+  external_tools?: ExternalToolDto[];
+  mcp?: McpCatalogDto;
 }
 /** v2 文档（含 graph）的最小外形；专家条目另含 status / max_steps / knowledge_scope。 */
 export interface DefinitionDocumentV2 {
@@ -1497,6 +1687,152 @@ export class ApiClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+  }
+
+  // ------------------------------------------------------------------ //
+  // REV-29（IFC-R29-200 ~ 218）：MCP 外部工具管理（**仅 admin**；凭证只写不读，响应不含值）
+  // ------------------------------------------------------------------ //
+
+  mcpListServers(): Promise<{ items: McpServerDto[] }> {
+    return this.request('/api/mcp/servers');
+  }
+
+  mcpCreateServer(body: McpServerCreateBody): Promise<McpServerDto> {
+    return this.request('/api/mcp/servers', this.jsonInit('POST', body));
+  }
+
+  mcpGetServer(serverId: string): Promise<McpServerDto> {
+    return this.request(`/api/mcp/servers/${encodeURIComponent(serverId)}`);
+  }
+
+  mcpPatchServer(
+    serverId: string,
+    patch: Partial<Pick<McpServerCreateBody, 'description' | 'endpoint_url' | 'auth_kind' | 'auth_header_name' | 'data_categories' | 'credential_scope'>> & {
+      limits?: McpServerLimits;
+      expected_updated_at: string;
+    },
+  ): Promise<{ server: McpServerDto; identity_changed: boolean; tools_marked_rereview: number }> {
+    return this.request(`/api/mcp/servers/${encodeURIComponent(serverId)}`, this.jsonInit('PATCH', patch));
+  }
+
+  mcpVerify(serverId: string): Promise<McpVerifyResult> {
+    return this.request(`/api/mcp/servers/${encodeURIComponent(serverId)}/verify`, this.jsonInit('POST', {}));
+  }
+
+  mcpEnable(serverId: string): Promise<McpServerDto> {
+    return this.request(`/api/mcp/servers/${encodeURIComponent(serverId)}/enable`, this.jsonInit('POST', {}));
+  }
+
+  mcpDisable(serverId: string): Promise<McpServerDto> {
+    return this.request(`/api/mcp/servers/${encodeURIComponent(serverId)}/disable`, this.jsonInit('POST', {}));
+  }
+
+  mcpRefresh(serverId: string): Promise<{ diff: McpDiffDto }> {
+    return this.request(`/api/mcp/servers/${encodeURIComponent(serverId)}/refresh`, this.jsonInit('POST', {}));
+  }
+
+  /** 删除需二次确认：`confirm` 必须等于 serverId；`force=1` 才会清理项目授权后删除。 */
+  async mcpDeleteServer(serverId: string, opts: { confirm: string; force: boolean }): Promise<void> {
+    const q = new URLSearchParams({ confirm: opts.confirm, force: opts.force ? '1' : '0' });
+    await this.request<null>(`/api/mcp/servers/${encodeURIComponent(serverId)}?${q.toString()}`, { method: 'DELETE' });
+  }
+
+  /** 凭证只写不读：响应只有 configured / 时间 / 操作者，**永不含值**。 */
+  mcpSetCredential(
+    serverId: string,
+    body: { scope: 'shared' | 'discovery' | 'project'; project_id?: string; secret: string },
+  ): Promise<{ scope: string; project_id: string | null; configured: boolean; updated_at: string; updated_by: string }> {
+    return this.request(`/api/mcp/servers/${encodeURIComponent(serverId)}/credentials`, this.jsonInit('PUT', body));
+  }
+
+  async mcpClearCredential(serverId: string, scope: 'shared' | 'discovery' | 'project', projectId?: string): Promise<void> {
+    const q = new URLSearchParams({ scope });
+    if (projectId) q.set('project_id', projectId);
+    await this.request<null>(`/api/mcp/servers/${encodeURIComponent(serverId)}/credentials?${q.toString()}`, { method: 'DELETE' });
+  }
+
+  mcpSetOpen(serverId: string, body: { open_all: boolean; project_ids: string[] }): Promise<{ open_all: boolean; project_ids: string[] }> {
+    return this.request(`/api/mcp/servers/${encodeURIComponent(serverId)}/open`, this.jsonInit('PUT', body));
+  }
+
+  mcpListTools(filter: { server_id?: string; state?: McpToolState; risk?: McpRisk; granted?: boolean } = {}): Promise<{ items: McpToolDto[] }> {
+    const q = new URLSearchParams();
+    if (filter.server_id) q.set('server_id', filter.server_id);
+    if (filter.state) q.set('state', filter.state);
+    if (filter.risk) q.set('risk', filter.risk);
+    if (filter.granted !== undefined) q.set('granted', filter.granted ? '1' : '0');
+    const suffix = q.toString() ? `?${q.toString()}` : '';
+    return this.request(`/api/mcp/tools${suffix}`);
+  }
+
+  mcpGetTool(toolId: number): Promise<McpToolDetailDto> {
+    return this.request(`/api/mcp/tools/${toolId}`);
+  }
+
+  mcpReviewTool(
+    toolId: number,
+    body:
+      | { decision: 'reject' }
+      | {
+          decision: 'approve';
+          expected_fingerprint: string;
+          risk: McpRisk;
+          hidden_params: string[];
+          llm_description?: string;
+          ack_tenant_params: boolean;
+        },
+  ): Promise<McpToolDto> {
+    return this.request(`/api/mcp/tools/${toolId}/review`, this.jsonInit('POST', body));
+  }
+
+  mcpSetToolState(toolId: number, enabled: boolean): Promise<McpToolDto> {
+    return this.request(`/api/mcp/tools/${toolId}/state`, this.jsonInit('POST', { enabled }));
+  }
+
+  /** 响应只回显键名（固定值可能含租户标识，仅详情接口对 admin 可见）。 */
+  mcpPutBinding(toolId: number, projectId: string, fixedArgs: Record<string, unknown>): Promise<{ fixed_keys: string[] }> {
+    return this.request(
+      `/api/mcp/tools/${toolId}/bindings/${encodeURIComponent(projectId)}`,
+      this.jsonInit('PUT', { fixed_args: fixedArgs }),
+    );
+  }
+
+  mcpPutWaiver(toolId: number, projectId: string, reason: string): Promise<{ waived: boolean }> {
+    return this.request(`/api/mcp/tools/${toolId}/waivers/${encodeURIComponent(projectId)}`, this.jsonInit('PUT', { reason }));
+  }
+
+  async mcpDeleteWaiver(toolId: number, projectId: string): Promise<void> {
+    await this.request<null>(`/api/mcp/tools/${toolId}/waivers/${encodeURIComponent(projectId)}`, { method: 'DELETE' });
+  }
+
+  mcpGetGovernance(): Promise<McpGovernanceDto> {
+    return this.request('/api/mcp/governance');
+  }
+
+  mcpPutGovernance(body: Omit<McpGovernanceDto, 'hard_max' | 'updated_at' | 'updated_by'>): Promise<McpGovernanceDto> {
+    return this.request('/api/mcp/governance', this.jsonInit('PUT', body));
+  }
+
+  mcpListInternalAllow(): Promise<{ items: McpInternalAllowDto[] }> {
+    return this.request('/api/mcp/internal-allow');
+  }
+
+  mcpAddInternalAllow(host: string, port: number): Promise<McpInternalAllowDto> {
+    return this.request('/api/mcp/internal-allow', this.jsonInit('POST', { host, port }));
+  }
+
+  async mcpRemoveInternalAllow(host: string, port: number): Promise<void> {
+    const q = new URLSearchParams({ host, port: String(port) });
+    await this.request<null>(`/api/mcp/internal-allow?${q.toString()}`, { method: 'DELETE' });
+  }
+
+  mcpAudit(
+    filter: { server_id?: string; tool?: string; project_id?: string; kind?: string; from?: string; to?: string; limit?: number; offset?: number } = {},
+  ): Promise<{ items: McpAuditDto[]; total: number }> {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(filter)) if (v !== undefined && v !== '') q.set(k, String(v));
+    const suffix = q.toString() ? `?${q.toString()}` : '';
+    return this.request(`/api/mcp/audit${suffix}`);
   }
 
   // ------------------------------------------------------------------ //

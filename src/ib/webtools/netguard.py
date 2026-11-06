@@ -23,6 +23,7 @@ __all__ = [
     "Resolver",
     "UrlGuard",
     "DENIED_NETWORKS",
+    "NEVER_ALLOW_NETWORKS",
     "is_address_allowed",
     "URL_MAX_CHARS",
 ]
@@ -145,8 +146,29 @@ DENIED_NETWORKS = tuple(ipaddress.ip_network(c) for c in _DENIED_CIDRS)
 _MAPPED = ipaddress.ip_network("::ffff:0:0/96")
 
 
-def is_address_allowed(addr: str) -> bool:
-    """项目自有拒绝网段 与 `is_global` 取交：两个条件都满足才放行。"""
+# MOD-R29-04 / IFC-R29-030：内网允许名单"绝不放行集"（链路本地 / 元数据 / 保留段；映射内嵌同判）
+_NEVER_ALLOW_CIDRS = (
+    "169.254.0.0/16",
+    "fe80::/10",
+    "fd00:ec2::254/128",
+    "0.0.0.0/8",
+    "224.0.0.0/4",
+    "240.0.0.0/4",
+    "ff00::/8",
+)
+NEVER_ALLOW_NETWORKS = tuple(ipaddress.ip_network(c) for c in _NEVER_ALLOW_CIDRS)
+# 允许名单命中时可被放行的地址类：回环 / RFC1918 / CGNAT / ULA
+_INTERNAL_ALLOWABLE = tuple(
+    ipaddress.ip_network(c)
+    for c in ("127.0.0.0/8", "::1/128", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "fc00::/7")
+)
+
+
+def is_address_allowed(addr: str, *, internal_allowed: bool = False) -> bool:
+    """项目自有拒绝网段 与 `is_global` 取交：两个条件都满足才放行。
+
+    `internal_allowed=True`（仅 MCP 允许名单命中时）只跳过 私有/回环/CGNAT 判定，永不放行 NEVER_ALLOW_NETWORKS。
+    """
     if "%" in addr:  # IPv6 zone id
         return False
     try:
@@ -157,7 +179,14 @@ def is_address_allowed(addr: str) -> bool:
         embedded = ip.ipv4_mapped
         if embedded is None:
             return False
-        return is_address_allowed(str(embedded))
+        return is_address_allowed(str(embedded), internal_allowed=internal_allowed)
+    if internal_allowed:
+        for net in NEVER_ALLOW_NETWORKS:
+            if ip.version == net.version and ip in net:
+                return False
+        for net in _INTERNAL_ALLOWABLE:
+            if ip.version == net.version and ip in net:
+                return True
     for net in DENIED_NETWORKS:
         if ip.version == net.version and ip in net:
             return False
@@ -183,8 +212,18 @@ _ALLOWED_PORTS = (80, 443)
 
 
 class UrlGuard:
-    def __init__(self, rules: DomainRules, *, resolver: Resolver | None = None, dns_timeout_s: float = 3.0) -> None:
+    def __init__(
+        self,
+        rules: DomainRules,
+        *,
+        resolver: Resolver | None = None,
+        dns_timeout_s: float = 3.0,
+        allowed_ports: frozenset[int] | None = frozenset({80, 443}),
+        internal_allow: frozenset[tuple[str, int]] = frozenset(),
+    ) -> None:
         self._rules = rules
+        self._allowed_ports = allowed_ports  # None ⇒ 任意 1–65535（MCP）
+        self._internal_allow = frozenset((str(h).lower().rstrip("."), int(p)) for h, p in internal_allow)
         self._resolver: Resolver | None = resolver  # None ⇒ 惰性取 fetch.default_resolver（本文件不持有任何网络导入）
         self._dns_timeout_s = float(dns_timeout_s)
 
@@ -213,7 +252,10 @@ class UrlGuard:
         if not host_raw:
             raise WebBlocked("scheme_not_allowed")
         port = port_raw if port_raw is not None else (443 if scheme == "https" else 80)
-        if port not in _ALLOWED_PORTS:
+        if self._allowed_ports is None:
+            if not (1 <= port <= 65535):
+                raise WebBlocked("port_not_allowed")
+        elif port not in self._allowed_ports:
             raise WebBlocked("port_not_allowed")
         host = host_raw.lower().rstrip(".")
         try:
@@ -242,8 +284,9 @@ class UrlGuard:
             raise WebBlocked("resolve_failed") from None
         if not addrs:
             raise WebBlocked("resolve_failed")
+        internal_ok = (host_ascii, port) in self._internal_allow
         for a in addrs:
-            if not is_address_allowed(str(a)):
+            if not is_address_allowed(str(a), internal_allowed=internal_ok):
                 raise WebBlocked("private_address")
         path = parts.path or "/"
         path_query = path + ("?" + parts.query if parts.query else "")

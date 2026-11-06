@@ -53,3 +53,7 @@ jieba>=0.42,<1.0
 # 版本上限 `<5` 依 tech_stack §1「建议 >=4,<5」（[TBD-T22]：目标机 CPU-only 的单次哈希耗时待实测，
 # 实测后由 cost 旋钮（环境变量，非本 pin）调优，**不需要**改代码或改本条 pin）。
 bcrypt>=4,<5
+
+# MCP 凭证加解密（R29，ADR-R29-06 / 17）：只用 Fernet / MultiFernet；许可 Apache-2.0 OR BSD-3-Clause。
+# 生产 venv 已是 pdfminer.six 的传递依赖（>=36.0.0），此处显式声明并收紧区间；延迟导入（ib.mcp.crypto）。
+cryptography>=42,<51

@@ -819,6 +819,10 @@ def healthz_deps_endpoint(request: Any) -> Any:
     egress_web = tuple(getattr(deps, "egress_web", ()) or ())
     if egress_web:
         payload["egress_web"] = [EgressDescriptorSerializer(d).data for d in egress_web]
+    # REV-29（IFC-R29-222）：MCP 外发声明（已启用 Server；无已启用 Server ⇒ 不追加，响应与基线逐字节相同）
+    egress_mcp = composition.mcp_egress_descriptors(getattr(deps, "mcp", None))
+    if egress_mcp:
+        payload["egress_mcp"] = [EgressDescriptorSerializer(d).data for d in egress_mcp]
     return _json(payload, status.HTTP_200_OK)
 
 

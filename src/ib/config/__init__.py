@@ -209,6 +209,17 @@ IB_RUNTIME_ENV_KEYS: tuple[str, ...] = (
     "IB_WEB_SEARCH_PROVIDER",
     "IB_WEB_FETCH_ENABLED",
     "IB_WEB_GOVERNANCE_BACKEND",
+    # REV-29（IFC-R29-221 / MOD-R29-20）：MCP 外部工具（只登记键名）。
+    #   IB_MCP_ENABLED —— 总开关，缺省 1；0 ⇒ 调用 fail-closed、supervisor 不启动、写端点 503。
+    #   IB_MCP_TRANSPORT —— `http`（缺省）；`fake` 仅离线（非离线配置为 fake ⇒ 启动失败，错误不含所配值）。
+    #   IB_MCP_CA_BUNDLE —— 可选，内网私有 CA 的 PEM 路径。
+    #   IB_MCP_SECRET_KEY / IB_MCP_SECRET_KEY_PREVIOUS —— 凭证主密钥（Fernet）与旧钥（逗号分隔，可选）。
+    #     这两个**只登记键名**：值永远不映射进 `GlobalConfig`（可打印结构），仅由组合根 `build_mcp_runtime` 从环境读取。
+    "IB_MCP_ENABLED",
+    "IB_MCP_TRANSPORT",
+    "IB_MCP_CA_BUNDLE",
+    "IB_MCP_SECRET_KEY",
+    "IB_MCP_SECRET_KEY_PREVIOUS",
 )
 
 #: v1 支持的 4 种格式（**OQ-IB-02 默认值**：其余格式按扩展点预留，不实现）。
@@ -421,6 +432,10 @@ class GlobalConfig:
     web_search_provider: str = "none"  # IB_WEB_SEARCH_PROVIDER
     web_fetch_enabled: bool = False  # IB_WEB_FETCH_ENABLED
     web_governance_backend: str = "sqlite"  # IB_WEB_GOVERNANCE_BACKEND
+    #: REV-29（IFC-R29-221）：MCP 外部工具（不含任何密钥值）。
+    mcp_enabled: bool = True  # IB_MCP_ENABLED
+    mcp_transport: str = "http"  # IB_MCP_TRANSPORT
+    mcp_ca_bundle: str = ""  # IB_MCP_CA_BUNDLE
     max_upload_mb: int = 50  # IB_MAX_UPLOAD_MB
     #: 资料库目录与批量上传限额（MOD-009）。总大小默认值 1024MB 为 [ESTIMATE]（A-01，部署阶段再确认）。
     upload_batch_max_files: int = 1000  # IB_UPLOAD_BATCH_MAX_FILES
@@ -773,6 +788,9 @@ def resolve_global_config(raw: RawConfig) -> GlobalConfig:
         web_governance_backend=str(
             values.get("web_governance_backend", GlobalConfig.web_governance_backend) or "sqlite"
         ),
+        mcp_enabled=_as_bool(values.get("mcp_enabled"), default=True, key="IB_MCP_ENABLED"),
+        mcp_transport=str(values.get("mcp_transport", GlobalConfig.mcp_transport) or "http").strip().lower(),
+        mcp_ca_bundle=str(values.get("mcp_ca_bundle", GlobalConfig.mcp_ca_bundle) or "").strip(),
         max_upload_mb=_warn_if_over_proxy_limit(
             _as_int(values.get("max_upload_mb"), default=GlobalConfig.max_upload_mb, key="IB_MAX_UPLOAD_MB")
         ),
@@ -954,6 +972,11 @@ def validate_required(
                     key="IB_WEB_SEARCH_PROVIDER",
                 )
             )
+
+    # 2c) REV-29（IFC-R29-221 / ADR-R29-17）：MCP 传输取值域。`fake` 仅离线可用（离线分支已提前返回）；
+    #     非离线配置为 fake ⇒ 启动失败。错误只报键名与允许值，不含所配值。
+    if cfg.mcp_transport != "http":
+        errors.append(ConfigError("配置键 IB_MCP_TRANSPORT 取值非法（非离线模式仅允许：http）", key="IB_MCP_TRANSPORT"))
 
     # 3) 维度与模型一致性
     if cfg.embedding.dim <= 0:

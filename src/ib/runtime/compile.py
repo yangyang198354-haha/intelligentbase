@@ -84,6 +84,9 @@ class RuntimeDeps:
     #: REV-28（IFC-R28-020）：顾问节点作答期间进入的回合作用域（组合根注入 bind_web_turn 适配；缺省 None）与全局联网上限存储。
     web_turn_scope: Callable[[Mapping[str, Any]], AbstractContextManager[Any]] | None = None
     web_governance: Any = None
+    #: REV-29（IFC-R29-180）：外部（MCP）工具注册器与回合作用域；缺省 None ⇒ 与现行路径逐位相同。
+    external_tool_registrar: Callable[[str, Any, frozenset[str]], Any] | None = None
+    mcp_turn_scope: Callable[[Mapping[str, Any]], AbstractContextManager[Any]] | None = None
 
 
 @dataclass(frozen=True)
@@ -159,11 +162,43 @@ def compile_project_config(
     # 每 agent 只拿到自己被授权的工具（参数 / 知识范围闭包注入）
     grants = {g.expert_name: g for g in doc.tool_grants}
     tool_registry = deps.tool_registry_factory()
+    # IFC-R29-181：授权含外部（mcp__）工具且注册器非空 ⇒ 注册已审核快照；否则与现行路径逐位相同
+    tool_param_specs = deps.tool_param_specs
+    has_external = False
+    ext_names = frozenset(
+        t for g in doc.tool_grants for t in g.tool_names if t.startswith("mcp__")  # EXTERNAL_TOOL_PREFIX
+    )
+    if ext_names:
+        if deps.external_tool_registrar is not None:
+            try:
+                reg = deps.external_tool_registrar(project_id, tool_registry, ext_names)
+            except Exception as exc:  # noqa: BLE001 - 台账不可读等：编译失败（保留旧快照，fail-closed 且可见）
+                raise ConfigError("外部工具注册失败（编译中止）", key="IB_MCP_ENABLED") from exc
+            dropped = frozenset(getattr(reg, "dropped_dangling", ()) or ())
+        else:  # 功能关闭（IB_MCP_ENABLED=0）：外部授权一律视为悬空——工具不存在、编译不失败（fail-closed）
+            reg = None
+            dropped = ext_names
+        if dropped:
+            from dataclasses import replace as _replace
+
+            grants = {
+                k: _replace(
+                    g,
+                    tool_names=tuple(t for t in g.tool_names if t not in dropped),
+                    param_values=tuple(pv for pv in g.param_values if pv.name.split(".", 1)[0] not in dropped),
+                )
+                for k, g in grants.items()
+            }
+        if reg is not None:
+            from ib.tools import derive_tool_param_specs
+
+            tool_param_specs = derive_tool_param_specs(tool_registry)
+            has_external = bool(getattr(reg, "registered", ()))
     node_mode = {n.expert: n.input_mode for n in graph.nodes if n.kind == "agent"}
     agents: dict[str, AgentRuntime] = {}
     for e in active:
         tools = build_agent_tools(
-            grants.get(e.name), registry=tool_registry, specs=deps.tool_param_specs, scope=scope,
+            grants.get(e.name), registry=tool_registry, specs=tool_param_specs, scope=scope,
             retrieval=deps.retrieval, knowledge=e.knowledge_scope,
         )
         agents[e.name] = AgentRuntime(
@@ -231,7 +266,8 @@ def compile_project_config(
                 checkpointer = MemorySaver()
         dag = compile_dag(graph, view=view, router=router, llm=deps.llm, config=config, scope=scope,
                           checkpointer=checkpointer,
-                          turn_scope=deps.web_turn_scope if advisor_active else None)
+                          turn_scope=deps.web_turn_scope if advisor_active else None,
+                          mcp_turn_scope=deps.mcp_turn_scope if has_external else None)
 
     understander = None
     if advisor_active:

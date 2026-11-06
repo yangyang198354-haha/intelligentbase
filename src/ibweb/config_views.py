@@ -466,17 +466,48 @@ def _catalog(deps: Any, ctx: Any, pid: str, request: Any) -> Any:
         }
     except Exception:  # noqa: BLE001
         pass
-    return _ok(
-        {
-            "available_tools": list(composition.known_tool_names()),
-            "tool_param_specs": [v._tool_param_spec_payload(s) for s in composition.known_tool_param_specs()],
-            "folders": folders,
-            "agents": _agents_summary(doc, snapshot),
-            "schema_version": doc.schema_version,
-            "builtin_agents": composition.builtin_agents_catalog(),
-            "web": web,
-        }
-    )
+    payload = {
+        "available_tools": list(composition.known_tool_names()),
+        "tool_param_specs": [v._tool_param_spec_payload(s) for s in composition.known_tool_param_specs()],
+        "folders": folders,
+        "agents": _agents_summary(doc, snapshot),
+        "schema_version": doc.schema_version,
+        "builtin_agents": composition.builtin_agents_catalog(),
+        "web": web,
+    }
+    # REV-29（IFC-R29-219 / 164）：仅当本项目存在可见外部工具（或已有外部授权）时追加键；否则键集与基线相同。
+    payload.update(_mcp_catalog_keys(deps, pid, snapshot))
+    return _ok(payload)
+
+
+def _mcp_catalog_keys(deps: Any, pid: str, snapshot: Any) -> dict[str, Any]:
+    bundle = getattr(deps, "mcp", None)
+    if bundle is None:
+        return {}
+    try:
+        from ib.mcp.grants import catalog_external_tools, grant_statuses
+
+        gov = bundle.gov_reader()
+        tools = catalog_external_tools(pid, stores=bundle.stores, gov=gov)
+        statuses = grant_statuses(pid, snapshot.definition.tool_grants, stores=bundle.stores)
+    except Exception:  # noqa: BLE001 - 台账不可读：不阻断配置页读取，仅不追加
+        return {}
+    if not tools and not statuses:
+        return {}
+    return {
+        "external_tools": tools,
+        "mcp": {
+            "caps": {
+                "max_calls_per_turn": gov.max_calls_per_turn,
+                "call_timeout_s": gov.call_timeout_s,
+                "max_result_bytes": gov.max_result_bytes,
+            },
+            "grant_status": [
+                {"local_name": s.local_name, "expert_name": s.expert_name, "valid": s.valid, "reason": s.reason}
+                for s in statuses
+            ],
+        },
+    }
 
 
 def _web_search_configured(deps: Any) -> bool:

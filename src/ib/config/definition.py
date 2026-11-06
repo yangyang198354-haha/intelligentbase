@@ -524,6 +524,8 @@ def validate(
         granted_experts.add(g.expert_name)
         if known is not None:
             for t in g.tool_names:
+                if t.startswith("mcp__"):  # IFC-R29-183：保留前缀（EXTERNAL_TOOL_PREFIX）改由 ib.mcp.grants 校验
+                    continue
                 if t not in known:
                     errors.append(
                         _err(

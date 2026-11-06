@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from django.urls import path
 
-from ibweb import builder_views, config_views, library_views, views
+from ibweb import builder_views, config_views, library_views, mcp_views, views
 
 __all__ = ["urlpatterns"]
 
@@ -149,4 +149,27 @@ urlpatterns = [
     path("api/llm-key", views.llm_key_endpoint, name="ib-llm-key"),
     # REV-28（IFC-R28-023 / 024）：联网全局用量上限（仅 admin）
     path("api/web-governance", views.web_governance_endpoint, name="ib-web-governance"),
+    # REV-29（MOD-R29-19 / IFC-R29-200~218）：MCP 外部工具管理端点族。字面量路由先于带参路由。
+    path("api/mcp/servers", mcp_views.servers_endpoint, name="ib-mcp-servers"),
+    path("api/mcp/tools", mcp_views.tools_endpoint, name="ib-mcp-tools"),
+    path("api/mcp/governance", mcp_views.governance_endpoint, name="ib-mcp-governance"),
+    path("api/mcp/internal-allow", mcp_views.internal_allow_endpoint, name="ib-mcp-internal-allow"),
+    path("api/mcp/audit", mcp_views.audit_endpoint, name="ib-mcp-audit"),
+    path("api/mcp/servers/<str:server_id>/credentials", mcp_views.server_credentials_endpoint, name="ib-mcp-credentials"),
+    path("api/mcp/servers/<str:server_id>/open", mcp_views.server_open_endpoint, name="ib-mcp-open"),
+    path("api/mcp/servers/<str:server_id>/<str:action>", mcp_views.server_action_endpoint, name="ib-mcp-server-action"),
+    path("api/mcp/servers/<str:server_id>", mcp_views.server_endpoint, name="ib-mcp-server"),
+    path("api/mcp/tools/<int:tool_id>/review", mcp_views.tool_review_endpoint, name="ib-mcp-tool-review"),
+    path("api/mcp/tools/<int:tool_id>/state", mcp_views.tool_state_endpoint, name="ib-mcp-tool-state"),
+    path(
+        "api/mcp/tools/<int:tool_id>/bindings/<str:project_id>",
+        mcp_views.tool_binding_endpoint,
+        name="ib-mcp-tool-binding",
+    ),
+    path(
+        "api/mcp/tools/<int:tool_id>/waivers/<str:project_id>",
+        mcp_views.tool_waiver_endpoint,
+        name="ib-mcp-tool-waiver",
+    ),
+    path("api/mcp/tools/<int:tool_id>", mcp_views.tool_endpoint, name="ib-mcp-tool"),
 ]

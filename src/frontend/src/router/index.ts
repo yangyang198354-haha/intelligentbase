@@ -39,6 +39,7 @@ import SystemSection from '../views/SystemSection.vue';
 import ProjectsPage from '../views/ProjectsPage.vue';
 import LlmKeyPage from '../views/LlmKeyPage.vue';
 import WebGovernancePage from '../views/WebGovernancePage.vue'; // REV-28：联网全局用量上限（admin）
+import McpServersPage from '../views/McpServersPage.vue'; // REV-29：MCP 外部工具管理（admin）
 
 /** 公共路由（不需要登录）。 */
 const PUBLIC_ROUTES = new Set(['login']);
@@ -126,6 +127,13 @@ const routes: RouteRecordRaw[] = [
             name: 'web-governance',
             component: WebGovernancePage,
             meta: { title: '联网上限', requiresAdmin: true },
+          },
+          // REV-29（MOD-R29-22）：MCP 外部工具管理（#/system/mcp；仅 admin 可见，授权唯一经服务端）。
+          {
+            path: 'mcp',
+            name: 'mcp',
+            component: McpServersPage,
+            meta: { title: 'MCP 服务', requiresAdmin: true },
           },
         ],
       },

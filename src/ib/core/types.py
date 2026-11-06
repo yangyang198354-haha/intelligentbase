@@ -1890,3 +1890,305 @@ __all__ = [
     "DEEPSEEK_API_HOST",
     "WebGovernance",
 ]
+
+
+# =========================================================================== #
+# MOD-R29-01 REV-29 增量：MCP 外部工具领域类型（IFC-R29-001）
+# 全部为追加；ib.core 仍只含 stdlib。
+# =========================================================================== #
+
+EXTERNAL_TOOL_PREFIX: Final[str] = "mcp__"  # 保留前缀；内置工具名永不以此开头
+MCP_MODERN_VERSION: Final[str] = "2026-07-28"
+MCP_LEGACY_VERSION: Final[str] = "2025-11-25"
+MCP_SUPPORTED_VERSIONS: Final[tuple[str, ...]] = (MCP_MODERN_VERSION, MCP_LEGACY_VERSION)
+
+McpTransportKind = Literal["streamable_http"]  # 本轮唯一取值（stdio 已移出，OOS-R29-11）
+McpAuthKind = Literal["none", "bearer", "header"]
+McpCredentialScope = Literal["shared", "project"]
+McpScopeKind = Literal["platform", "project"]
+McpAdminState = Literal["registered", "enabled", "disabled"]
+McpHealth = Literal["unknown", "up", "down"]
+McpEra = Literal["modern", "legacy"]
+McpToolState = Literal["pending_review", "enabled", "disabled", "needs_rereview", "offline", "excluded"]
+McpRisk = Literal["read_only", "side_effect", "unknown"]
+McpDataCategory = Literal["query_text", "structured_args", "business_ids", "other"]
+
+MCP_TRANSPORT_KINDS: Final[tuple[str, ...]] = ("streamable_http",)
+MCP_AUTH_KINDS: Final[tuple[str, ...]] = ("none", "bearer", "header")
+MCP_DATA_CATEGORIES: Final[tuple[str, ...]] = ("query_text", "structured_args", "business_ids", "other")
+MCP_TOOL_STATES: Final[tuple[str, ...]] = (
+    "pending_review", "enabled", "disabled", "needs_rereview", "offline", "excluded",
+)
+MCP_RISKS: Final[tuple[str, ...]] = ("read_only", "side_effect", "unknown")
+
+McpDenyReason = Literal[
+    "feature_disabled", "server_missing", "server_disabled", "server_not_open", "server_unverified",
+    "tool_missing", "tool_not_enabled", "tool_needs_rereview", "tool_offline", "tool_stale",
+    "risk_not_waived", "credential_missing", "secret_key_missing", "no_turn_scope", "turn_limit",
+    "circuit_open", "server_down", "busy", "audit_failed", "admission_unreadable",
+]
+McpFailureKind = Literal[
+    "unreachable", "timeout", "auth_failed", "protocol_incompatible", "protocol_error",
+    "address_blocked", "bad_arguments", "input_required", "response_too_large", "tool_error",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class McpServerLimits:
+    """全部可空：空 = 继承全局（只能调低）。"""
+
+    call_timeout_s: int | None = None
+    max_calls_per_turn: int | None = None
+    max_result_bytes: int | None = None
+    max_concurrency: int | None = None
+    breaker_threshold: int | None = None
+    breaker_cooldown_s: int | None = None
+    discover_timeout_s: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class McpServer:
+    server_id: str
+    description: str
+    transport: str
+    endpoint_url: str
+    auth_kind: str
+    auth_header_name: str | None
+    credential_scope: str
+    scope_kind: str
+    owner_project: str | None
+    open_all: bool
+    data_categories: tuple[str, ...]
+    admin_state: str
+    health: str
+    health_checked_at: str | None
+    protocol_era: str | None
+    protocol_version: str | None
+    supports_list_changed: bool
+    last_verify_at: str | None
+    last_verify_result: str | None
+    identity_epoch: int
+    limits: McpServerLimits
+    created_at: str
+    created_by: str
+    updated_at: str
+    updated_by: str
+
+
+@dataclass(frozen=True, slots=True)
+class McpToolSnapshot:
+    title: str | None
+    description: str
+    input_schema: Mapping[str, Any]
+    output_schema: Mapping[str, Any] | None
+    annotations: Mapping[str, Any]
+    fingerprint: str
+
+
+@dataclass(frozen=True, slots=True)
+class McpToolRecord:
+    tool_id: int
+    server_id: str
+    remote_name: str
+    local_name: str
+    display_name: str
+    state: str
+    risk: str
+    exclusion_reason: str | None
+    observed: McpToolSnapshot | None
+    observed_at: str | None
+    approved: McpToolSnapshot | None
+    approved_at: str | None
+    approved_by: str | None
+    approved_epoch: int | None
+    llm_description: str | None
+    hidden_params: tuple[str, ...]
+    offline_at: str | None
+    offline_reason: str | None
+
+
+# 初始默认（INF-1~3）：仅作为"行缺失 / 读取失败"的保守回落，非业务常量
+MCP_DEFAULTS: Final[Mapping[str, int]] = {
+    "discover_timeout_s": 10,
+    "call_timeout_s": 30,
+    "max_calls_per_turn": 5,
+    "max_result_bytes": 32768,
+    "breaker_threshold": 5,
+    "breaker_cooldown_s": 60,
+    "max_concurrency_per_server": 2,
+    "max_inflight_global": 3,
+    "max_tools_per_server": 200,
+    "max_description_chars": 4000,
+    "max_schema_bytes": 32768,
+    "max_schema_depth": 10,
+    "max_arg_bytes": 8192,
+    "health_interval_s": 60,
+    "revalidate_interval_s": 300,
+    "listener_max": 4,
+}
+#: 字段 → (下界, 硬上限)
+MCP_HARD_MAX: Final[Mapping[str, tuple[int, int]]] = {
+    "discover_timeout_s": (1, 60),
+    "call_timeout_s": (1, 120),
+    "max_calls_per_turn": (1, 20),
+    "max_result_bytes": (1024, 262144),
+    "breaker_threshold": (1, 50),
+    "breaker_cooldown_s": (1, 3600),
+    "max_concurrency_per_server": (1, 16),
+    "max_inflight_global": (1, 8),
+    "max_tools_per_server": (1, 500),
+    "max_description_chars": (100, 20000),
+    "max_schema_bytes": (1024, 131072),
+    "max_schema_depth": (2, 16),
+    "max_arg_bytes": (256, 65536),
+    "health_interval_s": (0, 3600),
+    "revalidate_interval_s": (0, 86400),
+    "listener_max": (0, 8),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class McpGovernance:
+    """全局默认；取值初值见 MCP_DEFAULTS，范围见 MCP_HARD_MAX。"""
+
+    discover_timeout_s: int = 10
+    call_timeout_s: int = 30
+    max_calls_per_turn: int = 5
+    max_result_bytes: int = 32768
+    breaker_threshold: int = 5
+    breaker_cooldown_s: int = 60
+    max_concurrency_per_server: int = 2
+    max_inflight_global: int = 3
+    max_tools_per_server: int = 200
+    max_description_chars: int = 4000
+    max_schema_bytes: int = 32768
+    max_schema_depth: int = 10
+    max_arg_bytes: int = 8192
+    health_interval_s: int = 60
+    revalidate_interval_s: int = 300
+    listener_max: int = 4
+    updated_at: str = ""
+    updated_by: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class McpAdmission:
+    """单次读取的准入快照（调用路径用）。"""
+
+    server: McpServer
+    tool: McpToolRecord
+    project_open: bool
+    waiver_active: bool
+    fixed_args: Mapping[str, Any]
+    credential_present: bool
+    governance: McpGovernance
+
+
+@dataclass(frozen=True, slots=True)
+class McpNegotiated:
+    era: str
+    version: str
+    tools_capability: bool
+    supports_list_changed: bool
+
+
+@dataclass(frozen=True, slots=True)
+class McpDiscoveredTool:
+    remote_name: str
+    snapshot: McpToolSnapshot
+
+
+@dataclass(frozen=True, slots=True)
+class McpExcludedTool:
+    """reason: name_invalid / name_collision / schema_invalid / schema_unsupported /
+    x_mcp_header_invalid / param_name_reserved / over_limit"""
+
+    remote_name: str
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class McpDiscovery:
+    tools: tuple[McpDiscoveredTool, ...]
+    excluded: tuple[McpExcludedTool, ...]
+    negotiated: McpNegotiated
+
+
+@dataclass(frozen=True, slots=True)
+class McpDiscoveryDiff:
+    added: tuple[str, ...] = ()
+    changed: tuple[str, ...] = ()
+    offline: tuple[str, ...] = ()
+    reappeared: tuple[str, ...] = ()
+    excluded: tuple[str, ...] = ()
+    unchanged: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class McpCallRequest:
+    """外发载荷：类型层只有这三个字段（selfcheck 断言字段集）。"""
+
+    server_id: str
+    remote_name: str
+    arguments: Mapping[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class McpRawCallResult:
+    is_error: bool
+    content: tuple[Mapping[str, Any], ...]
+    structured: Any | None
+    result_type: str
+
+
+@dataclass(frozen=True, slots=True)
+class McpAuditRecord:
+    """类型层无凭证 / 完整入参字段。confirm 本轮恒 False（HITL 已移出）。"""
+
+    call_id: str
+    ts: str
+    kind: str  # admin | call | system
+    action: str
+    actor: str
+    project_id: str
+    server_id: str
+    tool_name: str
+    display_name: str
+    outcome: str
+    reason: str
+    duration_ms: int | None
+    args_digest: str
+    args_summary: str
+    fingerprint: str
+    confirm: bool
+    trial: bool
+
+
+@dataclass(frozen=True, slots=True)
+class McpInternalAllow:
+    host: str
+    port: int
+    created_at: str
+    created_by: str
+
+
+@dataclass(frozen=True, slots=True)
+class McpCredentialStatus:
+    """无密文。scope_key ∈ @shared / @discovery / <project_id>。"""
+
+    scope_key: str
+    configured: bool
+    updated_at: str
+    updated_by: str
+
+
+__all__ += [
+    "EXTERNAL_TOOL_PREFIX", "MCP_MODERN_VERSION", "MCP_LEGACY_VERSION", "MCP_SUPPORTED_VERSIONS",
+    "MCP_TRANSPORT_KINDS", "MCP_AUTH_KINDS", "MCP_DATA_CATEGORIES", "MCP_TOOL_STATES", "MCP_RISKS",
+    "McpTransportKind", "McpAuthKind", "McpCredentialScope", "McpScopeKind", "McpAdminState", "McpHealth",
+    "McpEra", "McpToolState", "McpRisk", "McpDataCategory", "McpDenyReason", "McpFailureKind",
+    "McpServerLimits", "McpServer", "McpToolSnapshot", "McpToolRecord", "MCP_DEFAULTS", "MCP_HARD_MAX",
+    "McpGovernance", "McpAdmission", "McpNegotiated", "McpDiscoveredTool", "McpExcludedTool", "McpDiscovery",
+    "McpDiscoveryDiff", "McpCallRequest", "McpRawCallResult", "McpAuditRecord", "McpInternalAllow",
+    "McpCredentialStatus",
+]

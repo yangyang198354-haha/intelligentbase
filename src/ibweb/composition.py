@@ -83,6 +83,11 @@ __all__ = [
     "resolve_scope",
     "register_builtin_tools",
     "build_web_runtime",
+    "build_mcp_runtime",
+    "start_mcp_supervisor",
+    "make_secret_cipher",
+    "mcp_egress_descriptors",
+    "McpRuntimeBundle",
     "builtin_agents_catalog",
     "admit",
     "SEARCH_TOOL_SPEC",
@@ -213,6 +218,8 @@ class Deps:
     web_runtime: Any = None
     web_governance: Any = None
     egress_web: tuple[Any, ...] = ()
+    # REV-29（MOD-R29-20）：MCP 外部工具运行时（IB_MCP_ENABLED=0 ⇒ None；由 `_install_config_runtime` 填充）。
+    mcp: Any = None
 
     def __post_init__(self) -> None:
         self._lock = threading.Lock()
@@ -446,6 +453,13 @@ class Deps:
             self.vectors.flush()
         except Exception:  # noqa: BLE001 - 关机清理失败不应掩盖真正的关机原因
             pass
+        # REV-29：停止 MCP supervisor（未启动 ⇒ no-op）
+        try:
+            sup = getattr(getattr(self, "mcp", None), "supervisor", None)
+            if sup is not None:
+                sup.stop()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _search_tool(
@@ -526,6 +540,236 @@ def build_web_runtime(cfg: Any, *, audit: Any, governance: Any, api_key: str | N
     fetcher = SafeFetcher() if bool(getattr(cfg, "web_fetch_enabled", False)) else None
     gate = WebEgressGate(audit=audit, clock=utc_now_iso, concurrency=3)
     return WebRuntime(provider=provider, fetcher=fetcher, gate=gate, governance=governance)
+
+
+# --------------------------------------------------------------------------- #
+# REV-29（MOD-R29-20）：MCP 外部工具运行时装配
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class McpRuntimeBundle:
+    """IFC-R29-220：MCP 运行时聚合（组合根持有；`Deps.mcp`）。含离线测试用的 transport / resolver 句柄。"""
+
+    stores: Any
+    cipher: Any
+    client: Any
+    breaker: Any
+    invoker: Any
+    catalog: Any
+    admin: Any
+    supervisor: Any  # McpSupervisor | None
+    enabled: bool
+    registrar: Any
+    transport: Any
+    resolver: Any  # 离线：FakeResolver；生产：None（使用 default_resolver）
+    gov_reader: Any
+
+
+def make_secret_cipher(primary_key: str | None, previous_keys: Sequence[str] = (), *, offline: bool) -> Any:
+    """[IFC-R29-223 / ADR-R29-17] 选择凭证密码器。
+
+    * primary_key 为空 → `UnconfiguredSecretCipher`（fail-closed）；
+    * 非空且 cryptography 可导入 → `FernetSecretCipher`（offline 与否皆然）；
+    * 非空、不可导入、offline=True → `ReversibleTestCipher`（延迟导入，仅离线）；
+    * 非空、不可导入、offline=False → ConfigError(key="IB_MCP_SECRET_KEY")（启动失败；错误不含值）。
+    offline=False 时**永不**返回 `ReversibleTestCipher`。
+    """
+    from ib.mcp.crypto import FernetSecretCipher, SecretKeyError, UnconfiguredSecretCipher
+
+    if not (primary_key or "").strip():
+        return UnconfiguredSecretCipher()
+    try:
+        return FernetSecretCipher(str(primary_key).strip(), tuple(k for k in previous_keys if k and k.strip()))
+    except SecretKeyError:  # cryptography 不可导入
+        if offline:
+            from ib.mcp.double import ReversibleTestCipher
+
+            return ReversibleTestCipher(str(primary_key).strip(), tuple(previous_keys))
+        raise ConfigError("IB_MCP_SECRET_KEY 已配置但 cryptography 不可用", key="IB_MCP_SECRET_KEY") from None
+
+
+class _LazyPublish:
+    """按调用时解析的发布服务代理（P-SD-008：离线夹具会整体替换 deps.publish_service）。"""
+
+    def __init__(self, deps: "Deps") -> None:
+        self._deps = deps
+
+    def current(self, project_id: str) -> Any:
+        return self._deps.publish_service.current(project_id)
+
+    def publish(self, req: Any) -> Any:
+        return self._deps.publish_service.publish(req)
+
+
+def build_mcp_runtime(cfg: Any, deps: "Deps", *, offline: bool) -> McpRuntimeBundle | None:
+    """[IFC-R29-221] `IB_MCP_ENABLED=0` → None；offline → 内存存储 + FakeMcpTransport（空服务器表）+ 无 supervisor。
+
+    密钥只从环境读取（不进 GlobalConfig / 日志 / 审计）。transport=fake 且非离线 ⇒ ConfigError(IB_MCP_TRANSPORT)。
+    """
+    if not bool(getattr(cfg, "mcp_enabled", True)):
+        return None
+    import sqlite3
+
+    from ib.context import utc_now_iso
+    from ib.core import McpGovernance
+    from ib.ledger.mcp_store import build_mcp_stores
+    from ib.ledger.schema import ensure_schema
+    from ib.mcp.admin import GrantCleaner, GrantIndex, McpAdminService
+    from ib.mcp.binding import make_registrar
+    from ib.mcp.catalog import McpCatalogService
+    from ib.mcp.client import McpClient
+    from ib.mcp.runtime import McpBreaker, McpInvoker
+    from ib.mcp.supervisor import McpSupervisor
+    from ib.webtools.netguard import DomainRules
+
+    transport_kind = str(getattr(cfg, "mcp_transport", "http") or "http").strip().lower()
+    if transport_kind not in ("http", "fake") or (transport_kind == "fake" and not offline):
+        raise ConfigError("配置键 IB_MCP_TRANSPORT 取值非法（非离线模式仅允许：http）", key="IB_MCP_TRANSPORT")
+
+    ledger_path = str(getattr(cfg, "ledger_path", "") or ":memory:")
+    if offline or getattr(cfg, "ledger_backend", "sqlite") == "memory":
+        stores = build_mcp_stores(None, backend="memory")
+    else:
+        if ledger_path != ":memory:":
+            parent = os.path.dirname(os.path.abspath(ledger_path))
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+        boot = sqlite3.connect(ledger_path, isolation_level=None, timeout=5.0)
+        try:
+            ensure_schema(boot)
+        finally:
+            boot.close()
+
+        def _factory() -> Any:
+            c = sqlite3.connect(ledger_path, check_same_thread=False, isolation_level=None, timeout=5.0)
+            c.execute("PRAGMA busy_timeout=5000")
+            c.execute("PRAGMA synchronous=NORMAL")
+            return c
+
+        stores = build_mcp_stores(_factory, backend="sqlite")
+
+    primary = os.environ.get("IB_MCP_SECRET_KEY", "").strip()
+    previous = tuple(k.strip() for k in os.environ.get("IB_MCP_SECRET_KEY_PREVIOUS", "").split(",") if k.strip())
+    cipher = make_secret_cipher(primary or None, previous, offline=offline)
+
+    def _gov() -> Any:
+        try:
+            return stores.governance.get()
+        except Exception:  # noqa: BLE001 - 读取失败 ⇒ 保守默认（不放大权限）
+            return McpGovernance()
+
+    def _rules() -> tuple[Any, frozenset[tuple[str, int]]]:
+        return DomainRules((), ()), frozenset((a.host, a.port) for a in stores.servers.list_internal_allow())
+
+    resolver: Any = None
+    if offline or transport_kind == "fake":
+        from ib.mcp.double import FakeMcpTransport, FakeResolver
+
+        resolver = FakeResolver()
+        transport: Any = FakeMcpTransport({}, resolver=resolver, rules_factory=_rules)
+    else:
+        from ib.mcp.transport import HttpMcpTransport
+
+        transport = HttpMcpTransport(rules_factory=_rules, ca_bundle_path=str(getattr(cfg, "mcp_ca_bundle", "") or "") or None)
+
+    client = McpClient(transport)
+    breaker = McpBreaker()
+    invoker = McpInvoker(stores=stores, cipher=cipher, client=client, breaker=breaker, enabled=True)
+    holder: dict[str, Any] = {}
+    catalog = McpCatalogService(
+        stores=stores, cipher=cipher, client=client, audit=stores.audit, clock=utc_now_iso, gov_reader=_gov,
+        on_tools_changed=lambda sid: holder["admin"].refresh_projects(sid),
+    )
+    index = GrantIndex(projects=deps.project_registry, snapshot_of=lambda pid: deps.publish_service.current(pid))
+    cleaner = GrantCleaner(
+        publish=_LazyPublish(deps), clock=utc_now_iso,
+        head_of=lambda pid: int(deps.version_store.head(pid).published_version),
+    )
+    admin = McpAdminService(
+        stores=stores, cipher=cipher, catalog=catalog, audit=stores.audit, grant_index=index, grant_cleaner=cleaner,
+        runtime_refresher=lambda pid: deps.runtime_cache.refresh_async(pid), clock=utc_now_iso, resolver=resolver,
+    )
+    holder["admin"] = admin
+    supervisor = None
+    if not offline:
+        supervisor = McpSupervisor(
+            stores=stores, catalog=catalog, client=client, cipher=cipher, breaker=breaker, gov_reader=_gov,
+            audit=stores.audit,
+        )
+    return McpRuntimeBundle(
+        stores=stores, cipher=cipher, client=client, breaker=breaker, invoker=invoker, catalog=catalog, admin=admin,
+        supervisor=supervisor, enabled=True,
+        registrar=make_registrar(stores=stores, invoker=invoker, gov_reader=_gov),
+        transport=transport, resolver=resolver, gov_reader=_gov,
+    )
+
+
+def mcp_egress_descriptors(bundle: McpRuntimeBundle | None) -> tuple[Any, ...]:
+    """[IFC-R29-222] 请求时读台账：已启用 Server → (remote=True, endpoint_host=主机, data_categories=登记声明)。读失败 ⇒ 空。"""
+    if bundle is None:
+        return ()
+    from urllib.parse import urlsplit
+
+    from ib.core import EgressDescriptor
+
+    try:
+        out = []
+        for s in bundle.stores.servers.list_all():
+            if s.admin_state != "enabled":
+                continue
+            host = (urlsplit(s.endpoint_url).hostname or "").lower()
+            out.append(EgressDescriptor(remote=True, endpoint_host=host, data_categories=list(s.data_categories)))
+        return tuple(out)
+    except Exception:  # noqa: BLE001
+        return ()
+
+
+def _external_param_specs(deps: "Deps", grants: Sequence[Any]) -> tuple[Any, ...]:
+    """保存期：项目外部授权对应的 `mcp_*` 参数规格（不并入全局 known_tool_param_specs）。"""
+    bundle = getattr(deps, "mcp", None)
+    names = {t for g in grants for t in g.tool_names if t.startswith("mcp__")}
+    if not names or bundle is None:
+        return ()
+    try:
+        from ib.mcp.binding import external_tool_spec
+        from ib.tools import ToolRegistry, derive_tool_param_specs
+
+        reg = ToolRegistry()
+        gov = bundle.gov_reader()
+        for n in sorted(names):
+            rec = bundle.stores.tools.get_by_local_name(n)
+            srv = bundle.stores.servers.get(rec.server_id) if rec is not None else None
+            if rec is not None and rec.approved is not None and srv is not None:
+                reg.register_external(external_tool_spec(rec, gov, srv), lambda **_k: None)
+        return derive_tool_param_specs(reg)
+    except Exception:  # noqa: BLE001
+        return ()
+
+
+def _external_grant_errors(deps: "Deps", snapshot: Any) -> tuple[Any, ...]:
+    """保存期外部授权校验（相对当前已发布版本"新增"者严格校验；无外部授权 ⇒ ()，零影响）。"""
+    from ib.core import ValidationErrorItem
+
+    grants = snapshot.definition.tool_grants
+    pairs = {(g.expert_name, t) for g in grants for t in g.tool_names if t.startswith("mcp__")}
+    has_param = any(pv.name.startswith("mcp__") for g in grants for pv in g.param_values)
+    if not pairs and not has_param:
+        return ()
+    pid = snapshot.definition.project_id
+    try:
+        prior = tuple(deps.publish_service.current(pid).definition.tool_grants)
+    except Exception:  # noqa: BLE001 - 无法取得已发布版本：按"全部为新增"严格校验（fail-closed）
+        prior = ()
+    bundle = getattr(deps, "mcp", None)
+    if bundle is None:
+        prior_pairs = {(g.expert_name, t) for g in prior for t in g.tool_names if t.startswith("mcp__")}
+        if pairs - prior_pairs:
+            return (ValidationErrorItem(path="tool_grants", code="mcp_disabled", message="外部工具功能未启用，无法新增外部工具授权"),)
+        return ()
+    from ib.mcp.grants import validate_external_grants
+
+    return validate_external_grants(pid, grants, prior, stores=bundle.stores, gov=bundle.gov_reader())
 
 
 def _web_turn_scope_factory(deps: "Deps") -> Any:
@@ -645,6 +889,10 @@ def build_application(deps: Deps | None = None) -> Any:
     if get_deps(required=False) is None:
         # `manage.py check` / `runserver` 等路径不会先调 build_deps，此处补齐
         build_deps()
+
+    # DEF-R29-008：build_application 只由 ib-web 的 WSGI 入口（wsgi.py）调用，ib-worker 不经此处，
+    # 故 MCP supervisor 在此启动即"仅 ib-web 进程"。
+    start_mcp_supervisor(get_deps(required=False))
 
     from django.core.wsgi import get_wsgi_application
 
@@ -1187,6 +1435,8 @@ def _install_config_runtime(deps: "Deps") -> None:
     graph_runtime = os.environ.get("IB_GRAPH_RUNTIME", "").strip().lower() or "dag"
     if graph_runtime not in ("dag", "legacy"):
         raise StartupError("IB_GRAPH_RUNTIME 取值须为 dag / legacy。只登记键名，不回显值。")
+    # REV-29：MCP 运行时（先于 RuntimeDeps；对发布服务 / 运行时缓存的引用均为调用时解析）
+    deps.mcp = build_mcp_runtime(cfg, deps, offline=bool(getattr(cfg, "offline_mode", False)))
     _checkpointers: dict[str, Any] = {}
     _cp_lock = threading.Lock()
 
@@ -1213,6 +1463,8 @@ def _install_config_runtime(deps: "Deps") -> None:
         checkpointer_for=_checkpointer_for,
         web_turn_scope=_web_turn_scope_factory(deps),
         web_governance=deps.web_governance,
+        external_tool_registrar=(deps.mcp.registrar if deps.mcp is not None else None),
+        mcp_turn_scope=(_mcp_turn_scope if deps.mcp is not None else None),
     )
     try:
         interval = float(os.environ.get("IB_CONFIG_HEAD_CHECK_INTERVAL_S", "").strip() or 1.0)
@@ -1242,10 +1494,12 @@ def _install_config_runtime(deps: "Deps") -> None:
         return _plain_validate(snapshot, folder_ids)
 
     def _plain_validate(snapshot: Any, folder_ids: Any) -> tuple[Any, ...]:
+        # REV-29：外部授权对应的 mcp_* 参数规格（项目级，不并入全局 known_tool_param_specs）；无外部授权 ⇒ ()
+        ext_specs = _external_param_specs(deps, snapshot.definition.tool_grants)
         report = validate_two_domains(
             snapshot.definition,
             known_tools=known_tool_names(),
-            tool_param_specs=known_tool_param_specs(),
+            tool_param_specs=known_tool_param_specs() + tuple(ext_specs),
             prompt_refs=prompt_refs_of_snapshot(snapshot),
             known_folder_ids=folder_ids,
         )
@@ -1271,6 +1525,8 @@ def _install_config_runtime(deps: "Deps") -> None:
                 )
             else:
                 errors.extend(validate_web_grants(grants, caps))
+        # REV-29（IFC-R29-160）：外部（mcp__）授权的保存期校验——仅相对已发布版本"新增"者严格校验；无外部授权时跳过
+        errors.extend(_external_grant_errors(deps, snapshot))
         return tuple(errors)
 
     def _precompile(project_id: str, version: int, snapshot: Any) -> Any:
@@ -1376,6 +1632,30 @@ def _install_config_runtime(deps: "Deps") -> None:
         except Exception as exc:  # noqa: BLE001 - 恢复失败不阻断启动，但必须可见
             log_event("definition_config", "recover_failed", project_id=pid, error_code=type(exc).__name__,
                       level="ERROR")
+
+    # DEF-R29-008：此处**不**启动 MCP supervisor。_assemble 也被 ib-worker（worker.py → django.setup → apps.ready）
+    # 走到；supervisor 只在 ib-web 进程内运行（module_design 运行单元表），由 build_application() 显式启动。
+
+
+def start_mcp_supervisor(deps: "Deps | None") -> bool:
+    """启动 MCP supervisor（ib-web 进程入口专用；幂等，`start()` 已启动为 no-op）。
+
+    离线 / `IB_MCP_ENABLED=0` ⇒ `deps.mcp` 或 supervisor 为 None ⇒ 返回 False。
+    daemon 线程、延迟首轮、非阻塞；停止路径见 `Deps.close()`。
+    """
+    mcp = getattr(deps, "mcp", None)
+    sup = getattr(mcp, "supervisor", None)
+    if sup is None:
+        return False
+    sup.start()
+    return True
+
+
+def _mcp_turn_scope(info: Any) -> Any:
+    """`RuntimeDeps.mcp_turn_scope` 适配器（编排层不 import ib.mcp，经 RuntimeDeps 注入）。"""
+    from ib.mcp.runtime import bind_mcp_turn
+
+    return bind_mcp_turn(info)
 
 
 def _offline_view(cfg: Any) -> Any:

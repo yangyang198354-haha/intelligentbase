@@ -4997,6 +4997,413 @@ def web_key_reuse_no_new_credential() -> None:
             os.environ[cfg.llm.api_key_env] = old
 
 
+# =========================================================================== #
+# REV-29：MCP 外部工具（MOD-R29-24；全部离线；:3924 / :3962 的既有断言不改）
+# =========================================================================== #
+
+
+def _mcp_sample_tool(name: str = "search", desc: str = "d") -> dict:
+    return {
+        "name": name, "description": desc,
+        "inputSchema": {"type": "object", "properties": {"q": {"type": "string"}}, "required": ["q"]},
+    }
+
+
+def _mcp_mem_server(server_id: str = "crm") -> Any:
+    from ib.core.types import McpServer, McpServerLimits
+
+    return McpServer(
+        server_id, "d", "streamable_http", "https://crm.example.com/mcp", "none", None, "shared", "platform", None,
+        False, ("query_text",), "enabled", "unknown", None, None, None, False, None, None, 0, McpServerLimits(),
+        "t", "a", "t", "a",
+    )
+
+
+def _mcp_discovery(tools: list[dict], excluded: tuple = ()) -> Any:
+    from ib.core.types import McpDiscovery, McpGovernance, McpNegotiated
+    from ib.mcp.rules import check_discovered_tool
+
+    items = []
+    for t in tools:
+        r = check_discovered_tool(t, server_id="crm", gov=McpGovernance(), taken_local_names=set())
+        items.append(r)
+    return McpDiscovery(tuple(items), tuple(excluded), McpNegotiated("modern", "2026-07-28", True, False))
+
+
+@_case("mcp_namespace_guard：内置工具名无保留前缀；register() 拒绝保留前缀；register_external() 禁覆盖（REV-29 ADR-R29-02）")
+def mcp_namespace_guard() -> None:
+    from ibweb.composition import known_tool_names, register_builtin_tools
+    from ib.core import ToolResult, ToolSpec
+    from ib.tools import ReservedToolNameError, ToolNameConflictError, ToolRegistry
+
+    reg = register_builtin_tools(ToolRegistry())
+    assert reg.names() and not any(n.startswith("mcp__") for n in reg.names())
+    assert not any(n.startswith("mcp__") for n in known_tool_names())
+    fn = lambda **_k: ToolResult(ok=True, content="x")  # noqa: E731
+    try:
+        reg.register(ToolSpec(name="mcp__a__b", description="x"), fn)
+    except ReservedToolNameError:
+        pass
+    else:
+        raise AssertionError("register() 必须拒绝保留前缀")
+    reg.register_external(ToolSpec(name="mcp__a__b", description="x", external=True), fn)
+    try:
+        reg.register_external(ToolSpec(name="mcp__a__b", description="覆盖", external=True), fn)
+    except ToolNameConflictError:
+        pass
+    else:
+        raise AssertionError("register_external() 不得覆盖同名")
+    try:
+        reg.register_external(ToolSpec(name="search_knowledge", description="x"), fn)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("register_external() 只接受保留前缀")
+    assert reg.get("mcp__a__b").spec.description == "x"
+
+
+@_case("mcp_egress_single_exit：ib.mcp 仅 transport.py 含网络导入；越界 import 与反向边；McpCallRequest 字段集（REV-29 NFUNC-009）")
+def mcp_egress_single_exit() -> None:
+    import pathlib
+    from dataclasses import fields
+
+    root = pathlib.Path(_SRC) / "ib" / "mcp"
+    net = {"urllib.request", "http.client", "socket", "ssl", "http.server", "socketserver", "requests", "httpx", "aiohttp"}
+    forbidden = (
+        "ib.retrieval", "ib.vectorstore", "ib.blob", "ib.streaming", "ib.context", "ib.ledger", "ib_embed",
+    )
+    seen = False
+    for path in sorted(root.glob("*.py")):
+        mods = _py_imports(path)
+        hit = {m for m in mods if m in net}
+        if path.name == "transport.py":
+            seen = True
+        else:
+            assert not hit, f"{path.name} 不得持有网络相关导入：{hit}"
+        assert "subprocess" not in mods, f"{path.name} 不得 import subprocess（stdio 已移出）"
+        for m in mods:
+            assert not any(m == f or m.startswith(f + ".") for f in forbidden), f"ib.mcp/{path.name} 引用了 {m}"
+    assert seen, "缺少 ib/mcp/transport.py"
+    # 反向边：这些包不得 import ib.mcp（经 RuntimeDeps 的 Callable 注入）
+    for rel in ("webtools", "orchestration", "tools", "runtime"):
+        for path in sorted((pathlib.Path(_SRC) / "ib" / rel).glob("*.py")):
+            for m in _py_imports(path):
+                assert not (m == "ib.mcp" or m.startswith("ib.mcp.")), f"{rel}/{path.name} 引用了 {m}"
+    for path in sorted((pathlib.Path(_SRC) / "ib" / "core").glob("*.py")):
+        for m in _py_imports(path):
+            assert not (m == "ib.mcp" or m.startswith("ib.mcp.")), f"core/{path.name} 引用了 {m}"
+    from ib.core.types import McpAuditRecord, McpCallRequest
+
+    assert {f.name for f in fields(McpCallRequest)} == {"server_id", "remote_name", "arguments"}
+    assert not ({f.name for f in fields(McpAuditRecord)} & {"arguments", "secret", "credential", "password", "token"})
+
+
+@_case("mcp_schema_single_source：010 与 schema 生成器单源 / 幂等 / 无可执行 DROP / 老库升级（REV-29 MOD-R29-07）")
+def mcp_schema_single_source() -> None:
+    import pathlib
+    import sqlite3
+
+    from ib.ledger import schema as S
+
+    deploy = pathlib.Path(_SRC) / "deploy" / "migrations"
+    sql = (deploy / "010_mcp.sql").read_text(encoding="utf-8")
+    norm = lambda s: "".join(s.split())  # noqa: E731
+    assert norm(S.mcp_ddl_script()) in norm(sql), "010_mcp.sql 与 mcp_ddl_script() 不一致（单源）"
+    for old in ("001_ledger_init", "002_chunk_image", "003_accounts", "004_config_audit", "005_projects",
+                "006_llm_key", "007_folder_tree", "008_config_versions", "009_web_governance"):
+        assert (deploy / f"{old}.sql").is_file(), f"既有迁移 {old}.sql 缺失（001~009 不得删改）"
+    assert "MANUAL_ROLLBACK_REQUIRED" in sql.split("CREATE TABLE")[0], "010 头注释缺回滚说明"
+    for line in sql.splitlines():
+        assert "DROP" not in line.split("--")[0].upper(), "010 含可执行的 DROP 语句"
+    con = sqlite3.connect(":memory:", isolation_level=None)
+    S.ensure_schema(con)
+    con.executescript(sql)
+    con.executescript(sql)  # 幂等重放
+    assert S.missing_mcp_tables(con) == ()
+    assert len(S.MCP_TABLE_NAMES) == 9
+    for bad in ("INSERT INTO mcp_governance VALUES (2,10,30,5,32768,5,60,2,3,200,4000,32768,10,8192,60,300,4,'t','u')",
+                "INSERT INTO mcp_internal_allow VALUES ('h', 0, 't', 'u')"):
+        try:
+            con.execute(bad)
+        except sqlite3.IntegrityError:
+            continue
+        raise AssertionError(f"CHECK 约束未生效：{bad}")
+    # transport 的 CHECK 只含 streamable_http（stdio 已移出）
+    try:
+        con.execute(
+            "INSERT INTO mcp_servers (server_id, description, transport, endpoint_url, auth_kind, credential_scope, scope_kind, "
+            "open_all, data_categories, admin_state, health, supports_list_changed, identity_epoch, created_at, created_by, "
+            "updated_at, updated_by) VALUES ('s','d','stdio','u','none','shared','platform',0,'[]','registered','unknown',0,0,'t','a','t','a')"
+        )
+    except sqlite3.IntegrityError:
+        pass
+    else:
+        raise AssertionError("transport CHECK 不得放行 stdio")
+    old = sqlite3.connect(":memory:", isolation_level=None)
+    for st in S.DDL_STATEMENTS:
+        old.execute(st)
+    S.ensure_schema(old)
+    S.ensure_schema(old)
+    old.executescript(sql)
+    assert S.missing_mcp_tables(old) == ()
+
+
+@_case("mcp_no_plaintext_secret：canary 流程后库内无明文 / 主密钥；类型层与 DTO 无凭证字段（REV-29 NFUNC-005）")
+def mcp_no_plaintext_secret() -> None:
+    import pathlib
+    from dataclasses import fields
+
+    from ib.core.types import McpAuditRecord, McpServer
+    from ib.ledger.mcp_store import build_mcp_stores
+    from ib.mcp.crypto import Secret
+    from ibweb.composition import make_secret_cipher
+
+    canary_secret = "CANARY-SECRET-VALUE-7f3a"
+    canary_key = "CANARY-MASTER-KEY-not-fernet"
+    try:
+        import cryptography.fernet as _f  # noqa: F401
+
+        from cryptography.fernet import Fernet
+
+        cipher = make_secret_cipher(Fernet.generate_key().decode("ascii"), offline=True)
+        cipher_kind = "fernet"
+        master = ""
+    except ImportError:
+        cipher = make_secret_cipher(canary_key, offline=True)  # 仅离线：ReversibleTestCipher（账记 cipher=test）
+        cipher_kind = "test"
+        master = canary_key
+    print(f"      mcp_no_plaintext_secret: cipher={cipher_kind}")
+    stores = build_mcp_stores(None, backend="memory")
+    stores.servers.create(_mcp_mem_server())
+    token, key_id = cipher.encrypt(Secret(canary_secret))
+    stores.credentials.put("crm", "@shared", token, key_id, actor="a", now="t")
+    assert cipher.decrypt(stores.credentials.get_ciphertext("crm", "@shared")[0]).reveal() == canary_secret
+    blob = b""
+    for (name,) in stores.servers._db.query("SELECT name FROM sqlite_master WHERE type='table'"):  # noqa: SLF001
+        for row in stores.servers._db.query(f"SELECT * FROM {name}"):  # noqa: SLF001
+            blob += repr(row).encode("utf-8", "replace")
+            blob += b"".join(bytes(c) for c in row if isinstance(c, (bytes, bytearray)))
+    assert canary_secret.encode() not in blob, "库内出现凭证明文"
+    if master:
+        assert master.encode() not in blob, "库内出现主密钥"
+    assert repr(Secret(canary_secret)) == "***" and canary_secret not in str(Secret(canary_secret))
+    bad = {"secret", "password", "token", "arguments", "ciphertext"}
+    assert not ({f.name for f in fields(McpAuditRecord)} & bad)
+    assert not ({f.name for f in fields(McpServer)} & bad)
+    deploy = pathlib.Path(_SRC) / "deploy"
+    for p in deploy.rglob("*"):
+        if p.is_file() and p.suffix in {".example", ".txt", ".conf", ".service", ".json", ".sql", ".md"}:
+            text = p.read_text(encoding="utf-8", errors="ignore")
+            assert canary_secret not in text and canary_key not in text, f"{p.name} 含 canary"
+
+
+@_case("mcp_fake_rejected_in_production：非离线 + fake 传输 ⇒ ConfigError（不含所配值）；非离线永不返回 ReversibleTestCipher（REV-29 ADR-R29-17）")
+def mcp_fake_rejected_in_production() -> None:
+    from ib.config import GlobalConfig, validate_required
+    from ib.core import ConfigError
+    from ib.mcp.double import ReversibleTestCipher
+    from ibweb.composition import make_secret_cipher
+
+    cfg = GlobalConfig(mcp_transport="fake")
+    errs = validate_required(cfg, env={})
+    mine = [e for e in errs if getattr(e, "key", None) == "IB_MCP_TRANSPORT"]
+    assert mine and all("fake" not in str(e) for e in mine), "非离线 + fake 必须启动失败且错误不含所配值"
+    assert not [e for e in validate_required(GlobalConfig(mcp_transport="http"), env={}) if getattr(e, "key", None) == "IB_MCP_TRANSPORT"]
+    # 离线分支不要求（替身仅离线可用）
+    import dataclasses
+
+    assert validate_required(dataclasses.replace(cfg, offline_mode=True), env={}) == []
+    # 密码器工厂：非离线永不返回替身
+    probe = "not-a-valid-fernet-key-CANARY"
+    try:
+        c = make_secret_cipher(probe, offline=False)
+    except ConfigError as exc:
+        assert exc.key == "IB_MCP_SECRET_KEY" and probe not in str(exc)
+    else:
+        assert not isinstance(c, ReversibleTestCipher)
+    assert make_secret_cipher(None, offline=False).configured is False
+    assert make_secret_cipher("", offline=True).configured is False
+
+
+@_case("mcp_ssrf_rejects：≥30 条地址拒绝 + 允许名单精确放行 + 绝不放行集 + 公网明文 http（REV-29 NFUNC-004）")
+def mcp_ssrf_rejects() -> None:
+    import ipaddress
+    import time
+
+    from ib.mcp.wire import plain_http_allowed
+    from ib.webtools.netguard import DomainRules, UrlGuard, WebBlocked
+
+    table = {
+        "loop.t": ("127.0.0.1",), "a10.t": ("10.1.2.3",), "a172.t": ("172.16.5.4",), "a192.t": ("192.168.1.1",),
+        "meta.t": ("169.254.169.254",), "cgnat.t": ("100.64.0.1",), "bench.t": ("198.18.0.1",), "zero.t": ("0.0.0.0",),
+        "mcast.t": ("224.0.0.1",), "resv.t": ("240.0.0.1",), "v6lo.t": ("::1",), "v6ula.t": ("fc00::1",),
+        "v6ll.t": ("fe80::1",), "v6meta.t": ("fd00:ec2::254",), "mapped.t": ("::ffff:127.0.0.1",),
+        "mappedmeta.t": ("::ffff:169.254.169.254",), "nat64.t": ("64:ff9b::7f00:1",), "mixed.t": ("93.184.216.34", "10.0.0.5"),
+        "empty.t": (), "good.t": ("93.184.216.34",), "zone.t": ("fe80::1%eth0",), "ok10.t": ("10.0.0.8",),
+        "ok127.t": ("127.0.0.1",), "okcg.t": ("100.64.0.5",), "rebind.t": ("169.254.169.254",), "linkloc.t": ("169.254.10.1",),
+        "ulaallow.t": ("fc00::5",),
+    }
+
+    def resolver(host: str, port: int, timeout: float) -> tuple[str, ...]:
+        if host in table:
+            return table[host]
+        ipaddress.ip_address(host)
+        return (host,)
+
+    dl = time.monotonic() + 30
+    guard = UrlGuard(DomainRules((), ()), resolver=resolver, allowed_ports=None)
+    rejects = [
+        "http://loop.t:9000/", "http://a10.t:9000/", "http://a172.t:9000/", "http://a192.t:9000/", "http://meta.t:80/",
+        "http://cgnat.t:9000/", "http://bench.t:9000/", "http://zero.t:9000/", "http://mcast.t:9000/", "http://resv.t:9000/",
+        "http://v6lo.t:9000/", "http://v6ula.t:9000/", "http://v6ll.t:9000/", "http://v6meta.t:9000/", "http://mapped.t:9000/",
+        "http://mappedmeta.t:9000/", "http://nat64.t:9000/", "http://mixed.t:9000/", "http://empty.t:9000/",
+        "http://127.0.0.1:9000/", "http://169.254.169.254/", "http://[::1]:9000/", "http://[fd00:ec2::254]/", "http://[fe80::1]:80/",
+        "ftp://good.t/", "file:///etc/passwd", "http://user:pw@good.t/", "https://good.t:0/", "https://good.t:65536/",
+        "http://zone.t:9000/", "javascript:alert(1)", "http://good.t:99999/",
+    ]
+    assert len(rejects) >= 30
+    for url in rejects:
+        try:
+            guard.check(url, deadline=dl)
+        except WebBlocked:
+            continue
+        raise AssertionError(f"应被拒绝却放行：{url}")
+    assert guard.check("https://good.t:8443/x?y=1", deadline=dl).port == 8443  # MCP 任意端口
+    # R28 默认守卫仍只允许 80/443（默认值回归）
+    legacy = UrlGuard(DomainRules((), ()), resolver=resolver)
+    for url in ("http://good.t:8080/", "https://good.t:8443/"):
+        try:
+            legacy.check(url, deadline=dl)
+        except WebBlocked as exc:
+            assert exc.kind == "port_not_allowed"
+        else:
+            raise AssertionError("默认 UrlGuard 的端口白名单被改动")
+    allow = frozenset({("ok10.t", 9000), ("ok127.t", 9100), ("okcg.t", 9200), ("meta.t", 80), ("linkloc.t", 8080),
+                       ("rebind.t", 443), ("ulaallow.t", 9000)})
+    ag = UrlGuard(DomainRules((), ()), resolver=resolver, allowed_ports=None, internal_allow=allow)
+    for url in ("http://ok10.t:9000/", "http://ok127.t:9100/", "http://okcg.t:9200/", "http://ulaallow.t:9000/"):
+        assert ag.check(url, deadline=dl).scheme == "http"
+    for url in ("http://ok10.t:9001/", "http://a10.t:9000/", "http://meta.t:80/", "http://linkloc.t:8080/", "https://rebind.t:443/"):
+        try:
+            ag.check(url, deadline=dl)
+        except WebBlocked:
+            continue
+        raise AssertionError(f"允许名单不得放行：{url}")
+    # 公网明文 http：纯字符串判定，先于 DNS
+    assert plain_http_allowed("https://good.t/", frozenset()) and not plain_http_allowed("http://good.t/", frozenset())
+    assert plain_http_allowed("http://ok10.t:9000/", frozenset({("ok10.t", 9000)}))
+    assert not plain_http_allowed("http://ok10.t:9001/", frozenset({("ok10.t", 9000)}))
+
+
+@_case("mcp_state_machine：工具状态机转移表穷举（REV-29 ADR-R29-08）")
+def mcp_state_machine() -> None:
+    from ib.core import ConflictError
+    from ib.core.types import McpDiscovery, McpExcludedTool, McpNegotiated
+    from ib.ledger.mcp_store import build_mcp_stores
+
+    st = build_mcp_stores(None, backend="memory")
+    st.servers.create(_mcp_mem_server())
+    neg = McpNegotiated("modern", "2026-07-28", True, False)
+    d1 = _mcp_discovery([_mcp_sample_tool("a"), _mcp_sample_tool("b")], (McpExcludedTool("bad name", "name_invalid"),))
+    diff = st.tools.apply_discovery("crm", d1, now="t1")
+    assert set(diff.added) == {"a", "b"} and diff.excluded == ("bad name",)
+    again = st.tools.apply_discovery("crm", d1, now="t2")  # 幂等
+    assert again.added == () and again.unchanged == 2
+    by = {t.remote_name: t for t in st.tools.list(server_id="crm")}
+    assert by["a"].state == "pending_review" and by["bad name"].state == "excluded"
+    a = by["a"]
+    # 非法转移：excluded 不得驳回 / 启用
+    for bad in (
+        lambda: st.tools.reject(by["bad name"].tool_id, actor="u", now="t"),
+        lambda: st.tools.set_enabled(by["bad name"].tool_id, True, actor="u", now="t"),
+    ):
+        try:
+            bad()
+        except ConflictError:
+            continue
+        raise AssertionError("excluded 不得驳回 / 启用")
+    # pending_review → enabled（指纹不符 ⇒ 409）
+    try:
+        st.tools.approve(a.tool_id, expected_fingerprint="x", risk="read_only", hidden_params=(), llm_description=None, actor="u", now="t")
+    except ConflictError:
+        pass
+    else:
+        raise AssertionError("指纹不符必须 409")
+    a = st.tools.approve(a.tool_id, expected_fingerprint=a.observed.fingerprint, risk="read_only", hidden_params=(), llm_description=None, actor="u", now="t")
+    assert a.state == "enabled"
+    # enabled → needs_rereview（描述变化）
+    d2 = _mcp_discovery([_mcp_sample_tool("a", "changed"), _mcp_sample_tool("b")])
+    diff = st.tools.apply_discovery("crm", d2, now="t3")
+    assert "a" in diff.changed and st.tools.get(a.tool_id).state == "needs_rereview"
+    # needs_rereview → disabled（驳回）→ 启用须复审（指纹不符 ⇒ 409）
+    st.tools.reject(a.tool_id, actor="u", now="t")
+    assert st.tools.get(a.tool_id).state == "disabled"
+    try:
+        st.tools.set_enabled(a.tool_id, True, actor="u", now="t")
+    except ConflictError:
+        pass
+    else:
+        raise AssertionError("disabled → enabled 仅当 observed 指纹 = approved")
+    # 复审通过 → enabled；禁用 / 再启用（指纹相同）
+    a = st.tools.approve(a.tool_id, expected_fingerprint=st.tools.get(a.tool_id).observed.fingerprint, risk="read_only", hidden_params=(), llm_description=None, actor="u", now="t")
+    assert a.state == "enabled"
+    assert st.tools.set_enabled(a.tool_id, False, actor="u", now="t").state == "disabled"
+    assert st.tools.set_enabled(a.tool_id, True, actor="u", now="t").state == "enabled"
+    # 下线 → 重现：已审核 ⇒ needs_rereview（不自动恢复）；从未审核 ⇒ pending_review
+    st.tools.apply_discovery("crm", McpDiscovery((), (), neg), now="t4")
+    assert {t.remote_name: t.state for t in st.tools.list(server_id="crm")} == {"a": "offline", "b": "offline"}
+    diff = st.tools.apply_discovery("crm", d2, now="t5")
+    states = {t.remote_name: t.state for t in st.tools.list(server_id="crm")}
+    assert set(diff.reappeared) == {"a", "b"} and states == {"a": "needs_rereview", "b": "pending_review"}
+    # 身份变更联动：已审核工具 → needs_rereview（同事务 epoch+1）
+    a = st.tools.approve(a.tool_id, expected_fingerprint=st.tools.get(a.tool_id).observed.fingerprint, risk="read_only", hidden_params=(), llm_description=None, actor="u", now="t")
+    assert a.state == "enabled"
+    assert st.tools.mark_identity_changed("crm", now="t6") == 1
+    assert st.tools.get(a.tool_id).state == "needs_rereview" and st.servers.get("crm").identity_epoch == 1
+
+
+@_case("mcp_callable_signature_guard：外部工具 callable 不含 scope/retrieval/knowledge 参数名（REV-29 MOD-R29-13）")
+def mcp_callable_signature_guard() -> None:
+    import inspect
+
+    from ib.core import McpGovernance
+    from ib.ledger.mcp_store import build_mcp_stores
+    from ib.mcp.binding import make_registrar
+    from ib.mcp.client import McpClient
+    from ib.mcp.double import FakeMcpTransport, FakeResolver
+    from ib.mcp.runtime import McpBreaker, McpInvoker
+    from ib.mcp.crypto import UnconfiguredSecretCipher
+    from ib.tools import ToolRegistry, build_agent_tools, derive_tool_param_specs
+    from ib.core import Scope, ToolGrantSpec
+
+    st = build_mcp_stores(None, backend="memory")
+    st.servers.create(_mcp_mem_server())
+    st.tools.apply_discovery("crm", _mcp_discovery([_mcp_sample_tool("search")]), now="t")
+    t = st.tools.list(server_id="crm")[0]
+    t = st.tools.approve(t.tool_id, expected_fingerprint=t.observed.fingerprint, risk="read_only", hidden_params=(), llm_description=None, actor="u", now="t")
+    inv = McpInvoker(
+        stores=st, cipher=UnconfiguredSecretCipher(), client=McpClient(FakeMcpTransport({}, resolver=FakeResolver())),
+        breaker=McpBreaker(),
+    )
+    reg = ToolRegistry()
+    out = make_registrar(stores=st, invoker=inv, gov_reader=lambda: McpGovernance())("p", reg, frozenset({t.local_name, "mcp__crm__ghost"}))
+    assert out.registered == (t.local_name,) and out.dropped_dangling == ("mcp__crm__ghost",)
+    entry = reg.get(t.local_name)
+    assert entry is not None and entry.spec.route_visible is False and entry.spec.external is True
+    params = set(inspect.signature(entry.fn).parameters)
+    assert not (params & {"scope", "retrieval", "knowledge"}), params
+    specs = derive_tool_param_specs(reg)
+    assert {s.name for s in specs} == {
+        f"{t.local_name}.q", f"{t.local_name}.mcp_timeout_s", f"{t.local_name}.mcp_max_calls_per_turn"
+    }
+    tools = build_agent_tools(
+        ToolGrantSpec("kb", (t.local_name,)), registry=reg, specs=specs, scope=Scope(project_id="p"),
+        retrieval=object(), knowledge=None,
+    )
+    assert len(tools) == 1 and tools[0].timeout_s is not None
+    assert not (set(inspect.signature(tools[0].callable).parameters) & {"scope", "retrieval", "knowledge"})
+
+
 def main() -> int:
     print("=" * 72)
     print("intelligentbase 离线自检（GROUP_C 自我验证；正式测试套件属 GROUP_D）")
@@ -5084,6 +5491,15 @@ def main() -> int:
         deepseek_adapter_contract,
         deepseek_double_covers_p11,
         web_key_reuse_no_new_credential,
+        # ---- REV-29：MCP 外部工具 ----
+        mcp_namespace_guard,
+        mcp_egress_single_exit,
+        mcp_schema_single_source,
+        mcp_no_plaintext_secret,
+        mcp_fake_rejected_in_production,
+        mcp_ssrf_rejects,
+        mcp_state_machine,
+        mcp_callable_signature_guard,
     ]
     for case in cases:
         case()

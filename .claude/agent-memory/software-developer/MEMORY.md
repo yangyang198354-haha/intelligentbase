@@ -19,6 +19,13 @@
 - [M-SD-015] 运行期新建项目不在 cfg.projects：读路径以台账/注册表为准、config 仅回退；新建项目须幂等补台账行（先 upsert_project 再 upsert_kb，顺序不可换），装配期与 reload_projects 各调一次 — conf 0.8 · 证据 commit 8b5755f / 23a7470 · 首见 2026-10-17 · 命中 2
 - [M-SD-016] docs/ 文档 `<file_header>` 内禁裸 `<` `>`（写 `&lt;` `&gt;`）；改头后抽出该块用 `ET.fromstring` 校验；code_review_report 用 Markdown 表头时如实写"ET 解析不适用" — conf 0.8 · 证据 GR-C-002 / KE-PM-025 同源 · 首见 2026-09-26 · 命中 2
 - [M-SD-017] src/deploy/checklists.txt 新增 `[Bn]` 检查项时，同步改 selfcheck 签署行断言（B1–Bn）；REV-21 漏改导致 selfcheck 51/52 — conf 0.6 · 证据 commit 4f4ad5e · 首见 2026-10-17 · 命中 1
+- [M-SD-025] `_assemble`/`build_deps` 被 ib-web 与 ib-worker 共用（worker→django.setup→apps.ready），进程级副作用（后台线程）不得放进去；ib-web 专属动作挂在只有 wsgi.py 调用的 `build_application`（先例 `start_mcp_supervisor`，composition.py:895） — conf 0.8 · 证据 DEF-R29-008 / GR-E1-001-F01 / GR-C-006 · 首见 2026-11-06 · 命中 3
+- [M-SD-019] `IB_CONFIG_SOURCE=dict` 的离线夹具里环境变量不覆盖配置字典：测"开关关闭"要把键放进 `build_deps(raw)`（如 `mcp_enabled: False`），`monkeypatch.setenv` 无效；密钥类键只从 os.environ 读、不进 GlobalConfig — conf 0.8 · 证据 REV-29 禁用路径冒烟 / test_mcp_supervisor_process_r29.py · 首见 2026-11-05 · 命中 2
+- [M-SD-020] 管理端点判定 admin 用 `get_authz(request)` 的主体自身（同 `views._require_admin`），不用 `ctx.authz`：admin 带 `X-IB-Project` 头时后者是选定项目而非 GLOBAL，列表会被过滤为空 — conf 0.6 · 证据 mcp_views.py:164、冒烟首轮 `/api/mcp/tools` 返回 [] · 首见 2026-11-05 · 命中 1
+- [M-SD-021] 前端既有测试对 `ConsoleLayout.vue` 的 `SYSTEM_ORDER` 字面量做精确 regex（advisor_r28.test.js:260）：追加导航项须同步放行该断言（授权范围内只改这一处）；纯 TS 工具文件不 import 其他 utils，以便 node:test 单文件转译加载 — conf 0.8 · 证据 GR-C-001-F01(CRITICAL，越界改测试) / GR-C-002 · 首见 2026-11-05 · 命中 2
+- [M-SD-022] http.client 流式读取用 `read1(N)` 而非 `read(N)`；close-delimited 响应时 `getresponse()` 把 `conn.sock` 置 None，须提前留底 socket；跨线程停止先 `sock.shutdown(SHUT_RDWR)` 再 close，读取侧兜 AttributeError/ValueError 竞态；静默 SSE 上的监听线程不会感知 stop Event，stop() 须关响应并带超时 join。HTTPS 路径仅回环明文验证 — conf 0.8 · 证据 DEF-R29-003/006/007 / GR-D-002 / transport.py:131,145 · 首见 2026-11-05 · 命中 2
+- [M-SD-023] 构造发往外部工具的参数用"已批准 schema 声明键"白名单，不用"隐藏/固定键"黑名单，否则 LLM 自加的未声明键原样发出 — conf 0.6 · 证据 DEF-R29-004 / GR-D-001 / GR-C-004 · 首见 2026-11-05 · 命中 1
+- [M-SD-024] 文本同时有字符上限与字节上限时只用字节上限，并在上限内为截断标记留位；先按字符截断会让 ASCII 文本不触发字节截断而静默丢标记 — conf 0.6 · 证据 DEF-R29-002 / GR-D-001 / GR-C-004 · 首见 2026-11-05 · 命中 1
 
 ## 用户偏好与禁止项
 

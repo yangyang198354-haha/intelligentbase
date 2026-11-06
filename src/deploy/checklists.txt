@@ -626,6 +626,23 @@
     说明：本轮新增可选键名 IB_CONFIG_HEAD_CHECK_INTERVAL_S / IB_GRAPH_RUNTIME / IB_LLM_CLIENT_CACHE_MAX / IB_DOC_SCOPE_MAX_IDS
     （缺省值即可运行；/etc/intelligentbase/*.env 由用户按需自行添加）。
 
+[B30] MCP 外部工具迁移 010 与凭证主密钥上线核对（REV-29 / ADR-R29-06 / 07 / 17；迁移随 ib-web 重启自动应用；台账读取一律以 ib-web 身份只读打开）
+    (1) 迁移前备份：同 [B28](1)（只拷贝、不回显内容；以 ib-web 身份，避免 -wal/-shm 变 root 属主，见 [B22]）
+    (2) 依赖与主密钥（**不回显任何值**）：
+        [ ] 目标机 venv 执行 `/opt/intelligentbase/venv/bin/pip show cryptography`，版本落在 >=42,<51；先 `/opt/intelligentbase/venv/bin/pip install -r src/requirements.txt`（已是 pdfminer.six 的传递依赖，显式声明会校验区间）
+        [ ] 目标机 `/opt/intelligentbase/venv/bin/python -c "from cryptography.fernet import Fernet; k=Fernet.generate_key(); f=Fernet(k); assert f.decrypt(f.encrypt(b'probe'))==b'probe'; print('fernet ok')"`
+            输出 fernet ok（较老 x86_64 CPU 的 import + 一次加解密探针，TBD-R29-1；该探针用临时随机密钥，与 IB_MCP_SECRET_KEY 无关）
+        [ ] /etc/intelligentbase/ib-web.env 已设置 IB_MCP_SECRET_KEY（仅核对"存在且长度为 44"：`sudo grep -c '^IB_MCP_SECRET_KEY=' /etc/intelligentbase/ib-web.env` 与 `sudo awk -F= '/^IB_MCP_SECRET_KEY=/{print length($2)}' /etc/intelligentbase/ib-web.env`，只输出计数/长度，**不回显值**）；文件仍为 0600
+    (3) ib-web 重启后：
+        [ ] 只读核对新表存在：mcp_servers / mcp_server_projects / mcp_tools / mcp_tool_bindings / mcp_risk_waivers / mcp_credentials / mcp_governance / mcp_internal_allow / mcp_audit
+        [ ] `journalctl -u ib-web --since <启动时刻>` 无 ConfigError(IB_MCP_*)、无 runtime_compile_failed；/healthz/deps 无已启用 Server 时不含 egress_mcp 键
+        [ ] 新页面 #/system/mcp 仅 admin 可见（前端 lock 未变时目标机本地只 `npm run build` 后拷贝，不 `npm ci`——node_modules 属目标机本地状态，SKILL.md §5.2）
+    (4) 出站 ACL（**由用户 / 运维执行**）：放行每个已登记 MCP Server 的 host:port（含内网允许名单内目标）；公网目标必须 https
+    (5) 回滚前置核对（仅回滚时）：先在新版本中"强制清理授权"或手工移除各项目定义文档里的 mcp__ 授权，否则旧代码下保存会被拒绝；
+        撤销新结构的 DROP 语句见 010_mcp.sql 头注释（**备份之后由用户执行**）[MANUAL_ROLLBACK_REQUIRED]；主密钥丢失 ⇒ 已存凭证不可恢复，需重录
+    说明：本轮新增可选键名 IB_MCP_ENABLED / IB_MCP_SECRET_KEY / IB_MCP_SECRET_KEY_PREVIOUS / IB_MCP_CA_BUNDLE / IB_MCP_TRANSPORT
+    （/etc/intelligentbase/*.env 由用户按需自行添加）。stdio 传输与调用前人工确认本轮不支持。
+
 ##############################################################################
 # C. 验收签署
 ##############################################################################
@@ -633,5 +650,6 @@
 [ ] B1–B27 全部勾选，证据归档
 [ ] B28（R25 文件夹树迁移 007）全部勾选，证据归档
 [ ] B29（R26 配置版本迁移 008 与热生效上线）全部勾选，证据归档
+[ ] B30（R29 MCP 外部工具迁移 010 与凭证主密钥上线）全部勾选，证据归档
 [ ] 本文件不含任何真实凭据（自检：grep -nE 'sk-|ghp_|BEGIN .*PRIVATE KEY' 本文件应无命中）
 执行人：____________  复核人：____________  日期：____________

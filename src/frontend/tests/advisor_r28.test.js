@@ -257,7 +257,8 @@ describe('源码结构契约', () => {
   it('TC-FE-R28-023 路由与导航：web-governance 路由仅 admin；挂在“系统管理”下；导航项排序追加 web-governance', () => {
     assert.match(router, /path: 'web-governance',\s*name: 'web-governance',\s*component: WebGovernancePage,\s*meta: \{ title: '联网上限', requiresAdmin: true \}/);
     assert.match(router, /import WebGovernancePage from '\.\.\/views\/WebGovernancePage\.vue'/);
-    assert.match(layout, /const SYSTEM_ORDER = \['accounts', 'projects', 'llm-key', 'web-governance'\];/);
+    // REV-29 MOD-R29-22 契约变更；授权 GR-C-001 REWORK_AUTHORIZED：SYSTEM_ORDER 严格为五项（末尾追加 'mcp'）
+    assert.match(layout, /const SYSTEM_ORDER = \['accounts', 'projects', 'llm-key', 'web-governance', 'mcp'\];/);
     // 既有三项的相对顺序不变
     const order = layout.match(/SYSTEM_ORDER = \[([^\]]*)\]/)[1].split(',').map((s) => s.trim().replace(/'/g, ''));
     assert.deepEqual(order.slice(0, 3), ['accounts', 'projects', 'llm-key']);

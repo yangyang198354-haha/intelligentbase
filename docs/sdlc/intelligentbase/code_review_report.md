@@ -1,365 +1,430 @@
 <file_header>
   <author_agent>software-developer</author_agent>
-  <timestamp>2026-11-03T18:35:30+08:00</timestamp>
+  <timestamp>2026-11-06T21:13:39+08:00</timestamp>
   <project_name>intelligentbase</project_name>
   <version>4.0.0</version>
-  <input_files><file>docs/sdlc/intelligentbase/module_design.md</file><file>docs/sdlc/intelligentbase/implementation_plan.md</file><file>docs/external_api/deepseek_search_fetch.md</file></input_files>
-  <phase>PHASE_06</phase>
+  <input_files><file>docs/sdlc/intelligentbase/implementation_plan.md</file><file>docs/sdlc/intelligentbase/module_design.md</file><file>docs/sdlc/intelligentbase/architecture_design.md</file><file>docs/sdlc/intelligentbase/requirements_spec.md</file><file>docs/sdlc/intelligentbase/user_stories.md</file><file>docs/sdlc/intelligentbase/tech_stack.md</file></input_files>
+  <phase>PHASE_05,PHASE_06</phase>
   <status>APPROVED</status>
 </file_header>
 
-# 代码评审报告 — REV-28 平台级内置「顾问 agent」
+# 代码评审报告 — REV-29 agent 工具调用的 MCP 适配
 
-REV-27 版本已归档于 `docs/sdlc/intelligentbase/archive/rev27/code_review_report.md`（只读）。本报告为 REV-28 自评审（0.1.0 DRAFT）；ET 解析不适用（Markdown 表格正文）。
+REV-28 版本已归档于 `docs/sdlc/intelligentbase/archive/rev28/code_review_report.md`。本报告为 REV-29 全新版本（0.1.0 DRAFT，`REWORK_AUTHORIZED`）。
+
+## 修订记录
+
+| 版本 | 时间 | 说明 |
+|---|---|---|
+| 0.1.0 | 2026-11-05T16:06:04+08:00 | 初稿 |
+| 0.2.0 | 2026-11-05T16:16:46+08:00 | GR-C-001 返工：测试断言严格化（见“现有测试调整”）；其余正文保留 |
+| 1.1.0 | 2026-11-05T22:46:38+08:00 | 缺陷回流第 1 轮（GR-D-001）：追加文末“缺陷修复轮”，既有内容未删 |
+| 2.1.0 | 2026-11-05T23:13:57+08:00 | 缺陷回流第 2 轮（GR-D-002）：追加文末“缺陷修复轮 2”，既有内容未删 |
+| 3.1.0 | 2026-11-06T21:13:39+08:00 | 缺陷回流第 3 轮（DEF-R29-008、B30）：追加文末“缺陷回流第 3 轮”，既有内容未删 |
 
 ## 摘要
 
-`git diff --stat -- src tests`（仅追踪文件；2.1.0 后）：**35 files changed, 1878 insertions(+), 91 deletions(-)**（含工作区内与本 REV 无关的既有未提交改动，不代表本轮增量）；另有未追踪文件：2.0.0 的 18 个新增文件，加 2.1.0 新增 `src/ib/webtools/deepseek.py`、`deepseek_double.py`（`webtools/` 为未追踪目录，故不在 diff --stat 内）。2.1.0 本轮触及的文件见 implementation_plan "变更文件清单（2.1.0）"，无无关文件。
-
-五维平均分（18 个 MOD 的算术平均；逐模块评分见下；2.1.0 仅 MOD-R28-03 重评：Correctness 9→8、Maintainability 9→8）：Correctness 8.17 / Security 9.00 / Performance 8.61 / Maintainability 8.28 / Testability 8.39；总平均 **8.49**（764/90）。无低于 6 的维度（MOD-R28-18 Testability = 6，为最低值，对应 CR-011）。
-
-问题统计（累计，含 2.1.0）：**CRITICAL 1（已修复 1）/ MAJOR 7（已修复 4，遗留 3）/ MINOR 9（已修复 2：CR-009、CR-017；遗留 7：CR-010~016）**。2.1.0 新增 CR-015、016、017，CR-009 因 ADR-R28-13 落地转 FIXED。
+- **产品代码改动范围**（`git diff --stat -- src .github`，仅修改既有文件）：`26 files changed, 2070 insertions(+), 27 deletions(-)`；另有**新建**文件：`src/deploy/migrations/010_mcp.sql`、`src/ib/mcp/`（16 个 .py）、`src/ib/ledger/mcp_store.py`、`src/ibweb/mcp_views.py`、`src/frontend/src/views/McpServersPage.vue`、`src/frontend/src/utils/`（`mcpLabels.ts`、`externalGrants.ts`）。工作区 `git diff --stat` 全量另含 `docs/`（其他 agent 的文档改动，非本次产物）。无无关文件。
+- **五维平均分**（24 个 MOD 自评，见“按模块评审”；算术：正确性 203/24=8.46，安全 215/24=8.96，性能 203/24=8.46，可维护性 191/24=7.96，可测试性 203/24=8.46；总和 1015 ÷ 120 = **8.46**）。
+- **问题统计**：CRITICAL 0（已修复 0）/ MAJOR 5（已修复 1，遗留 4）/ MINOR 6（遗留 6）。共 11 条 CR（MAJOR：CR-001、003、005、008、009；其中 CR-005 已 FIXED）。
 
 ## 文件 → MOD/IFC 映射
 
 | 文件 | MOD / IFC |
 |---|---|
-| `src/ib/core/types.py`、`ports.py`、`__init__.py` | MOD-R28-01 / IFC-R28-001、002 |
-| `src/ib/webtools/netguard.py`、`policy.py`、`fetch.py`、`__init__.py` | MOD-R28-02 / IFC-R28-003、004 |
-| `src/ib/webtools/search.py`、`deepseek.py`、`deepseek_double.py`（2.1.0） | MOD-R28-03 / IFC-R28-005、029、030 |
-| `src/ib/llm/__init__.py` `resolve_llm_api_key`（2.1.0）；`src/ib/config/__init__.py` 校验与键删除（2.1.0） | MOD-R28-09 / IFC-R28-031；MOD-R28-07 / IFC-R28-011、032 |
-| `src/ib/webtools/gate.py` | MOD-R28-04 / IFC-R28-006 |
-| `src/ib/webtools/tools.py` | MOD-R28-05 / IFC-R28-007 |
-| `src/ib/ledger/schema.py`、`web_governance.py`、`__init__.py`、`src/deploy/migrations/009_web_governance.sql` | MOD-R28-06 / IFC-R28-008 |
-| `src/ib/config/graph.py`、`prompts.py`、`__init__.py`、`src/ib/experts/__init__.py`、`src/ib/expert_seeds/advisor.md` | MOD-R28-07 / IFC-R28-009、010、011 |
-| `src/ib/tools/__init__.py` | MOD-R28-08 / IFC-R28-012 |
-| `src/ib/llm/__init__.py` | MOD-R28-09 / IFC-R28-013 |
-| `src/ib/advisor/*.py` | MOD-R28-10 / IFC-R28-014~017 |
-| `src/ib/builder/types.py`、`rubric.py`、`adapt.py` | MOD-R28-11 / IFC-R28-018 |
-| `src/ib/orchestration/dag.py`、`__init__.py` | MOD-R28-12 / IFC-R28-019 |
-| `src/ib/runtime/compile.py`、`src/ib/observability/__init__.py` | MOD-R28-13 / IFC-R28-020 |
-| `src/ibweb/composition.py`、`src/deploy/env.example` | MOD-R28-14 / IFC-R28-021 |
-| `src/ibweb/views.py`、`config_views.py`、`urls.py` | MOD-R28-15 / IFC-R28-022~025 |
-| `src/scripts/selfcheck.py`、`advisor_eval.py`、`src/requirements.txt`、`requirements-offline.txt` | MOD-R28-16 |
-| `src/frontend/src/api/client.ts`、`components/config/advisorPlan.ts` | MOD-R28-17 / IFC-R28-026、027 |
-| `ProjectsPage.vue`、`ConfigStudio.vue`、`AgentDetailPanel.vue`、`WebGovernancePage.vue`、`ConsoleLayout.vue`、`router/index.ts` | MOD-R28-18 / IFC-R28-028 |
-| `tests/integration/test_prompt_config_r16.py`、`test_prompt_tool_config_int_r16d.py`、`tests/unit/test_prompt_tool_config_unit_r16d.py` | 既有测试（AQ3=A 预期更新点，见 implementation_plan） |
+| `src/ib/core/types.py`、`ports.py`、`__init__.py` | MOD-R29-01 / IFC-R29-001、002 |
+| `src/ib/mcp/rules.py`、`schema_lite.py`、`__init__.py` | MOD-R29-02 / IFC-R29-010~016 |
+| `src/ib/mcp/wire.py` | MOD-R29-03 / IFC-R29-020~024 |
+| `src/ib/webtools/netguard.py`、`fetch.py` | MOD-R29-04 / IFC-R29-030、031 |
+| `src/ib/tools/__init__.py` | MOD-R29-05 / IFC-R29-040、041 |
+| `src/ib/mcp/crypto.py` | MOD-R29-06 / IFC-R29-050~052 |
+| `src/ib/ledger/mcp_store.py`、`schema.py`、`src/deploy/migrations/010_mcp.sql` | MOD-R29-07 / IFC-R29-060~065 |
+| `src/ib/mcp/transport.py` | MOD-R29-08 / IFC-R29-070 |
+| `src/ib/mcp/double.py` | MOD-R29-09 / IFC-R29-080~083 |
+| `src/ib/mcp/client.py` | MOD-R29-10 / IFC-R29-090~093 |
+| `src/ib/mcp/result.py` | MOD-R29-11 / IFC-R29-100~102 |
+| `src/ib/mcp/runtime.py` | MOD-R29-12 / IFC-R29-110~114 |
+| `src/ib/mcp/binding.py` | MOD-R29-13 / IFC-R29-120~122 |
+| `src/ib/mcp/catalog.py`、`auditing.py` | MOD-R29-14 / IFC-R29-130~133 |
+| `src/ib/mcp/admin.py` | MOD-R29-15 / IFC-R29-140~144 |
+| `src/ib/mcp/grants.py` | MOD-R29-16 / IFC-R29-160~164 |
+| `src/ib/mcp/supervisor.py` | MOD-R29-17 / IFC-R29-170 |
+| `src/ib/runtime/compile.py`、`orchestration/dag.py`、`config/definition.py` | MOD-R29-18 / IFC-R29-180~183 |
+| `src/ibweb/mcp_views.py`、`urls.py` | MOD-R29-19 / IFC-R29-200~218 |
+| `src/ibweb/composition.py`、`views.py`、`config_views.py`、`src/ib/config/__init__.py` | MOD-R29-20 / IFC-R29-219~223 |
+| `src/frontend/src/api/client.ts`、`src/utils/mcpLabels.ts` | MOD-R29-21 |
+| `src/frontend/src/views/McpServersPage.vue`、`router/index.ts`、`layouts/ConsoleLayout.vue` | MOD-R29-22 |
+| `src/frontend/src/components/config/AgentDetailPanel.vue`、`src/utils/externalGrants.ts` | MOD-R29-23 |
+| `src/scripts/selfcheck.py`、`.github/workflows/ci.yml`、`src/deploy/env.example`、`checklists.txt`、`src/requirements.txt`、`requirements-offline.txt` | MOD-R29-24 |
+
+外部协议事实一律取自 module_design“领域与外部依赖出处”表（代码文件头/函数文档串中以 `[WEB: …]` / `[CODE: …]` 标注）；表外内容（函数名字符集）保持 `[UNSOURCED]`，见 implementation_plan U1。画像 P11 的 DeepSeek Search/Fetch 与本轮无关，未触及；未调用任何真实端点。
 
 ## 自验证结果
 
-环境变量：`PYTHONUTF8=1 IB_OFFLINE_MODE=1 IB_CONFIG_SOURCE=dict IB_LOG_LEVEL=ERROR DJANGO_SETTINGS_MODULE=ibweb.settings`；venv `/root/.venvs/intelligentbase`，未安装任何依赖。
+环境：项目 venv `/root/.venvs/intelligentbase/bin/python`；`PYTHONUTF8=1 IB_OFFLINE_MODE=1 IB_CONFIG_SOURCE=dict IB_LOG_LEVEL=ERROR DJANGO_SETTINGS_MODULE=ibweb.settings`。未安装任何依赖。最终一轮（2026-11-05 16:06~16:12，修复 CR-005 之后）结果：
 
-| 命令 | 输出尾部 | 与基线 |
+| 命令 | 输出尾部（计数行 / 结论行） | 结论 |
 |---|---|---|
-| `python -m compileall -q src` | 无输出（退出码 0，`COMPILE_OK`） | — |
-| `python -m pytest tests -q -p no:cacheprovider`（全量；含 3 个按 AQ3 调整的既有测试文件） | `914 passed in 27.66s` | 基线 914 passed → 新增失败 0 |
-| `python src/scripts/selfcheck.py` | `自检结果：64/65 通过`；失败项仅 `core_framework_free：… 引入了第三方顶层包：sitecustomize`（环境性既有失败） | 基线 57 PASS / 1 FAIL → 新增失败 0；新增用例 7 个全 PASS（`web_egress_single_exit`、`web_ssrf_rejects`（≥30 条）、`web_governance_schema_single_source`、`advisor_graph_rules`、`advisor_seed_clean`、`search_port_conformance`、`advisor_apology_text_safe`） |
-| `cd src/frontend && npm run build` | `✓ built in 33.20s`（含 `vue-tsc --noEmit`） | — |
-| `cd src/frontend && npm test` | `# tests 141 / # pass 141 / # fail 0` | 基线 141/141 → 新增失败 0 |
+| `python -m compileall -q src` | rc=0 | 通过 |
+| `python -m pytest tests -q -p no:cacheprovider` | `1358 passed in 60.68s (0:01:00)` | 与基线 1358 一致，**零新增失败** |
+| `python src/scripts/selfcheck.py` | `自检结果：76/77 通过` ／ `失败项：- core_framework_free … 引入了第三方顶层包：sitecustomize` | 基线 68/69 + 新增 8 个 MCP 守卫全部 PASS；唯一失败为基线既有 `core_framework_free`（本轮未引入新的第三方包到 `ib.core`） |
+| `(cd src/frontend && npm run build)` | `vue-tsc --noEmit && vite build` → `✓ built in 28.54s` | 通过 |
+| `(cd src/frontend && npm test)` | `# tests 160 / # pass 160 / # fail 0` | 通过（首轮 159/160，见“现有测试调整”） |
+| scratchpad 冒烟 `test_smoke_mcp.py`（Django 测试客户端；**不入库、不算测试**） | `2 passed` | 覆盖登记（stdio/明文 http/元数据地址被拒）、凭证（响应与库内无明文）、启用、发现、租户参数确认、审核、固定入参覆盖 LLM 同名实参、未开放时保存被拒、发布热编译、调用、无作用域拒绝、回合预算 5 次后拒绝且替身请求数不增加、rug-pull 后立即拒绝、审计无凭证、被引用时删除 409、强制删除清理授权、治理/允许名单、viewer 403；禁用路径（`mcp_enabled=False`：写端点 503、catalog 键集与基线相同、healthz 无 `egress_mcp`） |
+| scratchpad 回环 HTTP 服务冒烟（`HttpMcpTransport` + `McpClient`，modern 与 legacy） | probe/list/call 成功；3xx ⇒ `address_blocked`；未命中允许名单的明文 http ⇒ `address_blocked` | 通过（真实套接字路径已执行一次） |
+| scratchpad 内联驱动 `McpSupervisor.tick()` + `start()/stop()` | 健康探测落库、去抖刷新触发 `needs_rereview` 并通知、start/stop 干净退出 | 通过（监听线程路径除外，见 CR-008） |
 
-**未验证项（如实）**：真实 `PinnedTransport`（钉 IP 的 HTTP / TLS 连接）、真实 DNS 解析（仅做了 `localhost` 级本机解析冒烟）、真实搜索厂商（Q7=C，本轮无适配器）、真实 LLM 的理解步骤输出遵从度（A-7）、浏览器内的前端交互（无挂载环境）、`advisor_eval.py` 对真实 LLM 的运行（`langchain-openai` 未安装，且评测集由用户提供）。
+**未验证项（如实）**：① 真实 `FernetSecretCipher`/`MultiFernet`（venv 无 `cryptography`；本机 `test_mcp_crypto_fernet_r29.py` 将 SKIP，不得记 PASS；CI 以 `IB_REQUIRE_CRYPTO=1` 强制）；② `subscriptions/listen` 监听线程的真实流（CR-008）；③ 前端真实浏览器交互（仅 `vue-tsc` 严格类型检查 + 构建 + 源码级冒烟）；④ 目标机 CPU 上的 `cryptography` 探针（部署项 `[B30]`）；⑤ 与真实 MCP Server 互通（超出离线范围）。
 
 ## 按模块评审
 
-评分口径：0–10，本轮为自评审；"正确性"考虑未被真实环境验证的部分。
+评分口径：正确性 / 安全 / 性能 / 可维护性 / 可测试性，各 0~10；无任何维度 < 6，故无强制 finding。CR 编号见文末问题表。
 
-| MOD | Correctness | Security | Performance | Maintainability | Testability | 均分 |
-|---|---|---|---|---|---|---|
-| MOD-R28-01 | 9 | 9 | 9 | 9 | 9 | 9.00 |
-| MOD-R28-02 | 8 | 9 | 8 | 8 | 9 | 8.40 |
-| MOD-R28-03 | 8 | 9 | 9 | 8 | 9 | 8.60 |
-| MOD-R28-04 | 8 | 9 | 8 | 8 | 9 | 8.40 |
-| MOD-R28-05 | 8 | 9 | 8 | 8 | 8 | 8.20 |
-| MOD-R28-06 | 9 | 9 | 9 | 9 | 9 | 9.00 |
-| MOD-R28-07 | 9 | 9 | 9 | 9 | 9 | 9.00 |
-| MOD-R28-08 | 8 | 9 | 9 | 8 | 9 | 8.60 |
-| MOD-R28-09 | 8 | 9 | 8 | 8 | 8 | 8.20 |
-| MOD-R28-10 | 8 | 9 | 8 | 9 | 9 | 8.60 |
-| MOD-R28-11 | 9 | 9 | 9 | 9 | 9 | 9.00 |
-| MOD-R28-12 | 7 | 9 | 8 | 7 | 7 | 7.60 |
-| MOD-R28-13 | 9 | 9 | 9 | 9 | 9 | 9.00 |
-| MOD-R28-14 | 8 | 9 | 8 | 7 | 7 | 7.80 |
-| MOD-R28-15 | 8 | 9 | 9 | 8 | 8 | 8.40 |
-| MOD-R28-16 | 8 | 9 | 9 | 8 | 8 | 8.40 |
-| MOD-R28-17 | 8 | 9 | 9 | 9 | 9 | 8.80 |
-| MOD-R28-18 | 7 | 9 | 9 | 8 | 6 | 7.80 |
-| **维度平均** | **8.17** | **9.00** | **8.61** | **8.28** | **8.39** | **8.49** |
+### MOD-R29-01 核心类型与端口
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 9/10 | 9/10 | 9/10 | 8/10 | 9/10 |
 
-### MOD-R28-01 核心类型与端口扩展
-追加字段均带默认值，既有构造调用与序列化不变（全量 914 passed 佐证）。`SearchQuery.__post_init__` 构造期校验 ~~1..200 / 1..10~~ → 2.1.0：1..128 / 1..50 / >0（资料收紧）；新增常量 `DEEPSEEK_API_HOST`。
+仅追加；`ib.core` 零第三方依赖（selfcheck `core_framework_free` 的失败为基线既有，与本模块无关）。CR：无。
+
+### MOD-R29-02 命名、指纹与 schema 规则
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 9/10 | 9/10 | 8/10 | 8/10 | 10/10 |
+
+纯函数；无异常外泄；schema 校验有深度/节点数/体积上限，忽略 `pattern`。CR：无。
+
+### MOD-R29-03 线协议
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 8/10 | 9/10 | 9/10 | 8/10 | 10/10 |
+
+头值禁 CR/LF；未知 `resultType` 视为无效。`subscriptions/listen` 参数形状与 `MCP-Session-Id` 拼写取自出处表字面（见 implementation_plan A7）。CR：无。
+
+### MOD-R29-04 出网防护扩展
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 9/10 | 10/10 | 9/10 | 9/10 | 9/10 |
+
+默认值 = 现行为（R28 全部用例零新增失败；selfcheck `mcp_ssrf_rejects` 含默认端口白名单回归）；允许名单永不放行“绝不放行集”，含映射内嵌地址与“名单域名重绑”场景。CR：无。
+
+### MOD-R29-05 工具注册表扩展
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 9/10 | 9/10 | 9/10 | 9/10 | 9/10 |
+
+遮蔽防护三道之二（`register` 拒保留前缀、`register_external` 禁覆盖）。CR：无。
+
+### MOD-R29-06 凭证加解密
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 8/10 | 9/10 | 9/10 | 9/10 | 8/10 |
+
+`Secret` repr/str 恒 `***` 且不可 pickle；无 `cryptography` 时 import 成功。真实 Fernet 路径未执行。CR：CR-001。
+
+### MOD-R29-07 台账存储与迁移 010
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 8/10 | 9/10 | 8/10 | 7/10 | 8/10 |
+
+SQL 全参数化；写入 `BEGIN IMMEDIATE`；`read_admission` 单次联结查询无缓存；凭证表无明文列。单文件约 970 行（两后端共用实现）。CR：CR-004、CR-006。
+
+### MOD-R29-08 HTTP 传输
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 8/10 | 9/10 | 8/10 | 8/10 | 7/10 |
+
+每次新建 `UrlGuard` + 钉 IP；3xx 不跟随；日志/异常/repr 无头值。已用回环服务执行一次；无自动化回环用例（留 GROUP_D 的传输契约测试）。CR：无。
+
+### MOD-R29-09 离线替身
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 9/10 | 8/10 | 9/10 | 8/10 | 9/10 |
+
+无网络导入（selfcheck 断言）；`ReversibleTestCipher` 令牌不含明文子串，非离线永不被组合根返回。安全 8：替身可逆，仅靠组合根工厂与 selfcheck 守卫保证不进生产。CR：无。
+
+### MOD-R29-10 MCP 客户端
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 8/10 | 9/10 | 8/10 | 7/10 | 8/10 |
+
+时代探测/回退、legacy 会话 404 重初始化一次、分页与工具数上限；`listen` 仅 modern。CR：CR-008（监听流）。
+
+### MOD-R29-11 结果转换与不可信内容
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 9/10 | 9/10 | 9/10 | 9/10 | 9/10 |
+
+只采纳文本；净化 + 字节截断 + 专用围栏并置换围栏标记；失败短语无状态码/原文/凭证。CR：无。
+
+### MOD-R29-12 运行时
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 8/10 | 9/10 | 8/10 | 7/10 | 8/10 |
+
+11 步固定顺序；永不抛；审计先行失败不发送；回合预算按 `turn_id` 跨 agent 合计（冒烟：5 次后拒绝、替身请求数不增加）。CR：CR-002。
+
+### MOD-R29-13 外部工具注册器
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 9/10 | 9/10 | 9/10 | 9/10 | 9/10 |
+
+闭包签名不含 `scope/retrieval/knowledge`（selfcheck `mcp_callable_signature_guard`）；悬空授权容忍。CR：无。
+
+### MOD-R29-14 目录服务
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 8/10 | 9/10 | 8/10 | 8/10 | 8/10 |
+
+状态迁移集中在存储层事务内（selfcheck `mcp_state_machine` 穷举）；审核对租户参数嫌疑强制确认。CR：CR-007。
+
+### MOD-R29-15 管理服务
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 8/10 | 9/10 | 7/10 | 7/10 | 8/10 |
+
+公网明文 http 纯字符串先判；传输类型/主密钥缺失校验；强制删除“先停用 → 逐项目清理 → 全成功才删除”。`GrantIndex` 每次遍历全部活动项目。CR：CR-003、CR-004、CR-007。
+
+### MOD-R29-16 授权校验与项目视图
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 8/10 | 9/10 | 8/10 | 8/10 | 9/10 |
+
+与调用期共用 `admission_reason`；台账不可读 ⇒ 单条 `mcp_store_unavailable`（fail-closed，仅当存在新增外部授权/参数变更）。CR：无。
+
+### MOD-R29-17 supervisor
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 8/10 | 9/10 | 8/10 | 8/10 | 7/10 |
+
+任何异常只写 WARN/审计；`inline=True` 便于离线驱动；监听线程路径未被自动化覆盖。CR：CR-008。
+
+### MOD-R29-18 编译 / 编排 / 定义校验钩子
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 9/10 | 9/10 | 9/10 | 8/10 | 9/10 |
+
+加成式，默认 `None`；无外部授权时与现行路径逐位相同（全量回归零新增失败）；`IB_MCP_ENABLED=0` 时外部授权视为悬空而不使编译失败。CR：无。
+
+### MOD-R29-19 HTTP 视图与路由
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 8/10 | 9/10 | 7/10 | 7/10 | 7/10 |
+
+写端点先鉴权后解析请求体；`?token=` 由中间件统一 400；错误体不回显凭证；admin 判定与 `_require_admin` 同口径。自评审发现并修复项目侧可枚举他项目凭证行（CR-005）。CR：CR-003、CR-005（FIXED）、CR-010。
+
+### MOD-R29-20 组合根装配
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 8/10 | 9/10 | 9/10 | 7/10 | 8/10 |
+
+主密钥只从 `os.environ` 读取，不进 `GlobalConfig`；`make_secret_cipher` 四分支；发布服务/运行时缓存按调用时解析。`composition.py` 继续增长（+264 行）。CR：CR-010。
+
+### MOD-R29-21 前端 API 客户端与词表
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 9/10 | 9/10 | 9/10 | 9/10 | 9/10 |
+
+HTTP 只经 `client.ts`；无 axios/CDN；词表为纯 TS。CR：无。
+
+### MOD-R29-22 前端管理页与导航
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 8/10 | 8/10 | 8/10 | 7/10 | 7/10 |
+
+导航入口（`SYSTEM_ORDER` + 路由 `requiresAdmin`）已接；凭证 `type="password"`、提交即清空、永不回填；传输下拉仅 `streamable_http`。单文件约 690 行；未在真实浏览器中运行。CR：CR-009。
+
+### MOD-R29-23 前端配置页外部工具区
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 9/10 | 9/10 | 9/10 | 8/10 | 9/10 |
+
+纯函数 `externalGrants.ts` 不 import 其他模块（可被 `node:test` 单文件转译加载）；无外部工具且无失效授权时不渲染。CR：无。
+
+### MOD-R29-24 部署 / CI / 自检
+| Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|
+| 9/10 | 9/10 | 9/10 | 8/10 | 9/10 |
+
+`selfcheck.py:3924/:3962` 既有断言未改；`checklists.txt` 新增 `[B30]` 并同步签署行（既有 `B28/B29` 签署行断言不受影响）；`env.example` 仅 `<REPLACE_ME_…>` 占位。CR：无。
+
+## CR 问题表
+
 | CR | 级别 | 位置 | 描述 | 状态 |
 |---|---|---|---|---|
-| — | — | — | 无问题 | — |
-
-### MOD-R28-02 地址防护与安全抓取
-SSRF：`getaddrinfo` 统一解析、全部地址须通过"18 个显式网段 ∩ `is_global`"、IPv4 映射按内嵌地址判、zone id 拒绝、端口仅 80/443、userinfo / 控制字符 / 超长拒绝、每跳重校验、`Accept-Encoding: identity`、无 Cookie / Authorization / Referer；selfcheck 53 条拒绝用例（含重定向到内网、跳数超限）全部通过。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| CR-002 | MAJOR | `webtools/netguard.py`（初版） | 初版 `netguard.py` 持有 `socket` 导入（默认解析器），违反 `web_egress_single_exit`（仅 `fetch.py` / `search.py` 可持有网络导入）。已把 `default_resolver` 移到 `fetch.py`，`UrlGuard` 惰性引用 | FIXED |
-| CR-012 | MINOR | `webtools/fetch.py` `default_resolver` | `getaddrinfo` 不可取消：超时后后台线程继续至 OS 解析超时；已用 ≤4 的隔离线程池 + 满则拒绝兜底（设计已知风险，ADR-R28-03 后果 (2)） | OPEN |
-
-### MOD-R28-03 搜索提供方适配
-2.1.0 重写：`search.py`（工厂 / 注册表 / Null / Fake，仍无网络导入）、`deepseek.py`（适配器 + `UrllibPostTransport`，搜索侧唯一网络代码）、`deepseek_double.py`（离线替身，无网络导入）。密钥不进日志 / 异常消息 / `repr` / `health()` / `describe_egress()`；适配器只按状态码映射、不读错误体；单次尝试不重试；不跟随重定向；构造器强制 `transport`。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| CR-009 | MINOR | `webtools/search.py` `build_search_provider` | 2.0.0：`provider_id="fake"` 在生产环境也被接受。2.1.0：非离线 + `fake` ⇒ `ConfigError`（Fake 不被构造），`validate_required` 同步拒绝（ADR-R28-13） | FIXED（2.1.0） |
-| CR-015 | MINOR | `webtools/deepseek.py` `UrllibPostTransport.post_json` | 真实传输未对真实端点验证（P11-3 禁止）；套接字超时取 `timeout_s`，总期限仅在分块读取处检查，单次阻塞读最长可达 `timeout_s`，最坏总耗时约 `2×timeout_s`（A-9），由外层看门狗（`timeout_s+1`）兜底。仅做回环不可达冒烟与 opener 处理器清单核对 | OPEN（目标机人工验证，OQ-ARCH-R28-08） |
-| CR-017 | MINOR | `webtools/deepseek.py`（自评审初版） | 模块文档串与 `encode_search_request` 文档串含字面量 `ori_question` / `localization`，违反 selfcheck `deepseek_adapter_contract` 的源码纪律（适配器源码不得含未使用的外发字段名）。已改写为中文描述 | FIXED |
-
-### MOD-R28-04 联网出站闸与预算
-顺序固定：并发闸（非阻塞）→ 审计先行（失败不执行 `fn`）→ 执行；出站文本闸：长度 → 秘钥模式 → 与私有语料 ≥24 字符重叠（URL 含解码后的 path / query）。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| CR-001 | CRITICAL | `webtools/gate.py`、`llm/__init__.py`（初版） | 设计的"线程局部"回合绑定在 `_execute_tool` 看门狗线程池中不可见，联网工具会因"缺少回合上下文"整体失效（或在改动时绕过预算 / 出站闸）。改用 `contextvars.ContextVar`，`_execute_tool` 以 `copy_context().run` 提交；联网路径冒烟（看门狗线程内预算 / 审计 / 私有语料可见）通过 | FIXED |
-
-### MOD-R28-05 联网工具
-永不抛；失败文本固定短语；AQ4：`fetcher is None` 在预算 / 出站闸 / 审计 / 并发闸之前短路并只记 `fetch_disabled`；LLM 实参仅 `query` / `url`，其余同名实参被 MOD-R28-08 丢弃。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| — | — | — | 无问题（A-6 见 implementation_plan） | — |
-
-### MOD-R28-06 联网治理存储与迁移
-009 与生成器逐字一致（selfcheck 单源 / 幂等 / CHECK / 老库补齐）；SQL 全参数化；`set` 校验 int 非 bool 且在范围内。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| CR-005 | MAJOR | `ledger/web_governance.py` `build_web_governance_store`（初版） | 初版在离线夹具（`ledger_backend=memory`、`ledger_path=./var/ledger/…`）下无条件打开 SQLite，目录不存在 → 装配失败（全量 pytest 首轮 `ERROR`）；且会在离线测试时落盘。改为 `web_governance_backend=memory` 或 `ledger_backend=memory` 时用内存替身，并为 sqlite 路径创建父目录 | FIXED |
-
-### MOD-R28-07 配置域
-顾问规则仅在存在启用的顾问专家时追加；`canonical_graph_from_experts` 输出不变；种子 0 命中 `BLOCKED_TERMS` 且含三项条款用语。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| — | — | — | 无问题 | — |
-
-### MOD-R28-08 工具注册与参数闭包
-`config_parameters=None` 的工具走原路径；配置胜出包装不暴露 `scope` / `knowledge` 形参。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| CR-003 | MAJOR | `tools/__init__.py` `bind_scope` / `build_agent_tools`（初版） | 这两处重建 `BoundTool` 时未携带 `timeout_s`，联网工具会失去看门狗。已补 `timeout_s=getattr(item, "timeout_s", None)` | FIXED |
-
-### MOD-R28-09 工具执行看门狗
-`timeout_s is None` 与现状完全一致（占位文本不变）；事件回调异常被吞。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| — | — | — | 无问题（线程池 8 线程为模块级共享；超时的任务线程无法强杀，由工具自身的协作式期限兜底） | — |
-
-### MOD-R28-10 顾问核心库
-`understand` 永不抛、fail-open；`build_history_digest` 满足"窗口 20 / 整条从最旧丢弃 / 最近一条始终保留 / len ≤ 预算"（含单条超预算截断）。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| CR-008 | MAJOR | `advisor/understand.py` `_PROMPT` | 理解步骤复用 `build_router()` 角色，其 system 提示要求"只输出 JSON 数组"，与理解器要求的 JSON 对象冲突；真实 LLM 的遵从度离线不可验证。不合规输出已 fail-open 为透传（路由照常），不影响可用性，但会削弱意图旁路 / 消解的收益。需目标机用评测集验收 | OPEN |
-
-### MOD-R28-11 Agent Builder 评审口径
-kb-agent 画像（含 `is_retrieval` 工具）返回原 `grounding_clauses`；顾问画像三项条款无条件适用；消息文案对非顾问画像逐字不变。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| CR-010 | MINOR | `ibweb/composition.py` `_context` | Builder 的项目摘要 `tools` 现在对所有项目含 `web_search` / `web_fetch`（`is_external=True`），Builder 外发的 `project_digest` 内容随之多两项；属设计允许的目录可见变化，但影响 Builder 提示输入 | OPEN |
-
-### MOD-R28-12 编排运行期
-全部新行为以 `view.advisor_id` 为前提；步数上限不计顾问、顾问不会被记 `skipped_step_cap`；失败路径（节点降级 / 保真两次不过 / 节点内异常 / `run_dag` 未预期异常）统一返回 `ADVISOR_APOLOGY_TEXT`，叶子集合 = {顾问}，`_collect` 与默认专家安全网未改且在顾问模式下不会触发。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| CR-007 | MAJOR | `orchestration/dag.py` `_advisor_node` | ADR-R28-09 要点 1 写"从被委托产出与联网结果中抽取保护片段"，实现只对祖先 agent 产出做保真核对，联网文本仅参与 `exceeds_quote_limit`。理由：联网结果含大量数字 / 网址，要求答复全部复述会使几乎每个联网回合触发致歉（用户裁决 AQ1=B 下误报直接可见）。联网事实"原样保留"目前仅靠提示词。需用户确认（implementation_plan Q-2 / A-1） | OPEN |
-| CR-013 | MINOR | `orchestration/dag.py` `_advisor_node` | 函数长（约 110 行）、分支多，致歉判定与重试内联；可读性一般，建议后续拆分为"作答→核对→重试"小函数（本轮保持最小改动、行为已由冒烟覆盖 6 条路径） | OPEN |
-
-### MOD-R28-13 运行时编译
-未启用项目：`advisor_id=None`、无理解器、无 `turn_scope`；日志白名单仅追加精确键名。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| — | — | — | 无问题 | — |
-
-### MOD-R28-14 组合根
-API Key 仅在 `_assemble` 读环境一次传入 `build_web_runtime`，不进 `GlobalConfig` / 日志 / 审计 / 描述；`seed_project(with_advisor=False)` 路径逐位不变；`_plain_validate` 对含联网授权文档在上限不可读时 fail-closed。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| CR-004 | MAJOR | `ibweb/composition.py` `Deps.bind_tools`（初版） | 防御性回落（项目无授权文档）会 `bind_scope(registry.registered())`，联网工具恒登记后将被绑定给所有此类项目的 agent，违反"未启用项目逐位一致"。已过滤 `external=True` 的工具 | FIXED |
-| CR-006 | MAJOR | `.github/workflows/ci.yml`（MOD-R28-16 子项） | 迁移检查步骤未追加 009：画像 P7 把 CI 配置归 devops，开发角色不写 CI 配置。等价检查由 selfcheck `web_governance_schema_single_source`（CI 已运行 selfcheck）覆盖；已在 implementation_plan Q-1 移交 | OPEN |
-
-### MOD-R28-15 HTTP 接口
-`enable_advisor` 非 bool → 400 且先于创建（不留半成品）；`/api/web-governance` 仅 admin、逐字段 400、存储不可用 503；`/healthz/deps` 在 `egress_web` 为空时不追加键（基线逐字节一致）。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| — | — | — | 无问题 | — |
-
-### MOD-R28-16 自检 / CI / 评测脚本 / 依赖清单
-`lxml>=5.0,<7.0` 上下界都写，仅 `requirements.txt` / `requirements-offline.txt`；`env.example` 仅注释形态占位。`advisor_eval.py` 不内置合成集，统计逻辑经替身验证。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| CR-006 | MAJOR | （同 MOD-R28-14 表） | 同上，不重复计数 | OPEN（见上） |
-
-### MOD-R28-17 前端 API 与顾问接线纯函数
-`createProject` 仅当 `enableAdvisor === true` 才加键，其余请求体与既有逐字相同；`addAdvisor`/`removeAdvisor` 往返恢复规范图（冒烟验证）。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| — | — | — | 无问题 | — |
-
-### MOD-R28-18 前端页面
-HTTP 只经 `client.ts`；无 axios / CDN；"启用顾问"默认不勾选；联网上限页经"系统管理"导航可达（`SYSTEM_ORDER` 追加 `web-governance`，导航项由路由表派生，仅 admin 可见）。
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| CR-011 | MINOR | `src/frontend/tests/`、`tests/unit|integration|e2e/*rev28*` | 本轮未提交新测试文件（`advisor_r28.test.js` 及后端 `*_rev28.py`，属 GROUP_D 职责）；前端组件交互无挂载环境，仅 `advisorPlan.ts` 做了脚本冒烟。Testability 6 分对应本条 | OPEN |
+| CR-001 | MAJOR | `src/ib/mcp/crypto.py`（`FernetSecretCipher`） | 真实 Fernet/MultiFernet 路径在本机从未执行（venv 无 `cryptography`，按 ADR-R29-17 方案 C 只验证了端口层与替身）；密钥格式校验、轮换解密、坏令牌异常不含值等行为仅靠代码审阅 | OPEN |
+| CR-002 | MINOR | `src/ib/mcp/runtime.py` 步骤② | 回合预算在步骤②先 `reserve`，之后被准入/断路器等拒绝的调用也消耗计数（保守方向，不放宽上限）；Server 级每回合分计在③之后复核 | OPEN |
+| CR-003 | MAJOR | `src/ibweb/mcp_views.py`（`_tool_dto`、`tools_endpoint`/`server_endpoint`）；`src/ib/mcp/admin.py`（`GrantIndex.references`） | 列表接口对每个工具各发一次审计查询（N+1，每次 ≤200 行）；引用索引每次遍历全部活动项目（O(P)，设计已估算为十~百量级）。目录规模大时列表接口变慢 | OPEN |
+| CR-004 | MINOR | `src/ib/ledger/mcp_store.py`（`update`，CAS 基于 `updated_at`） | 乐观并发用秒级 ISO 时间戳，同一秒内两次更新无法区分（沿用 `utc_now_iso` 精度） | OPEN |
+| CR-005 | MAJOR | `src/ibweb/mcp_views.py`（`_server_dto`） | 自评审发现：项目绑定主体读 Server 时，`credential.projects` 会列出其他项目的专属凭证行（泄露他项目标识）。**已修复**：非 admin 仅见本项目条目；冒烟与全量回归复跑通过 | FIXED |
+| CR-006 | MINOR | `src/ib/ledger/mcp_store.py`（`Memory*`） | 单独实例化的 `Memory*` 各自独立内存库（只有 `build_mcp_stores(None, backend="memory")` 共享连接）；偏差 D1 已登记，测试需用工厂 | OPEN |
+| CR-007 | MINOR | `src/ib/mcp/admin.py`、`catalog.py`、`client.py` | 少量未使用的导入（仓库无 lint 配置，未被工具发现） | OPEN |
+| CR-008 | MAJOR | `src/ib/mcp/supervisor.py`（`_sync_listeners`/`_listen_loop`）、`client.py::listen` | 监听线程与 `subscriptions/listen` 流的真实路径无自动化覆盖：`FakeMcpServer` 对该方法返回 `-32601`，且 `tick()` 的 inline 模式不启动监听线程；仅健康探测/复核/去抖/启停被执行验证 | OPEN |
+| CR-009 | MAJOR | `src/frontend/src/views/McpServersPage.vue` | 管理页仅通过 `vue-tsc` 严格类型检查与构建，未在真实浏览器中运行，也没有页面逻辑的单元测试（本轮不写测试） | OPEN |
+| CR-010 | MINOR | `src/ibweb/config_views.py::_mcp_catalog_keys`、`composition.py::_external_param_specs` | 台账读取失败时静默省略追加键/参数规格（只读路径的降级；保存路径另有 fail-closed 的 `mcp_store_unavailable`），管理员在该窗口看不到失效标注 | OPEN |
+| CR-011 | MINOR | `src/ib/mcp/double.py`（`FakeMcpServer.handle`） | 替身对 `x-mcp-header` 镜像只校验“头存在”，不比对值；契约测试需另行断言镜像值 | OPEN |
 
 ## 未解决的 CRITICAL
 
-无（CR-001 已修复）。
+无。
 
 ## 遗留 MAJOR
 
-遗留 3 条（≤3，无强制逐条要求，仍逐条说明）：
+遗留 4 条（CR-001、003、008、009），逐条原因与建议处理时机：
 
-| CR | 原因 | 建议处理时机 |
+| CR | 遗留原因 | 建议处理时机 |
 |---|---|---|
-| CR-006 | 角色边界：CI 配置归 devops；selfcheck 已等价覆盖 | 下一轮 GROUP_E1 追加 `ci.yml` 迁移检查 009 |
-| CR-007 | 与 ADR 文字有出入且涉及用户可见误报权衡，需用户裁决 | 本轮门控 / 用户确认（Q-2） |
-| CR-008 | 离线无法验证真实 LLM 遵从度；已 fail-open | 目标机用评测集运行 `advisor_eval.py` 后；若遵从度低，改为专用理解角色（需设计变更） |
+| CR-001 | 项目约束不允许子代理安装依赖；设计已选方案 C（端口 + 替身 + CI 必跑真实依赖） | GROUP_D 写入 `test_mcp_crypto_fernet_r29.py`；**CI 首次运行**以 `IB_REQUIRE_CRYPTO=1` 强制执行；用户在开发机执行 tech_stack 的安装命令后本机可复核 |
+| CR-003 | 设计已接受 O(P) 遍历（项目数十~百量级）；缓存会引入新的一致性窗口，违背“管理动作后下一次读取即可见” | 若目录/项目规模增长到数百以上，GROUP_B/E 评估按请求缓存或聚合审计查询；本轮不改 |
+| CR-008 | 替身不支持流式订阅，补替身属测试夹具工作（GROUP_D 职责）；监听只是变更感知的四途径之一，其故障不影响调用路径（ADR-R29-04 第 6 点） | GROUP_D 在回环线程服务上补监听用例；部署后以 `[B30]` 与日志核对 |
+| CR-009 | 无浏览器环境；本轮范围不含前端单元测试 | GROUP_D 前端冒烟追加（导航入口/词表/外部授权纯函数）；上线后用户在 UI 复核（登记→验证→启用→审核→开放→授权） |
 
 ## 缺陷修复
 
-非缺陷修复模式（无 `<defects>`）。
+非缺陷修复模式（无 `<defects>`）。不适用。
 
 ## 现有测试调整
 
-3 个既有测试文件共 4 处断言（原因：AQ3=A，全局工具目录恰好多出 `web_search`、`web_fetch`），逐条改前改后见 implementation_plan "既有测试调整"：
+仅 1 处。v0.2.0 按 GR-C-001（retry 1/2）修正：上一轮的可选组 `(, 'mcp')?` 属弱化，已撤销并改为严格匹配新契约；授权来源 `REWORK_AUTHORIZED: src/frontend/tests/advisor_r28.test.js`（仅 :260 附近这一条断言）。
 
-1. `tests/integration/test_prompt_config_r16.py::test_TC_INT_R16_prompt_list_contract` — `available_tools` 与 `tool_param_specs` 两处；
-2. `tests/integration/test_prompt_tool_config_int_r16d.py::test_TC_INT_136_single_registration_point_tools_and_params` — 工具名元组与规格列表；
-3. `tests/unit/test_prompt_tool_config_unit_r16d.py::test_TC_UNIT_123_search_tool_spec_exposes_optional_retrieval_param_specs` — 规格集合。
-
-均保留 `search_knowledge` 的精确断言（集合 / 顺序不变），仅放行"其余项恰为 `web_search` / `web_fetch`"；未放宽任何无关断言。
-
-## 修订记录（1.1.0，DEF-001 修复）
-
-### 缺陷修复补充
-
-| DEF | 位置 | 根因 | 修改说明 |
+| 文件:行 | 原断言 | 调整 | 原因 |
 |---|---|---|---|
-| DEF-001 | `src/ib/webtools/tools.py`（`_web_fetch`，原 300-302 行）；`src/ib/webtools/gate.py`（`TurnBudget.charge_bytes`） | `add_bytes` 先判超限再累计，超限时抛 `WebBlocked` 且不累计，调用处 `except WebBlocked: pass` 吞掉，导致超限失败的抓取字节未入账，同回合可重复超限抓取 | 新增无条件累计的 `charge_bytes`，调用处改用之；`add_bytes` 不变；耗尽后由既有 `remaining_bytes <= 0` 在出站前拒绝 |
+| `src/frontend/tests/advisor_r28.test.js:260-261`（TC-FE-R28-023） | `/const SYSTEM_ORDER = \['accounts', 'projects', 'llm-key', 'web-governance'\];/` | 严格改为 `/const SYSTEM_ORDER = \['accounts', 'projects', 'llm-key', 'web-governance', 'mcp'\];/`（无可选组、无宽松正则），注释为“REV-29 MOD-R29-22 契约变更；授权 GR-C-001 REWORK_AUTHORIZED”；其后 `order.slice(0,3)` 的既有三项相对顺序断言原样未动 | module_design MOD-R29-22 明确要求 `SYSTEM_ORDER` 末尾追加 `'mcp'`（新管理页必须有导航入口，画像 P6），契约由四项变为五项。ConsoleLayout.vue:59 实际为五项字面，严格断言通过；去掉 'mcp' 则会失败 |
 
-### 新增评审条目
+返工后复跑 `(cd src/frontend && npm run build && npm test)`：`# tests 160 / # suites 26 / # pass 160 / # fail 0`。产品代码与 .py 未改动，故未重跑 pytest / selfcheck（沿用 1358 passed；selfcheck 基线不变）。
 
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| CR-014 | MINOR | `src/ib/webtools/gate.py` `charge_bytes` | 超限读取全额计入，`bytes_used` 可略大于上限；语义为"耗尽即拒"，不影响上限约束。`add_bytes` 现无生产调用方，保留供既有单测 | OPEN |
+其余既有测试（pytest 1358、selfcheck `:3924` / `:3962`）**零改动**。
 
-### 自验证（1.1.0，历史）
+## 缺陷修复轮（GR-D-001，缺陷回流第 1 轮；文档 1.1.0 DRAFT）
 
-环境同上（venv `/root/.venvs/intelligentbase`，PYTHONUTF8=1 IB_OFFLINE_MODE=1 IB_CONFIG_SOURCE=dict IB_LOG_LEVEL=ERROR DJANGO_SETTINGS_MODULE=ibweb.settings）。
+### 缺陷修复（DEF-ID → 修改位置 → 根因）
 
-| 检查 | 命令 | 结果 |
-|---|---|---|
-| 编译 | `python -m compileall -q src` | `COMPILE_OK` |
-| 全量后端 | `python -m pytest tests -q -p no:cacheprovider` | `1 failed, 1230 passed`；失败仅 `test_TC_UNIT_R28_085_fetch_tool_total_bytes_budget_and_call_limit`（`assert tr.count == 3`，实际 2；预期信号，冻结守卫 DEF-001-GUARD） |
-| selfcheck | `python src/scripts/selfcheck.py` | `自检结果：64/65 通过`（失败仅 `core_framework_free`，环境性既有） |
-
-改动范围：`src/ib/webtools/gate.py`（+5 行）、`src/ib/webtools/tools.py`（-4/+2 行）；`webtools/` 为未追踪新目录，故 `git diff --stat` 无输出。无测试文件改动；本轮五维评分不变，问题统计增 MINOR 1（共 MINOR 6）。
-
-## 修订记录（2.1.0，Q7 纳入：DeepSeek 搜索适配器；新增范围，非缺陷回流）
-
-依据：module_design 3.0.0 MOD-R28-03、IFC-R28-029~032，ADR-R28-11/12/13；唯一外部出处 `docs/external_api/deepseek_search_fetch.md`（画像 P11-3）。逐文件改动与 selfcheck / 既有测试口径变更见 implementation_plan "修订记录 2.1.0"。
-
-### 文件 → MOD/IFC（2.1.0 增量）
-
-| 文件 | MOD / IFC |
-|---|---|
-| `src/ib/webtools/deepseek.py`（新）、`deepseek_double.py`（新）、`search.py`（改） | MOD-R28-03 / IFC-R28-005、029、030、032（工厂闸） |
-| `src/ib/core/types.py`、`core/__init__.py` | MOD-R28-01 / IFC-R28-001（`SearchQuery` 取值域、`DEEPSEEK_API_HOST`） |
-| `src/ib/llm/__init__.py` | MOD-R28-09 / IFC-R28-031 |
-| `src/ib/config/__init__.py` | MOD-R28-07 / IFC-R28-011、032 |
-| `src/ib/webtools/gate.py`、`policy.py`、`tools.py` | MOD-R28-04 / 02 / 05（IFC-R28-006、003、007：128 字符、lang 校验、1..50、空检索词短语、摘要 800） |
-| `src/ibweb/composition.py`、`src/deploy/env.example` | MOD-R28-14 / IFC-R28-021 |
-| `src/scripts/selfcheck.py` | MOD-R28-16 |
-| `AgentDetailPanel.vue` | MOD-R28-18（AQ6=A 静态提示） |
-| `tests/unit/test_webtools_tools_unit_r28.py`、`tests/integration/test_advisor_web_int_r28.py` | 既有测试调整（见下） |
-
-### 2.1.0 评审要点（按设计硬约束逐条核对）
-
-| 约束 | 核对结论 | 证据 |
-|---|---|---|
-| 自动化 / 自验证不调用真实端点 | 满足：构造器强制 `transport`；`UrllibPostTransport` 仅在 `build_search_provider` 非离线 + `deepseek` + 有 Key 分支构造，全部测试与自检均离线（`offline_mode=1` ⇒ Fake）；回环冒烟仅连 `127.0.0.1:1` | selfcheck `search_fake_rejected_in_production`（离线路径真实传输构造数 = 0） |
-| 请求只发 `query` / `count` / `need_content`；query ≤128；count 1..50 | 满足 | `deepseek_adapter_contract` |
-| 不重试；不读错误体；不暴露错误细节 | 满足：`HTTPError` 仅取 `code` 后 `close()`；意外异常统一 `bad_response`，不记录细节 | `deepseek_adapter_contract`（请求数 = 1） |
-| Key 不进日志 / 异常 / `repr` | 满足：`repr` 固定串；构造器异常文案不含 Key；`DoubleRequest` 只记 `authorization_ok` | `search_port_conformance`、`deepseek_double_covers_p11` |
-| 非离线 + `fake` ⇒ 启动失败只报键名 | 满足：`validate_required` 与工厂双重拒绝，消息不含所配值 | `search_fake_rejected_in_production` |
-| 复用 LLM Key 解析点，不新增凭据 | 满足：`resolve_llm_api_key` 单点；两个旧键与 `web_search_base_url` 删除 | `web_key_reuse_no_new_credential` |
-| `env.example` 无真实值 | 满足（仅删除两行并改注释） | `deploy_templates_have_no_secrets` PASS |
-| 未启用顾问 / `none` 缺省行为逐位一致 | 满足：`resolve_llm_api_key` 为原逻辑搬移；`_offline_view` 对 `none` 保持；全量 pytest 1232 passed | 全量回归 |
-| 资料未写的数值标假设 | 满足：2 MiB（A-14）、lang 正则（A-16）、不重试（A-15）、不跟随重定向（A-18）、非 2xx/其他 4xx 映射（[ASSUMPTION]）在注释中标出 | `deepseek.py` 注释 |
-
-### 新增评审条目（2.1.0）
-
-| CR | 级别 | 位置 | 描述 | 状态 |
-|---|---|---|---|---|
-| CR-009 | MINOR | `webtools/search.py` | 见 MOD-R28-03 表：因 ADR-R28-13 落地转 FIXED | FIXED |
-| CR-015 | MINOR | `webtools/deepseek.py` `UrllibPostTransport` | 真实传输未对真实端点验证；最坏总耗时约 `2×timeout_s`（A-9） | OPEN |
-| CR-016 | MINOR | `tests/integration/test_advisor_web_int_r28.py::test_TC_INT_R28_223` | 因旧键 / 自定义提供方路径取消，该用例对“非离线 Key 流向”的覆盖减弱（离线夹具下搜索提供方统一为 Fake，哨兵 Key 经 `IB_LLM_API_KEY` 仅验证不泄露面）；DeepSeek 路径的 Key → 请求头 → 不入日志需 GROUP_D 以 `FakeDeepSeekTransport.requests` 新增用例覆盖 | OPEN（移交 GROUP_D） |
-| CR-017 | MINOR | `webtools/deepseek.py`（初版文档串） | 含未使用外发字段名字面量，违反源码纪律；已改写 | FIXED |
-
-评分变化：仅 MOD-R28-03（Correctness 9→8：真实传输未验证；Maintainability 9→8：新增 3 个文件 + 惰性 import 分支，复杂度上升）。其余 MOD 的 2.0.0 评分不变（MOD-R28-01/05/07/09/14/16/18 的 2.1.0 改动均为小幅、被新增自检覆盖，未改变其评分依据）。总平均 8.51 → 8.49；无低于 6 的维度。
-
-### 遗留 MAJOR（2.1.0 无变化）
-
-仍为 CR-006、CR-007、CR-008 共 3 条（≤3），原因与建议时机见上文“遗留 MAJOR”。2.1.0 未新增 MAJOR。
-
-### 现有测试调整（2.1.0，逐条）
-
-1. `tests/unit/test_webtools_tools_unit_r28.py::test_TC_UNIT_R28_075_…`：期望 `[10, 1, 5]` → `[50, 1, 5]`（条数上限 10 → 50，IFC-R28-001 / 007）。
-2. `…::test_TC_UNIT_R28_091_…`：工厂调用补 `offline=` 关键字、去 `base_url`；删除两条“`http://` 或缺 Key ⇒ Null”断言（该退化规则随 `base_url` 删除取消）；其余断言保留。
-3. `tests/integration/test_advisor_web_int_r28.py::test_TC_INT_R28_223_…`：取消自定义提供方 `r28cred` 与两个已删除的键，哨兵 Key 改经 `IB_LLM_API_KEY`，期望主机 `search.r28.test` → `fake.invalid`（离线整体切替身）；全部“哨兵串出现 0 次”断言保留。
-
-详细改前 / 改后与原因见 implementation_plan "既有测试调整（2.1.0）"。未放宽任何无关断言。selfcheck 口径变更（`web_egress_single_exit`、`search_port_conformance` 两条既有，另新增 4 条）逐条见 implementation_plan "selfcheck 口径变更"。
-
-### 缺陷修复
-
-非缺陷修复模式（无 `<defects>`）。
-
-### 自验证（2.1.0）
-
-| 命令 | 输出尾部 | 与当前基线（1232 / 64/65 / 160） |
-|---|---|---|
-| `python -m compileall -q src` | `COMPILE_OK` | — |
-| `python -m pytest tests -q -p no:cacheprovider` | `1232 passed in 47.02s` | 新增失败 0 |
-| `python src/scripts/selfcheck.py` | `自检结果：68/69 通过`；失败项仅 `core_framework_free`（`sitecustomize`，环境性既有） | 新增失败 0；新增 4 个用例全 PASS |
-| `cd src/frontend && npm run build` | `✓ built in 33.66s` | — |
-| `cd src/frontend && npm test` | `# tests 160 / # pass 160 / # fail 0` | 新增失败 0 |
-
-**未验证项（如实）**：`UrllibPostTransport` 对真实 `api.deepseek.com` 的 TLS / 重定向 / 超时 / 代理行为（P11-3 禁止调用真实端点；列目标机人工验证）；资料本身由主会话整理、PM 未核对原页面。
-ET 解析不适用（Markdown 表格正文）；文件头为 `&lt;`/`&gt;` 安全的纯文本。
-
-## 修订记录（3.1.0，缺陷回流 2/2）
-
-### 缺陷修复
-
-| DEF | 位置 | 根因 | 修改说明 |
+| DEF | 修改位置 | 根因 | 修改说明 |
 |---|---|---|---|
-| DEF-002 | `src/ib/orchestration/__init__.py` `_run_dag_turn`（摘要 / `AdvisorTurn` 构造） | A-12 兜底只覆盖 `run_dag` 调用，理解步骤之后的回合准备在 try 之外，异常逃出到视图层只剩 error 事件 | 准备段包进 try，异常 ⇒ 日志（仅异常类名）+ `ADVISOR_APOLOGY_TEXT` + 写历史 + 终态；仅顾问分支，未启用顾问项目不变 |
-| DEF-004 | `src/ib/builder/egress.py` `render_user_message`（根源字段 `types.py:107`、`composition.py:1333`） | `ToolDigest.is_external` 经 `asdict` 对所有工具恒输出，基线条目多出键 | 外发序列化时 `is_external` 仅为真保留；dataclass 与装配不动 |
-| DEF-005 | `src/ib/webtools/tools.py` `_web_fetch` | `http_error` 一律落到通用“网页抓取失败” | 401/403/429 ⇒ “目标网站拒绝了访问”，其余 `http_error` ⇒ “该网页无可用内容”，不含状态码 |
-| DEF-006 | `src/ib/webtools/fetch.py` `_fetch` | 200 且抽取为空仍判 ok + 空正文 | 空正文 ⇒ 失败 `empty_content` ⇒ “该网页无可用内容” |
+| DEF-R29-004 | `src/ib/mcp/runtime.py` `_call` ⑥ | 构造入参只做“剔除 hidden/fixed 键”的黑名单，未做白名单；LLM 自加的未声明键原样外发（AC-027-04 / REQ-NFUNC-009） | 白名单 = 已审核 `input_schema.properties` 键，且不属于 `hidden ∪ fixed`；之后 `update(fixed_args)`；其后的 `max_arg_bytes` 与 `validate_args` 仍照常执行 |
+| DEF-R29-003 | `src/ib/mcp/client.py` `McpTarget` / `list_tools` / `listen`；`src/ib/mcp/catalog.py` `_target`；`src/ib/mcp/supervisor.py` `stop` | ① 已知时代分支把 `list_changed` 写死 False，refresh 的 `record_probe(negotiated=...)` 覆盖验证期协商值 ⇒ 监听从不启动；② `stop()` 只置 Event，阻塞在安静 SSE 流上的读取不检查 Event，流也未被关闭 ⇒ 线程残留 | ① `McpTarget` 增可选字段（默认 False，位置在末尾，全部既有调用点不变）并由 `catalog._target` 带入台账值；② `listen()` 的关闭小线程在 stop 置位时 `resp.close()`，`supervisor.stop()` 带超时 join 监听线程 |
+| DEF-R29-002 | `src/ib/mcp/result.py` `render_result`；`src/ib/mcp/client.py` `call_tool` | ① `sanitize(max_chars=limit)` 先按字符截断，ASCII 下已压到上限，随后字节截断判定“未超限”⇒ 静默截短、无标注；② 读取上限仅 `max_bytes+64KB`，100 KB 文本被判 `response_too_large` | ① 净化不截断，统一字节截断 + 标注，并为标注预留字节；② 读取上限放宽到 `max(4×max_bytes, max_bytes+64KB)` |
+| DEF-R29-005 | `src/ib/orchestration/dag.py` `_advisor_node` | 顾问节点走独立分支，未进入 `mcp_turn_scope`，调用恒 `no_turn_scope` | 与非顾问分支同判定进入外部回合作用域；`ExitStack` 叠加在既有 `turn_scope` 之内，预算语义不变 |
 
-DEF-003 本轮不修（CR-008 已接受设计，待用户裁决）。
+### 共享判定函数 / 调用方副作用评估（P-PM-001）
 
-副作用评估：`FetchResult` / `SafeFetcher.fetch` 调用方仅 `tools.py::_web_fetch`（grep 核对）；`render_user_message` 的 `asdict` 仅作用于 `project_digest`，judge 载荷无 tools；全量回归无其他层新增失败。
+| 被改符号 | 全部调用方 | 评估 |
+|---|---|---|
+| `McpTarget`（新增末位默认字段） | `catalog.py`（2 处，其中 `_target` 已改）、`supervisor.py`（2 处，位置参数 6 项）、`runtime.py:456`（关键字）、测试夹具 | 默认值 False，旧调用点语义不变；仅 `_target` 路径（verify 之后的 refresh）获得协商值。supervisor 的监听 target 不用该字段 |
+| `render_result` | 仅 `runtime.py` ⑪；单测 `test_mcp_rules_r29.py`（256/264/284 等）全部仍通过 | 不再字符截断：中文超限由字节截断承担，`test_mcp_rules` 的 120000 字节用例仍通过；标注预留字节只在 `truncated` 时触发 |
+| `call_tool` 读取上限 | 仅 `runtime._call` 经 `max_bytes` 传入 | 内存仍有界（≤ 4×结果上限，默认 128 KB）；`response_too_large` 仍对更大响应生效 |
+| `McpSupervisor.stop` | `Deps.close()`、测试 | 最坏多等 `timeout_s`（默认 2 s）；`_inline` 模式无监听线程，无影响 |
+| `_advisor_node` | 仅 `make_agent` 顾问分支 | 无 `mcp__` 工具或 `mcp_turn_scope is None` ⇒ `nullcontext`，与现状逐位相同（REV-28 顾问全量回归通过） |
 
-### 新增评审条目（3.1.0）
+### 新问题自评审
 
 | CR | 级别 | 位置 | 描述 | 状态 |
 |---|---|---|---|---|
-| CR-018 | MAJOR | `orchestration/__init__.py` 顾问回合准备段 | DEF-002：准备段异常无致歉 | FIXED |
-| CR-019 | MINOR | `builder/egress.py` | DEF-004：既有工具条目多出 `is_external` | FIXED |
-| CR-020 | MAJOR | `webtools/tools.py` | DEF-005：拒绝与无内容不可区分 | FIXED |
-| CR-021 | MAJOR | `webtools/fetch.py` | DEF-006：空正文判成功 | FIXED |
-| CR-022 | MINOR | `tests/integration/test_advisor_http_int_r28.py:387`（344）与 `test_deepseek_search_int_r28.py`（421） | 两测试对 `search_knowledge.is_external` 键的要求互相矛盾；满足 421 后 344 KeyError；需 test-engineer 改 344 为 `.get` | OPEN |
+| CR-012 | MINOR | `client.py` `listen()` | 每次监听多一个轮询小线程（0.2 s 间隔，流结束即退出）；与 supervisor 既有 watcher 功能重叠，后续可合并 | OPEN |
+| CR-013 | MINOR | `runtime.py` ⑥ | 被白名单丢弃的键名未写审计（指令“可记入”）；如需可观测，后续追加审计字段 | OPEN |
+| CR-008 | MAJOR | `supervisor.stop` / `client.listen` | 线程残留问题已修复；真实传输下 `resp.close()` 打断阻塞读取未在真实 socket 上验证（见 A12） | FIXED（离线）；真实路径未验证 |
 
-### 统计（累计，含 3.1.0）
+五维（本轮改动范围）：正确性 9 / 安全 9 / 性能 8 / 可维护性 8 / 可测试性 8。
 
-CRITICAL 1（已修复 1）/ MAJOR 10（已修复 7，遗留 3：原遗留不变）/ MINOR 11（已修复 3，遗留 8）。算术：MAJOR 7+3(CR-018/020/021)=10，已修复 4+3=7，遗留 10-7=3；MINOR 9+2(CR-019/022)=11，已修复 2+1(CR-019)=3，遗留 11-3=8。五维评分：受影响 MOD 评分不变。
+### 自验证结果（本轮）
 
-### 自验证（3.1.0）
-
-- `python -m compileall -q src`：通过。
-- `pytest tests -q`（离线环境变量同 CI）：**2 failed, 1350 passed**；失败：TC-INT-R28-418[intent]（DEF-003，预期）、TC-INT-R28-344（CR-022，新增，测试间矛盾）。
-- `python src/scripts/selfcheck.py`：68/69，仅 `core_framework_free`（既有，sitecustomize）失败。
-- 前端：未改动，未运行。
+- `$P -m compileall -q src` → 无输出，通过。
+- `$P -m pytest tests -q -p no:cacheprovider` → `7 failed, 1707 passed, 6 skipped in 85.61s`；7 个失败**恰为**上述预期翻转的缺陷冻结用例（列表见 implementation_plan“预期翻转的缺陷冻结用例”），基线 1714 passed = 1707 + 7；无其他新增失败。
+- `$P src/scripts/selfcheck.py` → `自检结果：76/77 通过`；唯一失败 `core_framework_free`（既有，`sitecustomize`），8 个 mcp_* 守卫均 PASS。
+- `(cd src/frontend && npm test)` → `# tests 180 / # pass 180 / # fail 0`（前端未改，仅确认）。
+- 未验证：真实 socket 上监听流被关闭后的读取行为；真实 MCP Server 互通。
 
 ### 现有测试调整
 
-无（本轮未改任何测试）。
+无（本轮未改任何测试文件；7 个冻结用例交 test-engineer 翻转）。
+
+## 缺陷修复轮 2（GR-D-002，缺陷回流第 2 轮；文档 2.1.0 DRAFT）
+
+### 缺陷修复（DEF-ID → 修改位置 → 根因）
+
+| DEF | 修改位置 | 根因 | 修改说明 |
+|---|---|---|---|
+| DEF-R29-007 | `src/ib/mcp/transport.py` `_chunks`（原 :129） | `HTTPResponse.read(N)` 在真实 socket 上循环读到凑满 N 字节或 EOF，约 70 字节的 list_changed 事件滞留；离线替身整块投递掩盖了问题 | 改为 `read1(_BLOCK)`（一次底层读取，有多少返回多少；chunked 返回当前块内已到达的部分）；`settimeout` 改用留底的 `sock`，期限语义不变，`socket.timeout`→`timeout`、其余→`unreachable` 的映射保留 |
+| DEF-R29-006 | `src/ib/mcp/transport.py` `post`（原 :139 `close=conn.close`） | close-delimited 响应时 `getresponse()` 已把 `conn.sock` 置 None 并把 fd 交给响应的 makefile，`conn.close()` 无事可做；chunked 时 fd 仍被 makefile 引用，close 不真正关 fd；二者都无法唤醒另一线程阻塞的 recv | 新 `_close()`：先对 `endheaders` 后留底的 `sock` 执行 `shutdown(SHUT_RDWR)`（忽略 OSError）唤醒读取，再 `resp.close()`、`conn.close()`（各自吞异常，幂等）。`_chunks` 的异常映射追加 `ValueError/AttributeError`：首次实现后实测关闭与读取线程存在竞态（`'NoneType' object has no attribute 'close'` 泄漏到 `listen` 的 errors），现统一映射为 `unreachable`，`listen` 在 stop 已置位时吞掉 |
+
+### 共享符号 / 调用方副作用评估（P-PM-001）
+
+`HttpMcpTransport.post` 的返回对象 `McpHttpResponse.chunks` / `.close` 被所有调用方共用。grep 结果（`src/ib/mcp`）：`client.py` 仅 5 处消费 `resp.chunks`（:140 错误体读取、:148 排空、:167 SSE 读取、:177 JSON 读取、:449 listen）与 2 处 `resp.close()`（`_exchange` 的 finally、`listen` 的 `_closer` 与 finally）；`supervisor.py` / `catalog.py` / `runtime.py` 不直接接触 chunks/close（均经 `McpClient`）；`double.py` 的替身自带 `chunks=iter(...)`、`close=lambda: None`，不经本文件。
+
+| 调用方 | read1 的影响 | shutdown/_close 的影响 |
+|---|---|---|
+| `_exchange` 错误体（:140）、排空（:148） | 块变小但累计到 `_ERR_BODY_MAX` 的逻辑按累计长度，无影响；排空仅取首块即 break，read1 更快返回 | 读取已完成后才 close；此时 fd 多已关闭，`shutdown` 抛 OSError 被忽略；`resp.close`/`conn.close` 幂等 |
+| `_read_outcome` JSON（:177）、SSE（:167） | 按块累计 `len(buf) > max_bytes`、`iter_sse_events` 逐块拼接，不依赖块大小；块更碎只多几次循环，内存上限不变 | 同上；SSE 读到匹配 id 即返回后 finally 关闭：shutdown 对仍存活的流会主动 RST/FIN 对端（此前依赖 conn.close，行为等价于提前断开，符合“读完即弃”） |
+| `listen`（:449） | 事件即时投递（修复目标） | stop 后 `_closer` 线程调用 `_close()`，监听线程在约 0.1 s 内因 EOF 正常结束或因竞态异常被映射为 `unreachable` 且被吞 |
+| `initialize / list_tools / call_tool / probe` | 均经 `_exchange`，同上 | 同上 |
+
+HTTPS：`ssl.SSLSocket.shutdown` 同样可用，OSError/SSLError 均被忽略；本轮仅回环明文验证，HTTPS 路径**未验证**。
+
+自验证期间既有传输契约测试 `tests/integration/test_mcp_http_transport_r29.py` 全部通过（与 realsocket 文件同批连跑 3 次：`4 failed, 20 passed`，4 个失败恰为冻结用例）。
+
+### 新问题自评审
+
+| CR | 级别 | 位置 | 描述 | 状态 |
+|---|---|---|---|---|
+| CR-014 | MINOR | `transport.py` `_chunks` | 关闭/读取竞态靠捕获 `AttributeError`/`ValueError` 兜底，而非加锁；语义安全（stop 已置位时被吞，否则映射 `unreachable`）但略显粗；后续可在 `_close` 与读取间加显式状态位 | OPEN |
+| CR-008 | MAJOR | `supervisor.stop` / `client.listen` | 真实 socket（回环明文）上 stop 后线程约 0.1 s 退出，客户端断开已由服务端观察到；HTTPS 路径未验证 | FIXED（回环明文）；HTTPS 未验证 |
+
+五维（本轮改动范围）：正确性 9 / 安全 9 / 性能 9 / 可维护性 8 / 可测试性 8。
+
+### 自验证结果（本轮）
+
+- `$P -m compileall -q src` → 无输出（exit 0）。
+- scratchpad 复现脚本（不入库）：stop 后线程 alive=False、服务端 client_gone=True、errors=[]（close-delimited 与 chunked，重复 5 轮）；list_changed 在流仍开着 1 s 内 `changed == [1]`。
+- `$P -m pytest tests -q -p no:cacheprovider` → `4 failed, 1714 passed, 6 skipped in 92.01s`；4 个失败恰为 `test_mcp_listen_realsocket_r29.py` 的 720/721 × (close-delimited, chunked) 冻结守卫串（预期翻转）；基线 1718 passed = 1714 + 4；无其他新增失败。
+- `$P -m pytest tests/integration/test_mcp_listen_realsocket_r29.py tests/integration/test_mcp_http_transport_r29.py -q` 连跑 3 次 → 每次 `4 failed, 20 passed`（稳定，失败项同上）。
+- `$P src/scripts/selfcheck.py` → `自检结果：76/77 通过`；唯一失败 `core_framework_free`（既有，`sitecustomize`）。
+- 前端未改，未重跑（沿用 180/180）。
+- 未验证：HTTPS 路径的 shutdown/read1；真实 MCP Server 互通。
+
+### 现有测试调整
+
+无（本轮未改任何测试文件；720/721 的 4 个收集项交 test-engineer 翻转为期望口径）。
+
+## 缺陷回流第 3 轮（DEF-R29-008、B30；文档 3.1.0 DRAFT）
+
+### 缺陷修复（DEF-ID → 修改位置 → 根因）
+
+| DEF | 修改位置 | 根因 | 修改说明 |
+|---|---|---|---|
+| DEF-R29-008 | `src/ibweb/composition.py` `_assemble` 末尾（原 :1631-1633）；`build_application`；新增 `start_mcp_supervisor` | `_assemble` 是 ib-web 与 ib-worker 共用的装配体（worker.py `_setup_django` → `django.setup` → `apps.ready` → `build_deps`），把“启动后台线程”这一进程级副作用放在共用装配体内，违反“supervisor 仅在 ib-web 进程内”（module_design.md:866） | 启动点移到仅 ib-web 经过的 `build_application`（wsgi.py 调用）；`_assemble` 不再启动；`close()` 的停止逻辑不变 |
+| （交付物，CP-002 Q5=A / GR-E1-001-F02） | `src/deploy/checklists.txt` `[B30]` | 清单与 SKILL.md §5.2 / deployment_plan 不一致：前端写 `npm ci && npm run build`；env 读取缺 `sudo`；venv 命令未写绝对路径 | 见 implementation_plan 第 3 轮 G4；[B30] 以外未动；无凭据 |
+
+### 本轮五维与问题
+
+| 维度 | Correctness | Security | Performance | Maintainability | Testability |
+|---|---|---|---|---|---|
+| 评分 | 9/10 | 9/10 | 10/10 | 9/10 | 8/10 |
+
+五维平均 = (9+9+10+9+8)/5 = 9.0。
+
+| CR | 级别 | 位置 | 描述 | 状态 |
+|---|---|---|---|---|
+| CR-015 | MINOR | `composition.py` `build_application` | `manage.py runserver` 不再（亦不应）启动 supervisor，开发联调需经 wsgi 路径；已在计划 A14 登记取舍 | OPEN |
+| CR-016 | MINOR | tests（未改） | worker 不启动 / web 启动的成对用例尚缺，交 test-engineer；当前仅有一次性命令演示 | OPEN |
+
+统计（本轮新增）：CRITICAL 0（已修复 0）/ MAJOR 0 / MINOR 2。DEF-R29-008（MAJOR）本身 FIXED。全文累计 MAJOR 遗留数不因本轮增加（CR-001/003/009 等沿用既有逐条原因，见“遗留 MAJOR”）。
+
+### 自验证结果（本轮，gate_mode=baseline）
+
+- `/root/.venvs/intelligentbase/bin/python -m compileall -q src` → 无输出（exit 0）。
+- 一次性演示（scratchpad 脚本，不入库；非离线真实装配 + 持久化 SQLite 台账）：
+  ```
+  supervisor object present: True
+  [worker path] threads after build_deps: []
+  [web path] threads after build_application: ['ib-mcp-supervisor']
+  [idempotent] threads: ['ib-mcp-supervisor']
+  [after close] threads: []
+  ```
+- `$P -m pytest tests -q -p no:cacheprovider` → `1718 passed, 6 skipped in 91.03s`（与基线一致，零新增失败；6 skip = Fernet 契约，cryptography 未装）。
+- `$P src/scripts/selfcheck.py` → `自检结果：76/77 通过`；唯一失败 `core_framework_free`（既有，`sitecustomize`）。
+- 前端未改，未重跑（沿用 180/180）。
+- 未验证：目标机真实进程（ib-web / ib-worker）线程情况；`checklists.txt` 仅文本改动，已由全量 pytest/selfcheck（含 `deploy_templates_have_no_secrets`）通过。
+
+### 现有测试调整
+
+无（本轮未改任何测试文件）。

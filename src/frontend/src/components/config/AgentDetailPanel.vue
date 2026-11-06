@@ -17,6 +17,8 @@ import {
   setEdgeBranchKey,
 } from './graphModel';
 import { DEFAULT_EXPERT_HINT } from './nodeRemoval'; // MOD-R27-05
+import { greyHint, groupByServer, invalidBadges, isGreyed, limitSpecs, toggleExternalGrant, toolTitle } from '../../utils/externalGrants'; // MOD-R29-23
+import { invalidReasonLabel, riskLabel, WAIVER_HINT } from '../../utils/mcpLabels';
 
 const props = defineProps<{
   client: ApiClient;
@@ -122,6 +124,12 @@ function toggleTool(tool: string, on: boolean): void {
   if (!on) g.param_values = (g.param_values ?? []).filter((p) => !p.name.startsWith(`${tool}.`));
   emit('change', copy);
 }
+// ---- REV-29（MOD-R29-23）：外部工具分组 ----
+const externalGroups = computed(() => groupByServer(props.catalog?.external_tools ?? []));
+const staleBadges = computed(() => invalidBadges(expert()?.name ?? '', props.catalog?.mcp?.grant_status, invalidReasonLabel));
+function onToggleExternal(tool: string, on: boolean): void {
+  emit('change', toggleExternalGrant(props.doc, props.node?.expert ?? props.node?.id ?? '', tool, on));
+}
 function paramsFor(tool: string) {
   return (props.catalog?.tool_param_specs ?? []).filter((s) => s.name.startsWith(`${tool}.`));
 }
@@ -210,6 +218,32 @@ function onPrompt(layer: 'main' | 'fallback', text: string): void {
                 <span v-if="t.startsWith('web_') && catalog?.web?.caps" class="hint">全局上限：每回合 {{ catalog.web.caps.max_calls_per_turn }} 次 / {{ catalog.web.caps.max_fetch_bytes_per_turn }} 字节 / {{ catalog.web.caps.max_seconds_per_turn }} 秒（运行期取较小值）</span>
               </div>
             </div>
+          </div>
+        </el-form-item>
+        <!-- REV-29：外部工具（无可见外部工具且无失效授权时不渲染，与基线页面一致） -->
+        <el-form-item v-if="externalGroups.length || staleBadges.length" label="外部工具">
+          <div class="tools external-tools">
+            <div v-for="b in staleBadges" :key="b.local_name" class="ext-stale">
+              <el-tag type="warning" size="small">失效：{{ b.label }}</el-tag>
+              <span class="hint">{{ b.local_name }}（保存时存量失效授权会保留；可取消勾选移除）</span>
+              <el-button v-if="!readonly" size="small" link type="danger" @click="onToggleExternal(b.local_name, false)">移除授权</el-button>
+            </div>
+            <div v-for="g in externalGroups" :key="g.server_id" class="ext-group">
+              <h6>{{ g.server_id }}</h6>
+              <div v-for="t in g.tools" :key="t.local_name">
+                <el-checkbox :model-value="hasTool(t.local_name)" :disabled="readonly || isGreyed(t, hasTool(t.local_name))" @change="(v: boolean) => onToggleExternal(t.local_name, v)">{{ toolTitle(t) }}</el-checkbox>
+                <el-tag size="small" :type="t.risk === 'read_only' ? 'success' : 'warning'">{{ riskLabel(t.risk) }}</el-tag>
+                <span v-if="isGreyed(t, hasTool(t.local_name))" class="hint">{{ greyHint(t, riskLabel, WAIVER_HINT) }}</span>
+                <div v-if="hasTool(t.local_name)" class="params">
+                  <label v-for="s in limitSpecs(t)" :key="s.name">
+                    {{ s.name.split('.').pop() }}
+                    <el-input :model-value="paramValue(s.name)" size="small" :disabled="readonly" :placeholder="`默认 ${s.default}，范围 ${s.minimum}~${s.maximum}`" @change="(v: string) => setParam(s.name, v)" />
+                  </label>
+                  <span v-if="t.risk !== 'read_only'" class="hint">该工具有副作用或风险未知：已由管理员放行，使用时请留意</span>
+                </div>
+              </div>
+            </div>
+            <span v-if="catalog?.mcp?.caps" class="hint">全局上限：每回合 {{ catalog.mcp.caps.max_calls_per_turn }} 次 / 单次超时 {{ catalog.mcp.caps.call_timeout_s }} 秒（运行期取较小值）；外部工具返回内容仅作只读参考</span>
           </div>
         </el-form-item>
         <el-form-item label="知识范围">
