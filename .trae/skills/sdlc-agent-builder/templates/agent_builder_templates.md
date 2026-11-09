@@ -2,7 +2,9 @@
 
 > **TRAE 移植说明**：本文件是 `.claude/agents/templates/agent_builder_templates.md` 的只读副本。
 > 其中 T1–T4 面向 **Claude Code** 目标；生成 **TRAE** 目标时改用
-> `sdlc-agent-builder/SKILL.md` §9「Trae 目标形态」与共享协议 §N-6。
+> `sdlc-agent-builder/SKILL.md` §9「Trae 目标形态」与共享协议 §T-6。
+> T3A 等章节中的 `.claude/agent-memory/`、「自动注入」描述的是 **Claude 目标**；
+> Trae 目标的记忆模块改为「第 1 步显式 Read `.trae/sdlc/agent-memory/{agent}/MEMORY.md`」（共享协议 §T-3）。
 > 本副本不修改 `.claude/**`。
 
 > 生成或优化 agent 时，agent-builder 按"目标画像"从这里取模板。套件成员（SUITE）只用 T4 + T5；
@@ -140,7 +142,7 @@ memory: project   # 需要跨调用经验时（可选 user / project / local）
 # {角色} — {GROUP/PHASE}
 
 ## 1. 开始前必读（在 <notes> 中列出已读文件）
-1. `.claude/agents/shared_protocol.md` 的 §A、§B、§E、§L、§M 及本组 §J
+1. `.claude/agents/shared_protocol.md` 的 §A、§B、§E、§L、§M、§N 及本组 §J（§N：涉及画像 P11 领域事实时的出处规则）
 2. `.claude/agents/project_profile.md`（画像）
 3. `.claude/agents/knowledge_base/generic/{name}.md`
 4. invocation 中的 input_files
